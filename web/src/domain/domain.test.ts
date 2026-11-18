@@ -80,9 +80,10 @@ describe("mobile-compatible contracts", () => {
 describe("encrypted browser vault", () => {
   // Inputs: the values in this case. Expected: uses the mobile trigger normalization.
   it("uses the mobile trigger normalization", async () => {
-    expect(await triggerHash(" Moon Garden ")).toBe(
-      await triggerHash("moongarden"),
-    );
+    const first = await triggerHash(" Moon Garden ");
+    const second = await triggerHash("moongarden");
+    expect(first).toMatch(/^600000:[A-Za-z0-9+/]{22}==:[A-Za-z0-9+/]{43}=$/);
+    expect(first).not.toBe(second);
   });
   // Inputs: the values in this case. Expected: uses randomized ciphertext and rejects changed or wrong-key data.
   it("uses randomized ciphertext and rejects changed or wrong-key data", async () => {

@@ -43,32 +43,42 @@ class SecurityPolicyTest {
         assertEquals(GateState(1), GateState().failed())
     }
 
-    // Inputs: the values shown below. Expected: idle warning starts after one minute and locks after fifteen more seconds.
     @Test
-    fun idleWarningStartsAfterOneMinuteAndLocksAfterFifteenMoreSeconds() {
-        assertNull(IdlePolicy.countdown(59_999))
-        assertEquals(15, IdlePolicy.countdown(60_000))
-        assertEquals(1, IdlePolicy.countdown(74_999))
-        assertEquals(0, IdlePolicy.countdown(75_000))
+    fun idleWarningRunsBeforeTheOneMinuteTimeout() {
+        assertNull(IdlePolicy.countdown(44_999))
+        assertEquals(15, IdlePolicy.countdown(45_000))
+        assertEquals(1, IdlePolicy.countdown(59_999))
+        assertEquals(0, IdlePolicy.countdown(60_000))
     }
 
-    // Inputs: the values shown below. Expected: accessibility can extend the warning but cannot shorten the privacy default.
     @Test
-    fun accessibilityCanExtendTheWarningButCannotShortenThePrivacyDefault() {
-        assertNull(IdlePolicy.countdown(59_999, 60_000))
-        assertEquals(60, IdlePolicy.countdown(60_000, 60_000))
-        assertEquals(45, IdlePolicy.countdown(75_000, 60_000))
-        assertEquals(0, IdlePolicy.countdown(120_000, 60_000))
-        assertEquals(15, IdlePolicy.countdown(60_000, 0))
-        assertEquals(0, IdlePolicy.countdown(75_000, 0))
+    fun accessibilityCanStartTheWarningEarlierWithoutDelayingLock() {
+        assertNull(IdlePolicy.countdown(59_999, 60_000, 120_000))
+        assertEquals(60, IdlePolicy.countdown(60_000, 60_000, 120_000))
+        assertEquals(45, IdlePolicy.countdown(75_000, 60_000, 120_000))
+        assertEquals(0, IdlePolicy.countdown(120_000, 60_000, 120_000))
+        assertEquals(15, IdlePolicy.countdown(45_000, 0))
+        assertEquals(0, IdlePolicy.countdown(60_000, 0))
+    }
+
+    @Test
+    fun idleTimeoutCapsAtSevenMinutes() {
+        assertEquals(420, IdlePolicy.normalizeTimeout(Int.MAX_VALUE))
+        assertEquals(420, IdlePolicy.normalizeTimeout(449))
+        assertNull(IdlePolicy.countdown(404_999, idleDurationMs = 420_000))
+        assertEquals(15, IdlePolicy.countdown(405_000, idleDurationMs = 420_000))
+        assertEquals(1, IdlePolicy.countdown(419_999, idleDurationMs = 420_000))
+        assertEquals(0, IdlePolicy.countdown(420_000, Long.MAX_VALUE, Long.MAX_VALUE))
     }
 
     // Inputs: the values shown below. Expected: trigger requires exact normalized match.
     @Test
     fun triggerRequiresExactNormalizedMatch() {
-        assertEquals(InputPolicy.triggerHash("  MY WORD  "), InputPolicy.triggerHash("my word"))
-        assertEquals(InputPolicy.triggerHash("  He L P  "), InputPolicy.triggerHash("help"))
-        assertNotEquals(InputPolicy.triggerHash("my word"), InputPolicy.triggerHash("my words"))
+        val verifier = InputPolicy.triggerHash("  MY WORD  ")
+        assertTrue(InputPolicy.matchesTrigger("myword", verifier))
+        assertFalse(InputPolicy.matchesTrigger("my words", verifier))
+        assertNotEquals(verifier, InputPolicy.triggerHash("myword"))
+        assertTrue(InputPolicy.matchesTrigger("MY WORD", InputPolicy.legacyTriggerHash("my word")))
     }
 
     // Inputs: the values shown below. Expected: credentials and birth dates are validated.
@@ -147,7 +157,7 @@ class SecurityPolicyTest {
     fun idlePolicyHandlesNegativeAndVeryLargeDurations() {
         assertNull(IdlePolicy.countdown(-1L))
         assertNull(IdlePolicy.countdown(0L, Long.MIN_VALUE))
-        assertEquals(15, IdlePolicy.countdown(60_000L, -1L))
+        assertEquals(15, IdlePolicy.countdown(45_000L, -1L))
         assertEquals(0, IdlePolicy.countdown(Long.MAX_VALUE, Long.MAX_VALUE))
     }
 

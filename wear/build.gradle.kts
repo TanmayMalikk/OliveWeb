@@ -26,6 +26,8 @@ android {
     }
 
     buildTypes {
+        getByName("debug") { enableUnitTestCoverage = true
+            enableAndroidTestCoverage = providers.gradleProperty("oliveDeviceCoverage").orNull.equals("true", ignoreCase = true) }
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
         }
@@ -33,6 +35,7 @@ android {
 
     defaultConfig {
         applicationId = "com.olive.app"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 30
         targetSdk = 37
         versionCode = providers.environmentVariable("OLIVE_WEAR_VERSION_CODE").orNull?.toIntOrNull() ?: 2
@@ -59,6 +62,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.health:health-services-client:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.wear.tiles:tiles:1.6.2")
     implementation("androidx.wear.protolayout:protolayout:1.4.2")
     implementation("androidx.wear.protolayout:protolayout-material3:1.4.2")
@@ -67,7 +71,13 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.wear.protolayout:protolayout-proto:1.4.2")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }
+
+apply(from = rootProject.file("gradle/device-coverage.gradle.kts"))

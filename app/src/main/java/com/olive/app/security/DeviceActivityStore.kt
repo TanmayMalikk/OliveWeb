@@ -32,7 +32,6 @@ import androidx.lifecycle.Lifecycle
 import com.olive.app.R
 import com.olive.app.data.account.HistoryRecord
 import com.olive.app.data.account.PrivateEntry
-import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.trashExpired
@@ -111,14 +110,14 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
                 val entry = PrivateEntry.fromJson(entries.getJSONObject(index))
                 // Permanently delete trashed entries only after their recovery timer ends.
                 if (entry.purgedAt == null && entry.trashExpired(now)) {
-                    val tombstone = entry.copy(
+                    val tombstone = PrivateEntry(
+                        id = entry.id,
+                        timestamp = entry.timestamp,
                         updatedAt = now,
-                        kind = PrivateEntryKind.Note,
                         title = "",
                         body = "",
-                        pinned = false,
-                        edits = emptyList(),
-                        purgedAt = now
+                        deletedAt = entry.deletedAt,
+                        purgedAt = now,
                     )
                     entries.put(index, tombstone.toJson())
                     root.child("historySynced").child(uid).put("private_entries/${entry.id}", false)

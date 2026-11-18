@@ -15,7 +15,9 @@
     <string name="you">أنت</string>
     <string name="your_saved_location">موقعك المحفوظ</string>
     <string name="share_live_location_with">مشاركة الموقع المباشر مع</string>
-    <string name="location_contacts_selected">تم اختيار %1$d من 10 جهات اتصال</string>
+    <string name="location_contacts_selected">الأصدقاء المحددون: %1$d</string>
+    <string name="location_search_friends">البحث عن الأصدقاء</string>
+    <string name="location_no_matching_friends">لا يوجد أصدقاء يطابقون بحثك.</string>
     <string name="location_no_friends">أضف صديقًا واقبل طلبه قبل مشاركة الموقع.</string>
     <string name="start_sharing_location">بدء مشاركة الموقع المباشر</string>
     <string name="stop_sharing_location">إيقاف المشاركة</string>

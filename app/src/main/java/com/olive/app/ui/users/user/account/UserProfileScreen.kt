@@ -14,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -283,12 +284,13 @@ internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) 
                 )
             }
         }
-        rows
-            .forEach { (label, value) ->
-                Text(label, style = MaterialTheme.typography.labelLarge, color = OliveGreen)
-                if (value.isBlank()) Text(stringResource(R.string.not_provided))
-                else if (label == uiText(R.string.preferred_language)) Text(value)
-                else Text(value)
+        rows.forEach { (label, value) ->
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = OliveGreen)
+                    Text(value.ifBlank { stringResource(R.string.not_provided) }, style = MaterialTheme.typography.bodyLarge)
+                }
             }
+        }
     }
 }

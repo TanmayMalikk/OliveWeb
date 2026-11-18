@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_barcode">Barcode</string>
+    <string name="nutrition_all_foods">All foods</string>
+    <string name="nutrition_generic">Generic</string>
+    <string name="nutrition_branded">Branded</string>
+    <string name="nutrition_more">Load more foods</string>
+    <string name="nutrition_ip_approval">FatSecret needs server IP approval. Other available food sources still work.</string>
+    <string name="nutrition_manual">Enter food manually</string>
+    <string name="nutrition_label_basis">Enter the values for one label serving, then choose how much you ate. Calories, protein, carbs and fat are required; enter 0 when the label says zero. Other nutrients are optional.</string>
+    <string name="nutrition_scan_label">Read label photo</string>
+    <string name="nutrition_scan_failed">Could not read the nutrition values. Enter them manually or try a clearer photo.</string>
+    <string name="nutrition_scan_review">Check every scanned value and the serving size against the label before continuing.</string>
+    <string name="nutrition_food_name">Food name</string>
+    <string name="nutrition_serving_basis">Serving size (e.g. 1 bar, 40 g or 100 g)</string>
+    <string name="nutrition_more_nutrients">More nutrients (optional)</string>
+    <string name="nutrition_fewer_nutrients">Fewer nutrients</string>
+    <string name="nutrition_choose_portion">Choose portion</string>
+</resources>

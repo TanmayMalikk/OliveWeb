@@ -25,6 +25,7 @@ import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import java.io.File
@@ -32,6 +33,113 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    @Test
+    fun notesBoardSortsAndFiltersEntries() {
+        val session = setup()
+        val note = "Earlier sample note"
+        val incident = "Later sample incident"
+        click("safe_notes")
+        compose.runOnIdle {
+            session.savePrivateEntry(null, PrivateEntryKind.Note, note, "Synthetic note", "", "", "")
+        }
+        compose.waitUntil(10_000) { !session.busy && session.privateEntries.any { it.title == note } }
+        compose.runOnIdle {
+            session.savePrivateEntry(
+                null, PrivateEntryKind.Incident, incident, "Synthetic incident", "2026-11-01", "", "Edmonton"
+            )
+        }
+        compose.waitUntil(10_000) { !session.busy && session.privateEntries.any { it.title == incident } }
+        fun precedes(first: String, second: String): Boolean {
+            val a = compose.onNodeWithText(first).getUnclippedBoundsInRoot()
+            val b = compose.onNodeWithText(second).getUnclippedBoundsInRoot()
+            return a.top < b.top || (a.top == b.top && a.left < b.left)
+        }
+        assertTrue(precedes(incident, note))
+        click("private_sort")
+        click("private_sort_oldest")
+        compose.waitUntil(4_000) { precedes(note, incident) }
+        click("private_filter_note")
+        compose.onNodeWithText(note).assertExists()
+        compose.onNodeWithText(incident).assertDoesNotExist()
+        click("private_filter_incident")
+        compose.onNodeWithText(incident).assertExists()
+        compose.onNodeWithText(note).assertDoesNotExist()
+        fill("private_notes_search", "missing fixture")
+        compose.onNodeWithText("No notes or incidents match.").assertExists()
+    }
+
+    @Test
+    fun idleLockSliderSavesRecommendedAndMaximumDelays() {
+        val session = setup()
+        click("safe_settings")
+        fill("settings_full_name", "Unsaved test name")
+        click("settings_tab_privacy")
+        compose.onNodeWithTag("settings_tab_privacy").assertIsSelected()
+        compose.onNodeWithTag("settings_full_name").assertDoesNotExist()
+        val slider = compose.onNodeWithTag("idle_timeout").performScrollTo()
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(1f) }
+        compose.runOnIdle { assertEquals(120, session.idleTimeoutSeconds()) }
+        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "2 min (Recommended)"))
+        compose.onNode(hasScrollAction() and hasAnyDescendant(hasTestTag("idle_timeout")))
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 300f) }
+        slider.performTouchInput { swipe(centerLeft.copy(x = width / 7f), centerRight) }
+        compose.runOnIdle { assertEquals(420, session.idleTimeoutSeconds()) }
+        click("settings_tab_profile")
+        compose.onNodeWithTag("settings_full_name").assertTextContains("Unsaved test name")
+        compose.runOnIdle { session.navigation.back() }
+        waitFor("safe_settings")
+        click("safe_settings")
+        click("settings_tab_privacy")
+        compose.onNodeWithTag("idle_timeout").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "7 min")
+        )
+    }
+
+    @Test
+    fun incidentCalendarAndClockSaveTheSelectedValues() {
+        val session = setup()
+        click("safe_notes")
+        click("new_private_entry")
+        click("private_kind_incident")
+        fill("private_entry_title", "Test incident")
+        fill("private_entry_body", "Synthetic test details")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        click("incident_date")
+        compose.onNodeWithTag("incident_calendar").assertIsDisplayed()
+        click("incident_date_apply")
+        click("incident_time")
+        compose.onNodeWithTag("incident_clock").assertIsDisplayed()
+        click("incident_time_apply")
+        fill("incident_location", "Edmonton")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        click("save_private_entry")
+        compose.waitUntil(15_000) { session.privateEntries.any { it.title == "Test incident" } }
+        compose.runOnIdle {
+            val entry = session.privateEntries.single { it.title == "Test incident" }
+            assertEquals(java.time.LocalDate.now(), java.time.LocalDate.parse(entry.incidentDate))
+            assertTrue(entry.incidentTime.matches(Regex("[0-9]{2}:[0-9]{2}")))
+        }
+    }
+
+    @Test
+    fun safeHomeKeepsNavigationAndQuickExitAvailableWhenScrolled() {
+        val session = setup()
+        val home = compose.onNodeWithTag("safe_home_content")
+        home.performScrollToNode(hasTestTag("safe_notes"))
+        compose.onNodeWithTag("safe_notes").assertIsDisplayed()
+        home.performScrollToNode(hasTestTag("safe_documents"))
+        compose.onNodeWithTag("safe_documents").assertIsDisplayed()
+        compose.onNodeWithTag("safe_settings").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(SafePage.Settings, session.page) }
+        compose.runOnIdle { session.navigation.back() }
+        waitFor("safe_settings")
+        home.performScrollToNode(hasTestTag("sign_out"))
+        compose.onNodeWithTag("sign_out").assertIsDisplayed()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().performClick()
+        waitCover()
+        home.assertDoesNotExist()
+    }
+
     // Checks the support overlay uses the shared talk back traversal order step with the test's sample data.
     @Test
     fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {
@@ -117,8 +225,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
         toggle()
-        listOf("support_walkthrough", "support_emergency")
-            .forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
+        compose.onNodeWithTag("support_walkthrough").assertIsNotEnabled()
+        compose.onNodeWithTag("support_emergency").assertIsEnabled()
         compose.onNodeWithTag("support_staff_help").assertIsEnabled()
         compose.onNodeWithTag("support_hotlines").assertIsEnabled()
         compose.onNodeWithTag("support_contacts").assertIsEnabled()
@@ -158,8 +266,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 .isNotEmpty()
         }
         compose.onNodeWithTag("hotline_city").assertDoesNotExist()
-        compose.onNodeWithTag("hotline_location_summary")
-            .assertTextContains("Edmonton", substring = true)
+        compose.onNodeWithTag("hotline_region")
+            .assertTextContains(compose.activity.getString(R.string.support_region_ab))
         compose.onNodeWithTag("hotline_page")
             .performScrollToNode(hasText("Family Violence Info Line"))
         compose.onNodeWithText("Family Violence Info Line").assertIsDisplayed()
@@ -167,8 +275,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("hotline_page").performScrollToNode(hasTestTag("hotline_region"))
         compose.onNodeWithTag("hotline_region").performClick()
         compose.onNodeWithTag("hotline_region_ON").performScrollTo().performClick()
-        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-7867"))
-        compose.onNodeWithText("1-866-863-7867").assertExists()
+        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-0511"))
+        compose.onNodeWithText("1-866-863-0511").assertExists()
         compose.onNodeWithTag("hotline_page").performScrollToNode(hasTestTag("hotline_search"))
         fill("hotline_search", "no-such-provider")
         compose.onNodeWithTag("hotline_page")
@@ -208,14 +316,13 @@ class SafeSupportUiTest : OliveUiTestBase() {
         waitFor("hotline_use_device_location")
         compose.onNodeWithTag("hotline_use_device_location").performScrollTo().performClick()
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("hotline_location_summary").fetchSemanticsNodes()
-                .any {
-                    it.config.getOrElse(SemanticsProperties.Text) { emptyList() }
-                        .any { text -> text.text.contains("Toronto") }
-                }
+            runCatching {
+                compose.onNodeWithTag("hotline_region")
+                    .assertTextContains(compose.activity.getString(R.string.support_region_on))
+            }.isSuccess
         }
-        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-7867"))
-        compose.onNodeWithText("1-866-863-7867").assertExists()
+        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-0511"))
+        compose.onNodeWithText("1-866-863-0511").assertExists()
         compose.runOnIdle {
             assertEquals(
                 "Edmonton",
@@ -297,13 +404,17 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 )
             )
             compose.onNodeWithTag("safe_settings").assertDoesNotExist()
-            compose.onNodeWithTag("support_emergency").assertIsNotEnabled()
+            compose.onNodeWithTag("support_emergency").assertIsEnabled()
             activate("support_hotlines")
             waitFor("hotline_page")
             activate("support_menu_toggle")
             activate("quick_exit")
             waitCover()
-            compose.onNodeWithContentDescription("Returned to Olive")
+            val returnedToCover = compose.activity.getString(
+                R.string.a11y_returned_to_cover,
+                session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
+            )
+            compose.onNodeWithContentDescription(returnedToCover)
                 .assert(
                     SemanticsMatcher.expectValue(
                         SemanticsProperties.LiveRegion,
@@ -312,7 +423,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 )
             assertTrue(
                 "Quick-exit status must not move TalkBack focus",
-                talkBack.focused.none { it.contains("Returned to Olive") })
+                talkBack.focused.none { it.contains(returnedToCover) })
             assertNull(session.profile)
             compose.onNodeWithTag("hotline_page").assertDoesNotExist()
         }

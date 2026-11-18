@@ -1,15 +1,27 @@
 # Project structure
 
-Document the folders developers should know about. A short description is usually more useful than listing every file.
-
 ## Top-level folders
 
-| Path                                    | Purpose                          |
-| --------------------------------------- | -------------------------------- |
-| `app/kotlin_java/olive.app/`            | Application source code          |
-| `app/kotlin+java/com.olive.app (test)/` | Automated tests                  |
-| `docs/`                                 | Developer and user documentation |
-| `public/`                               | Static files served directly     |
+| Path | Purpose |
+| --- | --- |
+| `app/src/main/java/com/olive/app/ui/users/` | Android screens grouped by account role and feature |
+| `app/src/main/java/com/olive/app/ui/session/` | Android session state and feature controllers |
+| `app/src/main/java/com/olive/app/data/` | Android repositories, workers, and persisted models |
+| `app/src/test/`, `app/src/androidTest/` | Android unit and device tests |
+| `wear/` | Wear OS companion app |
+| `web/src/` | Browser app, including role-specific screens and shared services |
+| `functions/src/`, `firebase/` | Backend functions and Firebase authorization rules and tests |
+| `ppocr-sdk/` | On-device document OCR library |
+| `docs/` | Testing and distribution documentation |
+
+Android screens render session state and send actions to feature controllers through the view model.
+The session owns the mutable state for navigation, accounts, activity, messaging, and dashboards.
+Navigation, the messaging list, and the admin dashboard collect read-only state flows. Repositories
+own Firebase calls and validate data before it reaches the UI.
+
+The source tree includes three client applications, their shared Firebase backend, and an OCR library.
+Each target has its own build and tests. Run `checkArchitecture` from the repository root to verify
+Android package layout, source size, and UI dependency boundaries.
 
 
 ### Naming conventions

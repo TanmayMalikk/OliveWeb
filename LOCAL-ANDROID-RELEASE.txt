@@ -1,6 +1,6 @@
 & {
-    $version = 'v1.3.0.17'
-    $releaseNotes = @('Test Local APK Build')
+    $version = 'v2.0.0.18'
+    $releaseNotes = @('Web Redesign')
     $mandatory = $true
 
     Set-Location -LiteralPath 'C:/Users/Tanma/StudioProjects/F26_D1'

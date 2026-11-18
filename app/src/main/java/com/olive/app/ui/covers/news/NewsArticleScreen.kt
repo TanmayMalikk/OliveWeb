@@ -123,7 +123,7 @@ internal fun NewsArticleCard(
                 Surface(
                     color = PaleOlive,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(.7.dp, OliveGreen.copy(alpha = .3f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.weight(1f, fill = false).testTag("news_article_topic")
                 ) {
                     Text(
@@ -307,10 +307,6 @@ internal fun NewsArticleReader(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
                 .testTag("news_reader_host")
         )
-        if (progress < 100 && !failed) LinearProgressIndicator(
-            progress = { progress / 100f },
-            modifier = Modifier.fillMaxWidth()
-        )
         HorizontalDivider()
         Box(Modifier.weight(1f).fillMaxWidth()) {
             key(article.link) {
@@ -419,9 +415,9 @@ internal fun NewsArticleReader(
                         }
                     },
                     update = { view ->
-                        view.visibility = if (failed) View.INVISIBLE else View.VISIBLE
+                        view.visibility = if (failed || progress < 100) View.INVISIBLE else View.VISIBLE
                         view.importantForAccessibility =
-                            if (active && !failed) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                            if (active && !failed && progress >= 100) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
                             else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                     },
                     onRelease = { view ->
@@ -432,6 +428,9 @@ internal fun NewsArticleReader(
                         if (browser === view) browser = null
                     })
             }
+            if (progress < 100 && !failed) LoadingSkeleton(
+                SkeletonLayout.NewsArticle, Modifier.fillMaxWidth().padding(16.dp), rows = 1,
+            )
             if (failed) Column(
                 Modifier.fillMaxSize().background(Cream).padding(24.dp),
                 verticalArrangement = Arrangement.Center,

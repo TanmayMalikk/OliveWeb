@@ -59,6 +59,13 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
                 } else assertEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Cover, session.screen)
             }
         }
+        // Test stale callbacks after the lockout expires, keeping the lockout itself covered below.
+        val vault = EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext, "demo")
+        vault.update { root ->
+            val enrollment = root.child("enrollments").getJSONObject(root.getString("activeUid"))
+            assertTrue(enrollment.has("lockedUntil"))
+            enrollment.put("lockedUntil", System.currentTimeMillis() - 1)
+        }
         compose.runOnIdle {
             session.account.interceptSearch("moon garden")
             session.account.submitPin("739182", obsoleteChallenge)
@@ -85,9 +92,8 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         }
     }
 
-    // Checks the fifth failure allows immediate retry and legacy cooldown is ignored step with the test's sample data.
     @Test
-    fun fifthFailureAllowsImmediateRetryAndLegacyCooldownIsIgnored() {
+    fun fifthFailureBlocksEvenTheCorrectPinAcrossActivityRecreation() {
         register(username = "pin_attempt_tester")
         val session =
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
@@ -104,20 +110,17 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         }
         waitCover()
         compose.onNodeWithTag("safe_attempts").assertDoesNotExist()
-        trigger()
-        enterPin("999999")
-        compose.waitUntil(30_000) { !session.busy }
-        assertEquals("Incorrect PIN. 4 attempts remaining.", session.message)
-        compose.onNodeWithTag("quick_exit").performClick()
-        waitCover()
         compose.activityRule.scenario.recreate()
         waitCover()
-        // Simulate an upgrade from a version with an active cooldown.
+        trigger()
+        enterPin("123456")
+        waitCover()
         val vault =
             EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext, "demo")
         vault.update { root ->
-            root.child("enrollments").getJSONObject(root.getString("activeUid"))
-                .put("failures", 5).put("lockedUntil", System.currentTimeMillis() + 60_000L)
+            val enrollment = root.child("enrollments").getJSONObject(root.getString("activeUid"))
+            assertTrue(enrollment.getLong("lockedUntil") > System.currentTimeMillis())
+            enrollment.put("lockedUntil", System.currentTimeMillis() - 1)
         }
         unlock()
         click("safe_activity")
@@ -129,7 +132,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
                 .has("lockedUntil")
         )
         assertEquals(
-            6,
+            5,
             root.getJSONObject("attempts").getJSONArray(root.getString("activeUid")).length()
         )
         val bytes = File(
@@ -183,6 +186,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         register(username = "password_tester")
         unlock()
         click("safe_settings")
+        click("settings_tab_password")
         fill("current_password", "wrong-password")
         fill(
             "new_password",

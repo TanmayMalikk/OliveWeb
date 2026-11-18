@@ -44,4 +44,36 @@ class SafetyDocumentViewerUiTest {
             }
         ).assertExists()
     }
+
+    @Test
+    fun pdfSwipesAndArrowsChangePagesWithoutTreatingZoomedPansAsPageChanges() {
+        val file = File(compose.activity.cacheDir, "viewer-test.pdf")
+        val pdf = android.graphics.pdf.PdfDocument()
+        try {
+            repeat(3) { index ->
+                val page = pdf.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(300, 400, index + 1).create())
+                page.canvas.drawText("Test page ${index + 1}", 20f, 40f, android.graphics.Paint())
+                pdf.finishPage(page)
+            }
+            file.outputStream().use(pdf::writeTo)
+        } finally {
+            pdf.close()
+        }
+        val document = SafetyDocument("pdf-test", "owner", "path", "Sample.pdf", "application/pdf", listOf("owner"))
+        compose.activity.setContent { OliveTheme { SafetyDocumentViewer(document, file) {} } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("pdf_page_number").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("pdf_previous_page").assertIsNotEnabled()
+        compose.onNodeWithTag("pdf_page_content").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("pdf_page_number").assertTextEquals("Page 2 of 3")
+        compose.onNodeWithTag("pdf_next_page").performClick()
+        compose.onNodeWithTag("pdf_page_number").assertTextEquals("Page 3 of 3")
+        compose.onNodeWithTag("pdf_next_page").assertIsNotEnabled()
+        compose.onNodeWithTag("pdf_page_content").performTouchInput { swipeRight() }
+        compose.onNodeWithTag("pdf_page_number").assertTextEquals("Page 2 of 3")
+        compose.onNodeWithTag("media_zoom_in").performClick()
+        compose.onNodeWithTag("pdf_page_content").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("pdf_page_number").assertTextEquals("Page 2 of 3")
+        compose.onNodeWithTag("pdf_previous_page").performClick()
+        compose.onNodeWithTag("pdf_page_number").assertTextEquals("Page 1 of 3")
+    }
 }

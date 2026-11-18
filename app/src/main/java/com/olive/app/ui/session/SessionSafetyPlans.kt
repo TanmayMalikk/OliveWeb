@@ -1,6 +1,8 @@
 // Signed-in users: controls safety-plan access, editing, sharing, and sync.
 package com.olive.app.ui.session
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import com.olive.app.ui.users.shared.navigation.*
 import androidx.compose.runtime.*
 import com.google.firebase.firestore.ListenerRegistration
@@ -13,7 +15,6 @@ import kotlin.time.Duration.Companion.seconds
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.safety.SAFETY_FIELD_KEYS
 import com.olive.app.data.safety.SafetyAccessIndexStore
@@ -41,11 +42,14 @@ import android.os.SystemClock
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
-internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
+internal class SessionSafetyPlans(
+    private val runtime: SessionRuntime,
+    repositoryFactory: () -> SafetyPlanRepository = { SafetyPlanRepository() },
+) {
     private val safetyWriterId = UUID.randomUUID().toString()
     private val store = SafetyPlanStore(runtime.application, runtime.localMode)
     private val accessIndex = SafetyAccessIndexStore(runtime.application)
-    private val repository by lazy { SafetyPlanRepository() }
+    private val repository by lazy(repositoryFactory)
     private val writes = Mutex()
     private val sync = Mutex()
     private var activeOwner: String? = null
@@ -64,6 +68,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     var saving by mutableIntStateOf(0)
         private set
     var syncing by mutableStateOf(false)
+        private set
+    var loadingPlan by mutableStateOf(true)
+        private set
+    var loadingAccess by mutableStateOf(true)
         private set
     var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
         private set
@@ -130,11 +138,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         generation++
         activeOwner = null
         plan = null
+        loadingPlan = true
         error = null
         saving =
             0
         if (screenLease == null) {
+            loadingAccess = true
             consultations = emptyList()
+            sharedPlans = emptyList()
+            available = true
             accessListener?.remove()
             accessListener = null
             accessActor = null
@@ -157,6 +169,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         activeOwner = ownerUid
         plan = null
+        loadingPlan = true
         error = null
         saving = 0
         // Use the fallback when open is unavailable.
@@ -192,6 +205,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                             }
                             if (current(actor, ownerUid, token)) {
                                 plan = mergeVisibleSafetyPlan(plan, updated, actor)
+                                loadingPlan = false
                                 if (updated.pending) SafetyPlanSyncWorker.enqueue(
                                     runtime.application,
                                     actor,
@@ -219,6 +233,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             throw cancelled
         } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.
             if (current(actor, ownerUid, token)) error = R.string.safety_storage_error
+        } finally {
+            if (current(actor, ownerUid, token)) loadingPlan = false
         }
     }
 
@@ -337,7 +353,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         runtime.scope.launch {
             try {
-                val conversation = MessagingRepository().listConversations(actor).firstOrNull { it.id == conversationId }
+                val conversation = runtime.messagingRepository?.listConversations(actor)?.firstOrNull { it.id == conversationId }
                     ?: return@launch
                 if (!current(actor, actor, token)) return@launch
                 runtime.navigation.navigate(SafePage.Messages)
@@ -439,6 +455,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         runtime.scope.launch {
             // Turn an unexpected refresh shared plans failure into a readable message.
+            loadingAccess = true
             try {
                 if (actor != null) loadCachedAccessLists(actor)
                 val result = repository.sharedWithMe()
@@ -452,6 +469,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
                 if (actor != null && runtime.coverAccountId == actor && authorized()) error =
                     R.string.safety_sync_error
+            } finally {
+                if (runtime.coverAccountId == actor && authorized()) loadingAccess = false
             }
         }
     }
@@ -532,7 +551,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                             SystemClock.elapsedRealtime(),
                         )
                         if (waitMillis == 0L) break
-                        if (withTimeoutOrNull(waitMillis) {
+                        if (withTimeoutOrNull(waitMillis.milliseconds) {
                             foregroundSyncRequests.receive()
                         } == null) break
                         lastEditAt = SystemClock.elapsedRealtime()
@@ -556,7 +575,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     }
                     if (current(actor, owner, token) && saved != null) {
                         plan = mergeVisibleSafetyPlan(plan, saved, actor)
-                        if (!saved.pending) error = null
+                        if (!saved.pending && error != R.string.safety_account_required) error = null
                     }
                     syncing = false
                 }
@@ -575,6 +594,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
 
     // Flushes the latest locally durable edit when a field loses focus or a discrete control changes.
     fun flushEdits() {
+        if (runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
         val owner = activeOwner ?: return
         requestForegroundSync(actor, owner, generation, immediate = true)
@@ -631,7 +651,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
             if (current(actor, owner, token) && saving == 0) {
                 plan = saved
-                error = null
+                if (error != R.string.safety_account_required) error = null
             }
         } catch (_: TimeoutCancellationException) { /* Retain the local draft; the durable queue retries when connected. */
         } catch (cancelled: CancellationException) {
@@ -655,6 +675,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
         // Turn an unexpected refresh consultations failure into a readable message.
+        loadingAccess = true
         try {
             if (consultations.isEmpty()) loadCachedAccessLists(actor)
             if (!hasValidatedInternetConnection(runtime.application)) return
@@ -674,6 +695,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             throw cancelled
         } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
             if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+        } finally {
+            if (authorized() && actor == runtime.coverAccountId) loadingAccess = false
         }
     }
 

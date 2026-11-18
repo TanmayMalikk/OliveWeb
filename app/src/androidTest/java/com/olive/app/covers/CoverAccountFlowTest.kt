@@ -11,17 +11,22 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
     fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {
         waitCover()
-        compose.onNodeWithText("DELIVER TO").performClick()
-        waitFor("save_address")
+        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[
+            com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java
+        ]
+        compose.runOnIdle { session.runtime.state.coverType = com.olive.app.data.account.CoverType.NEWS }
+        waitFor("news_cover")
+        click("change_news_location")
+        fill("news_location_input", "Edmonton")
+        click("news_location_save")
+        val preferences = compose.activity.getSharedPreferences("daily_digest_preferences", android.content.Context.MODE_PRIVATE)
+        compose.waitUntil(10_000) { preferences.getString("custom_location_guest", null) == "Edmonton" }
+        compose.onNodeWithTag("news_location_input").assertDoesNotExist()
         compose.onNodeWithTag("new_user").assertDoesNotExist()
-        fill("address_line1", "123 Test Street")
-        fill("address_city", "Edmonton")
-        fill("address_province", "Alberta")
-        fill("address_postal", "T5J 0N3")
-        fill("address_country", "Canada")
-        click("save_address")
-        compose.onNodeWithTag("save_address").assertDoesNotExist()
-        compose.onNodeWithText("Edmonton", substring = true).assertExists()
+        compose.runOnIdle {
+            assertFalse(session.account.configured)
+            assertEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Cover, session.screen)
+        }
     }
 
     // Checks the cover choice switches news and fitness and both reach safe area step with the test's sample data.
@@ -34,6 +39,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
         click("cover_choice_news")
+        click("settings_tab_profile")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("news_cover")
@@ -56,6 +62,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
                 )
         }
         click("cover_choice_fitness")
+        click("settings_tab_profile")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("fitness_home")
@@ -79,21 +86,23 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
     fun coverAccountSavesBirthdayAndLocationWithoutExposingPrivateDetails() {
         register(username = "cover_account_tester")
-        compose.onNodeWithText("Account").performClick()
-        compose.onNodeWithTag("cover_profile_summary").assertTextContains("Test Person")
-            .assertTextContains("@cover_account_tester")
+        click("fitness_account_settings")
+        compose.onNodeWithTag("cover_full_name").assertTextContains("Test Person")
+        compose.onNodeWithText("@cover_account_tester").assertExists()
         compose.onNodeWithTag("cover_sign_out").assertDoesNotExist()
-        compose.onNodeWithTag("cover_profile_summary")
-            .assertTextContains("Edmonton", substring = true)
+        compose.onNodeWithTag("address_city").assertTextContains("Edmonton")
         compose.onNodeWithText("2000-01-02").assertDoesNotExist()
         compose.onNodeWithText("Test Person Causing Harm").assertDoesNotExist()
         compose.onNodeWithText("moon garden").assertDoesNotExist()
         fill("cover_full_name", "Delivery Customer")
-        compose.onNodeWithTag("cover_dob_year").performScrollTo()
-            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        waitFor("cover_dob_year_1999")
+        hideKeyboard()
+        click("cover_dob_open")
+        click("cover_dob_range_2006")
         click("cover_dob_year_1999")
+        click("cover_dob_month_1")
+        click("cover_dob_day_2")
         fill("address_city", "Calgary")
+        hideKeyboard()
         compose.onNodeWithTag("cover_language").assertDoesNotExist()
         compose.onNodeWithTag("language").assertDoesNotExist()
         val session =
@@ -111,12 +120,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
                 }", error
             )
         }
-        compose.onNodeWithText(compose.activity.getString(R.string.discover))
-            .performClick()
-        waitCover()
-        compose.onNode(hasSetTextAction()).performTextInput("moon garden")
-        waitFor("unlock_pin")
-        enterPin("123456")
+        unlock()
         waitFor("safe_profile")
         click("safe_profile")
         compose.onNodeWithText("Delivery Customer").assertExists()

@@ -114,6 +114,7 @@ export function Modal({
       <div className="modal-top">
         <h2 id={titleId}>{title}</h2>
         {onClose && <button
+          type="button"
           className="icon-button"
           onClick={onClose}
           aria-label="Close dialog"

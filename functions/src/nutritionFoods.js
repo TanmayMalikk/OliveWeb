@@ -13,33 +13,82 @@ exports.nutritionFoodSearch = onCall({
 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in before searching foods.");
   const query = cleanQuery(request.data?.query);
-  if (query.length < 2) throw new HttpsError("invalid-argument", "Enter at least two characters.");
-
+  const barcode = request.data?.barcode;
+  const foodId = request.data?.foodId;
+  if (request.data?.action === "detail" && (typeof foodId !== "string" || !/^[0-9]{1,20}$/.test(foodId))) {
+    throw new HttpsError("invalid-argument", "Invalid food ID.");
+  }
+  const page = request.data?.page ?? 0;
+  if (!Number.isInteger(page) || page < 0 || page > 99) {
+    throw new HttpsError("invalid-argument", "Invalid food search page.");
+  }
+  if (barcode !== undefined && !/^(?:[0-9]{8}|[0-9]{12,13})$/.test(String(barcode))) {
+    throw new HttpsError("invalid-argument", "Enter an 8, 12 or 13 digit barcode.");
+  }
+  if (request.data?.action !== "detail" && barcode === undefined && query.length < 2) {
+    throw new HttpsError("invalid-argument", "Enter at least two characters.");
+  }
   try {
-    const token = await fatSecretToken();
-    const form = new URLSearchParams({
-      method: "foods.search",
-      search_expression: query,
-      max_results: "20",
-      format: "json",
+    if (request.data?.action === "detail") {
+      const payload = await fatSecretRequest("food/v6", {food_id: foodId, flag_default_serving: "true"});
+      const food = normalizeFatSecretFood(payload.food);
+      return {foods: food ? [food] : []};
+    }
+    if (request.data?.action === "suggest") {
+      const payload = await fatSecretRequest("food/autocomplete/v2", {expression: query, max_results: "4"});
+      return {suggestions: arrayValue(payload.suggestions?.suggestion)
+        .map((value) => text(value, 80)).filter(Boolean)};
+    }
+    if (barcode !== undefined) {
+      const payload = await fatSecretRequest("food/barcode/find-by-id/v3", {
+        barcode: String(barcode).padStart(13, "0"), flag_default_serving: "true",
+      });
+      const food = normalizeFatSecretFood(payload.food);
+      return {foods: food ? [{...food, barcode: String(barcode)}] : [], hasMore: false};
+    }
+    const payload = await fatSecretRequest("foods/search/v6", {
+      search_expression: query, max_results: "20", page_number: String(page),
+      flag_default_serving: "true",
+      ...(request.data?.foodType === "generic" || request.data?.foodType === "brand" ?
+        {food_type: request.data.foodType} : {}),
     });
-    const response = await fetch("https://platform.fatsecret.com/rest/server.api", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form,
-    });
-    if (!response.ok) throw new Error(`FatSecret search returned ${response.status}`);
-    const payload = await response.json();
-    const rawFoods = arrayValue(payload?.foods?.food);
-    return {foods: rawFoods.map(normalizeFatSecretFood).filter(Boolean)};
+    return normalizeSearchPage(payload, page);
   } catch (error) {
-    console.error("FatSecret food search failed", error);
+    // Provider errors can contain request details; never log tokens or request headers.
+    console.warn("FatSecret request failed", {code: error.providerCode || error.code || "network"});
+    if (error.providerCode === 21) {
+      throw new HttpsError("failed-precondition", "Food search needs server IP approval in FatSecret.");
+    }
     throw new HttpsError("unavailable", "FatSecret food search is temporarily unavailable.");
   }
 });
+
+async function fatSecretRequest(path, parameters) {
+  const token = await fatSecretToken();
+  const response = await fetch(`https://platform.fatsecret.com/rest/${path}?${new URLSearchParams({
+    ...parameters, format: "json",
+  })}`, {headers: {Authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(12000)});
+  if (!response.ok) throw new Error(`FatSecret HTTP ${response.status}`);
+  const payload = await response.json();
+  if (payload.error) {
+    // 211 means a valid barcode has no matching food.
+    if (Number(payload.error.code) === 211 && path.includes("barcode")) return {};
+    const error = new Error("FatSecret rejected request");
+    error.providerCode = Number(payload.error.code);
+    throw error;
+  }
+  return payload;
+}
+
+function normalizeSearchPage(payload, page) {
+  const results = payload?.foods_search;
+  if (!results || typeof results !== "object") throw new Error("Invalid food search response");
+  return {
+    foods: arrayValue(results.results?.food).map(normalizeFatSecretFood).filter(Boolean),
+    hasMore: (page + 1) * 20 < nonNegativeNumber(results.total_results),
+    page,
+  };
+}
 
 async function fatSecretToken() {
   if (cachedAccessToken && Date.now() < cachedAccessTokenExpiry) return cachedAccessToken;
@@ -52,10 +101,15 @@ async function fatSecretToken() {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: "grant_type=client_credentials&scope=basic",
+    // Omitting scope requests the scopes enabled for this account, including Premier/barcode.
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`FatSecret authentication returned ${response.status}`);
   const payload = await response.json();
+  if (typeof payload.access_token !== "string" || !payload.access_token) {
+    throw new Error("Missing FatSecret access token");
+  }
   cachedAccessToken = payload.access_token;
   cachedAccessTokenExpiry = Date.now() + Math.max(60, Number(payload.expires_in) - 60) * 1000;
   return cachedAccessToken;
@@ -64,18 +118,30 @@ async function fatSecretToken() {
 function normalizeFatSecretFood(food) {
   const name = text(food?.food_name, 160);
   if (!name) return null;
-  const nutrition = parseFoodDescription(food?.food_description);
+  const servings = arrayValue(food.servings?.serving).filter((serving) =>
+    serving && serving.calories !== undefined && Number.isFinite(Number(serving.calories)));
+  const choices = servings.map(normalizeServing);
+  const preferred = servings.findIndex((serving) => String(serving.is_default) === "1");
+  const nutrition = choices[Math.max(0, preferred)] || parseFoodDescription(food.food_description);
   return {
-    id: text(food.food_id, 80),
-    name,
-    brand: text(food.brand_name, 120),
-    servingDescription: nutrition.servingDescription,
-    calories: nutrition.calories,
-    proteinGrams: nutrition.proteinGrams,
-    carbohydrateGrams: nutrition.carbohydrateGrams,
-    fatGrams: nutrition.fatGrams,
-    barcode: "",
+    id: text(food.food_id, 80), name, brand: text(food.brand_name, 120),
+    ...nutrition, servings: choices, barcode: "",
   };
+}
+
+function normalizeServing(serving) {
+  const result = {
+    servingId: text(serving.serving_id, 80),
+    servingDescription: text(serving.serving_description, 180) || "1 serving",
+  };
+  const nutrients = {
+    calories: "calories", proteinGrams: "protein", carbohydrateGrams: "carbohydrate",
+    fatGrams: "fat", saturatedFatGrams: "saturated_fat", transFatGrams: "trans_fat",
+    fiberGrams: "fiber", sugarGrams: "sugar", sodiumMilligrams: "sodium",
+    cholesterolMilligrams: "cholesterol", potassiumMilligrams: "potassium",
+  };
+  for (const [key, field] of Object.entries(nutrients)) result[key] = nonNegativeNumber(serving[field]);
+  return result;
 }
 
 function parseFoodDescription(value) {
@@ -114,6 +180,8 @@ function nonNegativeNumber(value) {
 }
 
 exports._test = {
+  normalizeSearchPage,
+  normalizeServing,
   cleanQuery,
   arrayValue,
   normalizeFatSecretFood,
