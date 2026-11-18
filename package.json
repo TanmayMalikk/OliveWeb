@@ -1,0 +1,11 @@
+{
+  "name": "olive-branch-workspace",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm --prefix web install --no-audit --no-fund",
+    "dev": "([ -d web/node_modules ] || npm --prefix web install --no-audit --no-fund) && PORT=${DEFAULT_APP_PORT:-3000} HOST=${HOST:-0.0.0.0} npm --prefix web run dev",
+    "build": "([ -d web/node_modules ] || npm --prefix web install --no-audit --no-fund) && npm --prefix web run build",
+    "start": "([ -d web/node_modules ] || npm --prefix web install --no-audit --no-fund) && PORT=${DEFAULT_APP_PORT:-3000} HOST=${HOST:-0.0.0.0} npm --prefix web run start",
+    "test": "([ -d web/node_modules ] || npm --prefix web install --no-audit --no-fund) && npm --prefix web test"
+  }
+}

@@ -45,12 +45,16 @@
   line-height: 1.3;
   text-align: center;
   transition:
-    background 0.18s,
-    transform 0.18s;
+    background 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .button:hover:not(:disabled) {
-  background: #304828;
+  background: #2b4324;
   transform: translateY(-1px);
+}
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 .button.quiet {
   background: transparent;
@@ -339,6 +343,7 @@ table {
   width: 100%;
   text-align: left;
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 th,
 td {
@@ -350,6 +355,24 @@ th {
   color: var(--muted);
   font-size: 0.74rem;
   letter-spacing: 0.04em;
+}
+.progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  accent-color: var(--olive);
+  background: var(--soft);
+  border: 0;
+}
+.progress-bar::-webkit-progress-bar {
+  background: var(--soft);
+  border-radius: 999px;
+}
+.progress-bar::-webkit-progress-value {
+  background: var(--olive);
+  border-radius: 999px;
+  transition: width 0.2s ease;
 }
 .sr-only {
   position: absolute;
@@ -406,6 +429,16 @@ th {
   border-radius: 0.75rem;
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
+}
+.status-banner.status-success {
+  background: #e4efde;
+  border-color: #b7cfb0;
+  color: #214025;
+}
+.status-banner.status-error {
+  background: #faebe5;
+  border-color: #e3b9ad;
+  color: #7c3127;
 }
 .preserve-lines {
   white-space: pre-wrap;

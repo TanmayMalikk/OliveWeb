@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ExternalLink, Phone } from "lucide-react";
-import { Empty } from "../../../components/SharedComponents";
+import { ExternalLink, Phone, RotateCcw } from "lucide-react";
+import { Button, Empty } from "../../../components/SharedComponents";
 import resources from "../../../domain/hotline-resources.json";
 import { useSession } from "../../../session/SessionProvider";
 
@@ -48,6 +48,14 @@ export default function HotlinesPage() {
     ].join(" ")).includes(term) || (digits && resource.phone.replace(/\D/g, "").includes(digits))),
   );
 
+  const hasFilters = Boolean(region || city || group || search.trim());
+  const clearFilters = () => {
+    setRegion("");
+    setCity("");
+    setGroup("");
+    setSearch("");
+  };
+
   return (
     <section className="safe-feature-page">
       <div className="panel">
@@ -55,10 +63,10 @@ export default function HotlinesPage() {
         <div className="toolbar-actions">
           <a className="button outline" href="tel:911"><Phone size={17} /> Emergency services (911)</a>
           <a className="button outline" href="tel:211"><Phone size={17} /> 211 Canada</a>
-          <a className="button outline" href="https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html" target="_blank" rel="noreferrer">
+          <a className="button outline" href="https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html" target="_blank" rel="noopener noreferrer">
             <ExternalLink size={17} /> Government of Canada help directory
           </a>
-          <a className="button outline" href="https://sheltersafe.ca/" target="_blank" rel="noreferrer">
+          <a className="button outline" href="https://sheltersafe.ca/" target="_blank" rel="noopener noreferrer">
             <ExternalLink size={17} /> ShelterSafe
           </a>
         </div>
@@ -90,6 +98,16 @@ export default function HotlinesPage() {
             <option>Shelters</option>
           </select>
         </div>
+        <div className="full toolbar-actions">
+          <small role="status">
+            Showing {visible.length} of {resources.length} verified resources
+          </small>
+          {hasFilters && (
+            <Button variant="quiet" onClick={clearFilters}>
+              <RotateCcw size={15} /> Clear filters
+            </Button>
+          )}
+        </div>
       </div>
       {visible.length ? (
         <div className="safe-resource-grid">
@@ -103,14 +121,21 @@ export default function HotlinesPage() {
                 <a className="button outline" href={`tel:${resource.phone.replace(/[^+\d]/g, "")}`}>
                   <Phone size={17} /> {resource.phone}
                 </a>
-                <a className="button outline" href={resource.website} target="_blank" rel="noreferrer" aria-label={`Visit website for ${resource.name}`}>
+                <a className="button outline" href={resource.website} target="_blank" rel="noopener noreferrer" aria-label={`Visit website for ${resource.name}`}>
                   <ExternalLink size={17} /> Website
                 </a>
               </div>
             </article>
           ))}
         </div>
-      ) : <Empty title="No matching resources">Try another city, province, or search term.</Empty>}
+      ) : (
+        <Empty
+          title="No matching resources"
+          action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined}
+        >
+          Try another city, province, or search term.
+        </Empty>
+      )}
     </section>
   );
 }

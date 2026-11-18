@@ -15,6 +15,8 @@ describe("Olive Crossing", () => {
   // Inputs: the values in this case. Expected: starts the olive on a safe lane.
   it("starts the olive on a safe lane", () => {
     const world = newCrossing(() => 0);
+    expect(world.lanes).toHaveLength(CROSSING.rows);
+    expect(world.playerRow).toBe(CROSSING.rows - 2);
     expect(world.lanes[world.playerRow].type).toBe("grass");
     expect(world.score).toBe(0);
   });
@@ -64,6 +66,17 @@ describe("Olive Crossing", () => {
       world = moveCrossing(world, "up", () => 0);
     expect(world.nextLaneId).toBeGreaterThan(CROSSING.rows);
     expect(world.lanes).toHaveLength(CROSSING.rows);
+    expect(world.lanes.length - world.playerRow).toBe(5);
+    let back = moveCrossing(world, "down", () => 0);
+    expect(back.playerRow).toBe(world.playerRow + 1);
+    expect(back.score).toBe(world.score);
+    for (let count = 0; count < CROSSING.rows; count++) {
+      back = moveCrossing(back, "down", () => 0);
+    }
+    expect(back.playerRow).toBe(CROSSING.rows - 1);
+    expect(back.position).toBeGreaterThanOrEqual(0);
+    expect(back.score).toBe(world.score);
+    expect(moveCrossing(back, "down", () => 0)).toBe(back);
   });
 
   // Inputs: the values in this case. Expected: moves farm traffic and detects a collision.
@@ -247,5 +260,135 @@ describe("Olive Crossing", () => {
     for (const seconds of [Number.NaN, Number.POSITIVE_INFINITY, "fast"] as unknown[]) {
       expect(advanceCrossing(world, seconds as number)).toBe(world);
     }
+  });
+
+  // Inputs: grass obstacles in front of the player. Expected: prevents hopping onto trees/boulders.
+  it("blocks hops into grass trees and boulders", () => {
+    const base = newCrossing(() => 0);
+    const blockedCol = base.playerColumn;
+    const world: CrossingWorld = {
+      ...base,
+      lanes: base.lanes.map((lane, row) =>
+        row === base.playerRow - 1
+          ? { ...lane, type: "grass", obstacles: [blockedCol], vehicles: [], pads: [] }
+          : lane,
+      ),
+    };
+    const next = moveCrossing(world, "up");
+    expect(next).toBe(world);
+  });
+
+  // Inputs: olive standing on a drifting river log. Expected: log carries olive sideways and snaps column when hopping onto grass.
+  it("carries the olive on drifting logs and snaps to grid column when stepping off", () => {
+    const base = newCrossing(() => 0);
+    const logLane = {
+      ...createCrossingLane(15, () => 0.4, false, "water"),
+      direction: 1 as const,
+      waterStyle: "logs" as const,
+      logSpeed: 2,
+      logs: [{ id: 1, x: base.playerColumn - 0.5, width: 3 }],
+    };
+    const safeGrass = {
+      ...createCrossingLane(16, () => 0, true),
+      obstacles: [],
+    };
+    const world: CrossingWorld = {
+      ...base,
+      lanes: base.lanes.map((lane, row) => {
+        if (row === base.playerRow) return logLane;
+        if (row === base.playerRow - 1) return safeGrass;
+        return lane;
+      }),
+    };
+    const drifted = advanceCrossing(world, 0.05);
+    expect(drifted.over).toBe(false);
+    expect(drifted.playerColumn).toBeGreaterThan(base.playerColumn);
+
+    const steppedOff = moveCrossing(drifted, "up");
+    expect(Number.isInteger(steppedOff.playerColumn)).toBe(true);
+  });
+
+  // Inputs: coin in next lane cell. Expected: collects coin and marks deathReason when stepping into water.
+  it("collects golden coins and records deathReason on water splash", () => {
+    const base = newCrossing(() => 0);
+    const coinRow = base.playerRow - 1;
+    const world: CrossingWorld = {
+      ...base,
+      lanes: base.lanes.map((lane, row) =>
+        row === coinRow
+          ? {
+              ...lane,
+              type: "grass",
+              obstacles: [],
+              coins: [base.playerColumn],
+              vehicles: [],
+              pads: [],
+            }
+          : lane,
+      ),
+    };
+    const collected = moveCrossing(world, "up");
+    expect(collected.coinsCollected).toBe(1);
+    expect(collected.coinJustCollected).toBe(true);
+    expect(collected.lanes[collected.playerRow].coins).toEqual([]);
+
+    const waterAhead: CrossingWorld = {
+      ...collected,
+      lanes: collected.lanes.map((lane, row) =>
+        row === collected.playerRow - 1
+          ? {
+              ...createCrossingLane(80, () => 0.3, false, "water"),
+              pads: [],
+            }
+          : lane,
+      ),
+    };
+    const splashed = moveCrossing(waterAhead, "up");
+    expect(splashed.over).toBe(true);
+    expect(splashed.deathReason).toBe("water");
+  });
+
+  // Inputs: fast trailing car behind slower truck in the same road lane. Expected: vehicles never overlap or drive through each other.
+  it("prevents trailing road vehicles from overlapping slower vehicles ahead", () => {
+    const base = newCrossing(() => 0);
+    const road = {
+      ...createCrossingLane(90, () => 0.2, false, "road"),
+      direction: 1 as const,
+      vehicles: [
+        { id: 1, x: 6.0, width: 1.25, kind: "truck" as const, speed: 0.7 },
+        { id: 2, x: 4.0, width: 0.95, kind: "car" as const, speed: 2.0 },
+      ],
+      spawnIn: 99,
+    };
+    let world: CrossingWorld = {
+      ...base,
+      lanes: base.lanes.map((lane, row) => (row === 0 ? road : lane)),
+    };
+    for (let step = 0; step < 80; step++) {
+      world = advanceCrossing(world, 0.05, () => 0.5);
+    }
+    const [front, trailing] = [...world.lanes[0].vehicles].sort((a, b) => b.x - a.x);
+    expect(trailing.x + trailing.width).toBeLessThanOrEqual(front.x - 0.49);
+  });
+
+  // Inputs: olive between two drifting river logs. Expected: triggers water collision accurately at log edges.
+  it("detects water splash accurately when standing between drifting logs", () => {
+    const base = newCrossing(() => 0);
+    const logLane = {
+      ...createCrossingLane(95, () => 0.4, false, "water"),
+      direction: 1 as const,
+      waterStyle: "logs" as const,
+      logSpeed: 1,
+      logs: [
+        { id: 1, x: 6, width: 2.5 },
+        { id: 2, x: 11.5, width: 2.5 },
+      ],
+    };
+    const world: CrossingWorld = {
+      ...base,
+      playerColumn: 9.5,
+      lanes: base.lanes.map((lane, row) => (row === base.playerRow ? logLane : lane)),
+    };
+    expect(crossingCollision(world)).toBe(true);
   });
 });

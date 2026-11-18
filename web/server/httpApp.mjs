@@ -77,14 +77,17 @@ export function createServerApp({ development = false } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
-    res.set({
+    const headers = {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
-      "X-Frame-Options": "DENY",
       "Permissions-Policy": "camera=(), microphone=(self), geolocation=(self)",
-      "Cross-Origin-Opener-Policy": "same-origin",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-    });
+    };
+    if (!development) {
+      headers["X-Frame-Options"] = "DENY";
+      headers["Cross-Origin-Opener-Policy"] = "same-origin";
+    }
+    res.set(headers);
     if (!development)
       res.set(
         "Content-Security-Policy",

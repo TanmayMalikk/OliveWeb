@@ -22,6 +22,10 @@ import {
   setBrowserDocumentEvidence,
   type BrowserDocument,
 } from "../../../services/MediaService";
+import {
+  prepareSupportTickets,
+  subscribeConversations,
+} from "../../../services/MessagingService";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 
 // Sends a signed-in support request to the protected Cloud Function.
@@ -42,6 +46,48 @@ export function StaffHelpPage() {
     conversationId?: string;
     ticketNumber?: number;
   } | null>(null);
+
+  useEffect(() => {
+    const identity = accounts.identity;
+    if (!cloudMode || !identity) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    void prepareSupportTickets()
+      .then(() => {
+        if (!active) return undefined;
+        return subscribeConversations(
+          identity.uid,
+          (conversations) => {
+            if (!active) return;
+            const openSupport = conversations.find(
+              (c) => c.type === "SUPPORT" && !c.closedAt && c.supportOrigin !== "PLAN_CONSULT",
+            );
+            if (openSupport) {
+              setTicket({
+                requested: true,
+                conversationId: openSupport.id,
+                ticketNumber: openSupport.ticketNumber,
+                staffName: openSupport.staffUid
+                  ? openSupport.participantUsernames[openSupport.staffUid] || "Olive Staff"
+                  : undefined,
+              });
+            }
+          },
+          () => undefined,
+        );
+      })
+      .then((cleanup) => {
+        if (!cleanup) return;
+        if (active) stop = cleanup;
+        else cleanup();
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, []);
+
   return (
     <section className="panel safe-feature-page">
       <h2>{ticket?.requested && ticket.ticketNumber !== undefined
@@ -103,21 +149,31 @@ type Position = { latitude: number; longitude: number; accuracy: number };
 // Shows the account's saved places and the browser's current location.
 export function LocationPage() {
   const [position, setPosition] = useState<Position | null>(null);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
   // Asks the browser for a fresh GPS reading and displays its accuracy.
   const locate = () => {
     setError("");
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setError("Location services are not available in this browser.");
+      return;
+    }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) =>
+      ({ coords }) => {
+        setLocating(false);
         setPosition({
           latitude: coords.latitude,
           longitude: coords.longitude,
           accuracy: coords.accuracy,
-        }),
-      () =>
+        });
+      },
+      () => {
+        setLocating(false);
         setError(
           "Location is unavailable. Check this site's location permission.",
-        ),
+        );
+      },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
     );
   };
@@ -133,8 +189,8 @@ export function LocationPage() {
           The browser requests location only while this page is open. Android
           remains responsible for background live sharing and navigation.
         </p>
-        <Button onClick={locate}>
-          <LocateFixed size={17} /> Update location
+        <Button onClick={locate} disabled={locating}>
+          <LocateFixed size={17} /> {locating ? "Updating location…" : "Update location"}
         </Button>
         {error && (
           <p role="alert" className="form-error">
@@ -147,12 +203,14 @@ export function LocationPage() {
           <iframe title="Current location map" src={map} loading="lazy" />
           <p>
             <MapPin size={16} /> Accuracy about {Math.round(position.accuracy)}{" "}
-            m
+            m · {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
           </p>
         </div>
       ) : (
-        <Empty title="Waiting for location.">
-          Allow location access to show your position.
+        <Empty title={error ? "Location paused." : locating ? "Finding your location…" : "Waiting for location."}>
+          {error
+            ? "Grant location access in your browser settings, then select Update location."
+            : "Allow location access to show your position."}
         </Empty>
       )}
     </section>
@@ -290,9 +348,14 @@ export function DocumentsPage() {
         </p>
       )}
       {uploadProgress !== null && (
-        <p role="status">
-          Encrypting and saving: {Math.round(uploadProgress * 100)}%
-        </p>
+        <div className="panel" role="status">
+          <p>Encrypting and saving: {Math.round(uploadProgress * 100)}%</p>
+          <progress
+            className="progress-bar"
+            max={100}
+            value={Math.round(uploadProgress * 100)}
+          />
+        </div>
       )}
       {loading ? (
         <Empty title="Loading documents…">

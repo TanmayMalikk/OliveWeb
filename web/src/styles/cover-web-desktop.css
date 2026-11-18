@@ -3,116 +3,103 @@
   display: none !important;
 }
 
+.cover-container.game-cover {
+  width: 100%;
+  height: 100svh;
+  height: 100dvh;
+  margin: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+.cover-container.game-cover > .cover-tab-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cover-container.game-cover > .cover-tab-panel > .grove,
+.cover-container > .grove {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+.cover-container.game-cover > .cover-account-panel {
+  overflow-y: auto;
+}
+
 .cover-account-tabs {
-  width: min(100%, 96rem);
-  margin-inline: auto;
-  padding: 0.35rem clamp(1rem, 4vw, 4rem);
+  width: 100%;
+  padding: 0.35rem clamp(0.75rem, 3vw, 2.5rem);
   display: flex;
   justify-content: flex-end;
   gap: 0.35rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper, #f7f7ef);
+  border-bottom: 1px solid #d9e1d9;
+  background: #f4f5ef;
 }
 .cover-account-tabs button {
-  min-height: 2.7rem;
-  padding: 0.5rem 1rem;
-  border: 0;
-  border-radius: 2rem;
-  color: var(--muted);
+  min-height: 2.5rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  color: #526057;
   background: transparent;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.cover-account-tabs button:hover {
+  background: #e9efe6;
 }
 .cover-account-tabs button[aria-selected="true"] {
-  color: var(--olive);
-  background: #e8eddf;
+  color: #223e32;
+  background: #dceacb;
+  border-color: #cbd9bc;
+}
+@media (max-width: 48rem), (max-height: 46rem) {
+  .cover-account-tabs {
+    padding: 0.22rem 0.75rem;
+  }
+  .cover-account-tabs button {
+    min-height: 2.2rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.78rem;
+  }
 }
 .cover-account-panel {
-  width: min(100% - 2rem, 58rem);
-  min-height: min(68svh, 40rem);
-  margin: clamp(2rem, 8svh, 6rem) auto;
-  padding: clamp(1.5rem, 5vw, 4rem);
+  width: min(100% - 2rem, 36rem);
+  min-height: min(64svh, 32rem);
+  margin: clamp(2rem, 8svh, 5rem) auto;
+  padding: clamp(1.5rem, 5vw, 3rem);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: 1.5rem;
-  background: #fffef9;
-  color: var(--ink);
+  border: 1px solid #d9e1d9;
+  border-radius: 1rem;
+  background: #ffffff;
+  color: #202c25;
   text-align: center;
 }
 .cover-account-panel h1 {
-  margin: 0.7rem 0;
-  font: 500 clamp(2.5rem, 6vw, 4.5rem)/1.05 var(--serif);
+  margin: 0.6rem 0;
+  font: 650 clamp(1.8rem, 4vw, 2.6rem)/1.12 system-ui, sans-serif;
+  letter-spacing: -0.03em;
 }
-.cover-account-panel p { color: var(--muted); }
+.cover-account-panel p { color: #526057; }
 .cover-hidden-olive {
-  width: 3.25rem;
-  height: 3.25rem;
-  margin-top: 2rem;
+  width: 3rem;
+  height: 3rem;
+  margin-top: 1.75rem;
   display: grid;
   place-items: center;
-  border: 0;
-  border-radius: 50%;
-  color: var(--olive);
-  background: #edf1e5;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.75rem;
+  color: #284b3c;
+  background: #e9efe6;
 }
+.cover-hidden-olive:hover { background: #dce8d9; }
 .cover-hidden-olive svg { width: 1.35rem; height: 1.35rem; }
-.cover-hidden-olive:focus-visible { outline: 2px solid var(--olive); outline-offset: 3px; }
-
-/* Little Grove uses a game-library rail and gives the selected game the main workspace. */
-@media (min-width: 72rem) {
-  .grove {
-    height: 100svh;
-    min-height: 32rem;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    padding-inline: clamp(1.5rem, 4vw, 5rem);
-  }
-  .grove-header,
-  .grove-footer,
-  .grove-main { width: min(100%, 96rem); margin-inline: auto; }
-  .grove-header { min-height: 0; padding-block: clamp(0.45rem, 1.5svh, 1rem); border-bottom: 1px solid #dce2cd; }
-  .grove-main {
-    height: auto;
-    min-height: 0;
-    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: stretch;
-    gap: 1.25rem;
-    padding-block: clamp(0.35rem, 1.2svh, 0.8rem);
-  }
-  .grove-intro {
-    min-width: 0;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    border: 1px solid #dce2cc;
-    border-radius: 1.25rem;
-    background: #fdfdf4;
-  }
-  .grove-intro > .eyebrow,
-  .grove-intro h1,
-  .grove-intro p,
-  .grove-intro > .grove-games,
-  .grove-intro > .memory-options {
-    grid-column: auto;
-    grid-row: auto;
-  }
-  .grove-intro h1 { margin: 1rem 0; font-size: clamp(2.1rem, 3vw, 3.3rem); }
-  .grove-intro p { max-width: 100%; font-size: 0.82rem; line-height: 1.7; }
-  .grove-games { margin-top: 1.5rem; display: grid; gap: 0.55rem; }
-  .grove-games button { width: 100%; justify-content: flex-start; border-radius: 0.75rem; text-align: left; }
-  .memory-options { margin-top: auto; padding-top: 1.5rem; display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
-  .memory-options small { grid-column: auto; }
-  .grove-game { height: 100%; min-height: 0; max-height: none; }
-  .flight-arena,
-  .crossing-arena,
-  .memory-arena { min-height: 0; }
-  .game-bottom { min-height: 4rem; }
-  .grove-footer { padding-block: clamp(0.35rem, 1.2svh, 0.8rem); }
-}
+.cover-hidden-olive:focus-visible { outline: 2px solid #284b3c; outline-offset: 3px; }
 
 @media (max-width: 78rem) {
   .newspaper-card { grid-column: span 6; }
