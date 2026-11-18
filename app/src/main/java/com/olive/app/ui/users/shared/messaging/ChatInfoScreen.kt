@@ -181,7 +181,7 @@ internal fun ChatInfoDialog(
             ) { padding ->
                 LazyColumn(
                     Modifier.fillMaxSize().padding(padding),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    contentPadding = PaddingValues(
                         start = 20.dp, top = 20.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 20.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

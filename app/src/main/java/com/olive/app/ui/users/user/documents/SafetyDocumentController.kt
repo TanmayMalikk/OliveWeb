@@ -1,6 +1,8 @@
 // Safe-app users: manages safety document actions.
 package com.olive.app.ui.users.user.documents
 
+import kotlin.time.Duration.Companion.milliseconds
+
 
 import android.content.Context
 import android.net.Uri
@@ -54,6 +56,11 @@ internal class SafetyDocumentsController(
     private val failureMessageResolver: (Throwable) -> String = {
         context.getString(mediaFailureResource(it))
     },
+    private val emergencyFunctions: () -> com.google.firebase.functions.FirebaseFunctions = {
+        com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
+    },
+    private val renderEmergencyReport: (Context, UserProfile, List<PrivateEntry>,
+        EmergencyReportLocation?, Map<String, EmergencyReportMedia>) -> File = EmergencyReportPdf::create,
 ) {
     private val applicationContext = context.applicationContext
     private var generation = 0
@@ -89,7 +96,7 @@ internal class SafetyDocumentsController(
         var awaitingServer = hasValidatedInternetConnection(applicationContext)
         state = state.copy(loading = true, error = null)
         initialLoadTimeout = scope.launch {
-            delay(10_000)
+            delay(10_000.milliseconds)
             if (token == generation && awaitingServer) {
                 awaitingServer = false
                 state = state.copy(loading = false, error = applicationContext.getString(R.string.documents_load_failed))
@@ -326,8 +333,7 @@ internal class SafetyDocumentsController(
                         applicationContext.getString(R.string.emergency_report_device_verification_failed), error,
                     )
                 }
-                com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
-                    .getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
                 val pressedLocation = location()
                 check(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid && token == generation) {
                     "The account changed. Try again."
@@ -346,7 +352,7 @@ internal class SafetyDocumentsController(
                     files[document.id] = EmergencyReportMedia(document, file)
                 }
                 withContext(Dispatchers.IO) {
-                    EmergencyReportPdf.create(applicationContext, profile, incidents, pressedLocation, files)
+                    renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
                 }
             }
             result.onFailure { error ->

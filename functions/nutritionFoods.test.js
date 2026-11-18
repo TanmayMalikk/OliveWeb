@@ -128,4 +128,15 @@ test('Callable requests Premier scopes and detects HTTP-200 IP rejection', async
   assert.equal(found.foods[0].barcode, '012345678905');
   global.fetch = async () => ({ok: true, json: async () => ({error: {code: 211}})});
   assert.deepEqual((await handler({auth: {uid: 'test'}, data: {barcode: '012345678905'}})).foods, []);
+  await assert.rejects(handler({auth: {uid: 'test'}, data: {action: 'detail', foodId: '2:3'}}),
+    {code: 'invalid-argument'});
+  global.fetch = async (url) => {
+    const detail = new URL(url);
+    assert.equal(detail.pathname, '/rest/food/v6');
+    assert.equal(detail.searchParams.get('food_id'), '2');
+    return {ok: true, json: async () => ({food: {food_id: '2', food_name: 'Cereal',
+      servings: {serving: {serving_id: '3', serving_description: '1 bowl', calories: '130'}}}})};
+  };
+  const detail = await handler({auth: {uid: 'test'}, data: {action: 'detail', foodId: '2'}});
+  assert.equal(detail.foods[0].servings[0].servingId, '3');
 });

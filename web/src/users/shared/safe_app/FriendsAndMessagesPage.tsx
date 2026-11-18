@@ -557,6 +557,7 @@ export default function Messages() {
         <SafeMediaViewer
           document={viewerDocument}
           url={viewerUrl}
+          allowAudioPlayback
           onClose={() => {
             setViewerDocument(null);
             setViewerUrl("");

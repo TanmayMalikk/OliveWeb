@@ -142,6 +142,13 @@ internal fun OliveRoot(
     val view = LocalView.current
     val accessibilityRoot = (view.parent as? ComposeView) ?: view
     val privacyHidden = navigation.privacyBlackout
+    val privateArea = navigation.screen == SessionScreen.Safe || navigation.screen == SessionScreen.Portal
+    val systemLaunchers = rememberSafeSystemLaunchers(session)
+    val update = rememberSafeAppUpdate(
+        enabled = privateArea && !privacyHidden && !session.localMode,
+        cameraInHeader = navigation.screen == SessionScreen.Safe,
+        launch = systemLaunchers.open,
+    )
     SideEffect {
         accessibilityRoot.importantForAccessibility =
             if (privacyHidden) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -314,6 +321,9 @@ internal fun OliveRoot(
                                 CompositionLocalProvider(
                                     LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
                                     LocalQuickExit provides if (userQuickExit) exit else null,
+                                    LocalSafeSystemLauncher provides systemLaunchers.open,
+                                    LocalSafePermissionActions provides systemLaunchers.permissions,
+                                    LocalSafeUpdateReminder provides update.onDownload,
                                 ) {
                                     // Entry setup owns its pane title because choosing New PIN changes its local screen.
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
@@ -324,7 +334,7 @@ internal fun OliveRoot(
                                             SessionScreen.Loading -> Box(
                                                 Modifier.fillMaxSize(),
                                                 contentAlignment = Alignment.Center
-                                            ) { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Action, Modifier.widthIn(max = 180.dp).fillMaxWidth()) }
+                                            ) { LoadingSkeleton(SkeletonLayout.Action, Modifier.widthIn(max = 180.dp).fillMaxWidth()) }
 
                                             SessionScreen.Welcome -> Welcome(session)
                                             SessionScreen.NewCredentials -> Credentials(
@@ -373,6 +383,9 @@ internal fun OliveRoot(
                                 }
                             }
                         }
+                    }
+                    if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
+                        SafeAppUpdateBanner(update, Modifier.align(Alignment.TopCenter))
                     }
                     if (showPinAnimation) PinSafeOliveTransition(
                         backgroundColor = screenBackground,

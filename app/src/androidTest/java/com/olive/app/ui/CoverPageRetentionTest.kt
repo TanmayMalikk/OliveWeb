@@ -1,6 +1,5 @@
 package com.olive.app.ui
 
-import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties

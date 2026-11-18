@@ -496,7 +496,7 @@ if ($WithCoverage) {
     if ($WithDeviceTests) {
         $combinedTasks = @(':app:combinedDebugCoverageReport', ':app:deviceTestLineDetails')
         if ($WearDeviceSerial) { $combinedTasks += ':wear:combinedDebugCoverageReport' }
-        Invoke-Checked "Combined unit and device coverage" { & ".\gradlew.bat" @combinedTasks }
+        Invoke-Checked "Combined unit and device coverage" { & ".\gradlew.bat" -PoliveLocalTest=true -PoliveDeviceCoverage=true @combinedTasks }
     }
     $androidCoverage = if ($WithDeviceTests) { "app/build/reports/coverage/combinedDebug/report.xml" } else { "app/build/reports/coverage/test/debug/report.xml" }
     $dashboardOptions = @()
@@ -504,11 +504,26 @@ if ($WithCoverage) {
     if ($WearDeviceSerial) { $dashboardOptions += '--watch' }
     if ($SkipFirebaseRules -and -not $DeviceTestsOnly) { $dashboardOptions += '--skip-rules' }
     Invoke-Checked "Project coverage dashboard" { & python scripts/coverage_dashboard.py @dashboardOptions }
-    Invoke-Checked "Android coverage threshold (10%)" { & python scripts/check_coverage.py jacoco $androidCoverage 10 --name Android }
-    Invoke-Checked "Web coverage threshold (10%)" { & python scripts/check_coverage.py lcov web/coverage/combined/lcov.info 10 --name Web }
-    Invoke-Checked "Functions coverage threshold (30%)" { & python scripts/check_coverage.py lcov functions/coverage/lcov.info 30 --name "Cloud Functions" }
-    if (-not (Test-Path -LiteralPath "$projectRoot\wear\build\reports\coverage\test\debug\report.xml")) { throw "Wear coverage report was not generated." }
-    $completedChecks.Add("Wear unit-test coverage report generated")
+    $wearCoverage = if ($WearDeviceSerial) { "wear/build/reports/coverage/combinedDebug/report.xml" } else { "wear/build/reports/coverage/test/debug/report.xml" }
+    $coverageChecks = @(
+        @{ Name = 'Android'; Format = 'jacoco'; Path = $androidCoverage }
+        @{ Name = 'Wear OS'; Format = 'jacoco'; Path = $wearCoverage }
+        @{ Name = 'Web'; Format = 'lcov'; Path = 'web/coverage/combined/lcov.info' }
+        @{ Name = 'Cloud Functions'; Format = 'lcov'; Path = 'functions/coverage/lcov.info' }
+    )
+    $coverageFailures = @()
+    foreach ($check in $coverageChecks) {
+        $label = "$($check.Name) line coverage (85% minimum)"
+        try {
+            Invoke-Checked $label { & python scripts/check_coverage.py $check.Format $check.Path 85 --name $check.Name }
+        } catch {
+            $coverageFailures += $label
+        }
+    }
+    if ($coverageFailures.Count -gt 0) {
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value ($deviceFailures.ToArray() + $coverageFailures)
+        throw "Coverage did not reach 85% for every component. See build/reports/coverage/index.html and the test output."
+    }
 }
 
 if ($deviceFailures.Count -gt 0) {

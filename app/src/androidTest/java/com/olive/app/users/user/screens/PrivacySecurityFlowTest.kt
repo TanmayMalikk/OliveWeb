@@ -210,7 +210,6 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         compose.waitUntil(30_000) {
             compose.onAllNodesWithText("Password changed.").fetchSemanticsNodes().isNotEmpty()
         }
-        click("settings_tab_cover")
         fill("current_device_pin", "123456")
         fill(
             "new_device_pin",

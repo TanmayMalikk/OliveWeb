@@ -20,6 +20,7 @@ tasks.register<JacocoReport>("combinedDebugCoverageReport") {
     group = "verification"
     description = "Combines debug JVM and device UI-test coverage without excluding application features."
     dependsOn("compileDebugKotlin", "compileDebugJavaWithJavac")
+    mustRunAfter("testDebugUnitTest")
     executionData.from(fileTree(layout.buildDirectory) {
         include("outputs/unit_test_code_coverage/debugUnitTest/*.exec")
         include("outputs/device-test-coverage/*.ec")

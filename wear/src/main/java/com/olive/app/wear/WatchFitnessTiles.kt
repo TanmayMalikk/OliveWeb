@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.wear.protolayout.ActionBuilders.launchAction
 import androidx.wear.protolayout.DimensionBuilders.expand
+import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.TimelineBuilders.Timeline
 import androidx.wear.protolayout.material3.CardDefaults.filledVariantCardColors
 import androidx.wear.protolayout.material3.CircularProgressIndicatorDefaults.filledTonalProgressIndicatorColors
@@ -25,7 +26,6 @@ import androidx.wear.tiles.Material3TileService
 import androidx.wear.tiles.RequestBuilders.TileRequest
 import androidx.wear.tiles.TileBuilders.Tile
 import androidx.wear.tiles.tile
-import java.time.LocalDate
 import kotlin.math.roundToInt
 
 internal data class WatchTileSnapshot(
@@ -55,90 +55,86 @@ internal object WatchTileData {
 
 class OliveActivityTileService : Material3TileService() {
     // Builds the glanceable step, distance, and calorie tile shown outside the watch app.
-    override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile {
-        val data = WatchTileData.read(this@OliveActivityTileService)
-        val progress = (data.steps.toFloat() / data.stepGoal).coerceIn(0f, 1f)
-        return tile(
-            timeline = Timeline.fromLayoutElement(
-                primaryLayout(
-                    titleSlot = { text("Olive Activity".layoutString, typography = LABEL_MEDIUM) },
-                    mainSlot = {
-                        graphicDataCard(
-                            onClick = openWatchApp("open_activity"),
-                            modifier = LayoutModifier.contentDescription(
-                                "${data.steps} of ${data.stepGoal} steps, ${data.caloriesBurned} calories burned"
-                            ),
-                            height = expand(),
-                            colors = filledVariantCardColors(),
-                            style = largeGraphicDataCardStyle(),
-                            title = {
-                                text("${data.steps}".layoutString, typography = DISPLAY_MEDIUM)
-                            },
-                            content = {
-                                text(
-                                    "${data.stepGoal} goal · ${data.caloriesBurned} kcal".layoutString,
-                                    typography = BODY_MEDIUM,
-                                )
-                            },
-                            graphic = {
-                                segmentedCircularProgressIndicator(
-                                    segmentCount = 10,
-                                    staticProgress = progress,
-                                    colors = filledTonalProgressIndicatorColors(),
-                                )
-                            },
-                        )
-                    },
-                )
+    override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile =
+        tile(timeline = Timeline.fromLayoutElement(activityTileLayout(WatchTileData.read(this@OliveActivityTileService))))
+}
+
+internal fun MaterialScope.activityTileLayout(data: WatchTileSnapshot): LayoutElement {
+    val progress = (data.steps.toFloat() / data.stepGoal).coerceIn(0f, 1f)
+    return primaryLayout(
+        titleSlot = { text("Olive Activity".layoutString, typography = LABEL_MEDIUM) },
+        mainSlot = {
+            graphicDataCard(
+                onClick = openWatchApp("open_activity"),
+                modifier = LayoutModifier.contentDescription(
+                    "${data.steps} of ${data.stepGoal} steps, ${data.caloriesBurned} calories burned"
+                ),
+                height = expand(),
+                colors = filledVariantCardColors(),
+                style = largeGraphicDataCardStyle(),
+                title = {
+                    text("${data.steps}".layoutString, typography = DISPLAY_MEDIUM)
+                },
+                content = {
+                    text(
+                        "${data.stepGoal} goal · ${data.caloriesBurned} kcal".layoutString,
+                        typography = BODY_MEDIUM,
+                    )
+                },
+                graphic = {
+                    segmentedCircularProgressIndicator(
+                        segmentCount = 10,
+                        staticProgress = progress,
+                        colors = filledTonalProgressIndicatorColors(),
+                    )
+                },
             )
-        )
-    }
+        },
+    )
 }
 
 class OliveVitalsTileService : Material3TileService() {
     // Builds the glanceable heart-rate tile and its no-reading state.
-    override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile {
-        val data = WatchTileData.read(this@OliveVitalsTileService)
-        val current = data.currentHeartRate?.toString() ?: "--"
-        val range = if (data.lowestHeartRate != null && data.peakHeartRate != null) {
-            "${data.lowestHeartRate}–${data.peakHeartRate} today"
-        } else {
-            "No heart-rate data yet"
-        }
-        val average = data.averageHeartRate?.let { "Avg $it bpm" } ?: "Waiting for readings"
-        val heartProgress = ((data.currentHeartRate ?: 0) / 200f).coerceIn(0f, 1f)
-        return tile(
-            timeline = Timeline.fromLayoutElement(
-                primaryLayout(
-                    titleSlot = { text("Olive Vitals".layoutString, typography = LABEL_MEDIUM) },
-                    mainSlot = {
-                        graphicDataCard(
-                            onClick = openWatchApp("open_vitals"),
-                            modifier = LayoutModifier.contentDescription(
-                                "Current heart rate $current beats per minute. $range. $average"
-                            ),
-                            height = expand(),
-                            colors = filledVariantCardColors(),
-                            style = largeGraphicDataCardStyle(),
-                            title = {
-                                text("$current bpm".layoutString, typography = DISPLAY_MEDIUM)
-                            },
-                            content = {
-                                text("$range · $average".layoutString, typography = BODY_MEDIUM)
-                            },
-                            graphic = {
-                                segmentedCircularProgressIndicator(
-                                    segmentCount = 8,
-                                    staticProgress = heartProgress,
-                                    colors = filledTonalProgressIndicatorColors(),
-                                )
-                            },
-                        )
-                    },
-                )
-            )
-        )
+    override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile =
+        tile(timeline = Timeline.fromLayoutElement(vitalsTileLayout(WatchTileData.read(this@OliveVitalsTileService))))
+}
+
+internal fun MaterialScope.vitalsTileLayout(data: WatchTileSnapshot): LayoutElement {
+    val current = data.currentHeartRate?.toString() ?: "--"
+    val range = if (data.lowestHeartRate != null && data.peakHeartRate != null) {
+        "${data.lowestHeartRate}–${data.peakHeartRate} today"
+    } else {
+        "No heart-rate data yet"
     }
+    val average = data.averageHeartRate?.let { "Avg $it bpm" } ?: "Waiting for readings"
+    val heartProgress = ((data.currentHeartRate ?: 0) / 200f).coerceIn(0f, 1f)
+    return primaryLayout(
+        titleSlot = { text("Olive Vitals".layoutString, typography = LABEL_MEDIUM) },
+        mainSlot = {
+            graphicDataCard(
+                onClick = openWatchApp("open_vitals"),
+                modifier = LayoutModifier.contentDescription(
+                    "Current heart rate $current beats per minute. $range. $average"
+                ),
+                height = expand(),
+                colors = filledVariantCardColors(),
+                style = largeGraphicDataCardStyle(),
+                title = {
+                    text("$current bpm".layoutString, typography = DISPLAY_MEDIUM)
+                },
+                content = {
+                    text("$range · $average".layoutString, typography = BODY_MEDIUM)
+                },
+                graphic = {
+                    segmentedCircularProgressIndicator(
+                        segmentCount = 8,
+                        staticProgress = heartProgress,
+                        colors = filledTonalProgressIndicatorColors(),
+                    )
+                },
+            )
+        },
+    )
 }
 
 // Opens the full Olive Fitness watch app when a user taps either tile.

@@ -127,7 +127,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 if (!preserveMessages || !sameConversation) {
                     loadingConversation = true
                     messageLoadTimeout = scope.launch {
-                        delay(12_000)
+                        delay(12_000.milliseconds)
                         if (epoch == token && activeConversation?.id == conversation.id && loadingConversation) {
                             loadingConversation = false
                             if (chatMessages.isEmpty()) message = application.getString(R.string.unable_to_open_secure_conversation)

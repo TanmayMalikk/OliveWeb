@@ -45,7 +45,6 @@ import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import java.util.function.Consumer
 import android.app.Application
 import com.google.firebase.auth.FirebaseAuth
-import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import android.app.Activity
 import com.olive.app.data.update.AppUpdateScheduler
 import com.olive.app.data.messaging.VoipCallForegroundService
@@ -213,7 +212,7 @@ class OliveActivity : FragmentActivity() {
         // Authentication and runtime permission dialogs temporarily own another window.
         // The Safe App stays on its current page until the system permission result arrives.
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
         ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
@@ -224,7 +223,7 @@ class OliveActivity : FragmentActivity() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
         ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
@@ -291,7 +290,7 @@ class OliveActivity : FragmentActivity() {
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
-            !session.callPermissionRequestOpen && (session.deviceLockRequest != null ||
+            !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,
@@ -321,7 +320,8 @@ class OliveActivity : FragmentActivity() {
         recordingCallback = null
         session.recordingStopped()
         super.onStop()
-        if (!permissions.awaitingResult && !session.externalFilePickerOpen && !session.callPermissionRequestOpen) {
+        if (!permissions.awaitingResult && !session.externalFilePickerOpen && !session.callPermissionRequestOpen &&
+            !session.safeSystemActivityOpen) {
             runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
         }
     }

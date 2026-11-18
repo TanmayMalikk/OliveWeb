@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,8 +46,11 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 
 private const val FIRST_BIRTH_YEAR = 1927
-private const val LAST_BIRTH_YEAR = 2016
 private const val YEARS_PER_GROUP = 10
+
+internal fun birthdayYears(today: LocalDate): List<IntRange> =
+    (maxOf(FIRST_BIRTH_YEAR, today.minusYears(130).year)..today.year)
+        .chunked(YEARS_PER_GROUP).asReversed().map { it.first()..it.last() }
 
 @Composable
 internal fun rememberBirthdayInput(initialDate: String = "") = rememberSaveable(initialDate) {
@@ -99,7 +103,7 @@ internal fun BirthdayPicker(
     }
 
     if (open) {
-        BirthdayPickerDialog(tag, onDismiss = { open = false }) {
+        BirthdayPickerDialog(tag, today, onDismiss = { open = false }) {
             onChange(it.toString())
             open = false
         }
@@ -116,31 +120,38 @@ private enum class BirthdayStep(val title: Int, val columns: Int) {
 @Composable
 private fun BirthdayPickerDialog(
     tag: String,
+    today: LocalDate,
     onDismiss: () -> Unit,
     onSelect: (LocalDate) -> Unit,
 ) {
     val uiText = rememberResourceText()
     val locale = LocalConfiguration.current.locales[0]
     var step by rememberSaveable { mutableStateOf(BirthdayStep.Range) }
-    var rangeEnd by rememberSaveable { mutableStateOf(LAST_BIRTH_YEAR) }
-    var year by rememberSaveable { mutableStateOf(LAST_BIRTH_YEAR) }
-    var month by rememberSaveable { mutableStateOf(1) }
+    var rangeEnd by rememberSaveable { mutableIntStateOf(today.year) }
+    var year by rememberSaveable { mutableIntStateOf(today.year) }
+    var month by rememberSaveable { mutableIntStateOf(1) }
     val selectedMonth = YearMonth.of(year, month)
+    val ranges = remember(today) { birthdayYears(today) }
+    val range = ranges.firstOrNull { it.last == rangeEnd } ?: ranges.first()
+    val earliest = today.minusYears(130)
     val columns = if (LocalDensity.current.fontScale < 1.3f) step.columns else when (step) {
         BirthdayStep.Range, BirthdayStep.Month -> 1
         BirthdayStep.Year, BirthdayStep.Day -> 2
     }
     val choices = when (step) {
-        BirthdayStep.Range -> (LAST_BIRTH_YEAR downTo FIRST_BIRTH_YEAR step YEARS_PER_GROUP).map { end ->
-            val start = maxOf(end - YEARS_PER_GROUP + 1, FIRST_BIRTH_YEAR)
-            end to "$end–$start"
+        BirthdayStep.Range -> ranges.map {
+            it.last to if (it.first == it.last) it.last.toString() else "${it.last}–${it.first}"
         }
-        BirthdayStep.Year -> (rangeEnd downTo maxOf(rangeEnd - YEARS_PER_GROUP + 1, FIRST_BIRTH_YEAR))
+        BirthdayStep.Year -> range.reversed()
             .map { it to it.toString() }
-        BirthdayStep.Month -> (1..12).map {
+        BirthdayStep.Month -> (1..12).filter {
+            val candidate = YearMonth.of(year, it)
+            candidate.atEndOfMonth() >= earliest && candidate.atDay(1) <= today
+        }.map {
             it to java.time.Month.of(it).getDisplayName(TextStyle.FULL_STANDALONE, locale)
         }
-        BirthdayStep.Day -> (1..selectedMonth.lengthOfMonth()).map { it to it.toString() }
+        BirthdayStep.Day -> (1..selectedMonth.lengthOfMonth())
+            .filter { selectedMonth.atDay(it) in earliest..today }.map { it to it.toString() }
     }
 
     AlertDialog(
@@ -186,7 +197,7 @@ private fun BirthdayPickerDialog(
                                     val spokenLabel = when (step) {
                                         BirthdayStep.Range -> uiText(
                                             R.string.dob_spoken_range,
-                                            maxOf(number - YEARS_PER_GROUP + 1, FIRST_BIRTH_YEAR).spokenYear(),
+                                            ranges.first { it.last == number }.first.spokenYear(),
                                             number.spokenYear(),
                                         )
                                         BirthdayStep.Year -> number.spokenYear()

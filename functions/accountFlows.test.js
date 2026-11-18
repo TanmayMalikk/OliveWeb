@@ -96,3 +96,36 @@ test("admins cannot delete their own or protected accounts", async () => {
   await assert.rejects(api.adminDeleteAccount({data: {uid: "protected"}}), {code: "permission-denied"});
   assert.equal(f.users.has("protected"), true);
 });
+
+test("removing an admin keeps the consultation and restores its staff conversation", async () => {
+  const restored = [];
+  const f = fixture({
+    "./supportGroups": {
+      PLAN_CONSULT: "PLAN_CONSULT",
+      saveSupportConversation: async (plan, safeContactUid) => restored.push({plan, safeContactUid}),
+    },
+  });
+  const api = f.load("accountDeletion");
+  f.setCaller({uid: "acting-admin", role: "ADMIN"});
+  const request = {auth: {uid: "acting-admin"}, data: {uid: "departing-admin"}};
+  f.users.set("departing-admin", {
+    uid: "departing-admin", displayName: "departing_admin", customClaims: {role: "ADMIN"},
+  });
+  await assert.rejects(api.adminDeleteAccount(request), {code: "failed-precondition"});
+  assert.equal(f.users.has("departing-admin"), true);
+
+  f.users.set("acting-admin", {uid: "acting-admin", customClaims: {role: "ADMIN"}});
+  f.records.set("safetyPlans/owner", {
+    ownerUid: "owner", staffUid: "staff", adminUid: "departing-admin", adminName: "Departing admin",
+    consultationConversationId: "consult-room", supportSafeContactUid: "trusted-contact",
+  });
+  assert.deepEqual(await api.adminDeleteAccount(request), {deleted: true, uid: "departing-admin"});
+  assert.equal(f.records.get("safetyPlans/owner").adminUid, "");
+  assert.equal(f.records.get("safetyPlans/owner").adminName, "");
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].plan.conversationId, "consult-room");
+  assert.equal(restored[0].plan.supportOrigin, "PLAN_CONSULT");
+  assert.equal(restored[0].plan.staffUid, "staff");
+  assert.equal(restored[0].safeContactUid, "trusted-contact");
+  assert.equal(f.users.has("acting-admin"), true);
+});

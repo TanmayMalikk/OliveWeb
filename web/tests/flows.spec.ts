@@ -76,6 +76,7 @@ test("incident pin loads and keeps the selected location when address lookup is 
 test("account creation enforces current credential rules before onboarding", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date(2026, 10, 17, 12));
   await page.goto("/account/create");
   const username = page.getByLabel("Username", { exact: true });
   const passwordField = page.getByLabel("Password", { exact: true });
@@ -105,6 +106,14 @@ test("account creation enforces current credential rules before onboarding", asy
   const option = (name: string) => picker.getByRole("button", { name, exact: true });
   await expect(option("2016–2007")).toBeVisible();
   await expect(option("1926")).toHaveCount(0);
+  await option("2026–2017").click();
+  await option("2026").click();
+  await expect(option("December")).toHaveCount(0);
+  await option("November").click();
+  await expect(option("18")).toHaveCount(0);
+  await option("17").click();
+  await expect(page.locator('input[name="dob"]')).toHaveValue("2026-11-17");
+  await page.getByRole("button", { name: /November 17, 2026/ }).click();
   await option("1936–1927").click();
   await expect(picker.getByRole("button", { name: /^\d{4}$/ })).toHaveText(
     Array.from({ length: 10 }, (_, i) => String(1936 - i)),
@@ -239,6 +248,10 @@ test("returning account opens the PIN gate at the root URL without revealing pri
   await expect(
     page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
+  // The public cover uses this fresh document to open an existing browser enrollment.
+  await page.goto("/entry#open");
+  await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test("a browser enrollment with a phone cover migrates to its own game field", async ({ page }) => {

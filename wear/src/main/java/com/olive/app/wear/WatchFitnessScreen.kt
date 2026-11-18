@@ -1,6 +1,8 @@
 // Watch fitness users: shows short, readable dashboards for activity and nutrition.
 package com.olive.app.wear
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -104,7 +106,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
         while (workoutRunning) {
             elapsedSeconds = ((System.currentTimeMillis() - workoutStartMillis) / 1_000L)
                 .coerceAtLeast(0L)
-            delay(1_000L)
+            delay(1_000.milliseconds)
         }
     }
 

@@ -33,15 +33,29 @@ internal object FitnessHealthConnect {
 
     fun available(context: Context) = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
+    fun permissionsFor(client: HealthConnectClient): Set<String> =
+        if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) {
+            permissions + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        } else permissions
+
     fun schedule(context: Context, owner: String) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("fitness-health-${fitnessAccountKey(owner)}",
             ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<FitnessHealthWorker>(15, TimeUnit.MINUTES)
                 .setInputData(workDataOf("uid" to owner)).build())
     }
 
-    suspend fun read(context: Context, owner: String, background: Boolean = false) = readLock.withLock { withContext(Dispatchers.IO) {
-        if (!FitnessAccountSync.ready.value || fitnessAuthenticatedUid() != owner || !available(context)) return@withContext
-        val client = HealthConnectClient.getOrCreate(context)
+    suspend fun read(
+        context: Context,
+        owner: String,
+        background: Boolean = false,
+        authenticatedUid: () -> String? = ::fitnessAuthenticatedUid,
+        healthProvider: () -> HealthConnectClient? = {
+            if (available(context)) HealthConnectClient.getOrCreate(context) else null
+        },
+    ) = readLock.withLock { withContext(Dispatchers.IO) {
+        if (!FitnessAccountSync.ready.value || authenticatedUid() != owner) return@withContext
+        val client = healthProvider() ?: return@withContext
         val granted = client.permissionController.getGrantedPermissions()
         if (background && HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND !in granted) return@withContext
         if (permissions.none { it in granted }) return@withContext
@@ -80,7 +94,7 @@ internal object FitnessHealthConnect {
             } while (page != null)
         }
         // Reads begun in an old login session cannot be applied to a new session, including A -> B -> A.
-        if (fitnessAuthenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
+        if (authenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
         FitnessStore(context, owner).recordHealthConnect(steps, samples, today)
         samples.maxOfOrNull { it.recordedAt }?.let { last -> local.edit { putLong("_hc_read_$today", last) } }
     } }
@@ -112,9 +126,7 @@ internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
                 fitnessAuthenticatedUid() != accountId || !FitnessHealthConnect.available(context)) return@repeatOnLifecycle
             try {
                 val client = HealthConnectClient.getOrCreate(context)
-                val wanted = FitnessHealthConnect.permissions.toMutableSet()
-                if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
-                    HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) wanted += HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+                val wanted = FitnessHealthConnect.permissionsFor(client)
                 val missing = wanted - client.permissionController.getGrantedPermissions()
                 checked = true
                 if (missing.isNotEmpty()) launcher.launch(missing)

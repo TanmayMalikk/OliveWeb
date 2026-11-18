@@ -4,7 +4,7 @@ import type { SafetyPlan } from "./SafetyPlanService";
 const mocks = vi.hoisted(() => ({
   call: vi.fn(), subscribe: vi.fn(), stop: vi.fn(),
 }));
-vi.mock("./AccountService", () => ({ firebase: async () => ({ db: {}, functions: {} }) }));
+vi.mock("./AccountService", () => ({ cloudMode: true, firebase: async () => ({ db: {}, functions: {} }) }));
 vi.mock("firebase/functions", () => ({ httpsCallable: (_functions: unknown, name: string) =>
   (data: unknown) => mocks.call(name, data) }));
 vi.mock("firebase/firestore", () => ({
@@ -12,7 +12,12 @@ vi.mock("firebase/firestore", () => ({
   onSnapshot: mocks.subscribe,
 }));
 
-import { observePlan, observeSafetyAccess, resolvePlanConflict, saveField } from "./SafetyPlanService";
+import {
+  completePlans, consultation, loadPlan, observePlan, observeSafetyAccess, planMediaRecipients,
+  readSafetyChecklist, resolvePlanConflict, saveField, setStaffAvailability, sharedPlans,
+  sharePlanWithContacts, staffConsultations,
+} from "./SafetyPlanService";
+import { closeSupportTicket, requestAdministratorHelp } from "./OrganizationSupportService";
 
 const plan: SafetyPlan = {
   ownerUid: "owner", ownerName: "Owner", staffUid: "staff", staffName: "",
@@ -95,4 +100,56 @@ describe("live safety-plan listeners", () => {
     expect(update).toHaveBeenCalledTimes(3);
     expect(fail).toBe(error);
   });
+});
+
+it("seeds both plans with unchecked steps and adds dependent records only when applicable", async () => {
+  expect(await loadPlan("owner")).toEqual(plan);
+  expect(await loadPlan("owner", true)).toEqual(plan);
+  const [ordinary, tailored] = mocks.call.mock.calls.map(([name, payload]) => {
+    expect(name).toBe("safetyPlanSync");
+    expect(payload).toMatchObject({ ownerUid: "owner", changes: [] });
+    expect(Object.keys(payload.defaults)).toHaveLength(18);
+    return payload.defaults;
+  });
+  for (const kind of ["primary", "backup"]) {
+    const ordinaryRows = readSafetyChecklist(ordinary[kind + "_documents"]);
+    const tailoredRows = readSafetyChecklist(tailored[kind + "_documents"]);
+    expect(tailoredRows.slice(0, -1).map(row => row.text)).toEqual(ordinaryRows.map(row => row.text));
+    expect(tailoredRows.at(-1)?.text).toContain("people leaving with you");
+    expect(tailoredRows.every(row => !row.checked)).toBe(true);
+  }
+});
+
+it("requests contact sharing, consultation changes, and document access using server-validated inputs", async () => {
+  const recipients = [{ uid: "contact", username: "Trusted" }];
+  mocks.call.mockResolvedValue({ data: { plan, recipients, plans: [plan], available: false } });
+  expect(await sharePlanWithContacts([{ friendUid: "contact", friendUsername: "Trusted", friendshipId: "confirmed" }])).toEqual(plan);
+  expect(await consultation("request")).toEqual(plan);
+  expect(await consultation("stop")).toEqual(plan);
+  expect(await planMediaRecipients()).toEqual(recipients);
+  expect(await sharedPlans()).toEqual([plan]);
+  expect(await staffConsultations()).toMatchObject({ available: false, plans: [plan] });
+  expect(await setStaffAvailability(false)).toMatchObject({ available: false });
+  await completePlans("consult");
+  expect(mocks.call.mock.calls).toEqual([
+    ["safetyPlanShareContacts", { contacts: [{ uid: "contact", name: "Trusted", friendshipId: "confirmed" }] }],
+    ["safetyPlanConsult", { action: "request" }],
+    ["safetyPlanConsult", { action: "stop" }],
+    ["safetyPlanMediaRecipients", {}],
+    ["safetyPlansSharedWithMe", {}],
+    ["safetyPlanConsultations", {}],
+    ["safetyPlanAvailability", { available: false }],
+    ["staffSupportClose", { conversationId: "consult", planCompleted: true }],
+  ]);
+});
+
+it("uses different server operations to escalate a ticket or close it", async () => {
+  const result = { conversationId: "ticket", adminUid: "admin" };
+  mocks.call.mockResolvedValue({ data: result });
+  expect(await requestAdministratorHelp("ticket")).toEqual(result);
+  expect(await closeSupportTicket("ticket")).toEqual(result);
+  expect(mocks.call.mock.calls).toEqual([
+    ["safetySupportAdmin", { conversationId: "ticket" }],
+    ["staffSupportClose", { conversationId: "ticket" }],
+  ]);
 });

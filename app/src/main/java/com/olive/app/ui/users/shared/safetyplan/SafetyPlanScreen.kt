@@ -292,7 +292,7 @@ internal fun SafetyPlanScreen(
                     }
                 }
             }
-            if (controller.loadingPlan) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Checklist)
+            if (controller.loadingPlan) LoadingSkeleton(SkeletonLayout.Checklist)
             if (plan != null) {
                 SafetyChecklistProgress(
                     prepared = selectedCompletion.prepared,
@@ -354,12 +354,6 @@ internal fun SafetyPlanScreen(
                                             value
                                         )
                                     },
-                                    onResolve = { key, keepMine ->
-                                        if (!safeContact && controller.plan?.ownerUid == ownerUid) controller.resolve(
-                                            key,
-                                            keepMine
-                                        )
-                                    },
                                     onSyncNow = controller::flushEdits,
                                     contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
@@ -411,12 +405,6 @@ internal fun SafetyPlanScreen(
                                         if (controller.plan?.ownerUid == ownerUid) controller.edit(
                                             key,
                                             value
-                                        )
-                                    },
-                                    onResolve = { key, keepMine ->
-                                        if (controller.plan?.ownerUid == ownerUid) controller.resolve(
-                                            key,
-                                            keepMine
                                         )
                                     },
                                     onSyncNow = controller::flushEdits,
@@ -510,7 +498,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
             stringResource(R.string.safe_contact_shared_plans_intro)
         )
         if (session.localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
-        if (controller.loadingAccess && !session.localMode) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
+        if (controller.loadingAccess && !session.localMode) LoadingSkeleton(SkeletonLayout.SharedPlans)
         controller.error?.let { AccessibleMessage(stringResource(it)) }
         val visiblePlans = if (controller.loadingAccess) emptyList() else controller.sharedPlans
         if (visiblePlans.isEmpty() && (!controller.loadingAccess || session.localMode) && controller.error == null) Surface(

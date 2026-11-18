@@ -155,3 +155,52 @@ it("uses the authenticated callable for removing a ticket friend and preparing s
   expect(f.call).toHaveBeenCalledWith("conversationRemoveParticipant", {conversationId: "chat", participantUid: "friend"});
   expect(f.call).toHaveBeenCalledWith("supportTicketsPrepare", undefined);
 });
+
+it("writes one encrypted room key for a new ticket and opens it again with the same browser", async () => {
+  const user = { ...current, username: "ownername" };
+  const device = await chat.messageDevice(user.uid);
+  const peerDevice = await chat.messageDevice("friend");
+  f.records.set("messageDirectory/buddy", {uid: "friend", publicKey: peerDevice.publicKey});
+  f.records.set("conversations/chat", {});
+  f.call.mockResolvedValue({data: {participantUsernames: {owner: "ownername", friend: "buddy"}}});
+  const ticket = conversation({type: "SUPPORT", participantUsernames: {}});
+  const key = await chat.roomKey("chat", user, ticket);
+  expect(f.call).toHaveBeenCalledWith("conversationPrepareKeys", {conversationId: "chat"});
+  const update = f.writes.find(([method, path]) => method === "update" && path === "conversations/chat");
+  expect(update?.[2].participantPublicKeys).toEqual({owner: device.publicKey, friend: peerDevice.publicKey});
+  expect(Object.keys(update?.[2].roomKeys)).toEqual(["owner", "friend"]);
+
+  const reopened = await chat.roomKey("chat", user, ticket);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({name: "AES-GCM", iv}, key, new TextEncoder().encode("Private test message"));
+  const plaintext = await crypto.subtle.decrypt({name: "AES-GCM", iv}, reopened, encrypted);
+  expect(new TextDecoder().decode(plaintext)).toBe("Private test message");
+  expect(f.writes.filter(([method, path]) => method === "update" && path === "conversations/chat")).toHaveLength(1);
+});
+
+it("requires a current participant key and refuses to change keys for an existing history", async () => {
+  await expect(chat.roomKey("chat", current, conversation())).rejects.toThrow("Every person in this chat");
+  const peerDevice = await chat.messageDevice("friend");
+  f.records.set("messageDirectory/buddy", {uid: "friend", publicKey: peerDevice.publicKey});
+  await expect(chat.roomKey("chat", current, conversation())).rejects.toThrow("no longer available");
+  f.records.set("conversations/chat", {
+    participantPublicKeys: {owner: "different-device"}, roomKeys: {owner: "existing-envelope"}, lastMessageId: "historic",
+  });
+  await expect(chat.roomKey("chat", current, conversation())).rejects.toThrow("existing authorized device");
+  expect(f.writes.some(([method, path]) => method === "update" && path === "conversations/chat")).toBe(false);
+});
+
+it("reports only server-confirmed device approval and resets availability on errors", async () => {
+  const update = vi.fn();
+  const stop = await chat.subscribeChatDeviceKey("chat", current.uid, update);
+  const device = await chat.messageDevice(current.uid);
+  expect(f.listeners[0].path).toBe(`conversations/chat/deviceKeys/${current.uid}--${device.deviceId}`);
+  f.listeners[0].update({metadata: {fromCache: true}, exists: () => true});
+  expect(update).not.toHaveBeenCalled();
+  f.listeners[0].update({metadata: {fromCache: false}, exists: () => true});
+  expect(update).toHaveBeenCalledWith(true);
+  f.listeners[0].error(new Error("revoked"));
+  expect(update).toHaveBeenLastCalledWith(false);
+  stop();
+  expect(f.listeners[0].stop).toHaveBeenCalledOnce();
+});

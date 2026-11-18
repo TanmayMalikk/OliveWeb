@@ -94,7 +94,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     // Checks the settings step with the test's sample data.
     private fun settings(model: SessionViewModel) {
         compose.runOnIdle { model.navigation.openSafePage(SafePage.Settings) }
-        click("settings_tab_cover")
+        click("settings_tab_profile")
         waitFor("entry_use_device")
     }
 
@@ -114,8 +114,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     private fun enableDevice(model: SessionViewModel, pin: String = "123456") {
         driver.ensurePhonePin()
         settings(model)
-        fill("current_device_pin", pin)
         activate("entry_use_device")
+        fill("current_device_pin", pin)
+        compose.onNodeWithTag("confirm_entry_method").performClick()
         driver.confirmPhonePin()
         finished(model)
         assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
@@ -139,6 +140,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         waitFor("safe_settings")
         settings(model)
         compose.onNodeWithTag("entry_use_pin").assertDoesNotExist()
+        click("settings_tab_password")
         fill("new_device_pin", "123456")
         fill(
             "confirm_new_device_pin",

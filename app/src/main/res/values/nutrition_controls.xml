@@ -18,4 +18,12 @@
     <string name="nutrition_edit_food">Edit food entry</string>
     <string name="nutrition_edit_details">Edit food details</string>
     <string name="nutrition_volume_unit">ml</string>
+    <string name="nutrition_recent_foods">Recently logged</string>
+    <string name="nutrition_saved_foods">Saved foods</string>
+    <string name="nutrition_recent_searches">Recent searches</string>
+    <string name="nutrition_no_recent_foods">No recently logged foods.</string>
+    <string name="nutrition_no_saved_foods">You haven’t saved any foods yet.</string>
+    <string name="nutrition_save_food">Save food</string>
+    <string name="nutrition_unsave_food">Remove saved food</string>
+    <string name="nutrition_saved_unavailable">Couldn’t load this saved food.</string>
 </resources>

@@ -1,13 +1,19 @@
 // Admins: shows admin tools, dashboard portal, and account totals.
 package com.olive.app.ui.users.admin
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,14 +33,27 @@ import com.olive.app.R
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.shared.SkeletonLayout
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.organization.*
 import com.olive.app.ui.users.staff.SafetyConsultations
+import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
+import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages, Emergencies }
 
@@ -168,7 +187,8 @@ private fun AdminDashboard(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(end = if (LocalSafeUpdateReminder.current == null) 56.dp else 104.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.olive_tree),
                     fontFamily = FontFamily.Serif,
@@ -182,8 +202,11 @@ private fun AdminDashboard(
                 )
                 Text(uiText(R.string.ui_signed_in_as_value, session.coverUsername), color = Muted)
             }
-            IconButton(onClick = onSettings, modifier = Modifier.align(Alignment.TopEnd)) {
-                Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
+            Row(Modifier.align(Alignment.TopEnd)) {
+                SafeAppUpdateReminder()
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
+                }
             }
         }
         if (dashboard.adminSummaryOwner == session.coverAccountId && dashboard.adminSummaryOwner != null || session.localMode) {
@@ -351,4 +374,135 @@ private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel:
     }
 }
 
+@Composable
+internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<EmergencyAlert>?, String?> {
+    var alerts by remember(session.coverAccountId, session.localMode) {
+        mutableStateOf<List<EmergencyAlert>?>(if (session.localMode) emptyList() else null)
+    }
+    var error by remember(session.coverAccountId) { mutableStateOf<String?>(null) }
+    DisposableEffect(session.coverAccountId, session.localMode) {
+        val listener = if (session.localMode) null else session.emergencyResponses.observeAlerts(
+            onUpdate = { alerts = it; error = null },
+            onError = { error = it },
+        )
+        onDispose { listener?.close() }
+    }
+    val unavailable = stringResource(R.string.emergency_alerts_load_failed)
+    LaunchedEffect(session.coverAccountId, alerts) {
+        if (alerts == null) {
+            kotlinx.coroutines.delay(12_000.milliseconds)
+            if (error == null) error = unavailable
+        }
+    }
+    return alerts to error
+}
 
+@Composable
+internal fun EmergencyResponseScreen(
+    session: SessionViewModel,
+    alerts: List<EmergencyAlert>?,
+    error: String?,
+    onBack: () -> Unit,
+    onTrack: (String) -> Unit,
+) {
+    var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
+    var showResolved by remember { mutableStateOf(false) }
+    var resolving by remember { mutableStateOf(emptySet<String>()) }
+    var resolveError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val visibleAlerts = alerts.orEmpty().filter { (it.resolvedAt > 0L) == showResolved }
+    opened?.let { (document, file) ->
+        SafetyDocumentViewer(document, file) { opened = null }
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { androidx.compose.material3.Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
+                Text(stringResource(R.string.emergency_response_title), style = MaterialTheme.typography.headlineSmall)
+            }
+        }
+        error?.let { item { AccessibleMessage(it) } }
+        resolveError?.let { item { AccessibleMessage(it) } }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !showResolved, onClick = { showResolved = false }, label = { Text(stringResource(R.string.emergency_response_active)) })
+                FilterChip(selected = showResolved, onClick = { showResolved = true }, label = { Text(stringResource(R.string.emergency_response_resolved)) })
+            }
+        }
+        if (alerts == null && error == null) item { LoadingSkeleton(SkeletonLayout.EmergencyAlerts) }
+        if (alerts != null && visibleAlerts.isEmpty() && error == null) item { Text(stringResource(R.string.emergency_response_empty)) }
+        items(visibleAlerts, key = { it.id }) { alert ->
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(alert.ownerName, style = MaterialTheme.typography.titleMedium)
+                    if (alert.createdAt > 0) Text(
+                        DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
+                            .format(Instant.ofEpochMilli(alert.createdAt)),
+                    )
+                    OutlinedButton(onClick = { onTrack(alert.ownerUid) }) { Text(stringResource(R.string.emergency_response_track)) }
+                    if (alert.mediaId.isBlank()) Text(stringResource(R.string.emergency_response_waiting_pdf))
+                    else Button(
+                        enabled = alert.mediaId !in session.documents.state.openingDocumentIds,
+                        onClick = {
+                            session.coverAccountId?.let { uid ->
+                                session.documents.openShared(uid, alert.mediaId) { document, file ->
+                                    opened = document to file
+                                }
+                            }
+                        }
+                    ) { Text(stringResource(R.string.emergency_response_pdf)) }
+                    session.documents.state.attachmentErrors[alert.mediaId]?.let { AccessibleMessage(it) }
+                    FilledTonalButton(
+                        modifier = Modifier.align(Alignment.End),
+                        enabled = alert.id !in resolving,
+                        onClick = {
+                            resolving = resolving + alert.id
+                            resolveError = null
+                            scope.launch {
+                                try {
+                                    session.emergencyResponses.setResolved(
+                                        session.coverAccountId, alert.id, alert.resolvedAt == 0L,
+                                    )
+                                } catch (failure: Exception) {
+                                    if (failure is kotlinx.coroutines.CancellationException) throw failure
+                                    resolveError = failure.localizedMessage
+                                } finally {
+                                    resolving = resolving - alert.id
+                                }
+                            }
+                        },
+                    ) {
+                        androidx.compose.material3.Icon(if (alert.resolvedAt == 0L) Icons.Outlined.CheckCircle else Icons.Outlined.Replay, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(if (alert.resolvedAt == 0L) R.string.emergency_response_resolve else R.string.emergency_response_reopen))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EmergencyLocationPreview(session: SessionViewModel, ownerUid: String) {
+    var points by remember(ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }
+    var error by remember(ownerUid) { mutableStateOf<String?>(null) }
+    DisposableEffect(session.coverAccountId, ownerUid) {
+        val subscription = session.emergencyResponses.observeLocations(
+            onUpdate = { values -> points = values.filter { it.uid == ownerUid } },
+            onError = { error = it },
+        )
+        onDispose { subscription.close() }
+    }
+    Column {
+        if (points.isEmpty()) Text(error ?: stringResource(R.string.emergency_response_no_location))
+        else InteractiveLocationMap(
+            points = points, ownPointUid = null, initialFollowUid = ownerUid,
+            modifier = Modifier.fillMaxWidth().height(200.dp),
+        )
+    }
+}

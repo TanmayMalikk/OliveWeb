@@ -1,5 +1,6 @@
 // Web visitors: defines site routes, response headers, and the news API.
 import express from "express";
+import { contentSecurityPolicy, publicPageNonce } from "./pageSecurity.mjs";
 import { news, article } from "./newsProxy.mjs";
 import siteConfig from "../site.config.json" with { type: "json" };
 
@@ -77,33 +78,21 @@ export function createServerApp({ development = false } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use((req, res, next) => {
-    res.set({
+    const headers = {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
-      "X-Frame-Options": "DENY",
       "Permissions-Policy": "camera=(), microphone=(self), geolocation=(self)",
-      "Cross-Origin-Opener-Policy": "same-origin",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-    });
-    if (!development)
-      res.set(
-        "Content-Security-Policy",
-        [
-          "default-src 'self'",
-          "script-src 'self' https://www.google.com https://www.gstatic.com",
-          "style-src 'self' 'unsafe-inline'",
-          "img-src 'self' https: data: blob:",
-          "media-src 'self' blob:",
-          "connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com",
-          "frame-src blob: https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org",
-          "worker-src 'self'",
-          "object-src 'none'",
-          "base-uri 'self'",
-          "form-action 'self'",
-          "frame-ancestors 'none'",
-          "upgrade-insecure-requests",
-        ].join("; "),
-      );
+    };
+    if (!development) {
+      headers["X-Frame-Options"] = "DENY";
+      headers["Cross-Origin-Opener-Policy"] = "same-origin";
+    }
+    res.set(headers);
+    if (!development) {
+      res.locals.publicAdNonce = publicPageNonce(req.path);
+      res.set("Content-Security-Policy", contentSecurityPolicy(res.locals.publicAdNonce));
+    }
     next();
   });
   app.use("/api", (_req, res, next) => {

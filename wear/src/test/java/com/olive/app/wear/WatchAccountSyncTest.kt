@@ -60,4 +60,37 @@ class WatchAccountSyncTest {
         assertEquals(0, WatchTileData.read(context).steps)
         assertNull(WatchFitnessData.snapshot(context).heartRate)
     }
+
+    @Test fun passiveAndForegroundStepCountersDoNotDoubleCountOrAcceptStaleSamples() {
+        val now = System.currentTimeMillis()
+        WatchFitnessData.session(context, session("watch-user", "today", now))
+        WatchFitnessData.steps(context, 1450, now + 1, passive = false)
+        WatchFitnessData.steps(context, 70, now + 1, passive = true)
+        WatchFitnessData.steps(context, 1460, now + 2, passive = false)
+        WatchFitnessData.steps(context, 85, now + 2, passive = true)
+        WatchFitnessData.steps(context, 120, now + 1, passive = true)
+        assertEquals(15, WatchFitnessData.snapshot(context).watchSteps)
+        WatchFitnessData.steps(context, 5, now + 3, passive = true)
+        WatchFitnessData.steps(context, 9, now + 4, passive = true)
+        assertEquals(19, WatchTileData.read(context).steps)
+    }
+
+    @Test fun vitalsTileUsesAcceptedReadingsAndDoesNotLeakAnOlderAccountsSummary() {
+        val now = System.currentTimeMillis()
+        WatchFitnessData.session(context, session("card-user", "old", now))
+        WatchFitnessData.heart(context, 65, now + 1)
+        WatchFitnessData.heart(context, 87, now + 2)
+        WatchFitnessData.heart(context, 150, now + 1)
+        WatchFitnessData.heart(context, 400, now + 3)
+        val tile = WatchTileData.read(context)
+        assertEquals(87, tile.currentHeartRate)
+        assertEquals(87, tile.peakHeartRate)
+        assertEquals(65, tile.lowestHeartRate)
+        assertEquals(76, tile.averageHeartRate)
+        assertEquals(87, WatchFitnessData.snapshot(context).heartRateSummary.restingBpm)
+        WatchFitnessData.session(context, session("different-user", "new", now + 4))
+        WatchFitnessData.heart(context, 95, now + 3)
+        assertNull(WatchTileData.read(context).currentHeartRate)
+        assertNull(WatchTileData.read(context).averageHeartRate)
+    }
 }
