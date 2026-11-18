@@ -2,6 +2,7 @@
 package com.olive.app
 
 import android.app.KeyguardManager
+import android.app.ActivityManager
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.*
 import androidx.lifecycle.ViewModelProvider
@@ -235,12 +236,12 @@ class SafeEntryUiTest : OliveUiTestBase() {
         val saved = EncryptedVault(context, "demo").read().getJSONObject("enrollments")
             .getJSONObject(session.coverAccountId!!)
         assertFalse(saved.has("pinVerifier"))
-        compose.onNode(hasSetTextAction()).performTextInput("moon garden")
+        openDeviceLockFromCover()
         confirmPhonePin()
         waitFor("safe_settings")
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
-        compose.onNode(hasSetTextAction()).performTextInput("moon garden")
+        openDeviceLockFromCover()
         compose.waitUntil(15_000) { session.deviceLockRequest != null }
         waitForPhonePin()
         shell("input keyevent 4")
@@ -254,12 +255,26 @@ class SafeEntryUiTest : OliveUiTestBase() {
         click("device_lock_unlock")
         waitForPhonePin()
         val abandoned = session.deviceLockRequest!!
+        val activity = compose.activity
+        val appTask = activity.getSystemService(ActivityManager::class.java).appTasks.single {
+            it.taskInfo?.taskId == activity.taskId
+        }
         shell("input keyevent 3")
         compose.waitUntil(15_000) { session.screen == SessionScreen.Cover }
-        shell("am start -n com.olive.app/.OliveActivity")
+        // Return to the same task so the abandoned callback is tested against the live session.
+        appTask.moveToFront()
         waitCover()
         abandoned.complete(abandoned.challenge.promptCipher)
         assertEquals(SessionScreen.Cover, session.screen)
+    }
+
+    // Fitness has no search field: use its real private-entry gesture for each reentry.
+    private fun openDeviceLockFromCover() {
+        if (compose.onAllNodesWithTag("discreet_cover_olive").fetchSemanticsNodes().isEmpty()) {
+            click("fitness_account_settings")
+        }
+        waitFor("discreet_cover_olive")
+        compose.onNodeWithTag("discreet_cover_olive").performScrollTo().performTouchInput { doubleClick() }
     }
 
     // Checks the confirm phone pin step with the test's sample data.

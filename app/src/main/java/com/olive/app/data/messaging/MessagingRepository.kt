@@ -1,7 +1,10 @@
 // All chat roles: loads and saves direct messages and friend requests.
 package com.olive.app.data.messaging
 
+import com.olive.app.data.sync.cloudStringMap
+
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -29,6 +32,14 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     suspend fun prepareSupportTickets() {
         FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable("supportTicketsPrepare").call().await()
+    }
+
+    internal suspend fun prepareTicketParticipantNames(conversationId: String): Map<String, String> {
+        val result = FirebaseFunctions.getInstance("northamerica-northeast1")
+            .getHttpsCallable("conversationPrepareKeys")
+            .call(mapOf("conversationId" to conversationId)).await().data as? Map<*, *>
+        return result?.get("participantUsernames").cloudStringMap()
+            ?: error("Ticket participant identities are unavailable")
     }
     // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
@@ -82,16 +93,23 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     fun observeSocial(
         uid: String,
         onUpdate: (SocialSnapshot) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        onServerReady: (() -> Unit)? = null,
     ): ChatSubscription {
         var friends = emptyList<Friend>()
         var incoming = emptyList<FriendRequest>()
         var outgoing = emptyList<FriendRequest>()
         // Sends the newest friend and request lists after any listener changes.
-        fun publish() = onUpdate(SocialSnapshot(friends, incoming, outgoing))
+        val confirmed = mutableSetOf<Int>()
+        fun publish(list: Int, snapshot: QuerySnapshot?) {
+            onUpdate(SocialSnapshot(friends, incoming, outgoing))
+            if (snapshot?.metadata?.isFromCache == false && confirmed.add(list) && confirmed.size == 3) {
+                onServerReady?.invoke()
+            }
+        }
         val listeners = mutableListOf<ListenerRegistration>()
         listeners += firestore.collection("friendLists").document(uid).collection("friends")
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     onError(
                         error.localizedMessage ?: "Unable to load friends."
@@ -100,10 +118,10 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 }
                 friends =
                     snapshot?.documents.orEmpty().mapNotNull(::friendFrom).sortedBy { it.username }
-                publish()
+                publish(0, snapshot)
             }
         listeners += firestore.collection("friendRequests").whereEqualTo("recipientUid", uid)
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     onError(
                         error.localizedMessage ?: "Unable to load incoming requests."
@@ -112,10 +130,10 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 }
                 incoming = snapshot?.documents.orEmpty().mapNotNull(::requestFrom)
                     .sortedByDescending { it.createdAt }
-                publish()
+                publish(1, snapshot)
             }
         listeners += firestore.collection("friendRequests").whereEqualTo("senderUid", uid)
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     onError(
                         error.localizedMessage ?: "Unable to load sent requests."
@@ -124,7 +142,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 }
                 outgoing = snapshot?.documents.orEmpty().mapNotNull(::requestFrom)
                     .sortedByDescending { it.createdAt }
-                publish()
+                publish(2, snapshot)
             }
         return ChatSubscription { listeners.forEach(ListenerRegistration::remove) }
     }
@@ -217,10 +235,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val ids =
             (friendship.get("participantIds") as? List<*>)?.filterIsInstance<String>().orEmpty()
         check(ids.size == 2 && current.uid in ids && friend.uid in ids) { "Only friends can open this conversation." }
-        val names =
-            (friendship.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
-                if (key is String && value is String) key to value else null
-            }?.toMap().orEmpty()
+        val names = friendship.get("participantUsernames").cloudStringMap().orEmpty()
         val ref = firestore.collection("conversations").document(friend.friendshipId)
         val existing = ref.get().await()
         if (existing.exists()) return checkNotNull(conversationFrom(existing))
@@ -318,10 +333,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     // Converts a Firestore chat record into the app conversation model.
     private fun conversationFrom(row: DocumentSnapshot): ChatConversation? {
         val ids = (row.get("participantIds") as? List<*>)?.filterIsInstance<String>() ?: return null
-        val names =
-            (row.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
-                if (key is String && value is String) key to value else null
-            }?.toMap().orEmpty()
+        val names = row.get("participantUsernames").cloudStringMap().orEmpty()
         val friendshipId = row.getString("friendshipId") ?: row.id.takeIf { row.getString("type") == "SUPPORT" }
             ?: return null
         return ChatConversation(

@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,6 +29,38 @@ import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
 class AccessibilityUiTest : OliveUiTestBase() {
+    @Test
+    fun followingUserCoordinatesRefreshWithTheMapFeed() {
+        val point = com.olive.app.data.location.MapLocationPoint(
+            "map-fixture", "Test map user", 53.5, -113.5, 1000L, true, 6f
+        )
+        val points = androidx.compose.runtime.mutableStateOf(listOf(point))
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                OliveTheme {
+                    com.olive.app.ui.users.user.location.InteractiveLocationMap(
+                        points = points.value,
+                        ownPointUid = null,
+                        detailsOnlyForSelectedPoint = true,
+                        userSearchEnabled = true,
+                        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+        waitFor("search_user_location")
+        click("search_user_location")
+        click("location_user_map-fixture")
+        compose.onNodeWithTag("followed_user_latitude").assertTextContains("53.5", substring = true)
+        compose.runOnIdle {
+            points.value = listOf(point.copy(latitude = 53.5123456, longitude = -113.5345678, updatedAt = 2000L))
+        }
+        compose.onNodeWithTag("followed_user_latitude").assertTextContains("53.5123456", substring = true)
+        compose.onNodeWithTag("followed_user_longitude").assertTextContains("-113.5345678", substring = true)
+        compose.runOnIdle { points.value = emptyList() }
+        compose.onNodeWithTag("followed_user_coordinates").assertDoesNotExist()
+    }
+
     // Checks the admin counts read as one label per card step with the test's sample data.
     @Test
     fun adminCountsReadAsOneLabelPerCard() {
@@ -83,7 +116,12 @@ class AccessibilityUiTest : OliveUiTestBase() {
         waitFor("safe_settings")
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
-        compose.onNodeWithContentDescription("Returned to Olive")
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(
+                R.string.a11y_returned_to_cover,
+                session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
+            ),
+        )
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.LiveRegion,
@@ -116,9 +154,16 @@ class AccessibilityUiTest : OliveUiTestBase() {
         register()
         unlock()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Messages) }
+        waitFor("messages_dms_tab")
+        compose.onNodeWithTag("messages_dms_tab").assertIsSelected()
+        compose.onNodeWithTag("message_username").assertExists()
+        click("messages_tickets_tab")
+        compose.onNodeWithTag("messages_tickets_tab").assertIsSelected()
+        compose.onNodeWithTag("message_username").assertDoesNotExist()
+        click("messages_dms_tab")
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val uid = requireNotNull(session.coverAccountId)
-            session.navigation.openSafePage(SafePage.Messages)
             session.messages.openConversation(
                 ChatConversation(
                     "a11y-chat",

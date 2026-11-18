@@ -1,5 +1,5 @@
 // Tests domain routing for public visitors and signed-in users.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverageFixture";
 
 // The download and organization pages use paths on the main website instead of separate subdomains.
 test("download and organization pages open from the main website", async ({

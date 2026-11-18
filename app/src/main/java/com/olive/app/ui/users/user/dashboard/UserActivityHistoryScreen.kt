@@ -193,6 +193,13 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 }, uiText(R.string.search_activity_between_optional_local_date_and_time_values)
             )
         }
+        if (session.loadingHistory || session.historyLoadFailed) {
+            item {
+                if (session.loadingHistory) LoadingSkeleton(SkeletonLayout.History, rows = 3)
+                else AccessibleMessage(stringResource(R.string.account_history_load_failed))
+            }
+            return@LazyColumn
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActivityDateTimePicker(uiText(R.string.from), from, "activity_from") { from = it }

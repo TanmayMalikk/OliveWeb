@@ -1,6 +1,8 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data.safety
 
+import com.olive.app.data.sync.cloudStringMap
+
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -45,8 +47,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
             if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
         }
 
-        @Suppress("UNCHECKED_CAST")
-        val existingWrapped = existing?.get("wrappedKeys") as? Map<String, String> ?: emptyMap()
+        val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
         val documentKey: SecretKey = existingWrapped[ownerUid]?.let(KeyManager::unwrapKey)
             ?: EncryptionUtils.generateSymmetricKey()
 
@@ -94,8 +95,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         if (!snapshot.exists()) throw Exception("Document not found.")
 
-        @Suppress("UNCHECKED_CAST")
-        val wrappedKeysMap = snapshot.get("wrappedKeys") as? Map<String, String>
+        val wrappedKeysMap = snapshot.get("wrappedKeys").cloudStringMap()
             ?: throw Exception("Encryption keys missing from document.")
 
         // 1. Find the current user's specific wrapped key
@@ -131,10 +131,11 @@ internal val SAFETY_SECTIONS = listOf(
     "dependants",
     "aftercare",
     "documents",
-    "grab"
+    "grab",
+    "finances",
 )
 internal val SAFETY_CHECKLIST_SECTIONS =
-    listOf("documents", "grab", "destination", "travel", "contacts", "aftercare")
+    listOf("documents", "grab", "destination", "travel", "contacts", "finances", "aftercare")
 internal val SAFETY_FIELD_KEYS =
     listOf("primary", "backup").flatMap { plan -> SAFETY_SECTIONS.map { "${plan}_$it" } }
 
@@ -218,7 +219,7 @@ internal data class SafetyPlan(
         .put("pendingConflicts", JSONObject(pendingConflicts.mapValues { (_, conflict) ->
             JSONObject().put("value", conflict.value).put("mutationId", conflict.mutationId)
         }))
-        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> org.json.JSONArray(ids) }))
+        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> JSONArray(ids) }))
 
     companion object {
         // Rebuilds a safety plan from its encrypted JSON fields.

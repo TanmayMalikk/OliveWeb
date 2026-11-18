@@ -306,12 +306,12 @@ private fun HeartRateGraphCard(
                             val peakFraction = (day.peakBpm - minimum) / (maximum - minimum)
                             val isSelected = day.date == selectedDate
                             drawCircle(
-                                color = if (isSelected) OliveGreen else OliveGreen.copy(alpha = 0.38f),
+                                color = if (isSelected) OliveGreen else Muted,
                                 radius = if (isSelected) 6.dp.toPx() else 4.dp.toPx(),
                                 center = Offset(x, bottom - height * peakFraction),
                             )
                             drawLine(
-                                color = if (isSelected) OliveGreen else OliveGreen.copy(alpha = 0.38f),
+                                color = if (isSelected) OliveGreen else Muted,
                                 start = Offset(x, bottom - height * lowFraction),
                                 end = Offset(x, bottom - height * peakFraction),
                                 strokeWidth = if (isSelected) 12.dp.toPx() else 8.dp.toPx(),

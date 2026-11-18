@@ -1,6 +1,14 @@
 // Watch fitness users: provides the cards, tabs, and progress displays used by the watch screen.
 package com.olive.app.wear
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -9,7 +17,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,8 +52,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
@@ -143,27 +148,42 @@ internal fun CircularStepSummary(
 // Lets watch users switch between Home, Move, Vitals, and Food summaries.
 @Composable
 internal fun WatchTabs(selectedPage: WatchPage, onSelected: (WatchPage) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(CircleShape).background(WatchPaleOlive).padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        WatchPage.entries.forEach { page ->
-            val selected = page == selectedPage
-            Button(
-                onClick = { onSelected(page) },
-                modifier = Modifier.weight(1f).height(40.dp).semantics {
-                    role = Role.Tab
-                    this.selected = selected
-                    contentDescription = "${page.label} tab"
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selected) WatchAccent else Color.Transparent,
-                    contentColor = if (selected) WatchSurface else WatchAccent,
-                ),
-                contentPadding = PaddingValues(0.dp),
-                shape = CircleShape,
-            ) {
-                Text(page.label, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    val scroll = rememberScrollState()
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Wear buttons impose minimum dimensions that overflow four equal slots on small round screens.
+        // Use actual tab semantics and compact pill geometry; scroll rather than clip at larger font scales.
+        val minimumWidth = (48f * fontScale.coerceAtLeast(1f)).dp
+        val scrolling = maxWidth < minimumWidth * WatchPage.entries.size
+        val tabWidth = if (scrolling) minimumWidth else maxWidth / WatchPage.entries.size
+        val density = LocalDensity.current
+        LaunchedEffect(selectedPage, maxWidth, fontScale) {
+            if (scrolling) {
+                val target = with(density) {
+                    (tabWidth * selectedPage.ordinal - (maxWidth - tabWidth) / 2).roundToPx()
+                }
+                scroll.animateScrollTo(target.coerceAtLeast(0))
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(WatchPaleOlive)
+                .then(if (scrolling) Modifier.horizontalScroll(scroll) else Modifier)
+                .selectableGroup(),
+        ) {
+            WatchPage.entries.forEach { page ->
+                val selected = page == selectedPage
+                Box(
+                    modifier = Modifier.width(tabWidth).height(48.dp).padding(2.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (selected) WatchAccent else Color.Transparent)
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelected(page) })
+                        .semantics { contentDescription = "${page.label} tab" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(page.label, color = if (selected) WatchSurface else WatchAccent,
+                        fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                        textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

@@ -96,3 +96,33 @@ test("account changes write a revision and wake devices registered for app notif
     android: {priority: "normal"},
   }]);
 });
+
+test("revoked media access and conversation membership update the old and new recipients", async () => {
+  const fixture = require("./test-support/runtime.cjs");
+  const f = fixture({"./mediaTickets": {reconcilePlanMediaGrants: async () => {}}});
+  const triggers = f.load("syncInvalidations");
+  const written = (before, after) => ({
+    data: {before: {exists: true, data: () => before}, after: {exists: true, data: () => after}},
+  });
+  const before = {participantIds: ["owner", "removed"]};
+  await triggers.syncConversationInvalidation(written(before, {...before, lastMessageId: "new-message"}));
+  assert.equal(f.records.size, 0);
+  await triggers.syncMediaInvalidation(written(
+      {owner_id: "owner", allowed_users: ["removed"]},
+      {owner_id: "owner", allowed_users: ["added"]},
+  ));
+  const marker = (uid) => f.records.get(`syncInvalidations/${uid}`);
+  assert.equal(marker("removed").urgentRevision, 1);
+  assert.equal(marker("added").urgentRevision, 0);
+  for (const uid of ["owner", "removed", "added"]) assert.equal(marker(uid).mediaRevision, 1);
+
+  await triggers.syncConversationInvalidation(written(before, {participantIds: ["owner", "added"]}));
+  for (const uid of ["owner", "removed", "added"]) {
+    assert.equal(marker(uid).conversationRevision, 1);
+    assert.deepEqual(marker(uid).allowedUsers, [uid]);
+    assert.equal(marker(uid).revision, 2);
+  }
+  await triggers.syncConversationDeviceKeyInvalidation(written({uid: "owner"}, {uid: "owner"}));
+  assert.equal(marker("owner").conversationRevision, 2);
+  assert.equal(marker("added").conversationRevision, 1);
+});

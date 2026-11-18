@@ -1,5 +1,6 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
+import { BirthdayField } from "../../../components/BirthdayField";
 import { siteHref } from "../../../sites/SiteRouting";
 import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound, UserRoundPlus } from "lucide-react";
 import {
@@ -218,6 +219,48 @@ export function AuthPage({
   );
 }
 // Collects the profile details required after a new account signs in.
+function AffectedPeopleFields({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [people, setPeople] = useState(() => value.split("\n").filter(Boolean).map((line) => {
+    const match = /^(.*) \(([0-9]{1,3})\)$/.exec(line);
+    return match ? { name: match[1], age: match[2] } : { name: line, age: "" };
+  }));
+  const rows = people.length ? people : [{ name: "", age: "" }];
+  function update(next: typeof rows) {
+    const saved = next.filter(({ name }) => name.trim()).map(({ name, age }) =>
+      name.trim() + (age ? ` (${age})` : ""),
+    ).join("\n");
+    if (saved.length <= 500) {
+      setPeople(next);
+      onChange(saved);
+    }
+  }
+  return <fieldset className="field full">
+    <legend>People affected (optional)</legend>
+    {rows.map((person, index) => (
+      <div className="field" key={index}>
+        <Field label={`Person ${index + 1} name`} value={person.name}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            update(rows.map((row, i) => i === index ? { ...row, name: event.target.value } : row))}
+        />
+        <Field label={`Person ${index + 1} age (optional)`} type="number" min={0} max={130}
+          value={person.age} onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            const age = event.target.value;
+            if (!age || (/^[0-9]{1,3}$/.test(age) && Number(age) <= 130)) {
+              update(rows.map((row, i) => i === index ? { ...row, age } : row));
+            }
+          }}
+        />
+        {rows.length > 1 && <button type="button" className="button outline"
+          onClick={() => update(rows.filter((_, i) => i !== index))}
+        >Remove person {index + 1}</button>}
+      </div>
+    ))}
+    <button type="button" className="button outline" disabled={!rows.at(-1)?.name.trim() || value.length >= 500}
+      onClick={() => update([...rows, { name: "", age: "" }])}
+    >Add another person</button>
+  </fieldset>;
+}
+
 export function Setup() {
   const session = useSession();
   const identity = accounts.identity!;
@@ -267,19 +310,16 @@ export function Setup() {
         {step === 1 ? (
           <Form
             className="setup-form"
-            onSubmit={async () => {
+            onSubmit={async (data) => {
               await session.perform(async () => {
-                if (
-                  !profile.fullName.trim() ||
-                  !profile.dob ||
-                  new Date(profile.dob) > new Date() ||
-                  !profile.address.city.trim()
-                )
-                  throw new Error(
-                    "Add your name, a valid birth date, and city.",
-                  );
-                if (personal) setStep(2);
-                else await session.completeSetup(profile, "");
+                const next = { ...profile, dob: String(data.get("dob") ?? "") };
+                if (!next.fullName.trim() || !next.dob || !next.address.city.trim()) {
+                  throw new Error("Add your name, a valid birth date, and city.");
+                }
+                if (personal) {
+                  setProfile(next);
+                  setStep(2);
+                } else await session.completeSetup(next, "");
               });
             }}
           >
@@ -294,16 +334,7 @@ export function Setup() {
                 required
                 maxLength={120}
               />
-              <Field
-                label="Date of birth"
-                type="date"
-                value={profile.dob}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  update("dob", e.target.value)
-                }
-                max={new Date().toISOString().slice(0, 10)}
-                required
-              />
+              <BirthdayField defaultValue={profile.dob} required />
               <Field
                 label="City"
                 value={profile.address.city}
@@ -319,14 +350,7 @@ export function Setup() {
               />
               {personal && (
                 <>
-                  <Field
-                    label="People affected (optional)"
-                    value={profile.affectedNames}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      update("affectedNames", e.target.value)
-                    }
-                    maxLength={500}
-                  />
+                  <AffectedPeopleFields value={profile.affectedNames} onChange={(value) => update("affectedNames", value)} />
                   <Field
                     label="Person causing harm (optional)"
                     value={profile.abuserName}
@@ -337,6 +361,7 @@ export function Setup() {
                   />
                   <label className="field full">
                     <span>Anything you’d like to note (optional)</span>
+                    <span>If you choose to share, describe what is happening, such as physical, emotional, or financial harm.</span>
                     <textarea
                       value={profile.situation}
                       onChange={(e) => update("situation", e.target.value)}

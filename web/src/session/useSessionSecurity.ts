@@ -3,12 +3,14 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from "react";
 import { accounts } from "../services/AccountService";
 import { validEntryToken } from "../services/PrivateEntryLinks";
+import { database } from "../services/LocalDataStore";
 import {
   emptyHistory,
   type Enrollment,
@@ -19,6 +21,14 @@ import type { SiteMode } from "../sites/SiteRouting";
 import type { SessionPhase } from "./SessionContext";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
+
+export const idleTimeoutOptions = [60, 120, 180, 240, 300, 360, 420, 450] as const;
+const defaultIdleTimeout = idleTimeoutOptions[0];
+function normalizeIdleTimeout(seconds: unknown) {
+  return typeof seconds === "number"
+    ? idleTimeoutOptions.filter((option) => option <= seconds).at(-1) ?? defaultIdleTimeout
+    : defaultIdleTimeout;
+}
 
 // Web private entry: Keeps the safe session locked when it is not in use. It watches navigation, entry links, and idle time, then clears private data before returning to a cover.
 export function useSessionSecurity({
@@ -67,6 +77,28 @@ export function useSessionSecurity({
   roleRef.current = role;
   const buttonOnlyExit =
     role === "SAFE_CONTACT" || role === "STAFF" || role === "ADMIN";
+  const idleUid = phase === "safe" && role === "USER" ? accounts.identity?.uid : undefined;
+  const [idlePreference, setIdlePreference] = useState<{ uid: string; seconds: number }>();
+  const idleTimeoutSeconds = idlePreference?.uid === idleUid
+    ? idlePreference?.seconds ?? defaultIdleTimeout
+    : defaultIdleTimeout;
+
+  useEffect(() => {
+    if (!idleUid) return;
+    let active = true;
+    void database.then((db) => db.get("device", `idle-timeout:${idleUid}`)).then((value) => {
+      if (active) setIdlePreference((current) => current?.uid === idleUid ? current
+        : { uid: idleUid, seconds: normalizeIdleTimeout(value) });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [idleUid]);
+
+  async function setIdleTimeoutSeconds(seconds: number) {
+    if (!idleUid) return;
+    const normalized = normalizeIdleTimeout(seconds);
+    await (await database).put("device", normalized, `idle-timeout:${idleUid}`);
+    if (accounts.identity?.uid === idleUid) setIdlePreference({ uid: idleUid, seconds: normalized });
+  }
 
   // Web private entry: Installs navigation guards for the private session. The handlers clear account data before browser back or hash changes can expose another screen.
   useEffect(() => {
@@ -184,12 +216,13 @@ export function useSessionSecurity({
     events.forEach((event) =>
       document.addEventListener(event, noteInteraction),
     );
+    const lockAt = idleTimeoutSeconds * 1_000;
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastInteraction.current;
-      if (elapsed >= 75_000) quickExit();
+      if (elapsed >= lockAt) quickExit();
       else
         setIdleSeconds(
-          elapsed >= 60_000 ? Math.ceil((75_000 - elapsed) / 1000) : null,
+          elapsed >= lockAt - 15_000 ? Math.ceil((lockAt - elapsed) / 1000) : null,
         );
     }, 500);
     return () => {
@@ -198,7 +231,7 @@ export function useSessionSecurity({
         document.removeEventListener(event, noteInteraction),
       );
     };
-  }, [buttonOnlyExit, phase, noteInteraction, quickExit, setIdleSeconds]);
+  }, [buttonOnlyExit, idleTimeoutSeconds, phase, noteInteraction, quickExit, setIdleSeconds]);
 
-  return noteInteraction;
+  return { noteInteraction, idleTimeoutSeconds, setIdleTimeoutSeconds };
 }

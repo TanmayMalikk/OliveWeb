@@ -237,7 +237,9 @@ service cloud.firestore {
         && p.region is string && p.region.size() <= 200
 
         && p.triggerHash is string
-        && (p.triggerHash.matches('[a-f0-9]{64}') || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
+        && (p.triggerHash.matches('[a-f0-9]{64}')
+          || p.triggerHash.matches('600000:[A-Za-z0-9+/]{22}==:[A-Za-z0-9+/]{43}=')
+          || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
 
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 
@@ -265,6 +267,18 @@ service cloud.firestore {
 
         && contactAt(p.contacts,24);
 
+    }
+
+    // Fitness history and goals are private to the signed-in profile. Deletions use tombstones for offline sync.
+    match /users/{uid}/fitness/{entryId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && entryId.matches('[A-Za-z0-9_-]{1,180}')
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'payload', 'updatedAt'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.payload is string && request.resource.data.payload.size() <= 524288
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
 
     match /users/{uid} {
@@ -301,7 +315,7 @@ service cloud.firestore {
       }
       function validEncryptedMedia(data, id) {
         return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
-            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready'])
+            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready','emergency_id'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
           && data.encrypted_metadata is string && data.encrypted_metadata.size() > 0
@@ -327,7 +341,10 @@ service cloud.firestore {
         && validFileMetadata(request.resource.data, fileId);
       // A direct document read can validate both authorization and the complete stored shape because
       // Firestore evaluates the rule against one concrete resource.
-      allow get: if signedIn() && request.auth.uid in resource.data.allowed_users
+      allow get: if signedIn() &&
+        (request.auth.uid in resource.data.allowed_users ||
+          (request.auth.token.role == 'ADMIN' && resource.data.keys().hasAny(['emergency_id']) &&
+            get(/databases/$(database)/documents/emergencyReports/$(resource.data.emergency_id)).data.mediaId == fileId))
         && (validFileMetadata(resource.data, fileId) || validEncryptedMedia(resource.data, fileId));
       // Collection rules are evaluated against every *possible* query result, not only the records
       // currently stored. The Android client constrains this listener with
@@ -691,6 +708,11 @@ service cloud.firestore {
       }
     }
 
+    match /emergencyReports/{id} {
+      allow read: if request.auth != null &&
+        (request.auth.token.role == 'ADMIN' || resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
     match /{document=**} { allow read, write: if false; }
 
   }

@@ -25,25 +25,33 @@ html { font-size: 100%; }
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-/* Cover game users: game artwork fills its panel but never widens the page. */
+/* Cover game users: game artwork fills its panel cleanly without overflowing horizontally or vertically. */
 .grove-game,
 .flight-arena,
 .crossing-arena,
 .memory-arena,
+.canvas-arena,
+.merge-arena,
 .flight-stage,
-.crossing-stage,
-.memory-grid {
+.crossing-stage {
   inline-size: 100%;
   min-inline-size: 0;
   max-inline-size: 100%;
   overflow-x: clip;
 }
+.canvas-stage,
+.merge-board-wrap,
+.memory-grid {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
 
 @media (min-width: 48.01rem) {
   .grove-main {
     width: 100%;
-    max-width: none;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    max-width: 96rem;
+    grid-template-columns: clamp(14.5rem, 20vw, 17rem) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
   }
@@ -51,15 +59,9 @@ html { font-size: 100%; }
   .grove-intro {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
+    justify-content: flex-start;
+    align-items: stretch;
     min-width: 0;
-  }
-
-  .grove-intro > .grove-games,
-  .grove-intro > .memory-options {
-    width: 100%;
-    margin-top: clamp(0.75rem, 1.5svh, 1.25rem);
   }
 
   .grove-game {

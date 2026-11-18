@@ -105,7 +105,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Enforce Functions line coverage threshold
-        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 30 --name "Cloud Functions"
+        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 85 --name "Cloud Functions"
 
       - name: Upload Functions coverage report
         if: always()

@@ -40,10 +40,11 @@ import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
+import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
+import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import java.util.function.Consumer
 import android.app.Application
 import com.google.firebase.auth.FirebaseAuth
-import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import android.app.Activity
 import com.olive.app.data.update.AppUpdateScheduler
 import com.olive.app.data.messaging.VoipCallForegroundService
@@ -102,7 +103,7 @@ class OliveActivity : FragmentActivity() {
     // Counts changes to location permission.
     private var locationPermissionVersion by mutableIntStateOf(0)
     private val permissions =
-        AppPermissions(this, { !session.localMode }, { session.accountRole == AccountRole.USER }) {
+        AppPermissions(this, { !session.localMode }) {
             locationPermissionVersion++
             session.syncLocalNotificationHandler()
         }
@@ -143,7 +144,7 @@ class OliveActivity : FragmentActivity() {
                 selectedCover,
                 selectedRole,
                 session.screen,
-                session.page
+                session.page,
             ) { applySystemBarContrast() }
             // Keep the current activity available to privacy and permission callbacks.
             LaunchedEffect(notificationAccountId, selectedCover, selectedRole) {
@@ -159,17 +160,22 @@ class OliveActivity : FragmentActivity() {
                 selectedRole,
                 locationPermissionVersion,
             ) {
-                if (notificationAccountId != null && selectedRole == AccountRole.USER &&
+                if (!session.localMode && notificationAccountId != null && selectedRole == AccountRole.USER &&
                     permissions.hasLocation() && permissions.hasBackgroundLocation()
                 ) {
                     AdminLocationService.start(this@OliveActivity, notificationAccountId, locationAccountName)
-                } else if (selectedRole != AccountRole.USER || notificationAccountId == null) {
-                    if (AdminLocationService.active(this@OliveActivity)) {
-                        AdminLocationService.stop(this@OliveActivity)
-                    }
+                } else if (AdminLocationService.active(this@OliveActivity)) {
+                    AdminLocationService.stop(this@OliveActivity)
                 }
             }
-            CompositionLocalProvider(com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest provides permissions::requestLocation) {
+            val backgroundLocationRequest: (suspend () -> Boolean)? =
+                androidx.compose.runtime.remember(locationPermissionVersion) {
+                    if (permissions.hasBackgroundLocation()) null else permissions::requestBackgroundLocation
+                }
+            CompositionLocalProvider(
+                LocalLocationPermissionRequest provides permissions::requestLocation,
+                LocalBackgroundLocationPermissionRequest provides backgroundLocationRequest,
+            ) {
                 OliveTheme {
                     OliveRoot(session, locationPermissionVersion, closeApp = ::closeAfterQuickExit)
                 }
@@ -204,9 +210,9 @@ class OliveActivity : FragmentActivity() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
-        // Home/onStop still lock the safe area; a permission result never restores a private screen.
+        // The Safe App stays on its current page until the system permission result arrives.
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
         ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
@@ -217,7 +223,7 @@ class OliveActivity : FragmentActivity() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
         ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
@@ -226,6 +232,7 @@ class OliveActivity : FragmentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        locationPermissionVersion++
         closingForQuickExit = false
         session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
@@ -233,13 +240,15 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         removeRecentPrivacyCoverAfterRedraw()
-        if (LiveLocationController.active(this)) {
+        if (permissions.hasLocation() && LiveLocationController.active(this)) {
             ContextCompat.startForegroundService(
                 this,
                 Intent(this, LiveLocationService::class.java).setAction(LiveLocationService.PING)
             )
         }
-        if (AdminLocationService.active(this)) {
+        if (!session.localMode && permissions.hasLocation() && permissions.hasBackgroundLocation() &&
+            AdminLocationService.active(this)
+        ) {
             ContextCompat.startForegroundService(this, Intent(this, AdminLocationService::class.java))
         }
     }
@@ -281,7 +290,7 @@ class OliveActivity : FragmentActivity() {
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
-            !session.callPermissionRequestOpen && (session.deviceLockRequest != null ||
+            !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,
@@ -311,7 +320,10 @@ class OliveActivity : FragmentActivity() {
         recordingCallback = null
         session.recordingStopped()
         super.onStop()
-        runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
+        if (!permissions.awaitingResult && !session.externalFilePickerOpen && !session.callPermissionRequestOpen &&
+            !session.safeSystemActivityOpen) {
+            runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
+        }
     }
 
     private fun closeAfterQuickExit() {
@@ -378,15 +390,11 @@ class OliveActivity : FragmentActivity() {
     private fun applySystemBarContrast() {
         val transparent = Color.TRANSPARENT
         val camera = session.screen == SessionScreen.Safe && session.page == SafePage.Camera
+        val barStyle = if (camera) SystemBarStyle.dark(transparent)
+            else SystemBarStyle.light(transparent, transparent)
         enableEdgeToEdge(
-            statusBarStyle = if (camera) SystemBarStyle.dark(transparent) else SystemBarStyle.light(
-                transparent,
-                transparent
-            ),
-            navigationBarStyle = if (camera) SystemBarStyle.dark(transparent) else SystemBarStyle.light(
-                transparent,
-                transparent
-            ),
+            statusBarStyle = barStyle,
+            navigationBarStyle = barStyle,
         )
     }
 
@@ -429,6 +437,9 @@ class OliveApplication : Application() {
     // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
+        cacheDir.listFiles { file ->
+            file.name.startsWith(com.olive.app.ui.users.shared.messaging.VOICE_DRAFT_PREFIX)
+        }?.forEach(java.io.File::delete)
         if (BuildConfig.FIREBASE_CONFIGURED) {
             com.google.firebase.firestore.FirebaseFirestore.getInstance().firestoreSettings =
                 com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
@@ -442,7 +453,7 @@ class OliveApplication : Application() {
             AppCheckProviderInstaller.install()
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
                 // The watch follows the account currently authenticated on this phone.
-                FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
+                com.olive.app.ui.covers.fitness.FitnessAccountSync.bind(this@OliveApplication, auth.currentUser?.uid)
                 if (auth.currentUser != null) LocalNotificationEventHandler.start(this@OliveApplication)
                 else LocalNotificationEventHandler.cancel(this@OliveApplication)
             }

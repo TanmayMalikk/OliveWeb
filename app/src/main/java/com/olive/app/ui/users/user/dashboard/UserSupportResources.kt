@@ -7,6 +7,13 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -17,6 +24,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -47,6 +56,8 @@ internal val LocalHotlineLocationLookup =
     staticCompositionLocalOf<suspend (Context) -> DeliveryAddress?> { DeviceLocation::address }
 internal val LocalLocationPermissionRequest =
     staticCompositionLocalOf<suspend () -> Boolean> { { false } }
+internal val LocalBackgroundLocationPermissionRequest =
+    staticCompositionLocalOf<(suspend () -> Boolean)?> { null }
 
 // Start from the saved address. Device lookup is explicit and never writes the detected address to the account.
 @Composable
@@ -54,14 +65,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     val context = LocalContext.current
     val directory by produceState<Result<HotlineDirectory>?>(null, context) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                val files = context.assets.list("hotlines/provinces").orEmpty().associate { name ->
-                    name.removePrefix("Resources").removeSuffix(".json") to
-                            context.assets.open("hotlines/provinces/$name").bufferedReader()
-                                .use { it.readText() }
-                }
-                HotlineDirectory.parseProvinceFiles(files)
-            }
+            runCatching { HotlineDirectory.readBundled(context) }
         }
     }
     val catalog = directory?.getOrNull()
@@ -73,7 +77,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         )
     }
     var city by rememberSaveable(address) { mutableStateOf(address.city) }
-    var devicePlace by remember { mutableStateOf<String?>(null) }
     var locating by remember { mutableStateOf(false) }
     var locationError by remember { mutableStateOf<Int?>(null) }
     var permissionDenied by remember { mutableStateOf(false) }
@@ -100,11 +103,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                             selection = catalog?.regionFor(found)
                                 ?: if (catalog?.isCanada(found) == true) "CA" else ""
                             city = found.city
-                            devicePlace = listOf(
-                                found.city,
-                                found.province,
-                                found.country
-                            ).filter(String::isNotBlank).joinToString(", ")
                         }
                     }
                 } catch (cancelled: CancellationException) {
@@ -118,13 +116,14 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         }
     }
     var query by rememberSaveable { mutableStateOf("") }
+    var onlyAlwaysOpen by rememberSaveable { mutableStateOf(false) }
     var choosingRegion by remember { mutableStateOf(false) }
     var openFailed by remember { mutableStateOf(false) }
     val open: (String, Boolean) -> Unit =
         { url, dial -> openFailed = !openHotlineDestination(context, url, dial) }
     val matched =
         catalog?.matching(selection, city, query).orEmpty().takeIf { selection.isNotBlank() }
-            .orEmpty()
+            .orEmpty().filter { !onlyAlwaysOpen || it.hours.contains("24/7") }
     val text = rememberResourceText()
     val listState = rememberLazyListState()
     LazyColumn(
@@ -137,13 +136,13 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
             SafeBack(session)
             Heading(
                 stringResource(R.string.support_hotlines),
-                stringResource(R.string.support_location_description)
+                ""
             )
         }
         // Show a loading sign or a useful message while the hotline list loads.
         if (catalog == null) item {
             // The directory is still loading, so keep the user informed.
-            if (directory == null) CircularProgressIndicator() else {
+            if (directory == null) LoadingSkeleton(SkeletonLayout.HotlineDirectory) else {
                 AccessibleMessage(stringResource(R.string.support_load_failed))
                 TextButton(onClick = {
                     open(
@@ -159,10 +158,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         if (catalog != null) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        stringResource(R.string.support_show_region),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.semantics { heading() })
                     Box {
                         OutlinedButton(
                             onClick = { choosingRegion = true },
@@ -185,7 +180,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                                         ?: if (catalog.isCanada(address)) "CA" else ""
                                     city =
                                         address.city
-                                    devicePlace = null
                                     locationError =
                                         null
                                     choosingRegion = false
@@ -198,8 +192,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                                         selection = code
                                         city =
                                             if (code == savedRegion) address.city else ""
-                                        devicePlace =
-                                            null
                                         locationError = null
                                         choosingRegion = false
                                     },
@@ -214,16 +206,6 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                         modifier = Modifier.fillMaxWidth().testTag("hotline_use_device_location")
                     ) {
                         Text(stringResource(if (locating) R.string.support_finding_location else R.string.support_use_device_location))
-                    }
-                    // Tell the user whether results use their saved or detected location.
-                    if (devicePlace != null || (selection == savedRegion && city.isNotBlank())) {
-                        Text(
-                            stringResource(
-                                if (devicePlace != null) R.string.support_device_location_current else R.string.support_saved_location_current,
-                                devicePlace ?: city
-                            ),
-                            modifier = Modifier.testTag("hotline_location_summary")
-                                .semantics { liveRegion = LiveRegionMode.Polite })
                     }
                     locationError?.let { error ->
                         AccessibleMessage(
@@ -250,6 +232,12 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                         Field(text(R.string.support_search), query, "hotline_search") {
                             query = it.take(160)
                         }
+                        FilterChip(
+                            selected = onlyAlwaysOpen,
+                            onClick = { onlyAlwaysOpen = !onlyAlwaysOpen },
+                            label = { Text(stringResource(R.string.hotline_filter_247)) },
+                            modifier = Modifier.testTag("hotline_filter_247"),
+                        )
                     } else Text(stringResource(R.string.support_outside_canada))
                 }
             }
@@ -315,10 +303,13 @@ private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Bool
                 Modifier.semantics(mergeDescendants = true) {},
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    resource.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.semantics { heading() })
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        resource.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f).semantics { heading() })
+                    if (resource.hours.contains("24/7")) HotlineAlwaysOpenIndicator()
+                }
                 Text(
                     stringResource(if (resource.kind == HotlineResourceKind.Hotline) R.string.support_resource_hotline else R.string.support_resource_shelter),
                     color = OliveGreen, style = MaterialTheme.typography.labelLarge
@@ -329,6 +320,9 @@ private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Bool
                     color = Muted
                 )
                 Text(resource.description, style = MaterialTheme.typography.bodyMedium)
+                if (resource.hours.isNotBlank()) {
+                    Text(stringResource(R.string.resource_hours, resource.hours), style = MaterialTheme.typography.bodyMedium)
+                }
                 Text(resource.phone, style = MaterialTheme.typography.headlineSmall)
             }
             FlowRow(
@@ -362,6 +356,23 @@ private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Bool
             }
         }
     }
+}
+
+@Composable
+private fun HotlineAlwaysOpenIndicator() {
+    val description = stringResource(R.string.hotline_available_247)
+    val transition = rememberInfiniteTransition(label = "24/7 hotline availability")
+    val opacity by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
+        label = "Availability light opacity",
+    )
+    Box(
+        Modifier.size(12.dp).alpha(opacity)
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .semantics { contentDescription = description },
+    )
 }
 
 // Opening a dialer never calls automatically and needs no phone permission. Android leaving the app locks the safe area.

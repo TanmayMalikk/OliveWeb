@@ -4,6 +4,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 tasks.named("check") {
@@ -66,6 +67,7 @@ android {
     buildTypes {
         getByName("debug") {
             enableUnitTestCoverage = true
+            enableAndroidTestCoverage = providers.gradleProperty("oliveDeviceCoverage").orNull.equals("true", ignoreCase = true)
         }
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
@@ -142,6 +144,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
+    implementation("androidx.health.connect:connect-client:1.1.0")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-messaging")
@@ -153,7 +156,9 @@ dependencies {
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
     implementation("com.google.android.gms:play-services-location:21.4.0")
     implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.jsoup:jsoup:1.24.1")
     implementation(project(":ppocr-sdk"))
@@ -172,6 +177,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("org.mockito:mockito-core:5.20.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
@@ -190,3 +196,5 @@ val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseConfiguration) }
+
+apply(from = rootProject.file("gradle/device-coverage.gradle.kts"))

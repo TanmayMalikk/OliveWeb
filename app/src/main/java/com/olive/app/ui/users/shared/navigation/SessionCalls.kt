@@ -63,12 +63,13 @@ internal class SessionCalls(
     private val application: Application,
     private val scope: CoroutineScope,
     private val manager: VoipManager = VoipManager(),
+    private val controller: VoipSessionController = VoipSessionController.create(application, manager),
+    private val available: Boolean = isVoipApiConfigured(),
 ) {
     private val invitationPreferences = application.getSharedPreferences(
         "dismissed-voip-invitations",
         android.content.Context.MODE_PRIVATE,
     )
-    private val controller = VoipSessionController.create(application, manager)
     private var invitationJob: Job? = null
     private var callJoinJob: Job? = null
     private var observedUid: String? = null
@@ -112,7 +113,7 @@ internal class SessionCalls(
                 runCatching { VoipPushTokenRegistration.configureForRole(application, role) }
             }
         }
-        if (!canUseVoip(role) || !isVoipApiConfigured() || uid.isBlank()) {
+        if (!canUseVoip(role) || !available || uid.isBlank()) {
             stopObserving()
             return
         }
@@ -172,7 +173,7 @@ internal class SessionCalls(
 
     // Starts a call with every other person in a direct or personal group chat.
     fun start(conversation: ChatConversation, callerUid: String, role: AccountRole) {
-        if (!canCallFromConversation(role, conversation, callerUid)) {
+        if (!canCallFromConversation(role, conversation, callerUid, available)) {
             message = "Voice calls are available only in personal User and Safe Contact chats"
             return
         }

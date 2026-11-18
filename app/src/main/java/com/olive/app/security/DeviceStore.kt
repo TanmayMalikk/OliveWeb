@@ -180,6 +180,7 @@ class DeviceStore(
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
                 remove("pinVerifier")
                 remove("lockedUntil")
+                remove("pinLockouts")
                 put("failures", 0)
             }
         }
@@ -194,6 +195,10 @@ class DeviceStore(
             val saved = root.getJSONObject("enrollments").getJSONObject(uid)
             require(AccountRole.fromStored(saved.optString("role")) == AccountRole.USER) { "This account does not use a PIN" }
             check(enrollment(uid, saved).allowsAppPin())
+            if (saved.optLong("lockedUntil") > now) {
+                result = PinResult.Rejected(5)
+                return@update
+            }
             val verifier = saved.getString("pinVerifier")
             val accepted = SecretVerifier.matches(pin, verifier)
             val next = if (accepted) GateState() else GateState(saved.optInt("failures")).failed()
@@ -202,8 +207,14 @@ class DeviceStore(
                 SecretVerifier.createPin(pin)
             )
             saved.put("failures", if (next.failures >= 5) 0 else next.failures)
-            // Ignore and remove cooldowns written by earlier app versions.
-            saved.remove("lockedUntil")
+            if (accepted) {
+                saved.remove("lockedUntil")
+                saved.remove("pinLockouts")
+            } else if (next.failures >= 5) {
+                val previousLockouts = saved.optInt("pinLockouts").coerceIn(0, 5)
+                saved.put("lockedUntil", now + (30_000L shl previousLockouts).coerceAtMost(900_000L))
+                saved.put("pinLockouts", (previousLockouts + 1).coerceAtMost(5))
+            }
             // Record the failed attempt without storing the PIN that was entered.
             if (!accepted) {
                 val logs = root.child("attempts")
@@ -416,6 +427,7 @@ object SecretVerifier {
 
     // The PIN stays in the Keystore-encrypted phone vault; fewer rounds make local unlock quick.
     fun createPin(pin: String): String = encode(pin, PIN_ITERATIONS)
+    fun createTrigger(normalized: String): String = encode(normalized, PASSWORD_ITERATIONS)
     // Detects older PIN records that need stronger hashing after a valid sign-in.
     fun pinNeedsUpgrade(encoded: String) =
         encoded.substringBefore(':').toIntOrNull()?.let { it > PIN_ITERATIONS } ?: false
@@ -492,9 +504,19 @@ object InputPolicy {
     // Checks whether cover input matches the saved discreet trigger phrase.
     fun validTrigger(value: String) = value.trim().length in 3..64
     // Creates the trigger hash that protects app security.
-    fun triggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
+    fun triggerHash(value: String): String = SecretVerifier.createTrigger(normalizeTrigger(value))
+
+    fun matchesTrigger(value: String, stored: String): Boolean {
+        if (!validTrigger(value) || stored.isBlank()) return false
+        return if (':' in stored) SecretVerifier.matches(normalizeTrigger(value), stored)
+        else unsaltedTriggerHash(value) == stored || legacyTriggerHash(value) == stored
+    }
+
+    private fun normalizeTrigger(value: String) = value.lowercase(Locale.ROOT).filterNot(Char::isWhitespace)
+
+    private fun unsaltedTriggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(
-            value.lowercase(Locale.ROOT).filterNot(Char::isWhitespace).toByteArray(Charsets.UTF_8)
+            normalizeTrigger(value).toByteArray(Charsets.UTF_8)
         )
         .joinToString("") { "%02x".format(it) }
 
@@ -510,20 +532,26 @@ object InputPolicy {
     }.getOrDefault(false)
 }
 
-// Count five failures without a timed cooldown; keep DeviceStore's reset and SessionAccess's exit threshold aligned.
+// Five failures trigger the cooldown in DeviceStore and close the private screen.
 data class GateState(val failures: Int = 0) {
     // Returns true when the failed-PIN limit has locked private entry.
     fun failed(): GateState =
         GateState(if (failures in 0..3) failures + 1 else if (failures == 4) 5 else 1)
 }
 
-// One minute without interaction starts a warning; accessibility settings can extend its fifteen-second default.
 object IdlePolicy {
-    // Calculates the remaining failed-entry cooldown for older saved records.
-    fun countdown(elapsedMs: Long, warningDurationMs: Long = 15_000L): Int? {
-        val lockAt = 60_000L + warningDurationMs.coerceIn(15_000L, Int.MAX_VALUE.toLong())
+    const val DEFAULT_TIMEOUT_SECONDS = 60
+    const val MAX_TIMEOUT_SECONDS = 420
+    val timeoutOptions = (1..7).map { it * 60 }
+
+    fun normalizeTimeout(seconds: Int): Int =
+        timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }
+
+    fun countdown(elapsedMs: Long, warningDurationMs: Long = 15_000L, idleDurationMs: Long = 60_000L): Int? {
+        val lockAt = idleDurationMs.coerceIn(DEFAULT_TIMEOUT_SECONDS * 1_000L, MAX_TIMEOUT_SECONDS * 1_000L)
+        val warningAt = lockAt - warningDurationMs.coerceIn(15_000L, lockAt)
         return when {
-            elapsedMs < 60_000L -> null
+            elapsedMs < warningAt -> null
             elapsedMs >= lockAt -> 0
             else -> ((lockAt - elapsedMs + 999L) / 1000L).toInt()
         }

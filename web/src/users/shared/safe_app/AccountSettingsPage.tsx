@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
+import { idleTimeoutOptions } from "../../../session/useSessionSecurity";
 import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
 import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
@@ -12,6 +13,7 @@ export default function Settings() {
   const [link, setLink] = useState<string | null>(null);
   const [confirmRotation, setConfirmRotation] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [notice, setNotice] = useState("");
   // Update the form when another device changes this account profile.
   useEffect(() => {
     let live = true;
@@ -24,8 +26,42 @@ export default function Settings() {
       live = false;
     };
   }, []);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   return (
     <div className="settings-grid">
+      {notice && (
+        <div className="status-banner status-success full" role="status">
+          <span>{notice}</span>
+          <Button variant="quiet" onClick={() => setNotice("")}>Dismiss</Button>
+        </div>
+      )}
+      {p.role === "USER" && (
+        <section className="panel">
+          <h2>Privacy</h2>
+          <label className="field">
+            <span>Idle lock delay</span>
+            <select
+              value={s.idleTimeoutSeconds}
+              disabled={s.busy}
+              onChange={(event) => {
+                const seconds = Number(event.currentTarget.value);
+                void s.perform(() => s.setIdleTimeoutSeconds(seconds));
+              }}
+            >
+              {idleTimeoutOptions.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds === 450 ? "7 min 30 sec" : `${seconds / 60} min`}
+                  {seconds <= 120 ? " (Recommended)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      )}
       <section className="panel">
         <h2>Personal entry link</h2>
         <p>
@@ -66,6 +102,7 @@ export default function Settings() {
               await accounts.changePassword(String(data.get("current")), next);
               await s.record("settings", newEvent("Changed account password"));
               s.clearMessage();
+              setNotice("Password updated.");
             });
           }}
         >
@@ -113,6 +150,7 @@ export default function Settings() {
                     p,
                   );
                   await s.record("settings", newEvent("Changed browser PIN"));
+                  setNotice("Browser PIN updated.");
                 });
               }}
             >
@@ -162,6 +200,7 @@ export default function Settings() {
                     { ...p, triggerHash: await triggerHash(value) },
                     "Updated private entry trigger",
                   );
+                  setNotice("Cover trigger updated.");
                 });
               }}
             >
@@ -208,20 +247,23 @@ export default function Settings() {
             Your previous link will stop working. Save the replacement before
             you leave.
           </p>
-          <Button
-            disabled={s.busy}
-            onClick={() =>
-              void s.perform(async () => {
-                setLink(await issueEntryLink(accounts.identity!.uid));
-                setConfirmRotation(false);
-              })
-            }
-          >
-            Create replacement
-          </Button>
-          <Button variant="quiet" onClick={() => setConfirmRotation(false)}>
-            Keep current link
-          </Button>
+          <div className="modal-actions">
+            <Button
+              disabled={s.busy}
+              onClick={() =>
+                void s.perform(async () => {
+                  setLink(await issueEntryLink(accounts.identity!.uid));
+                  setConfirmRotation(false);
+                  setNotice("Replacement personal link created.");
+                })
+              }
+            >
+              Create replacement
+            </Button>
+            <Button variant="quiet" onClick={() => setConfirmRotation(false)}>
+              Keep current link
+            </Button>
+          </div>
         </Modal>
       )}
     </div>

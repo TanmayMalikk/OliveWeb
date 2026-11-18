@@ -1,5 +1,5 @@
 // Staff and admins: reads assigned support chats and sends encrypted replies.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ArrowLeft, MessageCircle, Send, ShieldAlert } from "lucide-react";
 import { Button, Empty, Form } from "../../components/SharedComponents";
 import { accounts, cloudMode } from "../../services/AccountService";
@@ -11,6 +11,9 @@ import {
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
 import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
+
+import { sharedMessage } from "./safe_app/SharedMessageContent";
+import { VoiceMessageBubble, VoiceMessageComposer } from "./safe_app/VoiceMessages";
 
 const noMessages: Message[] = [];
 
@@ -36,8 +39,9 @@ export default function OrganizationSupportInbox() {
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [history, setHistory] = useState<{ ticketId: string; messages: Message[] } | null>(null);
   const messages = history && history.ticketId === selected?.id ? history.messages : noMessages;
-  const [room, setRoom] = useState<{ ticketId: string; key: CryptoKey } | null>(null);
-  const roomKey = room && room.ticketId === selected?.id ? room.key : null;
+  const roomScope = selected ? JSON.stringify([identity?.uid, selected.id, selected.participantIds]) : "";
+  const [room, setRoom] = useState<{ scope: string; key: CryptoKey } | null>(null);
+  const roomKey = room?.scope === roomScope ? room.key : null;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
@@ -45,6 +49,11 @@ export default function OrganizationSupportInbox() {
   const [showArchived, setShowArchived] = useState(false);
   const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
   const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [selected?.id, timeline.length]);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -92,7 +101,7 @@ export default function OrganizationSupportInbox() {
       .roomKey(selected.id, identity, selected)
       .then((key) => {
         if (!active) return undefined;
-        setRoom({ ticketId: selected.id, key });
+        setRoom({ scope: roomScope, key });
         return messaging.subscribeMessages(
           selected.id,
           key,
@@ -110,7 +119,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, selected?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
+  }, [roomScope, deviceKeyAvailable]);
 
   const visible = useMemo(
     () =>
@@ -161,19 +170,22 @@ export default function OrganizationSupportInbox() {
             role="group"
             aria-label="Ticket categories"
           >
-            {categories.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={category === item.id}
-                onClick={() => {
-                  if (category !== item.id) openTicket(null);
-                  setCategory(item.id);
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            {categories.map((item) => {
+              const count = conversations.filter((c) => !c.closedAt && categoryOf(c) === item.id).length;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={category === item.id}
+                  onClick={() => {
+                    if (category !== item.id) openTicket(null);
+                    setCategory(item.id);
+                  }}
+                >
+                  {item.label} ({count})
+                </button>
+              );
+            })}
           </div>
         )}
         {visible.length === 0 ? (
@@ -280,27 +292,45 @@ export default function OrganizationSupportInbox() {
               aria-label="Support messages"
               aria-live="polite"
             >
-              {timeline.length === 0 ? (
+              {!roomKey && !feedback ? (
+                <p className="help-note">Opening encrypted room…</p>
+              ) : timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
-                timeline.map((item) => item.kind === "membership" ? (
-                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
-                    {messaging.membershipEventText(selected, item.event, identity.role)}
-                  </p>
-                ) : (
-                  <article
-                    key={item.message.id}
-                    className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
-                  >
-                    <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
-                    <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>
-                    <time>
-                      {new Date(item.message.clientSentAt).toLocaleString()}
-                    </time>
-                  </article>
-                ))
+                timeline.map((item) => {
+                  const shared = item.kind === "message" && !item.message.deleted
+                    ? sharedMessage(item.message.body) : null;
+                  return item.kind === "membership" ? (
+                    <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                      {messaging.membershipEventText(selected, item.event, identity.role)}
+                    </p>
+                  ) : (
+                    <article
+                      key={item.message.id}
+                      className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
+                    >
+                      <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
+                      {shared?.kind === "voice" ? (
+                        <VoiceMessageBubble key={identity.uid + shared.id} mediaId={shared.id} identity={identity} />
+                      ) : <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>}
+                      <time>
+                        {new Date(item.message.clientSentAt).toLocaleString()}
+                      </time>
+                    </article>
+                  );
+                })
               )}
+              <div ref={logEndRef} />
             </div>
+            {!selected.closedAt && (
+              <VoiceMessageComposer
+                key={`${identity.uid}:${selected.id}`}
+                identity={identity}
+                conversation={selected}
+                roomKey={roomKey}
+                disabled={session.busy || !roomKey || selected.participantIds.length < 2}
+              />
+            )}
             {!selected.closedAt && (
               <Form
                 className="chat-compose"

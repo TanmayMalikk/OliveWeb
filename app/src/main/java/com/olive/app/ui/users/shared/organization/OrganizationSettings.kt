@@ -4,8 +4,6 @@ package com.olive.app.ui.users.shared.organization
 import android.util.Patterns
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -14,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -30,100 +29,112 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import com.olive.app.ui.users.user.account.SettingsSection
+import com.olive.app.ui.users.user.account.SettingsCategory
+import com.olive.app.ui.users.user.account.accountSettingsTabs
 
 
-// Shows profile and sign-out settings for staff and admin accounts.
+// Shows profile and password settings for staff and admin accounts.
 @Composable
 internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
     val profile = session.profile ?: return
     var fullName by remember(profile) { mutableStateOf(profile.fullName) }
-    var dob by remember(profile) { mutableStateOf(profile.dob) }
+    var birthday by rememberBirthdayInput(profile.dob)
+    var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
     var email by remember(profile) { mutableStateOf(profile.email) }
     var phone by remember(profile) { mutableStateOf(profile.phone) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp).padding(bottom = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
+    var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
+    OlivePrivateDesign {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
+                }
+                Text(
+                    stringResource(R.string.settings),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
             }
-            Text(
-                stringResource(R.string.account_settings),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() },
-            )
+            SecondaryScrollableTabRow(selectedTabIndex = accountSettingsTabs.indexOf(selectedTab), edgePadding = 8.dp) {
+                accountSettingsTabs.forEach { tab ->
+                    Tab(selected = selectedTab == tab, onClick = { selectedTab = tab },
+                        modifier = Modifier.testTag(tab.tag), text = { Text(uiText(tab.label)) })
+                }
+            }
+            FormColumn(scrollResetKey = selectedTab) {
+                when (selectedTab) {
+                    SettingsCategory.Permissions -> SafePermissionsSettings()
+                    SettingsCategory.Profile -> SettingsSection(uiText(R.string.settings_category_profile)) {
+                        Field(
+                            uiText(R.string.full_name),
+                            fullName,
+                            "organization_settings_name",
+                            enabled = !session.account.busy,
+                        ) { fullName = it.take(120) }
+                        BirthdayPicker(
+                            birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
+                        ) { birthday = it }
+                        Field(
+                            uiText(R.string.ui_email),
+                            email,
+                            "organization_settings_email",
+                            enabled = !session.account.busy,
+                        ) { email = it.take(254) }
+                        Field(
+                            uiText(R.string.ui_phone_optional),
+                            phone,
+                            "organization_settings_phone",
+                            enabled = !session.account.busy,
+                        ) { phone = it.take(40) }
+                        Button(
+                            onClick = {
+                                showBirthdayErrors = !InputPolicy.validDob(birthday)
+                                if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
+                            },
+                            enabled = !session.account.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.save_profile)) }
+                    }
+                    else -> SettingsSection(uiText(R.string.change_password)) {
+                        Field(
+                            uiText(R.string.current_password),
+                            currentPassword,
+                            "organization_current_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { currentPassword = it.take(128) }
+                        Field(
+                            uiText(R.string.new_password),
+                            newPassword,
+                            "organization_new_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { newPassword = it.take(24) }
+                        Field(
+                            uiText(R.string.confirm_new_password),
+                            confirmation,
+                            "organization_confirm_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { confirmation = it.take(24) }
+                        Button(
+                            onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
+                            enabled = !session.account.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.change_password)) }
+                    }
+                }
+                Status(session)
+            }
         }
-        Text(
-            uiText(R.string.ui_profile_information),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        Field(
-            uiText(R.string.full_name),
-            fullName,
-            "organization_settings_name",
-            enabled = !session.account.busy,
-        ) { fullName = it.take(120) }
-        BirthdayPicker(dob, "organization_settings_dob", !session.account.busy) { dob = it }
-        Field(
-            uiText(R.string.ui_email),
-            email,
-            "organization_settings_email",
-            enabled = !session.account.busy,
-        ) { email = it.take(254) }
-        Field(
-            uiText(R.string.ui_phone_optional),
-            phone,
-            "organization_settings_phone",
-            enabled = !session.account.busy,
-        ) { phone = it.take(40) }
-        Button(
-            onClick = { session.updateOrganizationProfile(fullName, dob, email, phone) },
-            enabled = !session.account.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.save_profile)) }
-        HorizontalDivider()
-        Text(
-            stringResource(R.string.change_password),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        Field(
-            uiText(R.string.current_password),
-            currentPassword,
-            "organization_current_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { currentPassword = it.take(128) }
-        Field(
-            uiText(R.string.new_password),
-            newPassword,
-            "organization_new_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { newPassword = it.take(24) }
-        Field(
-            uiText(R.string.confirm_new_password),
-            confirmation,
-            "organization_confirm_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { confirmation = it.take(24) }
-        Button(
-            onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
-            enabled = !session.account.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.change_password)) }
-        Status(session)
     }
 }
 
@@ -135,7 +146,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val existing = session.account.setupProfile
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
-    var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
+    var birthday by rememberBirthdayInput(existing?.dob.orEmpty())
+    val dob = birthday
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
     var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
     var page by rememberSaveable(existing?.username) { mutableIntStateOf(0) }
@@ -170,12 +182,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 showErrors = false
             }
             BirthdayPicker(
-                dob, "organization_dob", !session.account.busy,
-                error = if (showErrors && !InputPolicy.validDob(dob)) uiText(R.string.ui_birthday_required) else null
-            ) {
-                dob = it
-                showErrors = false
-            }
+                birthday, "organization_dob", !session.account.busy, showErrors,
+            ) { birthday = it }
         } else {
             Field(
                 uiText(R.string.ui_email_required),
@@ -223,39 +231,57 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
 
 /** Opens the organization feed and draws each user as a red live or last-known marker. */
 @Composable
-internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
+internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, initialFollowUid: String? = null) {
     BackHandler(onBack = onBack)
     DisposableEffect(session.coverAccountId, session.accountRole) {
         session.adminLocationMap.open(session.accountRole)
         onDispose(session.adminLocationMap::close)
     }
     val state = session.adminLocationMap.state
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        OutlinedButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
-        Text(
-            stringResource(R.string.organization_live_map),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.semantics { heading() },
+    Box(Modifier.fillMaxSize().testTag("organization_location_map")) {
+        InteractiveLocationMap(
+            points = state.points,
+            ownPointUid = null,
+            detailsOnlyForSelectedPoint = true,
+            userSearchEnabled = true,
+            initialFollowUid = initialFollowUid,
+            modifier = Modifier.fillMaxSize(),
         )
-        Box(
-            Modifier.fillMaxWidth().height(420.dp),
-            contentAlignment = Alignment.Center,
+        Surface(
+            modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = 280.dp),
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 4.dp,
         ) {
-            InteractiveLocationMap(
-                points = state.points,
-                ownPointUid = null,
-                detailsOnlyForSelectedPoint = true,
-                userSearchEnabled = true,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (state.loading) CircularProgressIndicator()
+            Row(
+                Modifier.padding(end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.testTag("organization_map_back")) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
+                }
+                Text(
+                    stringResource(R.string.organization_live_map),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+            }
         }
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (!state.loading && state.error == null && state.points.isEmpty()) {
-            Text(stringResource(R.string.organization_location_feed_empty), color = Muted)
+if (state.loading) Surface(Modifier.fillMaxSize()) {
+            LoadingSkeleton(SkeletonLayout.Map, Modifier.fillMaxSize().padding(16.dp))
+        }
+        val status = state.error ?: if (!state.loading && state.points.isEmpty())
+            stringResource(R.string.organization_location_feed_empty) else null
+        status?.let {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                AccessibleMessage(
+                    it,
+                    modifier = Modifier.padding(16.dp),
+                    color = if (state.error != null) MaterialTheme.colorScheme.error else Muted,
+                )
+            }
         }
     }
 }
@@ -271,7 +297,14 @@ internal fun OrganizationDashboardCard(
     onClick: () -> Unit,
     badgeCount: Int = 0,
 ) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    OutlinedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
         Row(
             Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,

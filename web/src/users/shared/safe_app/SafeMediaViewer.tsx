@@ -1,4 +1,4 @@
-// Safe-app users: previews a decrypted photo, video, recording, PDF, or text file without leaving Olive Branch.
+// Previews decrypted files inside Olive Branch. Audio playback is available in chats.
 import { useEffect, useState } from "react";
 import { Modal } from "../../../components/SharedComponents";
 import type { BrowserDocument } from "../../../services/MediaService";
@@ -25,10 +25,12 @@ export function SafeMediaViewer({
   document,
   url,
   onClose,
+  allowAudioPlayback = false,
 }: {
   document: BrowserDocument;
   url: string;
   onClose: () => void;
+  allowAudioPlayback?: boolean;
 }) {
   const mimeType = document.mimeType.toLowerCase().split(";", 1)[0].trim();
   const previewText = mimeType.startsWith("text/") && document.ciphertextSize <= 1024 * 1024;
@@ -39,7 +41,7 @@ export function SafeMediaViewer({
           <img src={url} alt={document.name} />
         ) : mimeType.startsWith("video/") ? (
           <video src={url} controls aria-label={document.name} />
-        ) : mimeType.startsWith("audio/") ? (
+        ) : allowAudioPlayback && mimeType.startsWith("audio/") ? (
           <audio src={url} controls aria-label={document.name} />
         ) : mimeType === "application/pdf" ? (
           <iframe src={url} title={document.name} />

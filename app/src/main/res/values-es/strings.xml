@@ -389,7 +389,7 @@
     <string name="incident_pin_help">Tap the map to save exact coordinates. Your current location stays visible as a red dot when available.</string>
     <string name="incident_show_location">Show my current location</string>
     <string name="attachments">Attachments</string>
-    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="incident_attachments_help">Los archivos adjuntos a un incidente se marcan automáticamente como evidencia.</string>
     <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
     <string name="title">Title</string>
     <string name="incident_body">Detalles del incidente</string>
@@ -467,4 +467,20 @@
     <string name="safety_assigned_staff_value">Asignado a %1$s</string>
     <string name="location_search_user">Buscar un usuario</string>
     <string name="location_search_no_users">No se encontraron usuarios que coincidan.</string>
+    <string name="voice_message">Mensaje de voz</string>
+    <string name="voice_record">Grabar un mensaje de voz</string>
+    <string name="voice_recording">Grabando</string>
+    <string name="voice_stop">Detener la grabación</string>
+    <string name="voice_failed">No se pudo grabar el audio. Inténtalo de nuevo.</string>
+    <string name="voice_play">Reproducir mensaje de voz</string>
+    <string name="voice_pause">Pausar mensaje de voz</string>
+    <string name="voice_play_failed">No se pudo reproducir este mensaje de voz.</string>
+    <string name="voice_sending">Subiendo el mensaje de voz…</string>
+    <string name="voice_send_failed">No se pudo enviar este mensaje de voz.</string>
+    <string name="voice_playback_speed">Velocidad de reproducción %1$s</string>
+    <string name="incident_optional_fields">La fecha, la hora y el lugar son opcionales, pero se recomienda indicarlos.</string>
+    <string name="incident_clear_date">Borrar fecha</string>
+    <string name="incident_body_required">Detalles del incidente (obligatorios)</string>
+    <string name="note_content_required">Nota (obligatoria)</string>
+    <string name="incident_clear_time">Borrar hora</string>
 </resources>

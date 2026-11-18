@@ -56,7 +56,12 @@ interface VoipAudioSession {
 }
 
 /** LiveKit-backed implementation of [VoipAudioSession]. */
-class LiveKitAudioSession(context: Context) : VoipAudioSession {
+class LiveKitAudioSession internal constructor(
+    context: Context,
+    private val roomFactory: (Context) -> Room,
+) : VoipAudioSession {
+    constructor(context: Context) : this(context, { LiveKit.create(it) })
+
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val mutex = Mutex()
@@ -86,7 +91,12 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
         ) { "Microphone permission is required to join a voice call" }
 
         prepareCallAudio()
-        val newRoom = LiveKit.create(appContext)
+        val newRoom = try {
+            roomFactory(appContext)
+        } catch (failure: Exception) {
+            restoreAudioRoute()
+            throw failure
+        }
         try {
             newRoom.connect(details.serverUrl, details.token)
             check(newRoom.localParticipant.setMicrophoneEnabled(true)) {
@@ -104,6 +114,8 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
                     }
                     if (event is RoomEvent.Disconnected && room === newRoom) {
                         room = null
+                        roomEventJob?.cancel()
+                        roomEventJob = null
                         onParticipantCountChanged(0)
                         restoreAudioRoute()
                         if (!localDisconnect) {

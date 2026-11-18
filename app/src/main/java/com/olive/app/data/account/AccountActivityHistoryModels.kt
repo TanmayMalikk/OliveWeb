@@ -1,23 +1,25 @@
 // All account roles: defines private account activity records.
 package com.olive.app.data.account
 
-import org.json.JSONArray
-import org.json.JSONObject
-import java.time.Instant
-import java.util.UUID
-import kotlin.time.Duration.Companion.seconds
-import com.google.firebase.auth.FirebaseAuth
+import android.util.Log
 import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
-import com.google.firebase.functions.FirebaseFunctions
-import android.util.Log
+import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.security.*
-import kotlinx.coroutines.tasks.await
+import java.time.Instant
+import java.util.UUID
 import kotlin.collections.get
-
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class HistoryRecord(val category: String, val id: String, val json: String)
 
@@ -256,10 +258,11 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
 // All account roles: loads and saves Firebase account profiles.
 
 // Real accounts use Firebase Auth, while each user's private profile gets its own Storage file.
-class FirebaseAccountRepository : AccountRepository {
-    private val auth = FirebaseAuth.getInstance()
-    private val storage = FirebaseStorage.getInstance()
-    private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+class FirebaseAccountRepository(
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
+) : AccountRepository {
     private val accountSync = AccountSyncRepository()
 
     // Change this path together with firebase/storage.rules and its tests.
@@ -283,11 +286,15 @@ class FirebaseAccountRepository : AccountRepository {
         val result = functions.getHttpsCallable("createPublicAccount").call(
             mapOf("username" to normalized, "password" to password, "role" to role.name)
         ).await().data as? Map<*, *> ?: error("Missing account")
-        check(result["uid"]?.toString()?.isNotBlank() == true) { "Missing account" }
+        val createdUid = result["uid"]?.toString()?.takeIf(String::isNotBlank) ?: error("Missing account")
         val user = auth.signInWithEmailAndPassword(
             AccountPolicy.signInEmail(normalized, role),
             password
         ).await().user ?: error("Missing account")
+        if (user.uid != createdUid) {
+            auth.signOut()
+            error("The newly created account could not be signed in.")
+        }
         return AccountIdentity(user.uid, normalized)
     }
 
@@ -316,6 +323,11 @@ class FirebaseAccountRepository : AccountRepository {
                     .await().user
             }
         } ?: error("Missing account")
+        val claimedRole = user.getIdToken(false).await().claims["role"] as? String
+        if (claimedRole != null && claimedRole != role.name) {
+            auth.signOut()
+            error("This account is registered under a different account type.")
+        }
         // Sign-in has already succeeded. Refreshing the older email alias must not block access if that optional update fails.
         if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runCatching {
@@ -432,6 +444,11 @@ class FirebaseAccountRepository : AccountRepository {
         auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
 
+    override suspend fun authenticatedRole(): AccountRole? {
+        val claim = auth.currentUser?.getIdToken(false)?.await()?.claims?.get("role")
+        return AccountRole.entries.firstOrNull { it.name == claim }
+    }
+
     // Account: Signs out the current account.
     override fun signOut() = auth.signOut()
 
@@ -500,6 +517,29 @@ interface AccountRepository {
     fun authenticatedUid(): String?
     // Returns the normalized username of the signed-in account.
     fun authenticatedUsername(): String?
+    suspend fun authenticatedRole(): AccountRole? = null
     // Signs out the current account and clears its repository session.
     fun signOut()
+}
+
+// Only a revision counter is stored here; profile and history contents stay in their protected Storage files.
+internal class AccountSyncRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+) {
+    // Watches one account marker and lets the session reload the matching Storage files.
+    fun observe(uid: String, onChange: () -> Unit, onError: (Exception) -> Unit): ChatSubscription {
+        val listener = firestore.collection("accountSync").document(uid)
+            .addSnapshotListener { _, error ->
+                if (error != null) onError(error) else onChange()
+            }
+        return ChatSubscription { listener.remove() }
+    }
+
+    // Raises the marker after a successful profile or history upload.
+    suspend fun notifyChanged(uid: String) {
+        firestore.collection("accountSync").document(uid).set(
+            mapOf("revision" to FieldValue.increment(1), "updatedAt" to FieldValue.serverTimestamp()),
+            com.google.firebase.firestore.SetOptions.merge(),
+        ).await()
+    }
 }
