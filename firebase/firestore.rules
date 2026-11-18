@@ -44,6 +44,11 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    match /friendInviteOwners/{uid} {
+      allow get: if owner(uid);
+      allow list, write: if false;
+    }
+
     function safetyContactUidAt(values, index) {
       return values.size() <= index || (values[index] is string
         && values[index].size() > 0 && values[index].size() <= 128);
@@ -174,13 +179,15 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid','relationship'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
         && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
 
         && (!('phone' in c[i]) || (c[i].phone is string && c[i].phone.size() <= 40))
+
+        && (!('relationship' in c[i]) || (c[i].relationship is string && c[i].relationship.size() <= 120))
 
         && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
@@ -392,7 +399,23 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
     }
 
-    // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
+    function messagingPeerAllowed(uid, username) {
+      let grant = /databases/$(database)/documents/messagingPeerAccess/$(request.auth.uid)/peers/$(uid);
+      return owner(uid) || validMessagingEmail(username)
+        || exists(/databases/$(database)/documents/friendships/$(request.auth.uid + '--' + uid))
+        || exists(/databases/$(database)/documents/friendships/$(uid + '--' + request.auth.uid))
+        || (exists(grant) && (
+          (get(grant).data.keys().hasAny(['organizationUsername'])
+            && get(grant).data.organizationUsername == username
+            && get(/databases/$(database)/documents/accountDirectory/$(username)).data.uid == uid
+            && get(/databases/$(database)/documents/accountDirectory/$(username)).data.role in ['STAFF', 'ADMIN'])
+          || (get(grant).data.keys().hasAny(['conversationId'])
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(get(grant).data.conversationId)).data.participantIds
+            && uid in get(/databases/$(database)/documents/conversations/$(get(grant).data.conversationId)).data.participantIds)
+        ));
+    }
+
+    // Public keys remain available to connected accounts, without username discovery.
     match /messageDirectory/{username} {
       function validDirectoryEntry() {
         return request.resource.data.keys().hasOnly(['uid','username','publicKey','updatedAt'])
@@ -402,7 +425,8 @@ service cloud.firestore {
           && validMessageUsername(username)
           && validMessagingEmail(username);
       }
-      allow get: if signedIn();
+      allow get: if signedIn() && (validMessagingEmail(username)
+        || (resource != null && messagingPeerAllowed(resource.data.uid, username)));
       allow list: if false;
       allow create: if owner(request.resource.data.uid) && validDirectoryEntry();
       allow update: if owner(resource.data.uid)
@@ -421,7 +445,8 @@ service cloud.firestore {
             && data.platform in ['ANDROID','WEB']
             && data.mgf1Digest in ['SHA-1','SHA-256'];
         }
-        allow get, list: if signedIn();
+        allow get, list: if signedIn() && messagingPeerAllowed(
+          get(/databases/$(database)/documents/messageDirectory/$(username)).data.uid, username);
         allow create: if owner(request.resource.data.uid) && validMessagingDevice(request.resource.data);
         allow update: if owner(resource.data.uid)
           && request.resource.data.uid == resource.data.uid
@@ -451,13 +476,7 @@ service cloud.firestore {
 
     match /friendRequests/{requestId} {
       allow read: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
-      allow create: if signedIn() && personalMessagingAccount()
-        && request.resource.data.senderUid == request.auth.uid
-        && requestId == request.resource.data.senderUid + '--' + request.resource.data.recipientUid
-        && validFriendRequest(request.resource.data)
-        && !exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid))
-        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.senderUid + '--' + request.resource.data.recipientUid))
-        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid));
+      allow create: if false;
       allow update: if false;
       allow delete: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
     }

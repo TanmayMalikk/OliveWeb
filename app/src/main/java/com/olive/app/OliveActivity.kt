@@ -70,9 +70,10 @@ class OliveActivity : FragmentActivity() {
         com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
     }
 
-    // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
-    private val screenCaptureProtectionEnabled by lazy {
-        resources.getBoolean(R.bool.screen_capture_protection_enabled)
+    private val screenCaptureProtectionEnabled get() =
+        com.olive.app.security.ScreenCapturePreferences.enabled(this, session.coverAccountId)
+    private val capturePreferencesListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        applyScreenCaptureProtection()
     }
     private val session: SessionViewModel by viewModels()
     private val callActionReceiver = object : BroadcastReceiver() {
@@ -124,6 +125,8 @@ class OliveActivity : FragmentActivity() {
         )
         receiveIncomingCallIntent(intent)
         CoverLauncher.ensureStudioLauncher(this)
+        com.olive.app.security.ScreenCapturePreferences.store(this)
+            .registerOnSharedPreferenceChangeListener(capturePreferencesListener)
         applyScreenCaptureProtection()
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         applySystemBarContrast()
@@ -149,6 +152,7 @@ class OliveActivity : FragmentActivity() {
             // Keep the current activity available to privacy and permission callbacks.
             LaunchedEffect(notificationAccountId, selectedCover, selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
+                applyScreenCaptureProtection()
                 updateRecentAppIdentity(selectedCover, selectedRole)
                 if (notificationAccountId != null) permissions.afterOnboarding()
                 session.syncLocalNotificationHandler()
@@ -184,6 +188,8 @@ class OliveActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        com.olive.app.security.ScreenCapturePreferences.store(this)
+            .unregisterOnSharedPreferenceChangeListener(capturePreferencesListener)
         unregisterReceiver(callActionReceiver)
         super.onDestroy()
     }
@@ -205,7 +211,7 @@ class OliveActivity : FragmentActivity() {
         intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME)
     }
 
-    // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.
+    // Leaving the foreground locks the User safe area; the account preference controls the extra privacy cover.
     override fun onPause() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()

@@ -350,7 +350,7 @@
 
 
     <string name="private_contact_note">Nota privada del contacto</string>
-    <string name="private_contact_note_explanation">Solo tú puedes leer esta nota cifrada en este dispositivo. El texto nuevo se agrega en una línea nueva.</string>
+    <string name="private_contact_note_explanation">Solo tú puedes leer esta nota cifrada en este dispositivo. Edítala y guárdala aquí.</string>
     <string name="choose_person">Elegir una persona</string>
     <string name="add_to_private_note">Agregar a la nota privada</string>
     <string name="append_note">Agregar nota</string>

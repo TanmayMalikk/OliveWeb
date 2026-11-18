@@ -1,0 +1,4 @@
+<resources>
+    <string name="a11y_safety_progress">进度，%1$d / %2$d</string>
+    <string name="nutrition_sign_in_required">登录 Olive 账号即可搜索此食物来源。您仍可手动输入食物。</string>
+</resources>

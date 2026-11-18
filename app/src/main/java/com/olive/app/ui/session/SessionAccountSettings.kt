@@ -419,6 +419,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
 
 // Owns activity records and history synchronization.
 internal class SessionHistory(private val runtime: SessionRuntime) {
+    private var loadedSession: Pair<String, Long>? = null
     private var loadVersion = 0
     var loadingUid by mutableStateOf<String?>(null)
         private set
@@ -448,7 +449,8 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 val version = ++loadVersion
-                loadingUid = uid
+                val loadEpoch = epoch
+                loadingUid = if (loadedSession == (uid to loadEpoch)) null else uid
                 failedUid = null
                 scope.launch {
                     try {
@@ -456,7 +458,8 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                             val purged = store.purgeExpiredPrivateEntries(uid)
                             Triple(store.settingsHistory(uid), store.triggerHistory(uid), store.privateEntries(uid)) to purged
                         }
-                        if (enrollment?.uid == uid && version == loadVersion) {
+                        if (enrollment?.uid == uid && epoch == loadEpoch && version == loadVersion) {
+                            loadedSession = uid to loadEpoch
                             settingsHistory = histories.first.filter {
                                 it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty())
                             }

@@ -2,6 +2,10 @@
 package com.olive.app
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,6 +22,9 @@ import kotlinx.coroutines.sync.withLock
 
 internal fun shouldRequestNotifications(enabled: Boolean, asked: Boolean, granted: Boolean) =
     enabled && !asked && !granted
+
+internal fun shouldOpenLocationSettings(asked: Boolean, fineRationale: Boolean, coarseRationale: Boolean) =
+    asked && !fineRationale && !coarseRationale
 
 // One owner serializes every post-onboarding prompt and explicit permission retries.
 internal class AppPermissions(
@@ -48,6 +55,15 @@ internal class AppPermissions(
         activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             finishLocationRequest(hasBackgroundLocation())
         }
+    private val locationSettings = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        finishLocationRequest(hasLocation())
+    }
+
+    private fun openLocationSettings() {
+        locationSettings.launch(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            "package:${activity.packageName}".toUri()))
+    }
+
     // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -88,7 +104,16 @@ internal class AppPermissions(
     suspend fun requestLocation(): Boolean = locationRequests.withLock {
         locationResult?.await()
         hasLocation() || launchLocationRequest {
-            location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+            val deniedPermanently = shouldOpenLocationSettings(
+                preferences.getBoolean("location_asked", false),
+                ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION),
+                ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+            if (deniedPermanently) openLocationSettings()
+            else {
+                preferences.edit { putBoolean("location_asked", true) }
+                location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+            }
         }
     }
 
@@ -97,6 +122,8 @@ internal class AppPermissions(
         return locationRequests.withLock {
             locationResult?.await()
             hasBackgroundLocation() || launchLocationRequest {
+                // Let Android show its own permission UI. Newer versions route directly to
+                // location permission settings rather than the generic app-info page.
                 backgroundLocation.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             }
         }

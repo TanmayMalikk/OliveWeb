@@ -1,0 +1,6 @@
+<resources>
+    <string name="contact_relationship">关系（可选）</string>
+    <string name="privacy_block_captures">阻止截屏和录屏</string>
+    <string name="privacy_block_captures_help">在此设备上保护此账号的屏幕。</string>
+    <string name="emergency_request_sent">紧急请求已发送。</string>
+</resources>

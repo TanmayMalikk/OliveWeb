@@ -28,6 +28,7 @@ internal class FoodNutritionRepository(
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build(),
+    private val signedIn: () -> Boolean = { runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null }.getOrDefault(false) },
     functions: () -> FirebaseFunctions = {
         FirebaseFunctions.getInstance("northamerica-northeast1")
     },
@@ -65,6 +66,10 @@ internal class FoodNutritionRepository(
             foods = foods,
             providerFailures = searches.count { it.isFailure } * if (foodType.isBlank()) 1 else 2,
             hasMore = searches.any { it.getOrNull()?.hasMore == true },
+            needsSignIn = !signedIn() && searches.any {
+                (it.exceptionOrNull() as? com.google.firebase.functions.FirebaseFunctionsException)?.code ==
+                    com.google.firebase.functions.FirebaseFunctionsException.Code.UNAUTHENTICATED
+            },
             needsIpApproval = searches.any {
                 (it.exceptionOrNull() as? com.google.firebase.functions.FirebaseFunctionsException)?.code ==
                     com.google.firebase.functions.FirebaseFunctionsException.Code.FAILED_PRECONDITION
@@ -141,6 +146,7 @@ internal data class FoodSearchResult(
     val providerFailures: Int = 0,
     val hasMore: Boolean = false,
     val needsIpApproval: Boolean = false,
+    val needsSignIn: Boolean = false,
 )
 
 // Converts a FatSecret result into the shared nutrition model.

@@ -331,6 +331,11 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     }
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
+                            Text(uiText(R.string.cover_emergency_help_title), style = MaterialTheme.typography.titleMedium)
+                            Text(uiText(R.string.cover_emergency_help), style = MaterialTheme.typography.bodySmall)
+                            HorizontalDivider()
+                            ScreenCaptureSetting(session.coverAccountId)
+                            HorizontalDivider()
                             IdleTimeoutSetting(session)
                             HorizontalDivider()
                             Text(

@@ -1,0 +1,16 @@
+<resources>
+    <string name="friend_invite">دعوة</string>
+    <string name="friend_invite_question">هل لديك رمز دعوة؟ (اختياري)</string>
+    <string name="friend_invite_code">رمز الدعوة</string>
+    <string name="friend_invite_connect">إضافة جهة اتصال</string>
+    <string name="friend_invite_connecting">جارٍ الاتصال…</string>
+    <string name="friend_invite_connected">تم الاتصال مع %1$s. يمكنك إضافة رمز آخر.</string>
+    <string name="friend_invite_unavailable">استُخدمت هذه الدعوة أو انتهت صلاحيتها. حدّثها لإنشاء دعوة جديدة.</string>
+    <string name="friend_invite_expires">تنتهي في %1$s</string>
+    <string name="friend_invite_once">للاستخدام مرة واحدة خلال 48 ساعة. التحديث يلغي الرمز السابق.</string>
+    <string name="friend_invite_copy_code">نسخ الرمز</string>
+    <string name="friend_invite_copy_link">نسخ الرابط</string>
+    <string name="friend_invite_share">مشاركة الدعوة</string>
+    <string name="friend_invite_refresh">تحديث رمز الدعوة</string>
+    <string name="friend_invite_done">تم</string>
+</resources>

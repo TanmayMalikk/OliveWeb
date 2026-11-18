@@ -97,6 +97,9 @@ class NutritionControlsUiTest {
     @Test fun waterQuickButtonsApplyPositiveAndNegativeAmounts() {
         var adjustment = 0
         compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { value, _ -> adjustment = value }) } }
+        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).performClick()
         compose.runOnIdle { assertEquals(-250, adjustment) }
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).performClick()

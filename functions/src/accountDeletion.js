@@ -57,6 +57,10 @@ exports.adminDeleteAccount = onCall(async (request) => {
         plan.supportSafeContactUid || "");
   }
   await db.collection("safetyStaff").doc(uid).delete();
+  await deleteQuery(db.collection("friendInvites").where("ownerUid", "==", uid));
+  await db.collection("friendInviteOwners").doc(uid).delete();
+  await db.collection("friendInviteAttempts").doc(uid).delete();
+  await db.recursiveDelete(db.collection("messagingPeerAccess").doc(uid)).catch(() => {});
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));
   await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));
   await deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid));

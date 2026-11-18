@@ -274,133 +274,143 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
     var affected by remember { mutableStateOf("") }
     var abuser by remember { mutableStateOf("") }
     var situation by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.create_account)) },
-        text = {
-            Column(
-                Modifier.fillMaxWidth().heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = roleOpen,
-                    onExpandedChange = { roleOpen = !roleOpen }) {
-                    OutlinedTextField(
-                        role.localizedTitle(uiText),
-                        {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.account_type)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(roleOpen) },
-                        modifier = Modifier.fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                    )
-                    ExposedDropdownMenu(
-                        roleOpen,
-                        {
-                            roleOpen = false
-                        }) {
-                        AccountRole.entries.forEach { item ->
-                            DropdownMenuItem(text = {
-                                Text(
-                                    item.localizedTitle(uiText)
-                                )
-                            }, onClick = {
-                                role = item
+    val dialogColors = MaterialTheme.colorScheme.copy(
+        surface = androidx.compose.ui.graphics.Color.White,
+        surfaceContainer = androidx.compose.ui.graphics.Color.White,
+        surfaceContainerHigh = androidx.compose.ui.graphics.Color.White,
+        onSurface = androidx.compose.ui.graphics.Color(0xFF20281E),
+        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF465141),
+    )
+    MaterialTheme(colorScheme = dialogColors) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = androidx.compose.ui.graphics.Color.White,
+            title = { Text(stringResource(R.string.create_account)) },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 520.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ExposedDropdownMenuBox(
+                        expanded = roleOpen,
+                        onExpandedChange = { roleOpen = !roleOpen }) {
+                        OutlinedTextField(
+                            role.localizedTitle(uiText),
+                            {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.account_type)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(roleOpen) },
+                            modifier = Modifier.fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        )
+                        ExposedDropdownMenu(
+                            roleOpen,
+                            {
                                 roleOpen = false
-                            })
+                            }) {
+                            AccountRole.entries.forEach { item ->
+                                DropdownMenuItem(text = {
+                                    Text(
+                                        item.localizedTitle(uiText)
+                                    )
+                                }, onClick = {
+                                    role = item
+                                    roleOpen = false
+                                })
+                            }
                         }
                     }
-                }
-                Field(uiText(R.string.username), username, "admin_username") {
-                    username = it.take(24)
-                }
-                Field(
-                    uiText(R.string.ui_temporary_password),
-                    password,
-                    "admin_password",
-                    secret = true,
-                    showSecretToggle = true
-                ) { password = it.take(24) }
-                HorizontalDivider()
-                Text(
-                    uiText(R.string.ui_optional_onboarding_details),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Field(uiText(R.string.full_name), fullName, "admin_full_name") {
-                    fullName = it.take(120)
-                }
-                BirthdayPicker(
-                    birthday, "admin_dob", enabled = true,
-                    showErrors = showBirthdayErrors && birthday.isNotEmpty(), required = false,
-                ) { birthday = it }
-                // Only staff and admin accounts can be protected from deletion.
-                if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-                    Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
-                        email = it.take(254)
+                    Field(uiText(R.string.username), username, "admin_username") {
+                        username = it.take(24)
                     }
+                    Field(
+                        uiText(R.string.ui_temporary_password),
+                        password,
+                        "admin_password",
+                        secret = true,
+                        showSecretToggle = true
+                    ) { password = it.take(24) }
+                    HorizontalDivider()
                     Text(
-                        uiText(R.string.ui_login_email_creation_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted
+                        uiText(R.string.ui_optional_onboarding_details),
+                        style = MaterialTheme.typography.titleMedium
                     )
-                    Field(uiText(R.string.ui_phone_optional), phone, "admin_phone") {
-                        phone = it.take(40)
+                    Field(uiText(R.string.full_name), fullName, "admin_full_name") {
+                        fullName = it.take(120)
                     }
-                    Text(
-                        uiText(R.string.ui_leave_required_details_blank_to_have_this_person_finish_them_on_f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted
-                    )
-                } else {
-                    Field(uiText(R.string.city), city, "admin_city") { city = it.take(160) }
-                    if (role == AccountRole.USER) {
-                        Field(
-                            uiText(R.string.names_of_people_experiencing_abuse_optional),
-                            affected,
-                            "admin_affected"
-                        ) { affected = it.take(500) }
-                        Field(
-                            uiText(R.string.abuser_s_name_optional),
-                            abuser,
-                            "admin_abuser"
-                        ) { abuser = it.take(120) }
-                        Field(
-                            uiText(R.string.ui_situation_optional),
-                            situation,
-                            "admin_situation",
-                            multiline = true
-                        ) { situation = it.take(2000) }
+                    BirthdayPicker(
+                        birthday, "admin_dob", enabled = true,
+                        showErrors = showBirthdayErrors && birthday.isNotEmpty(), required = false,
+                    ) { birthday = it }
+                    // Only staff and admin accounts can be protected from deletion.
+                    if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
+                        Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
+                            email = it.take(254)
+                        }
                         Text(
-                            uiText(R.string.ui_the_user_sets_their_own_trigger_word_and_device_pin_on_first_sign),
+                            uiText(R.string.ui_login_email_creation_help),
                             style = MaterialTheme.typography.bodySmall,
                             color = Muted
                         )
+                        Field(uiText(R.string.ui_phone_optional), phone, "admin_phone") {
+                            phone = it.take(40)
+                        }
+                        Text(
+                            uiText(R.string.ui_leave_required_details_blank_to_have_this_person_finish_them_on_f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Muted
+                        )
+                    } else {
+                        Field(uiText(R.string.city), city, "admin_city") { city = it.take(160) }
+                        if (role == AccountRole.USER) {
+                            Field(
+                                uiText(R.string.names_of_people_experiencing_abuse_optional),
+                                affected,
+                                "admin_affected"
+                            ) { affected = it.take(500) }
+                            Field(
+                                uiText(R.string.abuser_s_name_optional),
+                                abuser,
+                                "admin_abuser"
+                            ) { abuser = it.take(120) }
+                            Field(
+                                uiText(R.string.ui_situation_optional),
+                                situation,
+                                "admin_situation",
+                                multiline = true
+                            ) { situation = it.take(2000) }
+                            Text(
+                                uiText(R.string.ui_the_user_sets_their_own_trigger_word_and_device_pin_on_first_sign),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Muted
+                            )
+                        }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(onClick = create@{
-                showBirthdayErrors = birthday.isNotEmpty() && !InputPolicy.validDob(birthday)
-                if (showBirthdayErrors) return@create
-                session.createManagedAccount(
-                    AdminAccountDraft(
-                        username = username,
-                        password = password,
-                        role = role,
-                        fullName = fullName,
-                        dob = birthday,
-                        email = email,
-                        phone = phone,
-                        city = city,
-                        affectedNames = affected,
-                        abuserName = abuser,
-                        situation = situation
+            },
+            confirmButton = {
+                Button(onClick = create@{
+                    showBirthdayErrors = birthday.isNotEmpty() && !InputPolicy.validDob(birthday)
+                    if (showBirthdayErrors) return@create
+                    session.createManagedAccount(
+                        AdminAccountDraft(
+                            username = username,
+                            password = password,
+                            role = role,
+                            fullName = fullName,
+                            dob = birthday,
+                            email = email,
+                            phone = phone,
+                            city = city,
+                            affectedNames = affected,
+                            abuserName = abuser,
+                            situation = situation
+                        )
                     )
-                )
-                onDismiss()
-            }) { Text(stringResource(R.string.create)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+                    onDismiss()
+                }) { Text(stringResource(R.string.create)) }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+    }
 }

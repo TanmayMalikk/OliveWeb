@@ -1,0 +1,6 @@
+<resources>
+    <string name="contact_relationship">العلاقة (اختياري)</string>
+    <string name="privacy_block_captures">حظر لقطات الشاشة والتسجيلات</string>
+    <string name="privacy_block_captures_help">حماية شاشات هذا الحساب على هذا الجهاز.</string>
+    <string name="emergency_request_sent">تم إرسال طلب الطوارئ.</string>
+</resources>

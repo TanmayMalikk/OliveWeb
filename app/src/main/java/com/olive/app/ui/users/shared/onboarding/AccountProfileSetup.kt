@@ -102,12 +102,14 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FITNESS) }
     val pages = if (safeContact) listOf(
         uiText(R.string.ui_personal_details),
-        uiText(R.string.location)
+        uiText(R.string.location),
+        uiText(R.string.friend_invite_code)
     ) else
         listOf(
             uiText(R.string.ui_personal_details),
             uiText(R.string.location),
-            uiText(R.string.ui_safe_entry_cover)
+            uiText(R.string.ui_safe_entry_cover),
+            uiText(R.string.friend_invite_code)
         )
     var page by rememberSaveable(existing?.username, safeContact) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
@@ -124,12 +126,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val completed = required.count { it }
     val supportValid = validation.supportValid
     val localCompletion = validation.pageCompletion
-    val stages = if (safeContact) 3 else 4
+    val stages = if (safeContact) 4 else 5
     val progressPage = page + 1
     val credentialCount = if (session.account.creatingAccount) 3 else 2
     val totalRequired = credentialCount + required.size + if (safeContact) 0 else 2
     val progressCompleted = credentialCount + completed
-    val pageCompletion = listOf(true) + localCompletion
+    val pageCompletion = listOf(true) + localCompletion + true
     // Gives account storage the collected contacts it needs.
     fun collectedContacts() =
         (contacts.toList() + if (contactName.isNotBlank() && contactDetails.isNotBlank())
@@ -349,6 +351,10 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 }
             }
         }
+        if (page == pages.lastIndex) {
+            com.olive.app.ui.users.shared.messaging.InviteCodeEntry(enabled = !session.localMode,
+                accountUid = session.runtime.pendingIdentity?.uid)
+        }
         Status(session)
         val finalProfilePage = page == pages.lastIndex
         val last = safeContact && finalProfilePage
@@ -359,7 +365,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
             },
             next = {
                 showErrors = true
-                if (validation.isPageValid(page)) {
+                if (finalProfilePage || validation.isPageValid(page)) {
                     showErrors = false
                     if (finalProfilePage) saveProfile() else page++
                 }

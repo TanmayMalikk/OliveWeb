@@ -228,4 +228,4 @@ private fun BirthdayPickerDialog(
     )
 }
 
-private fun Int.spokenYear(): String = toString().toList().joinToString(" ")
+private fun Int.spokenYear(): String = toString()

@@ -49,7 +49,7 @@
     <string name="dob_pick_day">选择日期</string>
     <string name="dob_clear">清除出生日期</string>
     <string name="location_background_access">启用后台位置</string>
-    <string name="location_background_settings">后台位置可在应用关闭时继续更新管理员的位置地图。在 Android 设置中选择 %1$s，然后返回此处。</string>
+    <string name="location_background_settings">在接下来的 Android 权限页面选择%1$s，然后返回 Olive。Android 需要此设置才能在后台持续更新位置。</string>
     <string name="location_background_dialog">后台位置可在应用关闭时继续更新管理员的位置地图。请在 Android 提示中选择始终允许。</string>
     <string name="chat_dms_tab">私信</string>
     <string name="chat_tickets_tab">工单聊天</string>

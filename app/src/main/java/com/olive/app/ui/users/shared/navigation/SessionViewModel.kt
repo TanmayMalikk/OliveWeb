@@ -50,6 +50,8 @@ internal class SessionViewModel @JvmOverloads constructor(
     internal val media = runtime.mediaRepository?.let {
         MediaTransferController(application, viewModelScope, it, offlineCache = runtime.offlineMediaCache)
     }
+    internal var coverEmergencyConfirmation by mutableStateOf<Pair<String, Long>?>(null)
+    internal var coverEmergencyInFlight = false
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
     internal val locationMap =
@@ -184,6 +186,8 @@ internal class SessionViewModel @JvmOverloads constructor(
     // Closing this session also clears document and map data held by their screen controllers.
     fun signOut() {
         pendingCameraUploadTags = emptySet()
+        coverEmergencyConfirmation = null
+        coverEmergencyInFlight = false
         documents.clear()
         locationMap.clear()
         adminLocationMap.close()
@@ -192,6 +196,8 @@ internal class SessionViewModel @JvmOverloads constructor(
 
     // Stops account listeners and background work when the session view model is removed.
     override fun onCleared() {
+        coverEmergencyConfirmation = null
+        coverEmergencyInFlight = false
         documents.clear()
         locationMap.clear()
         adminLocationMap.close()
@@ -287,8 +293,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
         runtime.conversationActions.setArchived(conversation, archived)
 
     // Saves a private note about this friend or supported user.
-    fun appendPrivateContactNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) =
-        runtime.conversationActions.appendPrivateNote(target, text, onSaved)
+    fun savePrivateContactNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) =
+        runtime.conversationActions.savePrivateNote(target, text, onSaved)
 
     // Encrypts and sends the typed message to the current conversation.
     fun sendMessage(text: String, onSent: () -> Unit = {}) =

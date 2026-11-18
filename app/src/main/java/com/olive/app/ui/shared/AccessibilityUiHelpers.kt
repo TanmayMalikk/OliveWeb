@@ -77,14 +77,22 @@ internal fun AccessibleMessage(
     showText: Boolean = true,
 ) {
     val visible = LocalAccessibilityMessagesVisible.current
+    if (!showText) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        LaunchedEffect(text, visible, view) {
+            if (visible) {
+                @Suppress("DEPRECATION") // Announce once without leaving an invisible focusable node.
+                view.announceForAccessibility(text)
+            }
+        }
+        return
+    }
     val semantics = modifier.semantics {
         if (visible) {
             liveRegion = LiveRegionMode.Polite
-            if (!showText) contentDescription = text
         } else hideFromAccessibility()
     }
-    if (showText) Text(text, color = color, style = style, modifier = semantics)
-    else androidx.compose.foundation.layout.Box(semantics)
+    Text(text, color = color, style = style, modifier = semantics)
 }
 
 // Callers resolve action labels from Android resources; decorative icons keep a null description.
@@ -282,4 +290,19 @@ private fun DrawScope.drawLazyScrollbar(
         Size(width, thumbHeight),
         CornerRadius(width)
     )
+}
+
+// Focus a visible control once its window and content are ready, without refocusing on later updates.
+@Composable
+internal fun rememberEntryFocus(key: Any?, ready: Boolean = true): androidx.compose.ui.focus.FocusRequester {
+    val requester = remember(key) { androidx.compose.ui.focus.FocusRequester() }
+    val windowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+    var requested by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key, ready, windowFocused) {
+        if (ready && windowFocused && !requested) {
+            withFrameNanos { }
+            requested = requester.requestFocus()
+        }
+    }
+    return requester
 }

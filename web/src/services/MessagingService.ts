@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { firebase } from "./AccountService";
 import { database } from "./LocalDataStore";
+import { authorizeMessagingPeer } from "./FriendInviteService";
 import type { Identity } from "../domain/DomainModels";
 export interface DirectoryUser {
   uid: string;
@@ -252,6 +253,7 @@ export async function searchUser(
 ): Promise<DirectoryUser | null> {
   if (!/^[a-z0-9_]{4,24}$/.test(username.trim().toLowerCase()))
     throw new Error("Enter the exact 4–24 character username.");
+  await authorizeMessagingPeer(username);
   const { db } = await firebase();
   const row = await getDoc(
     doc(db, "messageDirectory", username.trim().toLowerCase()),
@@ -498,6 +500,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   const directory = await Promise.all(conversationData.participantIds.map(async (uid) => {
     const username = conversationData.participantUsernames[uid];
     if (!username) return [uid, ""] as const;
+    await authorizeMessagingPeer(username);
     const row = await getDoc(doc(db, "messageDirectory", username.toLowerCase()));
     return [uid, row.get("uid") === uid ? String(row.data()?.publicKey ?? "") : ""] as const;
   }));
@@ -567,6 +570,7 @@ async function shareRoomKeyWithDevices(id: string, conversation: Conversation, r
   for (const uid of conversation.participantIds) {
     const username = conversation.participantUsernames[uid]?.trim().toLowerCase();
     if (!username) continue;
+    await authorizeMessagingPeer(username);
     const devices = await getDocs(collection(db, "messageDirectory", username, "devices"));
     let batch = writeBatch(db);
     let count = 0;

@@ -282,7 +282,8 @@ class OrganizationAndChatUiTest {
         compose.setContent { OliveTheme { AdminPortal(session) } }
         compose.onNodeWithContentDescription("12 ${text(R.string.admin_open_tickets)}").assertExists()
         compose.onNodeWithContentDescription("7 ${text(R.string.admin_closed_tickets)}").assertExists()
-        compose.onNode(hasText(text(R.string.emergency_response_title)) and hasClickAction()).performScrollTo().performClick()
+        val emergencyCard = text(R.string.admin_emergency_response) + ". " + text(R.string.admin_emergency_response_help)
+        compose.onNodeWithContentDescription(emergencyCard).assertHasClickAction().performScrollTo().performClick()
         compose.onNodeWithText(text(R.string.emergency_response_empty)).assertIsDisplayed()
         compose.onNodeWithContentDescription(text(R.string.back)).performClick()
         compose.onNodeWithText(text(R.string.admin_staff_management)).performScrollTo().performClick()
@@ -307,7 +308,9 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { StaffPortal(session) } }
         compose.onNodeWithText(text(R.string.safety_inbox)).performClick()
-        compose.onNodeWithTag("safety_staff_available").assertIsDisplayed()
+        compose.onNodeWithTag("safety_staff_available").assertIsDisplayed().assertIsToggleable()
+            .assertContentDescriptionEquals(text(R.string.safety_available))
+        compose.onNodeWithText(text(R.string.safety_available)).assertDoesNotExist()
         compose.onNodeWithText(text(R.string.safety_back)).performClick()
         compose.onNodeWithContentDescription(text(R.string.account_settings)).performClick()
         compose.onNodeWithTag("organization_settings_name").assertTextContains("Fixture Name")

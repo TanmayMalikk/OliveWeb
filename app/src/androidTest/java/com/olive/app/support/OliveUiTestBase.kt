@@ -211,9 +211,11 @@ abstract class OliveUiTestBase {
         fill("address_city", "Edmonton")
         advanceOnboarding("address_city", "trigger")
         fill("trigger", "moon garden")
-        waitFor("profile_submit")
+        advanceOnboarding("trigger", "profile_submit")
+        compose.onNodeWithText("Step 5 of 5", useUnmergedTree = true).assertExists()
         submitProfile()
         chooseAppPin()
+        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
         submitPinSetup()
@@ -279,7 +281,7 @@ abstract class OliveUiTestBase {
 
     // Wait for one onboarding page to settle before moving to the next one. A second click handles
     // a button event that Android can drop while the keyboard or dropdown is closing under load.
-    private fun advanceOnboarding(currentTag: String, nextTag: String) {
+    protected fun advanceOnboarding(currentTag: String, nextTag: String) {
         compose.waitForIdle()
         click("onboarding_next")
         val moved = runCatching {
@@ -340,7 +342,8 @@ abstract class OliveUiTestBase {
 
     // Enters the test PIN on the private-entry screen.
     protected fun enterPin(pin: String) {
-        pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
+        compose.onNodeWithTag("unlock_pin").performTextReplacement(pin)
+        hideKeyboard()
         compose.onNodeWithTag("unlock_submit").performClick()
     }
 

@@ -310,6 +310,7 @@ internal class SafetyDocumentsController(
         profile: UserProfile,
         entries: List<PrivateEntry>,
         location: suspend () -> EmergencyReportLocation?,
+        onAlertSent: () -> Unit = {},
         onFinished: (Result<Unit>) -> Unit,
     ) {
         val ownerUid = identity.uid
@@ -334,6 +335,9 @@ internal class SafetyDocumentsController(
                     )
                 }
                 emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                if (token == generation && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid) {
+                    onAlertSent()
+                }
                 val pressedLocation = location()
                 check(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid && token == generation) {
                     "The account changed. Try again."
