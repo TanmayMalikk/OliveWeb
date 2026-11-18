@@ -50,13 +50,22 @@ function PinGate() {
             });
           }}
         >
+          <div className="pin-dots" aria-hidden="true">
+            {Array.from({ length: 6 }, (_, idx) => (
+              <span
+                key={idx}
+                className={idx < pin.length ? "pin-dot filled" : "pin-dot"}
+              />
+            ))}
+          </div>
           <Field
             label="Browser PIN"
             type="password"
             value={pin}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-            }
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              if (s.message) s.clearMessage();
+              setPin(e.target.value.replace(/\D/g, "").slice(0, 6));
+            }}
             inputMode="numeric"
             autoComplete="off"
             pattern="[0-9]{4,6}"
@@ -69,7 +78,10 @@ function PinGate() {
                 type="button"
                 key={digit}
                 disabled={s.busy}
-                onClick={() => setPin((value) => (value + digit).slice(0, 6))}
+                onClick={() => {
+                  if (s.message) s.clearMessage();
+                  setPin((value) => (value + digit).slice(0, 6));
+                }}
               >
                 {digit}
               </button>
@@ -78,7 +90,10 @@ function PinGate() {
               type="button"
               aria-label="Delete digit"
               disabled={s.busy || pin.length === 0}
-              onClick={() => setPin((value) => value.slice(0, -1))}
+              onClick={() => {
+                if (s.message) s.clearMessage();
+                setPin((value) => value.slice(0, -1));
+              }}
             >
               <Delete size={20} aria-hidden="true" />
             </button>

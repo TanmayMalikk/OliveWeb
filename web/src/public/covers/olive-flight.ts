@@ -13,6 +13,7 @@ export const FLIGHT = {
   lift: -270,
 };
 export interface Branch {
+  id?: number;
   x: number;
   gapY: number;
   gap: number;
@@ -58,6 +59,7 @@ export function newFlight(
     branches: Array.from(
       { length: Math.max(2, Math.ceil(safeWidth / 250)) },
       (_, index) => ({
+        id: index,
         x: 350 + index * 250,
         gapY: index % 2 ? 195 : 238,
         gap: flightGap(0),
@@ -214,8 +216,11 @@ export function advanceFlight(
       return { ...branch, x, passed };
     })
     .filter((branch) => branch.x + FLIGHT.branchWidth > -10);
+  let nextBranchId =
+    world.branches.reduce((max, b, idx) => Math.max(max, b.id ?? idx), -1) + 1;
   while (branches.length < Math.max(2, Math.ceil(safeWidth / 250)))
     branches.push({
+      id: nextBranchId++,
       x: branches.length ? branches[branches.length - 1].x + 250 : safeWidth + 40,
       gapY: 155 + validRandom(random) * 165,
       gap: flightGap(score),

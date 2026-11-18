@@ -152,7 +152,10 @@ export default function AdminPortal() {
             <tbody>
               {matchingAccounts.map((account) => (
                 <tr key={account.uid}>
-                    <th scope="row">@{account.username}</th>
+                    <th scope="row">
+                      @{account.username}{" "}
+                      {account.protected && <span className="tag">Protected</span>}
+                    </th>
                     <td><span className="tag">{roleLabels[account.role]}</span></td>
                     <td>{account.fullName || "—"}</td>
                     <td>
@@ -240,9 +243,17 @@ export default function AdminPortal() {
               login email cannot be changed after this account is created.
             </p>
             <Field label="City" name="region" maxLength={160} />
-            <Button type="submit" disabled={session.busy}>
-              Create account
-            </Button>
+            {session.message && (
+              <p role="alert" className="form-error">{session.message}</p>
+            )}
+            <div className="modal-actions">
+              <Button type="submit" disabled={session.busy}>
+                Create account
+              </Button>
+              <Button variant="quiet" onClick={() => setCreating(false)}>
+                Cancel
+              </Button>
+            </div>
           </Form>
         </Modal>
       )}
@@ -252,21 +263,26 @@ export default function AdminPortal() {
             This permanently deletes @{removing.username} and their cloud
             records. This cannot be undone.
           </p>
-          <Button
-            disabled={session.busy}
-            onClick={() =>
-              void session.perform(async () => {
-                await deleteAccount(removing.uid);
-                setRemoving(null);
-                await refresh();
-              })
-            }
-          >
-            Delete @{removing.username}
-          </Button>
-          <Button variant="quiet" onClick={() => setRemoving(null)}>
-            Cancel
-          </Button>
+          {session.message && (
+            <p role="alert" className="form-error">{session.message}</p>
+          )}
+          <div className="modal-actions">
+            <Button
+              disabled={session.busy}
+              onClick={() =>
+                void session.perform(async () => {
+                  await deleteAccount(removing.uid);
+                  setRemoving(null);
+                  await refresh();
+                })
+              }
+            >
+              Delete @{removing.username}
+            </Button>
+            <Button variant="quiet" onClick={() => setRemoving(null)}>
+              Cancel
+            </Button>
+          </div>
         </Modal>
       )}
     </OrganizationWorkspace>
