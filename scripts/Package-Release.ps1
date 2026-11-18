@@ -14,9 +14,11 @@ $signer = Get-ChildItem -LiteralPath $buildTools -Directory |
 if (-not $signer) { throw 'Install Android SDK build-tools before packaging.' }
 Push-Location $projectRoot
 try {
-    # Match CI and package the phone app. Wear OS has its own release checks.
-    & ./gradlew.bat :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
-    if ($LASTEXITCODE -ne 0) { throw 'Release checks failed.' }
+    # JVM fixtures expect local mode. Use a separate invocation for the Firebase-enabled APK.
+    & ./gradlew.bat -PoliveLocalTest=true :app:testDebugUnitTest --console=plain
+    if ($LASTEXITCODE -ne 0) { throw 'Android release unit tests failed.' }
+    & ./gradlew.bat -PoliveLocalTest=false :app:lintRelease :app:assembleRelease --console=plain
+    if ($LASTEXITCODE -ne 0) { throw 'Android release lint or assembly failed.' }
     $apk = Join-Path $projectRoot 'app/build/outputs/apk/release/app-release.apk'
     if (-not (Test-Path -LiteralPath $apk)) { throw 'Signed release APK was not produced.' }
     & $signer verify --verbose $apk

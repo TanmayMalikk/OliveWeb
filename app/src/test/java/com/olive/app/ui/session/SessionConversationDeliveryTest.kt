@@ -67,9 +67,10 @@ class SessionConversationDeliveryTest {
     fun sentQueueRowsDisappearWhenServerAcknowledgementArrivesAndDoNotDuplicateMessages() = runBlocking<Unit> {
         Fixture().use { t ->
             t.open()
-            var sent=false
-            t.r.conversationActions.sendMessage("Synthetic queued text") { sent=true }
-            t.f.await { !t.r.state.messagingBusy && sent }
+            val sent = CompletableDeferred<Unit>()
+            t.r.conversationActions.sendMessage("Synthetic queued text") { sent.complete(Unit) }
+            t.f.await { sent.isCompleted || t.r.state.message != null }
+            assertTrue("Send did not reach the queue: ${t.r.state.message}", sent.isCompleted)
             val queued=t.r.messageOutbox.all("owner").single()
             assertEquals("Synthetic queued text",EncryptionUtils.decryptText(queued.ciphertext,t.key))
             t.r.messageOutbox.update(queued.id) { it.copy(status=MessageDeliveryStatus.SENT) }

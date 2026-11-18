@@ -1,6 +1,6 @@
 & {
-    $version = 'v2.0.0.18'
-    $releaseNotes = @('Web Redesign')
+    $version = 'v2.1.2.20'
+    $releaseNotes = @('Website Games')
     $mandatory = $true
 
     Set-Location -LiteralPath 'C:/Users/Tanma/StudioProjects/F26_D1'
