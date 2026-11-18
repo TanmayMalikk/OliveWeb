@@ -248,6 +248,10 @@ test("returning account opens the PIN gate at the root URL without revealing pri
   await expect(
     page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
+  // The public cover uses this fresh document to open an existing browser enrollment.
+  await page.goto("/entry#open");
+  await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test("a browser enrollment with a phone cover migrates to its own game field", async ({ page }) => {

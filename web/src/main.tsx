@@ -3,7 +3,6 @@ import {
   Component,
   lazy,
   Suspense,
-  useRef,
   useState,
   type ErrorInfo,
   type ReactNode,
@@ -13,7 +12,7 @@ import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
-import Game from "./public/covers/OliveGamesCover";
+import PublicCoverPage from "./public/PublicCoverPage";
 import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
 const Download = lazy(() => import("./public/AppDownloadInstructions"));
@@ -124,75 +123,7 @@ function PinGate() {
 // Little Grove is the browser cover for every account.
 function Cover() {
   const s = useSession();
-  const [accountOpen, setAccountOpen] = useState(false);
-  const lastOliveTap = useRef(0);
-  const tapOlive = () => {
-    const now = Date.now();
-    if (now - lastOliveTap.current > 1500) {
-      lastOliveTap.current = now;
-      return;
-    }
-    lastOliveTap.current = 0;
-    void s.perform(s.beginEntry);
-  };
-  return (
-    <main
-      id="main"
-      className="cover-container game-cover"
-    >
-      <nav
-        className="cover-account-tabs"
-        role="tablist"
-        aria-label="Little Grove pages"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!accountOpen}
-          aria-controls="cover-display-panel"
-          onClick={() => setAccountOpen(false)}
-        >
-          Game
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={accountOpen}
-          aria-controls="cover-account-panel"
-          onClick={() => setAccountOpen(true)}
-        >
-          Account
-        </button>
-      </nav>
-      <div
-        id="cover-display-panel"
-        className="cover-tab-panel"
-        role="tabpanel"
-        hidden={accountOpen}
-      >
-        <Game />
-      </div>
-      <section
-        id="cover-account-panel"
-        className="cover-account-panel"
-        role="tabpanel"
-        aria-label="Account"
-        hidden={!accountOpen}
-      >
-        <span className="eyebrow">ACCOUNT</span>
-        <h1>Your account.</h1>
-        <p>Account access and private settings.</p>
-        <button
-          type="button"
-          className="cover-hidden-olive"
-          aria-label="olive icon"
-          onClick={tapOlive}
-        >
-          <Leaf aria-hidden="true" />
-        </button>
-      </section>
-    </main>
-  );
+  return <PublicCoverPage onPrivateEntry={() => { void s.perform(s.beginEntry); }} />;
 }
 // Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
@@ -267,6 +198,21 @@ const hostedSetupProblems = [
   import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true" &&
     "VITE_USE_FIREBASE_EMULATORS must be false",
 ].filter(Boolean);
+// An advertising document has no SessionProvider, PIN form, account form, or private workspace.
+const publicAdvertisingDocument = document.documentElement.dataset.olivePublicAds === "true";
+if (document.documentElement.dataset.olivePrivateRedirect === "true") {
+  createRoot(document.getElementById("root")!).render(<main id="main" role="status">Opening…</main>);
+} else if (publicAdvertisingDocument) {
+  createRoot(document.getElementById("root")!).render(
+    <ErrorBoundary>
+      <a className="skip-link" href="#main">Skip to content</a>
+      <Suspense fallback={<main id="main" role="status">Loading…</main>}>
+        {mode === "download" ? <Download /> :
+          <PublicCoverPage onPrivateEntry={() => window.location.assign("/entry#open")} />}
+      </Suspense>
+    </ErrorBoundary>,
+  );
+} else
 // Hosted private sites must use shared Firebase accounts; local browser accounts cannot sync to phones.
 if (
   import.meta.env.PROD &&
