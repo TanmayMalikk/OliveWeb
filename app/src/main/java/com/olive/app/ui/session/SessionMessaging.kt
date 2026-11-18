@@ -1,6 +1,8 @@
 // Signed-in users: loads and sends chat messages.
 package com.olive.app.ui.session
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,7 +30,6 @@ import com.olive.app.data.account.AccountPolicy
 import com.olive.app.data.account.AccountRole
 import com.olive.app.security.InputPolicy
 import com.olive.app.data.account.UserProfile
-import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.MessageSendWorker
 import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.ui.shared.ResourceText
@@ -49,12 +50,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         private set
     private var waitingForSocial = false
     private var waitingForConversations = false
-    private var indexLoadTimeout: kotlinx.coroutines.Job? = null
+    private var indexLoadTimeout: Job? = null
 
     private fun updateIndexLoading() {
         loadingIndex = waitingForSocial || waitingForConversations
     }
-    private var cacheIndexUpdate: kotlinx.coroutines.Job? = null
+    private var cacheIndexUpdate: Job? = null
 
     // Session messaging: Reports whether messaging screen active.
     private fun messagingScreenActive() = with(runtime.state) {
@@ -131,7 +132,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     // active while the message list listener drives unread badges on the dashboard.
                     LocalNotificationEventHandler.start(application)
                     indexLoadTimeout = scope.launch {
-                        delay(10_000)
+                        delay(10_000.milliseconds)
                         if (isCurrentListener() && loadingIndex) {
                             waitingForConversations = false
                             updateIndexLoading()

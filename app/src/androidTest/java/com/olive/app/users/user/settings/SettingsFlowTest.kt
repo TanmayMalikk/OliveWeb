@@ -3,12 +3,38 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
+import android.os.ParcelFileDescriptor
 import com.olive.app.security.EncryptedVault
+import com.olive.app.ui.users.shared.navigation.SafePage
+import com.olive.app.ui.users.shared.navigation.SessionScreen
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsFlowTest : OliveUiTestBase() {
+    @Test
+    fun installPermissionReturnsToTheSameSafeAppSettingsTab() {
+        register("1234", username = "installprobe")
+        unlock("1234")
+        click("safe_settings")
+        compose.onNodeWithTag("settings_tab_permissions").performScrollTo().performClick()
+        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        click("settings_install_permission")
+        compose.waitUntil(15_000) {
+            automation.rootInActiveWindow?.packageName?.toString() == "com.android.settings"
+        }
+        assertEquals(SessionScreen.Safe, session.screen)
+        assertEquals(SafePage.Settings, session.page)
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("input keyevent KEYCODE_BACK"))
+            .use { it.readBytes() }
+        waitFor("settings_install_permission")
+        compose.onNodeWithTag("settings_tab_permissions").assertIsSelected()
+        assertEquals(SessionScreen.Safe, session.screen)
+        compose.waitUntil(5_000) { !session.safeSystemActivityOpen }
+    }
+
     // Checks the settings preserve language without apicker and keep trigger and address working step with the test's sample data.
     @Test
     fun settingsPreserveLanguageWithoutAPickerAndKeepTriggerAndAddressWorking() {
@@ -17,8 +43,11 @@ class SettingsFlowTest : OliveUiTestBase() {
         click("safe_settings")
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val session =
-            androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+            androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         val originalLanguage = session.profile!!.language
+        compose.onNodeWithTag("settings_tab_permissions").performScrollTo().performClick()
+        compose.onNodeWithTag("settings_install_permission").assertIsDisplayed()
+        compose.onNodeWithTag("settings_tab_profile").performScrollTo().performClick()
         compose.onNodeWithTag("language").assertDoesNotExist()
         fill("settings_situation", "Updated test situation")
         fill("address_line1", "123 Test Street")
@@ -27,12 +56,15 @@ class SettingsFlowTest : OliveUiTestBase() {
         fill("address_country", "Canada")
         click("save_settings")
         compose.waitUntil(30_000) { !session.busy && session.profile?.situation == "Updated test situation" }
-        click("settings_tab_cover")
+        assertTrue(compose.onAllNodesWithTag("cover_choice_news").fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithTag("settings_trigger").assertDoesNotExist()
         // Trigger search is offered by the news cover, rather than the default fitness cover.
         click("cover_choice_news")
         compose.waitUntil(30_000) {
             !session.busy && session.coverType == com.olive.app.data.account.CoverType.NEWS
         }
+        click("settings_tab_password")
+        compose.onNodeWithTag("cover_choice_news").assertDoesNotExist()
         fill("settings_trigger", "new secret")
         fill(
             "settings_pin",

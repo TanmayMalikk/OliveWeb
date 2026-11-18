@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -243,7 +245,7 @@ internal fun TriggerSetup(session: SessionViewModel) {
     }
 }
 
-// Kept in memory for the lifetime of Settings, including when its Cover tab is hidden.
+// Kept in memory for the lifetime of Settings, including when the Password tab is hidden.
 internal class SafeEntryPinDraft {
     var currentPin by mutableStateOf("")
     var newPin by mutableStateOf("")
@@ -252,8 +254,14 @@ internal class SafeEntryPinDraft {
 
 // Both methods may be configured; only the preferred method appears on a normal trigger.
 @Composable
-internal fun SafeEntrySettings(session: SessionViewModel, draft: SafeEntryPinDraft) = with(draft) {
-    val text = rememberResourceText()
+internal fun SafeEntryMethodSettings(session: SessionViewModel) {
+    var pendingMethod by remember { mutableStateOf<SafeEntryMethod?>(null) }
+    fun select(method: SafeEntryMethod) {
+        if (session.account.hasAppPin &&
+            (session.account.preferredEntryMethod == SafeEntryMethod.APP_PIN || !session.account.phoneHasLock)
+        ) pendingMethod = method
+        else session.account.setSafeEntryMethod(method, "")
+    }
     Text(
         stringResource(R.string.entry_choose_method),
         style = MaterialTheme.typography.titleLarge,
@@ -265,23 +273,8 @@ internal fun SafeEntrySettings(session: SessionViewModel, draft: SafeEntryPinDra
         modifier = Modifier.testTag("entry_current_method")
             .semantics { liveRegion = LiveRegionMode.Polite })
     Text(stringResource(R.string.entry_backup_description))
-    if (session.account.canUseAppPin) Field(
-        text(R.string.current_device_pin),
-        currentPin,
-        "current_device_pin",
-        secret = true,
-        numeric = true,
-        showSecretToggle = true,
-        enabled = !session.busy
-    ) { currentPin = it.filter(Char::isDigit).take(6) }
     Button(
-        onClick = {
-            session.account.setSafeEntryMethod(
-                SafeEntryMethod.DEVICE_LOCK,
-                currentPin
-            )
-            currentPin = ""
-        },
+        onClick = { select(SafeEntryMethod.DEVICE_LOCK) },
         enabled = !session.busy && session.account.phoneHasLock,
         modifier = Modifier.fillMaxWidth().testTag("entry_use_device")
     ) {
@@ -292,20 +285,45 @@ internal fun SafeEntrySettings(session: SessionViewModel, draft: SafeEntryPinDra
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
     if (session.account.hasAppPin && session.account.preferredEntryMethod != SafeEntryMethod.APP_PIN) {
         OutlinedButton(
-            onClick = {
-                session.account.setSafeEntryMethod(
-                    SafeEntryMethod.APP_PIN,
-                    currentPin
-                )
-                currentPin = ""
-            }, enabled = !session.busy,
+            onClick = { select(SafeEntryMethod.APP_PIN) }, enabled = !session.busy,
             modifier = Modifier.fillMaxWidth().testTag("entry_use_pin")
         ) { Text(stringResource(R.string.entry_use_pin)) }
     }
-    Text(
-        stringResource(R.string.entry_pin_setup),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.semantics { heading() })
+    pendingMethod?.let { method ->
+        var pin by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { pendingMethod = null },
+            title = { Text(stringResource(R.string.entry_choose_method)) },
+            text = {
+                Field(stringResource(R.string.current_device_pin), pin, "current_device_pin",
+                    secret = true, numeric = true, showSecretToggle = true) {
+                    pin = it.filter(Char::isDigit).take(6)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        session.account.setSafeEntryMethod(method, pin)
+                        pendingMethod = null
+                    },
+                    enabled = InputPolicy.validPin(pin) && !session.busy,
+                    modifier = Modifier.testTag("confirm_entry_method"),
+                ) { Text(stringResource(R.string.next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingMethod = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPinDraft) = with(draft) {
+    val text = rememberResourceText()
+    if (session.account.canUseAppPin) Field(
+        text(R.string.current_device_pin), currentPin, "current_device_pin",
+        secret = true, numeric = true, showSecretToggle = true, enabled = !session.busy,
+    ) { currentPin = it.filter(Char::isDigit).take(6) }
     Field(
         text(R.string.new_device_pin),
         newPin,

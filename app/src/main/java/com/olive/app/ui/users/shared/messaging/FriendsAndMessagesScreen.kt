@@ -141,7 +141,6 @@ private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
 
 // UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MessagingSidebar(
     session: SessionViewModel,
@@ -331,7 +330,7 @@ private fun MessagingSidebar(
         }
         if (session.messages.loadingIndex) item {
             val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
-            com.olive.app.ui.shared.LoadingSkeleton(layout, rows = 3)
+            LoadingSkeleton(layout, rows = 3)
         }
         item { Status(session) }
         if (session.messages.loadingIndex) return@LazyColumn

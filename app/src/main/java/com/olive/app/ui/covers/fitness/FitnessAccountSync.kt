@@ -13,7 +13,6 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 internal fun fitnessAuthenticatedUid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
 
@@ -51,6 +50,7 @@ private fun SharedPreferences.Editor.putFitnessValue(key: String, value: Any?) {
 
 internal fun cloudFitnessKey(key: String) = key in setOf("weight_kg", "height_cm", "step_goal",
     "calorie_goal", "protein_goal", "carbohydrate_goal", "fat_goal", "water_goal_ml", "workout_history") ||
+    savedFoodKeyPattern.matches(key) ||
     Regex("""(?:activity_steps|heart_rate_[a-z_]+)_\d{4}-\d{2}-\d{2}""").matches(key)
 
 // The cloud is account-owned; the preferences are an offline cache and durable per-document outbox.
@@ -227,4 +227,69 @@ internal class FitnessUploadWorker(context: Context, parameters: WorkerParameter
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { return Result.retry() }
     }
+}
+
+private const val SAVED_FOOD_PREFIX = "saved_food_"
+internal val savedFoodKeyPattern = Regex("${SAVED_FOOD_PREFIX}[0-9a-f]{64}")
+private const val RECENT_SEARCHES = "recent_food_searches"
+
+internal data class SavedFood(val id: String, val food: NutritionFood?, val savedAt: Long)
+internal data class RecentFoodSearch(val query: String, val barcode: Boolean)
+
+internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
+    fun observeSavedFoods(onChange: (List<SavedFood>) -> Unit): AutoCloseable {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || savedFoodKeyPattern.matches(key)) onChange(savedFoods())
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onChange(savedFoods())
+        return AutoCloseable { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    fun savedFoods(): List<SavedFood> = preferences.all.asSequence()
+        .filter { (key, _) -> savedFoodKeyPattern.matches(key) }
+        .mapNotNull { (_, raw) ->
+            runCatching {
+                val entry = JSONObject(raw as String)
+                SavedFood(entry.getString("id"),
+                    entry.optJSONObject("food")?.toNutritionFood(includeServingOptions = true),
+                    entry.getLong("savedAt"))
+            }.getOrNull()
+        }
+        .sortedByDescending(SavedFood::savedAt).toList()
+
+    fun setSaved(food: NutritionFood, saved: Boolean) {
+        if (!saved) {
+            remove(food.id)
+            return
+        }
+        val entry = JSONObject().put("id", food.id).put("savedAt", System.currentTimeMillis())
+        if (food.source != FoodDataSource.FATSECRET) {
+            entry.put("food", food.toJson(includeServingOptions = true))
+        }
+        preferences.edit { putString(key(food.id), entry.toString()) }
+    }
+
+    fun remove(id: String) = preferences.edit { remove(key(id)) }
+
+    fun searches(): List<RecentFoodSearch> = runCatching {
+        val stored = JSONArray(preferences.getString(RECENT_SEARCHES, "[]"))
+        (0 until stored.length()).mapNotNull { index ->
+            val entry = stored.optJSONObject(index) ?: return@mapNotNull null
+            val query = entry.optString("query")
+            query.takeIf(String::isNotBlank)?.let { RecentFoodSearch(it, entry.optBoolean("barcode")) }
+        }
+    }.getOrDefault(emptyList())
+
+    fun recordSearch(search: RecentFoodSearch) {
+        val normalized = search.copy(query = search.query.trim())
+        if (normalized.query.isBlank()) return
+        val updated = (listOf(normalized) + searches()).distinctBy { it.query.lowercase() to it.barcode }.take(8)
+        val encoded = JSONArray().apply {
+            updated.forEach { put(JSONObject().put("query", it.query).put("barcode", it.barcode)) }
+        }
+        preferences.edit { putString(RECENT_SEARCHES, encoded.toString()) }
+    }
+
+    private fun key(id: String) = SAVED_FOOD_PREFIX + fitnessAccountKey(id)
 }

@@ -1,18 +1,19 @@
 // Users and safe contacts: defines their profile details.
 package com.olive.app.data.account
 
-import org.json.JSONArray
-import org.json.JSONObject
-import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.tasks.await
-import com.olive.app.security.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.util.UUID
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.PropertyName
-
+import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.security.*
+import com.olive.app.security.InputPolicy
+import java.time.LocalDate
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 // A trusted person can optionally be linked to one explicitly accepted chat friend.
 data class SafeContact(
@@ -495,3 +496,62 @@ data class Address(
     val country: String = ""
 )
 
+enum class AccountSetupStep { PersonalProfile, PrivateTrigger, DevicePin, OrganizationProfile, Ready }
+
+// Account rules stay pure here so sign-in aliases and first-login routing can be unit tested without Firebase.
+object AccountPolicy {
+    // Converts a username into its internal sign-in email.
+    fun signInEmail(identifier: String, role: AccountRole): String {
+        val value = identifier.trim()
+        if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN) && '@' in value) {
+            return value.lowercase()
+        }
+        val domain = when (role) {
+            AccountRole.USER -> "users.olive.invalid"
+            AccountRole.SAFE_CONTACT -> "safe.olive.invalid"
+            AccountRole.STAFF, AccountRole.ADMIN -> "yourolivebranch.ca"
+        }
+        return "${InputPolicy.username(value)}@$domain"
+    }
+
+    // Recreates the hidden email format used by older personal accounts.
+    fun legacyUserEmail(username: String) = "${InputPolicy.username(username)}@users.olive.invalid"
+
+    // Finds missing personal details that must be completed before using the safe app.
+    fun personalProfileNeedsSetup(value: UserProfile) =
+        value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
+            value.language.isBlank() || !value.address.locationValid
+
+    // Finds missing staff or admin details that must be completed before opening their portal.
+    fun organizationProfileNeedsSetup(value: UserProfile) =
+        value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
+            value.email.isBlank() || value.email.endsWith(".olive.invalid", true)
+
+    // Returns the setup rules for the selected account role.
+    fun nextSetup(profile: UserProfile?, role: AccountRole): AccountSetupStep {
+        if (profile == null) {
+            return if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
+                AccountSetupStep.OrganizationProfile
+            } else AccountSetupStep.PersonalProfile
+        }
+        return when (role) {
+            AccountRole.USER -> when {
+                personalProfileNeedsSetup(profile) -> AccountSetupStep.PersonalProfile
+                profile.triggerHash.isBlank() -> AccountSetupStep.PrivateTrigger
+                else -> AccountSetupStep.DevicePin
+            }
+            AccountRole.SAFE_CONTACT ->
+                if (personalProfileNeedsSetup(profile)) AccountSetupStep.PersonalProfile else AccountSetupStep.Ready
+            AccountRole.STAFF, AccountRole.ADMIN ->
+                if (organizationProfileNeedsSetup(profile)) AccountSetupStep.OrganizationProfile else AccountSetupStep.Ready
+        }
+    }
+}
+
+// Incident dates describe past events; malformed or future dates must be corrected explicitly.
+internal fun parseIncidentDate(value: String, today: LocalDate = LocalDate.now()): LocalDate? {
+    val text = value.trim()
+    if (!text.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) return null
+    return runCatching { LocalDate.parse(text) }.getOrNull()
+        ?.takeIf { it.year >= 1 && !it.isAfter(today) }
+}

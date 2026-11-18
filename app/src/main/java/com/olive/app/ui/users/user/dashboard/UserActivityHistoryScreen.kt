@@ -195,8 +195,8 @@ internal fun ActivityHistory(session: SessionViewModel) {
         }
         if (session.loadingHistory || session.historyLoadFailed) {
             item {
-                if (session.loadingHistory) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.History, rows = 3)
-                else com.olive.app.ui.shared.AccessibleMessage(stringResource(R.string.account_history_load_failed))
+                if (session.loadingHistory) LoadingSkeleton(SkeletonLayout.History, rows = 3)
+                else AccessibleMessage(stringResource(R.string.account_history_load_failed))
             }
             return@LazyColumn
         }

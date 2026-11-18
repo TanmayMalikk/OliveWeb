@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.olive.app.ui.shared.BirthdayPicker
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -32,6 +33,16 @@ class OnboardingBirthdayInputTest {
         choose("open")
         compose.onNodeWithContentDescription("Years 2 0 0 7 through 2 0 1 6").assertExists()
         compose.onNodeWithTag("dob_range_1926").assertDoesNotExist()
+        val today = LocalDate.now()
+        choose("range_${today.year}")
+        compose.onNodeWithTag("dob_year_${today.year + 1}").assertDoesNotExist()
+        choose("year_${today.year}")
+        compose.onNodeWithTag("dob_month_${today.monthValue + 1}").assertDoesNotExist()
+        choose("month_${today.monthValue}")
+        compose.onNodeWithTag("dob_day_${today.dayOfMonth + 1}").assertDoesNotExist()
+        choose("day_${today.dayOfMonth}")
+        compose.runOnIdle { assertEquals(today.toString(), birthday.value) }
+        choose("open")
         choose("range_1936")
         (1927..1936).forEach { compose.onNodeWithTag("dob_year_$it").assertExists() }
         compose.onNodeWithTag("dob_year_1926").assertDoesNotExist()

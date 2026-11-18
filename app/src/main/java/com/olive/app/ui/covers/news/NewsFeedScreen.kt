@@ -5,7 +5,6 @@ import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
@@ -180,7 +179,7 @@ internal fun NewsFeed(
                                         tint = OliveGreen,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    if (loading) com.olive.app.ui.shared.SkeletonBlock(Modifier.weight(1f).height(16.dp))
+                                    if (loading) SkeletonBlock(Modifier.weight(1f).height(16.dp))
                                     else Text(
                                         uiText(R.string.news_near_location, currentPlace),
                                         style = MaterialTheme.typography.bodyMedium,
@@ -222,7 +221,7 @@ internal fun NewsFeed(
                         }
                         if (tab == "Today") {
                             // Show a loading row while the first news stories are being fetched.
-                            if (loading) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 1) }
+                            if (loading) item { LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 1) }
                             if (newsError && !loading) item {
                                 Card(
                                     modifier = Modifier.semantics(mergeDescendants = true) {},

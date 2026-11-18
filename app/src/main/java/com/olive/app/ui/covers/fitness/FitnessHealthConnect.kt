@@ -33,6 +33,12 @@ internal object FitnessHealthConnect {
 
     fun available(context: Context) = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
+    fun permissionsFor(client: HealthConnectClient): Set<String> =
+        if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) {
+            permissions + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        } else permissions
+
     fun schedule(context: Context, owner: String) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("fitness-health-${fitnessAccountKey(owner)}",
             ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<FitnessHealthWorker>(15, TimeUnit.MINUTES)
@@ -120,9 +126,7 @@ internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
                 fitnessAuthenticatedUid() != accountId || !FitnessHealthConnect.available(context)) return@repeatOnLifecycle
             try {
                 val client = HealthConnectClient.getOrCreate(context)
-                val wanted = FitnessHealthConnect.permissions.toMutableSet()
-                if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
-                    HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) wanted += HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+                val wanted = FitnessHealthConnect.permissionsFor(client)
                 val missing = wanted - client.permissionController.getGrantedPermissions()
                 checked = true
                 if (missing.isNotEmpty()) launcher.launch(missing)

@@ -39,6 +39,32 @@ class FitnessAccountHydrationTest {
         WorkManagerImpl.setDelegate(null)
     }
     private fun payload(type:String,value:Any)=JSONObject().put("type",type).put("value",value).toString()
+
+    @Test
+    fun savedFatSecretFoodsSyncByIdAndRemoveThroughTheExistingOutbox() = fixture { context, db ->
+        val prefs = fitnessPreferences(context, "owner")
+        val library = FitnessFoodLibrary(prefs)
+        val food = NutritionFood("fatsecret:123:4", "Example cereal", "", "1 bowl",
+            160f, 3f, 34f, 1f, FoodDataSource.FATSECRET)
+        val key = "saved_food_${fitnessAccountKey(food.id)}"
+        FitnessAccountSync.bind(context, "owner")
+        db.emit("users/owner/fitness")
+        library.setSaved(food, true)
+        library.recordSearch(RecentFoodSearch("cereal", false))
+
+        val pending = FitnessAccountSync.outbox(context, "owner")
+        val savedPayload = checkNotNull(pending.getString(key, null))
+        val savedRecord = JSONObject(FitnessAccountSync.decode(savedPayload) as String)
+        assertEquals(food.id, savedRecord.getString("id"))
+        assertFalse(savedRecord.has("food"))
+        assertFalse(pending.contains("recent_food_searches"))
+        assertTrue(FitnessFoodLibrary(fitnessPreferences(context, "different-owner")).savedFoods().isEmpty())
+
+        library.remove(food.id)
+        assertTrue(library.savedFoods().isEmpty())
+        assertNull(FitnessAccountSync.decode(checkNotNull(pending.getString(key, null))))
+    }
+
     @Test
     fun firstServerSnapshotHydratesCloudValuesAndQueuesOnlyLocalValuesMissingFromTheCloud()=fixture { context,db ->
         val prefs=fitnessPreferences(context,"owner")

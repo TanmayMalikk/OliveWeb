@@ -1,6 +1,5 @@
 package com.olive.app.ui.users.user.documents
 
-import android.app.Application
 import android.net.*
 import com.olive.app.data.media.*
 import com.olive.app.data.safety.SafetyDocument

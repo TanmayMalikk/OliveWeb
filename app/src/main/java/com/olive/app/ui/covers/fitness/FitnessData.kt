@@ -280,6 +280,7 @@ internal class FitnessStore(private val context: Context, private val accountId:
             food = food,
             servings = servings.coerceIn(0.0001f, 10_000f),
             meal = meal,
+            loggedAt = System.currentTimeMillis(),
         )
         saveFoods(today, foods(today) + entry)
         FitnessAccountSync.meal(context, accountId, today.toString(), entry.logId, entry.toJson().toString())
@@ -301,6 +302,11 @@ internal class FitnessStore(private val context: Context, private val accountId:
         FitnessAccountSync.meal(context, accountId, today.toString(), logId, null)
         return snapshot(today)
     }
+
+    fun recentFoods(today: LocalDate = LocalDate.now()): List<FoodLogEntry> =
+        FitnessHistory.datesEndingOn(today, 30).asReversed().asSequence()
+            .flatMap { foods(it).asReversed().sortedByDescending(FoodLogEntry::loggedAt).asSequence() }
+            .distinctBy { it.food.id }.take(10).toList()
 
     // Reads today's steps from Health Connect for the fitness dashboard.
     private fun activitySteps(date: LocalDate): Int = preferences.getInt(
@@ -434,65 +440,277 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
     put("logId", logId)
     put("servings", servings.toDouble())
     put("meal", meal.name)
-    put("food", JSONObject().apply {
-        put("id", food.id)
-        put("name", food.name)
-        put("brand", food.brand)
-        put("servingDescription", food.servingDescription)
-        put("calories", food.calories.toDouble())
-        put("proteinGrams", food.proteinGrams.toDouble())
-        put("carbohydrateGrams", food.carbohydrateGrams.toDouble())
-        put("fatGrams", food.fatGrams.toDouble())
-        put("saturatedFatGrams", food.saturatedFatGrams.toDouble())
-        put("transFatGrams", food.transFatGrams.toDouble())
-        put("fiberGrams", food.fiberGrams.toDouble())
-        put("sugarGrams", food.sugarGrams.toDouble())
-        put("sodiumMilligrams", food.sodiumMilligrams.toDouble())
-        put("cholesterolMilligrams", food.cholesterolMilligrams.toDouble())
-        put("potassiumMilligrams", food.potassiumMilligrams.toDouble())
-        put("source", food.source.name)
-        put("barcode", food.barcode)
-    })
+    if (loggedAt > 0) put("loggedAt", loggedAt)
+    put("food", food.toJson())
+}
+
+internal fun NutritionFood.toJson(includeServingOptions: Boolean = false): JSONObject = JSONObject().apply {
+    put("id", id)
+    put("name", name)
+    put("brand", brand)
+    put("servingDescription", servingDescription)
+    put("calories", calories.toDouble())
+    put("proteinGrams", proteinGrams.toDouble())
+    put("carbohydrateGrams", carbohydrateGrams.toDouble())
+    put("fatGrams", fatGrams.toDouble())
+    put("saturatedFatGrams", saturatedFatGrams.toDouble())
+    put("transFatGrams", transFatGrams.toDouble())
+    put("fiberGrams", fiberGrams.toDouble())
+    put("sugarGrams", sugarGrams.toDouble())
+    put("sodiumMilligrams", sodiumMilligrams.toDouble())
+    put("cholesterolMilligrams", cholesterolMilligrams.toDouble())
+    put("potassiumMilligrams", potassiumMilligrams.toDouble())
+    put("source", source.name)
+    put("barcode", barcode)
+    if (includeServingOptions && servingOptions.isNotEmpty()) {
+        put("servingOptions", JSONArray().apply {
+            servingOptions.forEach { put(it.toJson()) }
+        })
+    }
 }
 
 // Converts a saved food entry into the model used by the nutrition screen.
 private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
-    val food = value.getJSONObject("food")
     FoodLogEntry(
         logId = value.getString("logId"),
         servings = value.getDouble("servings").toFloat().coerceIn(0.0001f, 10_000f),
         meal = MealType.valueOf(value.getString("meal")),
-        food = NutritionFood(
-            id = food.getString("id"),
-            name = food.getString("name"),
-            brand = food.optString("brand"),
-            servingDescription = food.optString("servingDescription", "1 serving"),
-            calories = food.optDouble("calories").toFloat().coerceAtLeast(0f),
-            proteinGrams = food.optDouble("proteinGrams").toFloat().coerceAtLeast(0f),
-            carbohydrateGrams = food.optDouble("carbohydrateGrams").toFloat().coerceAtLeast(0f),
-            fatGrams = food.optDouble("fatGrams").toFloat().coerceAtLeast(0f),
-            source = FoodDataSource.valueOf(food.getString("source")),
-            barcode = food.optString("barcode"),
-            saturatedFatGrams = food.safeNutrient("saturatedFatGrams"),
-            transFatGrams = food.safeNutrient("transFatGrams"),
-            fiberGrams = food.safeNutrient("fiberGrams"),
-            sugarGrams = food.safeNutrient("sugarGrams"),
-            sodiumMilligrams = food.safeNutrient("sodiumMilligrams"),
-            cholesterolMilligrams = food.safeNutrient("cholesterolMilligrams"),
-            potassiumMilligrams = food.safeNutrient("potassiumMilligrams"),
-        ),
+        loggedAt = value.optLong("loggedAt"),
+        food = checkNotNull(value.getJSONObject("food").toNutritionFood()),
     )
 }.getOrNull()
+
+internal fun JSONObject.toNutritionFood(includeServingOptions: Boolean = false): NutritionFood? = runCatching {
+    NutritionFood(
+        id = getString("id"),
+        name = getString("name"),
+        brand = optString("brand"),
+        servingDescription = optString("servingDescription", "1 serving"),
+        calories = safeNutrient("calories"),
+        proteinGrams = safeNutrient("proteinGrams"),
+        carbohydrateGrams = safeNutrient("carbohydrateGrams"),
+        fatGrams = safeNutrient("fatGrams"),
+        source = FoodDataSource.valueOf(getString("source")),
+        barcode = optString("barcode"),
+        saturatedFatGrams = safeNutrient("saturatedFatGrams"),
+        transFatGrams = safeNutrient("transFatGrams"),
+        fiberGrams = safeNutrient("fiberGrams"),
+        sugarGrams = safeNutrient("sugarGrams"),
+        sodiumMilligrams = safeNutrient("sodiumMilligrams"),
+        cholesterolMilligrams = safeNutrient("cholesterolMilligrams"),
+        potassiumMilligrams = safeNutrient("potassiumMilligrams"),
+        servingOptions = if (includeServingOptions) readNutritionFoods(optJSONArray("servingOptions"), false)
+            else emptyList(),
+    )
+}.getOrNull()
+
+internal fun readNutritionFoods(array: JSONArray?, includeServingOptions: Boolean = true): List<NutritionFood> =
+    if (array == null) emptyList() else (0 until array.length()).mapNotNull {
+        array.optJSONObject(it)?.toNutritionFood(includeServingOptions)
+    }
 
 // Reads a nutrient value and replaces invalid numbers with zero.
 private fun JSONObject.safeNutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
 
 // Formats the food serving amount shown in the diary.
-internal fun Float.displayAmount(): String = if (this > 0f && this < 1f) {
-    java.math.BigDecimal(toString()).setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
-} else if (this == roundToInt().toFloat()) {
-    roundToInt().toString()
-} else {
-    String.format(Locale.ROOT, "%.1f", this)
+internal fun Float.displayAmount(): String = when {
+    this > 0f && this < 1f ->
+        java.math.BigDecimal(toString()).setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    this == roundToInt().toFloat() -> roundToInt().toString()
+    else -> String.format(Locale.ROOT, "%.1f", this)
+}
+
+internal data class FitnessProfile(
+    val weightKg: Float = 70f,
+    val heightCm: Float = 170f,
+    val stepGoal: Int = 8_000,
+    val calorieGoal: Int = 2_000,
+    val proteinGoal: Int = 120,
+    val carbohydrateGoal: Int = 250,
+    val fatGoal: Int = 65,
+    val waterGoalMl: Int = 2000,
+)
+
+internal data class NutritionFood(
+    val id: String,
+    val name: String,
+    val brand: String,
+    val servingDescription: String,
+    val calories: Float,
+    val proteinGrams: Float,
+    val carbohydrateGrams: Float,
+    val fatGrams: Float,
+    val source: FoodDataSource,
+    val barcode: String = "",
+    val servingOptions: List<NutritionFood> = emptyList(),
+    val saturatedFatGrams: Float = 0f,
+    val transFatGrams: Float = 0f,
+    val fiberGrams: Float = 0f,
+    val sugarGrams: Float = 0f,
+    val sodiumMilligrams: Float = 0f,
+    val cholesterolMilligrams: Float = 0f,
+    val potassiumMilligrams: Float = 0f,
+)
+
+internal enum class FoodDataSource(val displayName: String) {
+    FATSECRET("FatSecret"), OPEN_FOOD_FACTS("Open Food Facts"), MANUAL("Manual entry")
+}
+
+internal enum class MealType(val displayName: String) {
+    BREAKFAST("Breakfast"), LUNCH("Lunch"), DINNER("Dinner"), SNACK("Snack")
+}
+
+internal data class FoodLogEntry(
+    val logId: String,
+    val food: NutritionFood,
+    val servings: Float,
+    val meal: MealType,
+    val loggedAt: Long = 0,
+)
+
+internal data class NutritionTotals(
+    val calories: Float = 0f,
+    val proteinGrams: Float = 0f,
+    val carbohydrateGrams: Float = 0f,
+    val fatGrams: Float = 0f,
+    val saturatedFatGrams: Float = 0f,
+    val transFatGrams: Float = 0f,
+    val fiberGrams: Float = 0f,
+    val sugarGrams: Float = 0f,
+    val sodiumMilligrams: Float = 0f,
+    val cholesterolMilligrams: Float = 0f,
+    val potassiumMilligrams: Float = 0f,
+)
+
+internal data class HeartRateVitals(
+    val date: LocalDate,
+    val peakBpm: Int,
+    val lowestBpm: Int,
+    val restingBpm: Int?,
+    val averageBpm: Int,
+    val sampleCount: Int,
+    val watchConnected: Boolean,
+    val lastUpdatedAt: Long,
+    val samples: List<HeartRateSample> = emptyList(),
+)
+
+internal data class HeartRateSample(val recordedAt: Long, val bpm: Int)
+
+internal data class HeartRateDayStats(
+    val peakBpm: Int = 0,
+    val lowestBpm: Int = 0,
+    val totalBpm: Long = 0L,
+    val sampleCount: Int = 0,
+    val restingTotalBpm: Long = 0L,
+    val restingSampleCount: Int = 0,
+) {
+    // Fitness watch users: adds one medically plausible watch reading to today's summary.
+    fun record(heartRate: Int, resting: Boolean): HeartRateDayStats {
+        if (heartRate !in 30..240) return this
+        return copy(
+            peakBpm = maxOf(peakBpm, heartRate),
+            lowestBpm = if (lowestBpm == 0) heartRate else minOf(lowestBpm, heartRate),
+            totalBpm = totalBpm + heartRate,
+            sampleCount = sampleCount + 1,
+            restingTotalBpm = restingTotalBpm + if (resting) heartRate else 0,
+            restingSampleCount = restingSampleCount + if (resting) 1 else 0,
+        )
+    }
+
+    // Fitness history: converts saved totals into values the daily vitals screen can display.
+    fun toVitals(
+        date: LocalDate,
+        watchConnected: Boolean,
+        lastUpdatedAt: Long,
+        samples: List<HeartRateSample> = emptyList(),
+    ): HeartRateVitals? {
+        if (sampleCount <= 0) return null
+        return HeartRateVitals(
+            date = date,
+            peakBpm = peakBpm,
+            lowestBpm = lowestBpm,
+            restingBpm = restingSampleCount.takeIf { it > 0 }
+                ?.let { (restingTotalBpm.toDouble() / it).roundToInt() },
+            averageBpm = (totalBpm.toDouble() / sampleCount).roundToInt(),
+            sampleCount = sampleCount,
+            watchConnected = watchConnected,
+            lastUpdatedAt = lastUpdatedAt,
+            samples = samples,
+        )
+    }
+}
+
+internal data class FitnessSnapshot(
+    val profile: FitnessProfile,
+    val stepsToday: Int,
+    val foodsToday: List<FoodLogEntry>,
+    val heartRateVitals: HeartRateVitals? = null,
+    val heartRateHistory: List<HeartRateVitals> = emptyList(),
+    val watchConnected: Boolean = false,
+    val watchSeenWithinFourteenDays: Boolean = false,
+    val waterTodayMl: Int = 0,
+) {
+    val nutrition = foodsToday.fold(NutritionTotals()) { total, entry ->
+        val servings = entry.servings
+        val food = entry.food
+        NutritionTotals(
+            calories = total.calories + food.calories * servings,
+            proteinGrams = total.proteinGrams + food.proteinGrams * servings,
+            carbohydrateGrams = total.carbohydrateGrams + food.carbohydrateGrams * servings,
+            fatGrams = total.fatGrams + food.fatGrams * servings,
+            saturatedFatGrams = total.saturatedFatGrams + food.saturatedFatGrams * servings,
+            transFatGrams = total.transFatGrams + food.transFatGrams * servings,
+            fiberGrams = total.fiberGrams + food.fiberGrams * servings,
+            sugarGrams = total.sugarGrams + food.sugarGrams * servings,
+            sodiumMilligrams = total.sodiumMilligrams + food.sodiumMilligrams * servings,
+            cholesterolMilligrams = total.cholesterolMilligrams + food.cholesterolMilligrams * servings,
+            potassiumMilligrams = total.potassiumMilligrams + food.potassiumMilligrams * servings,
+        )
+    }
+}
+
+internal data class FitnessHistoryDay(
+    val date: LocalDate,
+    val steps: Int,
+    val distanceKm: Float,
+    val caloriesBurned: Float,
+    val caloriesEaten: Float,
+    val proteinGrams: Float,
+    val carbohydrateGrams: Float,
+    val fatGrams: Float,
+)
+
+internal object FitnessHistory {
+    // Creates the ordered date list used by the 14-day fitness graphs.
+    fun datesEndingOn(endDate: LocalDate, days: Int): List<LocalDate> =
+        (days.coerceIn(1, 31) - 1 downTo 0).map { endDate.minusDays(it.toLong()) }
+}
+
+internal object FitnessMath {
+    // Gives the fitness cover the stride meters it needs.
+    fun strideMeters(heightCm: Float) = (heightCm.coerceIn(100f, 230f) * 0.413f) / 100f
+    // Estimates walking distance from the saved step count.
+    fun distanceKm(steps: Int, heightCm: Float) =
+        steps.coerceAtLeast(0) * strideMeters(heightCm) / 1_000f
+    // Returns the walking calories used by the fitness cover.
+    fun walkingCalories(steps: Int, profile: FitnessProfile) =
+        distanceKm(steps, profile.heightCm) * profile.weightKg.coerceIn(30f, 300f) * 0.75f
+}
+
+internal object StepSourcePolicy {
+    const val WATCH_ACTIVE_WINDOW_MS = 120_000L
+
+    // Watches is active for fitness cover.
+    fun watchIsActive(lastWatchActivityAt: Long, nowMillis: Long): Boolean =
+        lastWatchActivityAt in 1..nowMillis &&
+            nowMillis - lastWatchActivityAt <= WATCH_ACTIVE_WINDOW_MS
+
+    // Adds only new phone steps so watch and phone totals are not counted twice.
+    fun phoneDeltaToAdd(phoneDelta: Int, lastWatchActivityAt: Long, nowMillis: Long): Int =
+        if (watchIsActive(lastWatchActivityAt, nowMillis)) 0 else phoneDelta.coerceAtLeast(0)
+
+    // Fitness cover: Watches delta to add.
+    fun watchDeltaToAdd(watchDelta: Int, phoneFallbackSinceWatch: Int): Int =
+        (watchDelta.coerceAtLeast(0) - phoneFallbackSinceWatch.coerceAtLeast(0)).coerceAtLeast(0)
 }

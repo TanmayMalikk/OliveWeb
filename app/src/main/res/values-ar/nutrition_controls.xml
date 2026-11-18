@@ -17,4 +17,12 @@
     <string name="nutrition_water_plus">إضافة 250 مل ماء</string>
     <string name="nutrition_edit_food">تعديل الطعام</string>
     <string name="nutrition_edit_details">تعديل التفاصيل</string>
+    <string name="nutrition_recent_foods">الأطعمة المسجّلة مؤخرًا</string>
+    <string name="nutrition_saved_foods">الأطعمة المحفوظة</string>
+    <string name="nutrition_recent_searches">عمليات البحث الأخيرة</string>
+    <string name="nutrition_no_recent_foods">لا توجد أطعمة مسجّلة مؤخرًا.</string>
+    <string name="nutrition_no_saved_foods">لم تحفظ أي أطعمة بعد.</string>
+    <string name="nutrition_save_food">حفظ الطعام</string>
+    <string name="nutrition_unsave_food">إزالة الطعام المحفوظ</string>
+    <string name="nutrition_saved_unavailable">تعذّر تحميل هذا الطعام المحفوظ.</string>
 </resources>

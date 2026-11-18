@@ -57,6 +57,39 @@ class NutritionSearchUiTest {
     }
 
     @Test
+    fun recentFoodsReusePortionsAndBookmarksPersistInTheFoodLibrary() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val store = FitnessStore(context, "nutrition-ui-${java.util.UUID.randomUUID()}")
+        val library = FitnessFoodLibrary(store.preferences)
+        val recent = food.copy(id = "manual:oats", source = FoodDataSource.MANUAL)
+        library.recordSearch(RecentFoodSearch("oat bar", false))
+        var added: FoodLogEntry? = null
+        compose.setContent { OliveTheme {
+            FoodSearchPage(
+                enabled = true,
+                padding = PaddingValues(0.dp),
+                library = library,
+                initialSection = FoodLibrarySection.Recent,
+                recentFoods = listOf(FoodLogEntry("id", recent, 2f, MealType.LUNCH)),
+                onFoodAdded = { choice, servings, meal -> added = FoodLogEntry("new", choice, servings, meal) },
+            )
+        } }
+        compose.onNodeWithText("oat bar").assertExists()
+        compose.onNodeWithText(recent.name).performClick()
+        compose.onNodeWithContentDescription(text(R.string.nutrition_save_food)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.nutrition_unsave_food)).assertExists()
+        compose.onNodeWithText(text(R.string.add_food)).performClick()
+        compose.runOnIdle {
+            assertEquals(FoodLogEntry("new", recent, 2f, MealType.LUNCH), added)
+            assertEquals(recent, FitnessFoodLibrary(store.preferences).savedFoods().single().food)
+        }
+        compose.onNodeWithText(text(R.string.nutrition_saved_foods)).performClick()
+        compose.onNodeWithText(recent.name).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.nutrition_unsave_food)).performClick()
+        compose.onNodeWithText(text(R.string.nutrition_no_saved_foods)).assertExists()
+    }
+
+    @Test
     fun barcodeEntryIgnoresNonDigitsAndDisplaysProviderApprovalFailure() {
         var queried = ""
         val source = object : FoodNutritionDataSource {

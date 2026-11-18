@@ -1,6 +1,8 @@
 // Safe-app users: manages safety document actions.
 package com.olive.app.ui.users.user.documents
 
+import kotlin.time.Duration.Companion.milliseconds
+
 
 import android.content.Context
 import android.net.Uri
@@ -94,7 +96,7 @@ internal class SafetyDocumentsController(
         var awaitingServer = hasValidatedInternetConnection(applicationContext)
         state = state.copy(loading = true, error = null)
         initialLoadTimeout = scope.launch {
-            delay(10_000)
+            delay(10_000.milliseconds)
             if (token == generation && awaitingServer) {
                 awaitingServer = false
                 state = state.copy(loading = false, error = applicationContext.getString(R.string.documents_load_failed))

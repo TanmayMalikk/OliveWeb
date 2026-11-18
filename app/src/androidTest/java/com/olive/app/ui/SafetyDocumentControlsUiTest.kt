@@ -95,6 +95,24 @@ class SafetyDocumentControlsUiTest {
     }
 
     @Test
+    fun storedAudioOffersFileControlsWithoutAPreview() {
+        compose.setContent {
+            OliveTheme {
+                SafetyDocumentCard(
+                    file = file().copy(name = "Recording.m4a", mimeType = "audio/mp4"),
+                    currentUid = "owner", friends = emptyList(), onOpen = { error("Audio preview opened") },
+                    offline = OfflineMediaAvailability.NOT_CACHED, onShare = {}, onDelete = {},
+                    onMakeOffline = {}, onRemoveOffline = {}, opening = false, evidenceUpdating = false,
+                    onEvidenceChange = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("document_open_sample").assertDoesNotExist()
+        compose.onNodeWithTag("document_evidence_sample").assertExists()
+        compose.onNodeWithText(text(R.string.share)).assertExists()
+    }
+
+    @Test
     fun editingSharePreservesAnExistingRecipientOutsideTheFriendList() {
         val friends = listOf(Friend("first", "existing", "Old friend"), Friend("second", "new", "New friend"))
         var grant: Map<String, String>? = null

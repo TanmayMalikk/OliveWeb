@@ -1,11 +1,12 @@
 // Fitness cover users: shows nutrition totals, logged meals, and food search.
 package com.olive.app.ui.covers.fitness
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Edit
@@ -31,14 +31,10 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
@@ -78,6 +74,25 @@ import com.olive.app.R
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.ui.graphics.Color
+import kotlin.math.PI
+import kotlin.math.sin
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.semantics.*
 
 // Shows today's calorie and macro totals with meal logging.
 @Composable
@@ -89,7 +104,10 @@ internal fun TodayPage(
     onRemoveFood: (String) -> Unit,
     onAddWater: (Int, Int) -> Unit,
     onUpdateFood: (FoodLogEntry) -> Unit = {},
+    library: FitnessFoodLibrary? = null,
+    onOpenLibrary: (FoodLibrarySection) -> Unit = {},
 ) {
+    val savedFoods = rememberSavedFoods(library)
     var editingEntry by remember { mutableStateOf<FoodLogEntry?>(null) }
     var editDetails by remember { mutableStateOf(false) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -120,6 +138,15 @@ internal fun TodayPage(
                     Text(stringResource(R.string.add_food))
                 }
                 WaterTracker(snapshot.waterTodayMl, snapshot.profile.waterGoalMl, enabled, onAddWater)
+            }
+        }
+        if (library != null) item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(FoodLibrarySection.Recent, FoodLibrarySection.Saved).forEach { section ->
+                    OutlinedButton(onClick = { onOpenLibrary(section) }, enabled = enabled) {
+                        Text(stringResource(section.label))
+                    }
+                }
             }
         }
         item { DailyNutritionCard(snapshot) }
@@ -153,7 +180,9 @@ internal fun TodayPage(
                 onUpdateFood(entry.copy(food = food.copy(servingOptions = emptyList()), servings = servings, meal = meal))
                 editingEntry = null
             }, initialServings = entry.servings, initialMeal = entry.meal,
-            editing = true, onEditFood = { editDetails = true })
+            editing = true, onEditFood = { editDetails = true },
+            isSaved = savedFoods.any { it.id == entry.food.id },
+            onToggleSaved = library?.let { { saved: Boolean -> it.setSaved(entry.food, saved) } })
     }
 
 }
@@ -292,6 +321,9 @@ internal fun FoodSearchPage(
     padding: PaddingValues,
     onFoodAdded: (NutritionFood, Float, MealType) -> Unit,
     foodSource: FoodNutritionDataSource? = null,
+    library: FitnessFoodLibrary? = null,
+    initialSection: FoodLibrarySection = FoodLibrarySection.Search,
+    recentFoods: List<FoodLogEntry> = emptyList(),
 ) {
     val repository = remember(foodSource) { foodSource ?: FoodNutritionRepository() }
     val scope = rememberCoroutineScope()
@@ -300,6 +332,10 @@ internal fun FoodSearchPage(
     var result by remember { mutableStateOf(FoodSearchResult()) }
     var searched by remember { mutableStateOf(false) }
     var selectedFood by remember { mutableStateOf<NutritionFood?>(null) }
+    var previousEntry by remember { mutableStateOf<FoodLogEntry?>(null) }
+    var section by rememberSaveable(initialSection) { mutableStateOf(initialSection) }
+    val savedFoods = rememberSavedFoods(library)
+    var searches by remember(library) { mutableStateOf(library?.searches().orEmpty()) }
     var suggestions by remember { mutableStateOf(emptyList<String>()) }
     var manualEntry by rememberSaveable { mutableStateOf(false) }
     var barcodeMode by rememberSaveable { mutableStateOf(false) }
@@ -321,17 +357,22 @@ internal fun FoodSearchPage(
             }
         } finally { scanning = false }
     }, onError = { scanning = false; scanFailed = true })
-    var page by remember { mutableStateOf(0) }
+    var page by remember { mutableIntStateOf(0) }
     fun search(more: Boolean = false) {
         if (loading) return
         loading = true
         suggestions = emptyList()
         searched = true
         val nextPage = if (more) page + 1 else 0
+        val request = RecentFoodSearch(query, barcodeMode)
+        if (!more && library != null) {
+            library.recordSearch(request)
+            searches = library.searches()
+        }
         scope.launch {
             try {
-                val incoming = if (barcodeMode) repository.lookupBarcode(query)
-                    else repository.search(query, nextPage)
+                val incoming = if (request.barcode) repository.lookupBarcode(request.query)
+                    else repository.search(request.query, nextPage)
                 result = if (more) incoming.copy(foods = (result.foods + incoming.foods).distinctBy { it.id })
                     else incoming
                 // Retain the previous page on a failed load so the same page can be retried.
@@ -341,10 +382,11 @@ internal fun FoodSearchPage(
             }
         }
     }
-    LaunchedEffect(query, barcodeMode, loading, searched, enabled) {
+    LaunchedEffect(query, barcodeMode, loading, searched, enabled, section) {
         suggestions = emptyList()
-        if (!enabled || barcodeMode || loading || searched || query.trim().length < 2) return@LaunchedEffect
-        kotlinx.coroutines.delay(450)
+        if (section != FoodLibrarySection.Search || !enabled || barcodeMode || loading || searched ||
+            query.trim().length < 2) return@LaunchedEffect
+        kotlinx.coroutines.delay(450.milliseconds)
         suggestions = try {
             repository.suggestions(query)
         } catch (error: kotlinx.coroutines.CancellationException) {
@@ -370,70 +412,98 @@ internal fun FoodSearchPage(
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
         )
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(false to R.string.search_foods, true to R.string.nutrition_barcode).forEach { (mode, label) ->
-                FilterChip(selected = barcodeMode == mode, enabled = enabled && !loading && !scanning,
-                    onClick = { scanFailed = false; barcodeMode = mode; query = ""; searched = false; result = FoodSearchResult() },
-                    label = { Text(stringResource(label)) })
-            }
-            IconButton(onClick = { manualEntry = true }, enabled = enabled && !loading && !scanning,
-                modifier = Modifier.testTag("nutrition_manual_entry")) {
-                Icon(Icons.Outlined.Edit, stringResource(R.string.nutrition_manual))
+        if (library != null) Row(Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FoodLibrarySection.entries.forEach { option ->
+                FilterChip(selected = section == option, onClick = { section = option },
+                    enabled = enabled && !loading && !scanning, label = { Text(stringResource(option.label)) })
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = if (barcodeMode) it.filter(Char::isDigit).take(14) else it.take(80)
-                    searched = false
-                    result = FoodSearchResult()
-                },
-                label = { Text(stringResource(if (barcodeMode) R.string.nutrition_barcode else R.string.search_foods)) },
-                keyboardOptions = KeyboardOptions(keyboardType = if (barcodeMode) KeyboardType.Number else KeyboardType.Text),
-                trailingIcon = if (barcodeMode) { {
-                    IconButton(onClick = camera, enabled = enabled && !loading && !scanning) {
-                        Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.nutrition_scan_barcode))
-                    }
-                } } else null,
-                singleLine = true,
-                enabled = enabled && !loading && !scanning,
-                modifier = Modifier.weight(1f).testTag("fitness_food_search"),
-            )
-            Spacer(Modifier.width(8.dp))
-            IconButton(
-                onClick = { search() },
-                enabled = enabled && !loading && !scanning && if (barcodeMode) query.length in listOf(8, 12, 13)
-                    else query.trim().length >= 2,
-            ) { Icon(Icons.Outlined.Search, stringResource(R.string.search)) }
-        }
-        if (suggestions.isNotEmpty() && !loading) {
+        if (section == FoodLibrarySection.Search) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                suggestions.forEach { suggestion ->
-                    androidx.compose.material3.SuggestionChip(
-                        onClick = { query = suggestion; search() }, label = { Text(suggestion) })
+                listOf(false to R.string.search_foods, true to R.string.nutrition_barcode).forEach { (mode, label) ->
+                    FilterChip(selected = barcodeMode == mode, enabled = enabled && !loading && !scanning,
+                        onClick = { scanFailed = false; barcodeMode = mode; query = ""; searched = false; result = FoodSearchResult() },
+                        label = { Text(stringResource(label)) })
+                }
+                IconButton(onClick = { manualEntry = true }, enabled = enabled && !loading && !scanning,
+                    modifier = Modifier.testTag("nutrition_manual_entry")) {
+                    Icon(Icons.Outlined.Edit, stringResource(R.string.nutrition_manual))
                 }
             }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = {
+                        query = if (barcodeMode) it.filter(Char::isDigit).take(14) else it.take(80)
+                        searched = false
+                        result = FoodSearchResult()
+                    },
+                    label = { Text(stringResource(if (barcodeMode) R.string.nutrition_barcode else R.string.search_foods)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = if (barcodeMode) KeyboardType.Number else KeyboardType.Text),
+                    trailingIcon = if (barcodeMode) { {
+                        IconButton(onClick = camera, enabled = enabled && !loading && !scanning) {
+                            Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.nutrition_scan_barcode))
+                        }
+                    } } else null,
+                    singleLine = true,
+                    enabled = enabled && !loading && !scanning,
+                    modifier = Modifier.weight(1f).testTag("fitness_food_search"),
+                )
+                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick = { search() },
+                    enabled = enabled && !loading && !scanning && if (barcodeMode) query.length in listOf(8, 12, 13)
+                        else query.trim().length >= 2,
+                ) { Icon(Icons.Outlined.Search, stringResource(R.string.search)) }
+            }
+            if (suggestions.isNotEmpty() && !loading) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    suggestions.forEach { suggestion ->
+                        SuggestionChip(
+                            onClick = { query = suggestion; search() }, label = { Text(suggestion) })
+                    }
+                }
+            }
+            if (scanFailed) Text(stringResource(R.string.nutrition_barcode_failed), color = MaterialTheme.colorScheme.error)
+            if (loading || scanning) {
+                LoadingSkeleton(SkeletonLayout.FoodResults)
+            } else if (searched && result.foods.isEmpty()) {
+                val message = if (result.providerFailures >= 2) R.string.food_search_unavailable else R.string.no_food_results
+                Text(stringResource(message))
+            }
+            if (!loading && result.needsIpApproval) {
+                Text(stringResource(R.string.nutrition_ip_approval), color = MaterialTheme.colorScheme.error)
+            }
+            if (!loading && result.providerFailures == 1) {
+                Text(stringResource(R.string.some_food_sources_unavailable), color = FitnessSubtle)
+            }
         }
-        if (scanFailed) Text(stringResource(R.string.nutrition_barcode_failed), color = MaterialTheme.colorScheme.error)
-        if (loading || scanning) {
-            com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.FoodResults)
-        } else if (searched && result.foods.isEmpty()) {
-            val message = if (result.providerFailures >= 2) R.string.food_search_unavailable else R.string.no_food_results
-            Text(stringResource(message))
+        val listState = key(section) {
+            androidx.compose.foundation.lazy.rememberLazyListState()
         }
-        if (!loading && result.needsIpApproval) {
-            Text(stringResource(R.string.nutrition_ip_approval), color = MaterialTheme.colorScheme.error)
-        }
-        if (!loading && result.providerFailures == 1) {
-            Text(stringResource(R.string.some_food_sources_unavailable), color = FitnessSubtle)
-        }
-        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
         LazyColumn(
             modifier = Modifier.weight(1f).oliveScrollbar(listState),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (section == FoodLibrarySection.Recent) {
+                recentFoodItems(recentFoods, searches, enabled, onFood = { entry ->
+                    previousEntry = entry
+                    selectedFood = entry.food
+                }, onSearch = { request ->
+                    section = FoodLibrarySection.Search
+                    scanFailed = false
+                    barcodeMode = request.barcode
+                    query = request.query
+                    search()
+                })
+            }
+            if (section == FoodLibrarySection.Saved) {
+                savedFoodItems(savedFoods, repository, enabled, onFood = { selectedFood = it },
+                    onRemove = { library?.remove(it) })
+            }
+            if (section != FoodLibrarySection.Search) return@LazyColumn
             items(if (loading || scanning) emptyList() else result.foods, key = NutritionFood::id) { food ->
                 FoodSearchResultCard(food, enabled && !loading) { selectedFood = food }
             }
@@ -454,11 +524,16 @@ internal fun FoodSearchPage(
     selectedFood?.let { food ->
         AddFoodDialog(
             food = food,
-            onDismiss = { selectedFood = null },
+            onDismiss = { selectedFood = null; previousEntry = null },
             onAdd = { choice, servings, meal ->
                 selectedFood = null
+                previousEntry = null
                 onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal)
             },
+            initialServings = previousEntry?.servings ?: 1f,
+            initialMeal = previousEntry?.meal ?: MealType.BREAKFAST,
+            isSaved = savedFoods.any { it.id == food.id },
+            onToggleSaved = library?.let { { saved: Boolean -> it.setSaved(food, saved) } },
         )
     }
 }
@@ -527,102 +602,90 @@ private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: (
     }
 }
 
-// fitness cover shows this add food dialog view so the user can view its details and use its actions.
-@Composable
-internal fun AddFoodDialog(
-    food: NutritionFood,
-    onDismiss: () -> Unit,
-    onAdd: (NutritionFood, Float, MealType) -> Unit,
-    initialServings: Float = 1f,
-    initialMeal: MealType = MealType.BREAKFAST,
-    editing: Boolean = false,
-    onEditFood: (() -> Unit)? = null,
-) {
-    var servings by remember { mutableStateOf(initialServings.toString()) }
-    var choice by remember(food.id) { mutableStateOf(food) }
-    var servingMenu by remember { mutableStateOf(false) }
-    var custom by remember { mutableStateOf(false) }
-    var customUnit by remember { mutableStateOf(servingUnits(food).firstOrNull() ?: "serving") }
-    val portion = if (custom) customFoodPortion(food, servings, customUnit)
-        else parseServingAmount(servings)?.let { FoodPortion(choice, it) }
-    var meal by remember { mutableStateOf(initialMeal) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(food.name, modifier = Modifier.weight(1f))
-                onEditFood?.let { edit -> IconButton(onClick = edit) {
-                    Icon(Icons.Outlined.Edit, stringResource(R.string.nutrition_edit_details))
-                } }
-            }
-        },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (food.servingOptions.isNotEmpty() || food.servingDescription.isNotBlank()) {
-                    Box {
-                        OutlinedButton(onClick = { servingMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (custom) stringResource(R.string.nutrition_custom_portion) else choice.servingDescription)
-                        }
-                        DropdownMenu(expanded = servingMenu, onDismissRequest = { servingMenu = false }) {
-                            food.servingOptions.ifEmpty { listOf(food) }.forEach { option ->
-                                DropdownMenuItem(text = { Text(option.servingDescription) }, onClick = {
-                                    choice = option
-                                    custom = false
-                                    servings = "1"
-                                    servingMenu = false
-                                })
-                            }
-                            DropdownMenuItem(text = { Text(stringResource(R.string.nutrition_custom_portion)) }, onClick = {
-                                custom = true; servings = ""; servingMenu = false
-                            })
-                        }
-                    }
-                }
-                if (custom) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (servingUnits(food) + "serving").forEach { unit ->
-                        FilterChip(selected = customUnit == unit, onClick = { customUnit = unit },
-                            label = { Text(if (unit == "serving") stringResource(R.string.servings) else unit) })
-                    }
-                }
-                Text(
-                    "${(portion?.food ?: choice).servingDescription} · ${((portion?.food?.calories ?: 0f) * (portion?.servings ?: 0f)).displayAmount()} kcal · " +
-                            "P ${((portion?.food?.proteinGrams ?: 0f) * (portion?.servings ?: 0f)).displayAmount()} g · " +
-                            "C ${((portion?.food?.carbohydrateGrams ?: 0f) * (portion?.servings ?: 0f)).displayAmount()} g · F ${((portion?.food?.fatGrams ?: 0f) * (portion?.servings ?: 0f)).displayAmount()} g",
-                )
-                OutlinedTextField(
-                    value = servings,
-                    onValueChange = { value -> servings = value.take(12) },
-                    label = { Text(if (custom) stringResource(R.string.nutrition_amount) + " ($customUnit)" else stringResource(R.string.servings)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-                MealType.entries.forEach { option ->
-                    FilterChip(
-                        selected = meal == option,
-                        onClick = { meal = option },
-                        label = { Text(option.displayName) },
-                        leadingIcon = if (meal == option) {
-                            { Icon(Icons.Outlined.Check, null) }
-                        } else null,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { portion?.let { onAdd(it.food, it.servings, meal) } },
-                enabled = portion != null,
-            ) { Text(stringResource(if (editing) R.string.save else R.string.add_food)) }
-        },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
-}
 // Shows the required FatSecret and Open Food Facts credits.
 @Composable
 private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(stringResource(R.string.fatsecret_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
         Text(stringResource(R.string.open_food_facts_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
+    }
+}
+
+@Composable
+internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val target = (totalMl.toFloat() / goalMl.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val fill by animateFloatAsState(target, animationSpec = tween(1000), label = "water_fill")
+    val outline = Color(0xFF176B9B)
+    val water = Color(0xFF258ED2)
+    val ripples = rememberInfiniteTransition(label = "water_ripples")
+    val phase by ripples.animateFloat(0f, (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "water_wave_phase")
+    val description = stringResource(R.string.nutrition_water_progress, totalMl, goalMl)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Row(Modifier.clickable(enabled = enabled, role = Role.Button) { open = true }
+        .semantics { contentDescription = description; progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) }
+        .padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(42.dp, 54.dp)) {
+            val glass = Path().apply {
+                moveTo(size.width * .12f, size.height * .08f); lineTo(size.width * .88f, size.height * .08f)
+                lineTo(size.width * .76f, size.height * .92f); lineTo(size.width * .24f, size.height * .92f); close()
+            }
+            drawPath(glass, Color(0xFFE4F3FC))
+            clipPath(glass) {
+                if (fill > 0f) {
+                    val level = size.height * (.92f - .84f * fill)
+                    val amplitude = minOf(1.8.dp.toPx(), size.height * .84f * fill / 3f)
+                    fun wave(offset: Float): Path = Path().apply {
+                        moveTo(0f, size.height)
+                        for (step in 0..32) {
+                            val x = size.width * step / 32f
+                            val y = level + sin(x / size.width * 2f * PI.toFloat() + phase + offset) * amplitude
+                            lineTo(x, y)
+                        }
+                        lineTo(size.width, size.height)
+                        close()
+                    }
+                    drawPath(wave(PI.toFloat()), water.copy(alpha = .35f))
+                    drawPath(wave(0f), water.copy(alpha = .85f))
+                }
+                drawLine(Color.White.copy(alpha = .8f), Offset(size.width * .24f, size.height * .2f),
+                    Offset(size.width * .29f, size.height * .62f), strokeWidth = 1.5.dp.toPx())
+            }
+            drawPath(glass, outline, style = Stroke(2.dp.toPx()))
+        }
+        Column(Modifier.padding(start = 6.dp)) {
+            Text(stringResource(R.string.nutrition_water), style = MaterialTheme.typography.labelLarge)
+            Text("$totalMl / $goalMl ml", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { onAdd(-250, goalMl) }, enabled = enabled && totalMl > 0) {
+                androidx.compose.material3.Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
+            }
+            Text("250 ml", style = MaterialTheme.typography.labelSmall)
+            IconButton(onClick = { onAdd(250, goalMl) }, enabled = enabled) {
+                androidx.compose.material3.Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_water_plus))
+            }
+        }
+    }
+    if (open) {
+        var amount by remember { mutableStateOf("250") }
+        var goal by remember { mutableStateOf(goalMl.toString()) }
+        AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.nutrition_add_water)) },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(amount, { amount = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_amount)) },
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(150, 250, 500).forEach { value ->
+                        SuggestionChip(onClick = { amount = value.toString() }, label = { Text("$value ml") })
+                    }
+                }
+                OutlinedTextField(goal, { goal = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_goal)) },
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            } },
+            confirmButton = { Button(onClick = { onAdd(amount.toInt(), goal.toInt()); open = false },
+                enabled = amount.toIntOrNull()?.let { it in 1..10000 } == true && goal.toIntOrNull()?.let { it in 250..10000 } == true) { Text(stringResource(R.string.nutrition_add_water)) } },
+            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } })
     }
 }

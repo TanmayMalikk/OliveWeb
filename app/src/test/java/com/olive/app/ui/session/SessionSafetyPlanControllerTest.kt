@@ -4,7 +4,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
-import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.*
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SafePage

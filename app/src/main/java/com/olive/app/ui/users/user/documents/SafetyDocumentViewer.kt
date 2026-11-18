@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.safety.SafetyDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,6 +101,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         HorizontalDivider()
         // Opens the correct in-app viewer for an image, video, PDF, or text document.
         when {
+            pickerMediaKind(document.mimeType) == MediaKind.AUDIO -> UnsupportedViewer()
             document.mimeType.startsWith("image/") -> ImageViewer(file, document.name)
             document.mimeType.startsWith("video/") -> key(file) { VideoViewer(file) }
             document.mimeType == "application/pdf" || file.extension.equals(
@@ -271,93 +274,95 @@ private fun PdfViewer(file: File) {
         offsetY = 0f
     }
     val result = rendered
-    if (result == null && failedPage) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
-    else if (result == null) Box(
-        Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) { LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp)) }
-    else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        // Keep page controls above the preview, clear of floating safety actions.
-        Row(
-            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            IconButton(onClick = { page-- }, enabled = page > 0,
-                modifier = Modifier.testTag("pdf_previous_page")) {
-                Icon(Icons.AutoMirrored.Outlined.NavigateBefore, stringResource(R.string.ui_previous_safe_page))
-            }
-            Text(stringResource(R.string.documents_pdf_page, page + 1, result.count),
-                modifier = Modifier.testTag("pdf_page_number"))
-            IconButton(onClick = { page++ }, enabled = page + 1 < result.count,
-                modifier = Modifier.testTag("pdf_next_page")) {
-                Icon(Icons.AutoMirrored.Outlined.NavigateNext, stringResource(R.string.next))
-            }
-        }
-        Box(
-            Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("pdf_page_content").pointerInput(file, page, result.count) {
-                val swipeThreshold = 72.dp.toPx()
-                awaitEachGesture {
-                    awaitFirstDown()
-                    var swipeEligible = scale <= 1.01f
-                    var dragX = 0f
-                    var dragY = 0f
-                    var cancelled = false
-                    do {
-                        val event = awaitPointerEvent()
-                        if (event.changes.any { it.isConsumed }) cancelled = true
-                        if (event.changes.count { it.pressed || it.previousPressed } > 1) swipeEligible = false
-                        val pan = event.calculatePan()
-                        val zoom = event.calculateZoom()
-                        if (!cancelled) {
-                            dragX += pan.x
-                            dragY += pan.y
-                            scale = (scale * zoom).coerceIn(1f, 5f)
-                            if (scale > 1.01f) swipeEligible = false
-                            offsetX = if (scale > 1f) offsetX + pan.x else 0f
-                            offsetY = if (scale > 1f) offsetY + pan.y else 0f
-                            if (pan.x != 0f || pan.y != 0f || zoom != 1f) {
-                                event.changes.forEach { it.consume() }
-                            }
-                        }
-                    } while (event.changes.any { it.pressed })
-                    // One page per completed horizontal swipe; zoomed gestures remain pans.
-                    if (!cancelled && swipeEligible && abs(dragX) >= swipeThreshold && abs(dragX) > abs(dragY) * 1.5f) {
-                        page = (page + if (dragX < 0f) 1 else -1).coerceIn(0, result.count - 1)
-                    }
+    when {
+        result == null && failedPage -> AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
+        result == null -> Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) { LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp)) }
+        else -> Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Keep page controls above the preview, clear of floating safety actions.
+            Row(
+                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                IconButton(onClick = { page-- }, enabled = page > 0,
+                    modifier = Modifier.testTag("pdf_previous_page")) {
+                    Icon(Icons.AutoMirrored.Outlined.NavigateBefore, stringResource(R.string.ui_previous_safe_page))
                 }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (failedPage) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
-            else if (result.index != page) LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp))
-            else Image(
-                result.bitmap.asImageBitmap(),
-                contentDescription = stringResource(
-                    R.string.documents_pdf_page,
-                    page + 1,
-                    result.count
-                ),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(8.dp).graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                    rotationZ = rotation.toFloat(),
-                )
-            )
-            ZoomControls(
-                scale = scale,
-                onZoomOut = {
-                    scale = (scale / 1.25f).coerceAtLeast(1f)
-                    if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                Text(stringResource(R.string.documents_pdf_page, page + 1, result.count),
+                    modifier = Modifier.testTag("pdf_page_number"))
+                IconButton(onClick = { page++ }, enabled = page + 1 < result.count,
+                    modifier = Modifier.testTag("pdf_next_page")) {
+                    Icon(Icons.AutoMirrored.Outlined.NavigateNext, stringResource(R.string.next))
+                }
+            }
+            Box(
+                Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("pdf_page_content").pointerInput(file, page, result.count) {
+                    val swipeThreshold = 72.dp.toPx()
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        var swipeEligible = scale <= 1.01f
+                        var dragX = 0f
+                        var dragY = 0f
+                        var cancelled = false
+                        do {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.isConsumed }) cancelled = true
+                            if (event.changes.count { it.pressed || it.previousPressed } > 1) swipeEligible = false
+                            val pan = event.calculatePan()
+                            val zoom = event.calculateZoom()
+                            if (!cancelled) {
+                                dragX += pan.x
+                                dragY += pan.y
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1.01f) swipeEligible = false
+                                offsetX = if (scale > 1f) offsetX + pan.x else 0f
+                                offsetY = if (scale > 1f) offsetY + pan.y else 0f
+                                if (pan.x != 0f || pan.y != 0f || zoom != 1f) {
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        // One page per completed horizontal swipe; zoomed gestures remain pans.
+                        if (!cancelled && swipeEligible && abs(dragX) >= swipeThreshold && abs(dragX) > abs(dragY) * 1.5f) {
+                            page = (page + if (dragX < 0f) 1 else -1).coerceIn(0, result.count - 1)
+                        }
+                    }
                 },
-                onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
-                onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
-                onRotate = { rotation = (rotation + 90) % 360 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (failedPage) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
+                else if (result.index != page) LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp))
+                else Image(
+                    result.bitmap.asImageBitmap(),
+                    contentDescription = stringResource(
+                        R.string.documents_pdf_page,
+                        page + 1,
+                        result.count
+                    ),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(8.dp).graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY,
+                        rotationZ = rotation.toFloat(),
+                    )
+                )
+                ZoomControls(
+                    scale = scale,
+                    onZoomOut = {
+                        scale = (scale / 1.25f).coerceAtLeast(1f)
+                        if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                    },
+                    onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
+                    onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+                    onRotate = { rotation = (rotation + 90) % 360 },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                )
+            }
         }
     }
 }

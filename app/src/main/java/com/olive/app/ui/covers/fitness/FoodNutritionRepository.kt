@@ -20,6 +20,7 @@ internal interface FoodNutritionDataSource {
     suspend fun search(query: String, page: Int): FoodSearchResult
     suspend fun suggestions(query: String): List<String>
     suspend fun lookupBarcode(barcode: String): FoodSearchResult
+    suspend fun foodById(id: String): NutritionFood? = null
 }
 
 internal class FoodNutritionRepository(
@@ -90,6 +91,13 @@ internal class FoodNutritionRepository(
 
     private suspend fun searchFatSecret(query: String, page: Int, foodType: String) =
         fatSecret(mapOf("query" to query, "page" to page, "foodType" to foodType))
+
+    override suspend fun foodById(id: String): NutritionFood? {
+        val foodId = id.removePrefix("fatsecret:").substringBefore(':')
+        val food = fatSecret(mapOf("action" to "detail", "foodId" to foodId)).foods.firstOrNull() ?: return null
+        if (food.id == id) return food
+        return food.servingOptions.firstOrNull { it.id == id }?.copy(servingOptions = food.servingOptions)
+    }
 
     private suspend fun fatSecret(parameters: Map<String, Any>): FoodSearchResult {
         val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")

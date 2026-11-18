@@ -44,6 +44,8 @@ class SafeContactPagesUiTest {
         compose.onNodeWithText("contact_fixture").assertExists()
         compose.onNodeWithText("2000-01-01").assertExists()
         compose.onNodeWithTag("safe_contact_edit_profile").performScrollTo().performClick()
+        compose.onNodeWithTag("settings_tab_permissions").performClick()
+        compose.onNodeWithTag("settings_install_permission").assertIsDisplayed()
         compose.onNodeWithTag("settings_tab_password").performClick()
         compose.onNodeWithTag("settings_tab_profile").performClick()
         compose.onNodeWithTag("settings_full_name").assertTextContains("Synthetic Contact")

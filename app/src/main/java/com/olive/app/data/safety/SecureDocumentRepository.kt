@@ -219,7 +219,7 @@ internal data class SafetyPlan(
         .put("pendingConflicts", JSONObject(pendingConflicts.mapValues { (_, conflict) ->
             JSONObject().put("value", conflict.value).put("mutationId", conflict.mutationId)
         }))
-        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> org.json.JSONArray(ids) }))
+        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> JSONArray(ids) }))
 
     companion object {
         // Rebuilds a safety plan from its encrypted JSON fields.

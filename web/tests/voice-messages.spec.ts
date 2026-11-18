@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "./coverageFixture";
 
-async function openVoiceFixture(page: Page) {
-  await page.route("**/__test_voice", async route => {
+async function openVoiceFixture(page: Page, viewer?: "storage" | "chat") {
+  await page.route(/\/__test_voice(?:\?.*)?$/, async route => {
     const response = await route.fetch({ url: new URL("/", route.request().url()).href });
     const html = await response.text();
     await route.fulfill({ response, body: html.replace("/src/main.tsx", "/tests/voiceFixture.tsx") });
@@ -38,8 +38,17 @@ async function openVoiceFixture(page: Page) {
     }
     Object.defineProperty(window, "MediaRecorder", { value: TestRecorder });
   });
-  await page.goto("/__test_voice");
+  await page.goto(viewer ? `/__test_voice?viewer=${viewer}` : "/__test_voice");
 }
+
+test("audio can be downloaded from storage and played in chat", async ({ page }) => {
+  await openVoiceFixture(page, "storage");
+  await expect(page.getByText("This file cannot be previewed in the browser.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download decrypted file" })).toHaveAttribute("download", "Recording.m4a");
+  await expect(page.locator("audio")).toHaveCount(0);
+  await page.goto("/__test_voice?viewer=chat");
+  await expect(page.locator("audio[controls]")).toBeVisible();
+});
 
 async function hidePage(page: Page) {
   await page.evaluate(() => {

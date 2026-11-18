@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -42,7 +43,6 @@ import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -188,7 +188,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
             mapTitleFocus.requestFocus()
             do {
                 showCurrentLocation()
-                delay(15_000L)
+                delay(15_000.milliseconds)
             } while (editorOpen && incidentMapOpen && !locationLookupFailed)
         }
     }
@@ -640,7 +640,7 @@ private fun NoteBoardControls(
                 onClick = { sortOpen = true },
                 modifier = Modifier.testTag("private_sort"),
             ) {
-                Icon(Icons.Outlined.Sort, contentDescription = null)
+                Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(orderLabel)
             }

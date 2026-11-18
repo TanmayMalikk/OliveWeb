@@ -21,7 +21,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.SafetyDocument
 
@@ -108,7 +110,7 @@ internal fun SafetyDocumentCard(
                 if (evidenceUpdating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                if (pickerMediaKind(file.mimeType) != MediaKind.AUDIO) Button(
                     onClick = onOpen,
                     enabled = !opening,
                     modifier = Modifier.weight(1f).testTag("document_open_${file.id}"),

@@ -1,7 +1,6 @@
 // Safe-app users: manages user location actions.
 package com.olive.app.ui.users.user.location
 
-import com.olive.app.data.account.DeliveryAddress
 
 import android.content.Context
 import android.location.Location
@@ -242,20 +241,6 @@ internal class LocationMapController(
         )
     }
 
-    suspend fun resolvePrivateDestination(address: String): Boolean {
-        val requestGeneration = generation
-        val coordinates = try {
-            DeviceLocation.coordinatesForAddress(applicationContext, DeliveryAddress(line1 = address))
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
-        } ?: return false
-        if (requestGeneration != generation) return false
-        selectPrivateDestination(address, coordinates.first, coordinates.second)
-        return true
-    }
-
     // Requests a route to the selected person and starts map navigation.
     fun startNavigation(
         notConfiguredMessage: String,
@@ -310,7 +295,7 @@ internal class LocationMapController(
                             lastRoutedTarget = target
                         }
                     }.onFailure {
-                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        if (it is CancellationException) throw it
                         state = state.copy(routeWorking = false, routeError = failedMessage)
                     }
                 } else {

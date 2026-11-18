@@ -16,8 +16,6 @@ import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.notification.OliveNotificationManager
 import java.util.concurrent.TimeUnit
-import org.json.JSONArray
-import org.json.JSONObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
@@ -41,12 +39,14 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
     // A failed network check is retried later; a malformed or untrusted release is never installed.
     override suspend fun doWork(): Result = runCatching {
         val client = AppUpdateClient(applicationContext)
-        val release = client.fetchLatest()
+        val release = AppUpdateStore(applicationContext).refresh(client)
         if (release.versionCode <= BuildConfig.VERSION_CODE) return Result.success()
-        client.download(release)
+        if (inputData.getBoolean(CHECK_ONLY, false)) return Result.success()
+        client.prepare(release)
         notifyReady(release)
         Result.success()
     }.getOrElse { error ->
+        if (error is CancellationException) throw error
         if (runAttemptCount < 3 && error is java.io.IOException) Result.retry() else Result.failure()
     }
 
@@ -74,20 +74,8 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
         )
     }
 
-    private fun AppReleaseManifest.toJson() = JSONObject().apply {
-        put("packageName", packageName)
-        put("versionCode", versionCode)
-        put("versionName", versionName)
-        put("minimumSupportedVersionCode", minimumSupportedVersionCode)
-        put("apkUrl", apkUrl)
-        put("sha256", sha256)
-        put("sizeBytes", sizeBytes)
-        put("publishedAt", publishedAt)
-        put("mandatory", mandatory)
-        put("releaseNotes", JSONArray(releaseNotes))
-    }.toString()
-
     companion object {
+        const val CHECK_ONLY = "check_only"
         private const val NOTIFICATION = 7401
     }
 }
@@ -145,7 +133,15 @@ internal object AppUpdateScheduler {
     // Immediately enqueues an update check and download when an FCM release alert is received.
     fun triggerNow(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        val manager = WorkManager.getInstance(context)
+        manager.enqueueUniqueWork(
+            "olive-update-manifest",
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<AppUpdateWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setInputData(workDataOf(AppUpdateWorker.CHECK_ONLY to true)).build(),
+        )
+        manager.enqueueUniqueWork(
             "olive-update-fcm",
             ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<AppUpdateWorker>().setConstraints(constraints).build(),

@@ -1,6 +1,8 @@
 // Signed-in users: controls safety-plan access, editing, sharing, and sync.
 package com.olive.app.ui.session
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import com.olive.app.ui.users.shared.navigation.*
 import androidx.compose.runtime.*
 import com.google.firebase.firestore.ListenerRegistration
@@ -549,7 +551,7 @@ internal class SessionSafetyPlans(
                             SystemClock.elapsedRealtime(),
                         )
                         if (waitMillis == 0L) break
-                        if (withTimeoutOrNull(waitMillis) {
+                        if (withTimeoutOrNull(waitMillis.milliseconds) {
                             foregroundSyncRequests.receive()
                         } == null) break
                         lastEditAt = SystemClock.elapsedRealtime()

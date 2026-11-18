@@ -505,6 +505,7 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+            SafeAppUpdateReminder()
             FilledTonalIconButton(
                 onClick = { session.navigation.openSafePage(SafePage.Camera) },
                 enabled = !session.localMode,
