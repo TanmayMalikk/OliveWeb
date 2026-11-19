@@ -118,6 +118,7 @@ android {
 val cameraxVersion = "1.6.2"
 
 dependencies {
+    implementation("com.stripe:stripe-android:23.25.1")
     implementation("androidx.camera:camera-core:${cameraxVersion}")
     implementation("androidx.camera:camera-camera2:${cameraxVersion}")
     implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")

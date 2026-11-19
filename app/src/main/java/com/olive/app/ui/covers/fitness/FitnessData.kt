@@ -27,7 +27,7 @@ internal class FitnessStore(private val context: Context, private val accountId:
     )
 
     // Saves calorie, macro, activity, and body goals for the fitness cover.
-    fun saveProfile(value: FitnessProfile) = preferences.edit {
+    fun saveProfile(value: FitnessProfile, coachUpdateDate: LocalDate? = null) = preferences.edit {
         putFloat("weight_kg", value.weightKg.coerceIn(30f, 300f))
         putFloat("height_cm", value.heightCm.coerceIn(100f, 230f))
         putInt("step_goal", value.stepGoal.coerceIn(500, 100_000))
@@ -36,6 +36,7 @@ internal class FitnessStore(private val context: Context, private val accountId:
         putInt("carbohydrate_goal", value.carbohydrateGoal.coerceIn(10, 2_000))
         putInt("fat_goal", value.fatGoal.coerceIn(10, 1_000))
         putInt("water_goal_ml", value.waterGoalMl.coerceIn(250, 10000))
+        coachUpdateDate?.let { putString("coach_goal_update", it.toString()) }
     }
 
     // Loads the snapshot needed by the fitness cover.

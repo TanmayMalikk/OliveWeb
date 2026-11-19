@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Settings
@@ -75,6 +76,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.olive.app.R
@@ -91,7 +93,7 @@ import com.google.android.gms.wearable.Wearable
 import kotlin.time.Duration.Companion.milliseconds
 
 
-private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, FOOD_SEARCH, GOALS, ACCOUNT }
+private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, COACH, FOOD_SEARCH, GOALS, ACCOUNT }
 
 // Shows the fitness cover and keeps its selected page and saved health data in sync.
 @Composable
@@ -113,6 +115,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         FitnessPage.ACTIVITY -> stringResource(R.string.activity)
         FitnessPage.VITALS -> stringResource(R.string.fitness_vitals)
         FitnessPage.NUTRITION -> stringResource(R.string.nutrition)
+        FitnessPage.COACH -> stringResource(R.string.fitness_coach_tab)
         FitnessPage.FOOD_SEARCH -> stringResource(R.string.find_food)
         FitnessPage.GOALS -> stringResource(R.string.fitness_goals)
         FitnessPage.ACCOUNT -> stringResource(R.string.settings)
@@ -204,21 +207,26 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
             // Opens the selected fitness overview, activity, nutrition, or vitals page.
             FitnessHealthConnection(accountId, interactive && sensorPermissionSettled)
             if (cloudFailed) Text(stringResource(R.string.fitness_sync_pending), Modifier.padding(horizontal = 16.dp))
-            if (snapshot == null || loaded == null || (!session.localMode && accountId != "guest" && !ready)) {
+            val dataLoading = snapshot == null || loaded == null ||
+                (!session.localMode && accountId != "guest" && !ready)
+            if (page == FitnessPage.COACH) {
+                if (interactive) androidx.compose.runtime.key(accountId) {
+                    FitnessCoachPage(accountId, !session.localMode && accountId != "guest", store, history, dataLoading) {
+                        pendingSnapshot = it
+                    }
+                }
+            } else if (dataLoading || snapshot == null) {
                 val skeleton = when (page) {
                     FitnessPage.HOME -> SkeletonLayout.FitnessSummary
                     FitnessPage.ACTIVITY -> SkeletonLayout.FitnessActivity
                     FitnessPage.VITALS -> SkeletonLayout.FitnessVitals
                     FitnessPage.NUTRITION -> SkeletonLayout.FitnessNutrition
                     FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
-                    FitnessPage.GOALS, FitnessPage.ACCOUNT -> SkeletonLayout.Form
+                    FitnessPage.GOALS, FitnessPage.ACCOUNT, FitnessPage.COACH -> SkeletonLayout.Form
                 }
                 LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
             } else when (page) {
-                FitnessPage.HOME -> FitnessHomePage(
-                    snapshot = snapshot,
-                    onGoals = { page = FitnessPage.GOALS },
-                )
+                FitnessPage.HOME -> FitnessHomePage(snapshot, onGoals = { page = FitnessPage.GOALS })
                 FitnessPage.ACTIVITY -> FitnessActivityPage(
                     snapshot = snapshot,
                     history = history,
@@ -268,7 +276,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                         page = FitnessPage.HOME
                     },
                 )
-                FitnessPage.ACCOUNT -> Unit
+                FitnessPage.ACCOUNT, FitnessPage.COACH -> Unit
             }
         }
     }
@@ -344,6 +352,13 @@ private fun FitnessHeader(
                 enabled,
                 { onPage(FitnessPage.NUTRITION) },
             ) { Icon(Icons.Outlined.Restaurant, null) }
+            FitnessTab(
+                Modifier.weight(1f),
+                stringResource(R.string.fitness_coach_tab),
+                page == FitnessPage.COACH,
+                enabled,
+                { onPage(FitnessPage.COACH) },
+            ) { Icon(Icons.Outlined.AutoAwesome, null) }
         }
     }
 }
@@ -382,7 +397,8 @@ private fun FitnessTab(
             LocalContentColor provides if (selected) DarkOlive else Muted
         ) {
             icon()
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center)
         }
     }
 }

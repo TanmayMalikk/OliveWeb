@@ -29,6 +29,9 @@ for (const [name, handler] of Object.entries(emergencies)) {
   if (name !== "canReadEmergencyMedia") exports[name] = handler;
 }
 Object.assign(exports, require("./src/nutritionFoods"));
+const fitnessAi = require("./src/fitnessAi");
+exports.fitnessAiBilling = fitnessAi.fitnessAiBilling;
+exports.fitnessAiCoach = fitnessAi.fitnessAiCoach;
 const syncInvalidations = require("./src/syncInvalidations");
 Object.entries(syncInvalidations).filter(([name]) => name !== "_test")
     .forEach(([name, value]) => { exports[name] = value; });

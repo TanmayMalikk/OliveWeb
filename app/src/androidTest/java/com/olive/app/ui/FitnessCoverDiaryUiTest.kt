@@ -67,6 +67,18 @@ class FitnessCoverDiaryUiTest {
     }
 
     @Test
+    fun coachTabLocksChatWhenSubscriptionIsUnavailable() {
+        mount()
+        compose.onNodeWithContentDescription(label(R.string.fitness_coach_tab)).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_locked").assertIsDisplayed()
+        compose.onNodeWithText(label(R.string.fitness_coach_sign_in)).assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        compose.onNodeWithText(label(R.string.fitness_coach_apply)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(label(R.string.home)).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_locked").assertDoesNotExist()
+    }
+
+    @Test
     fun manualFoodCanBeLoggedEditedAndRemovedAndWaterChangesPersist() {
         mount()
         compose.onNodeWithContentDescription(label(R.string.nutrition)).performClick()
