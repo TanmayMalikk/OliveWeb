@@ -394,7 +394,7 @@ private fun CallAction(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
             onClick = onClick,
-            modifier = Modifier.size(72.dp).testTag(tag),
+            modifier = Modifier.size(72.dp).testTag(tag).semantics { contentDescription = label },
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (selected) Color.White else color,
@@ -403,6 +403,6 @@ private fun CallAction(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         ) { icon() }
         Spacer(Modifier.height(8.dp))
-        Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
+        Text(label, modifier = Modifier.clearAndSetSemantics { }, color = Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }

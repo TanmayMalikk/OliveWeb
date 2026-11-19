@@ -136,6 +136,7 @@ class SafetyDocumentRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val media: MediaTicketDataSource,
+    private val authorizePeer: suspend (String) -> Unit = { com.olive.app.data.messaging.authorizeMessagingPeer(it) },
 ) : SafetyDocumentDataSource {
     // Reads every Firebase document this account is allowed to open.
     override suspend fun listFor(uid: String): DocumentListSnapshot {
@@ -467,6 +468,7 @@ class SafetyDocumentRepository(
     ): RecipientAccess {
         val normalized = username.trim().lowercase()
         require(normalized.matches(Regex("[a-z0-9_]{4,24}"))) { "Recipient username is invalid" }
+        authorizePeer(normalized)
         val directory = firestore.collection("messageDirectory").document(normalized)
         val row = directory.get().await()
         require(row.getString("uid") == uid) { "Recipient encryption identity is unavailable" }

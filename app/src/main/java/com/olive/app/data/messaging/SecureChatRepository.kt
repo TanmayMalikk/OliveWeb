@@ -31,7 +31,10 @@ import java.util.Base64
 
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
-class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+class SecureChatRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val authorizePeer: suspend (String) -> Unit = ::authorizeMessagingPeer,
+) {
     internal fun observeKeyChanges(
         conversation: ChatConversation,
         uid: String,
@@ -194,6 +197,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         var writes = 0
         conversation.participantIds.forEach { uid ->
             val username = conversation.participantUsernames[uid] ?: return@forEach
+            authorizePeer(username)
             val devices = firestore.collection("messageDirectory").document(username.trim().lowercase())
                 .collection("devices").get().await()
             devices.documents.forEach { device ->

@@ -28,7 +28,6 @@ import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.messaging.FriendRelationship
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.media.OfflineMediaAvailability
@@ -57,15 +56,6 @@ internal fun LazyListScope.friendLists(
     onFriendsExpandedChange: (Boolean) -> Unit,
     onNoteTargets: (List<DirectoryUser>) -> Unit,
 ) {
-    if (session.messages.userSearchResults.isNotEmpty()) {
-        item {
-            Text(stringResource(R.string.search_results), style = MaterialTheme.typography.titleMedium)
-        }
-        items(session.messages.userSearchResults, key = { "search-${it.uid}" }) { user ->
-            SearchResultRow(session, user, onNoteTargets)
-        }
-    }
-
     // Show incoming requests only when someone is waiting for an answer.
     if (session.messages.incomingFriendRequests.isNotEmpty()) {
         item {
@@ -179,56 +169,6 @@ internal fun LazyListScope.friendLists(
     }
 }
 // Shows one username result and the friend action currently allowed.
-@Composable
-private fun LazyItemScope.SearchResultRow(
-    session: SessionViewModel,
-    user: DirectoryUser,
-    onNoteTargets: (List<DirectoryUser>) -> Unit,
-) {
-    val relationship = session.messages.relationshipFor(user.uid)
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = SoftCardSurface,
-        modifier = Modifier.animateItem().fillMaxWidth().animateContentSize(),
-    ) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(user.username, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            if (relationship == FriendRelationship.Friends) {
-                TextButton(onClick = { onNoteTargets(listOf(user)) }) {
-                    Text(stringResource(R.string.private_note))
-                }
-            }
-            // Shows the friend action allowed for this search result.
-            when (relationship) {
-                FriendRelationship.AddFriend -> Button(
-                    onClick = { session.messages.sendFriendRequest(user) },
-                    enabled = !session.messages.busy,
-                ) { Text(stringResource(R.string.add_friend)) }
-                FriendRelationship.RequestSent -> AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    label = { Text(stringResource(R.string.request_sent)) },
-                )
-                FriendRelationship.IncomingRequest -> AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    label = { Text(stringResource(R.string.incoming_request)) },
-                )
-                FriendRelationship.Friends -> AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    label = { Text(stringResource(R.string.friends)) },
-                )
-            }
-        }
-    }
-}
-
-// Shows who sent a request and lets the user accept or decline it.
 @Composable
 private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(

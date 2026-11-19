@@ -53,7 +53,7 @@
     <string name="dob_pick_day">اختر اليوم</string>
     <string name="dob_clear">امسح تاريخ الميلاد</string>
     <string name="location_background_access">تفعيل الموقع في الخلفية</string>
-    <string name="location_background_settings">يحافظ الموقع في الخلفية على تحديث معلومات الموقع لفريق الإدارة عند إغلاق التطبيق. في إعدادات Android، اختر %1$s، ثم عد إلى هنا.</string>
+    <string name="location_background_settings">في شاشة أذونات Android التالية، اختر %1$s ثم عد إلى Olive. يتطلب Android هذا الإعداد لتحديث الموقع في الخلفية.</string>
     <string name="location_background_dialog">يحافظ الموقع في الخلفية على تحديث معلومات الموقع لفريق الإدارة عند إغلاق التطبيق. اختر السماح طوال الوقت في نافذة Android.</string>
     <string name="chat_dms_tab">الرسائل المباشرة</string>
     <string name="chat_tickets_tab">محادثات التذاكر</string>

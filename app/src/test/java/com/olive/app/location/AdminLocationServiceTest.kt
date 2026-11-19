@@ -27,7 +27,7 @@ class AdminLocationServiceTest {
     @Test
     fun adminFeedRestoresTheActiveAccountThenMarksTheLocationOfflineWhenStopped() {
         val app = RuntimeEnvironment.getApplication()
-        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         val fused = mock(FusedLocationProviderClient::class.java)
         val database = mock(FirebaseDatabase::class.java)
         val root = mock(DatabaseReference::class.java)
@@ -64,8 +64,9 @@ class AdminLocationServiceTest {
                 service.onCreate()
                 try {
                     AdminLocationService.start(app, "owner", "Synthetic user")
-                    assertTrue(AdminLocationService.active(app))
+                    assertFalse(AdminLocationService.active(app))
                     assertEquals(Service.START_STICKY, service.onStartCommand(null, 0, 1))
+                    assertTrue(AdminLocationService.active(app))
                     assertNull(service.onBind(null))
                     verify(disconnect).updateChildren(mapOf("active" to false))
                     val initial = Location("fixture").apply {
@@ -96,5 +97,25 @@ class AdminLocationServiceTest {
                 }
             }
         }
+    }
+    @Test
+    fun emergencyStartWithoutLocationAccessNeverRequestsAForegroundService() {
+        val app = RuntimeEnvironment.getApplication()
+        val shadow = shadowOf(app)
+        app.getSharedPreferences("olive_admin_location", Context.MODE_PRIVATE).edit().clear().commit()
+        shadow.denyPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        AdminLocationService.start(app, "synthetic-owner", "Synthetic user")
+        assertFalse(AdminLocationService.active(app))
+        assertNull(shadow.nextStartedService)
+        shadow.grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        AdminLocationService.start(app, "synthetic-owner", "Synthetic user")
+        assertFalse(AdminLocationService.active(app))
+        assertNull(shadow.nextStartedService)
+        shadow.grantPermissions(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        AdminLocationService.start(app, "synthetic-owner", "Synthetic user")
+        assertNotNull(shadow.nextStartedService)
+        // The UI must not try to stop a service before its foreground notification exists.
+        assertFalse(AdminLocationService.active(app))
     }
 }

@@ -350,7 +350,7 @@
 
 
     <string name="private_contact_note">私人联系人备注</string>
-    <string name="private_contact_note_explanation">只有您能在此设备上阅读这条加密备注。新内容会另起一行添加。</string>
+    <string name="private_contact_note_explanation">只有您能在此设备上阅读这条加密笔记。在此编辑并保存。</string>
     <string name="choose_person">选择联系人</string>
     <string name="add_to_private_note">添加到私人备注</string>
     <string name="append_note">添加备注</string>

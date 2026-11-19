@@ -18,6 +18,7 @@ import com.olive.app.security.EncryptedVault
 import com.olive.app.ui.session.SessionDataSources
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import com.olive.app.ui.users.user.location.LocationMapScreen
 import org.junit.Assert.*
@@ -122,5 +123,29 @@ class LocationWorkspaceUiTest {
         compose.onNodeWithTag("share_saved_location").assertIsOff().performClick()
         compose.onNodeWithTag("share_saved_location").assertIsOn()
         compose.runOnIdle { assertTrue(locations.savedEnabled) }
+    }
+    @Test
+    fun openingMapRequestsForegroundThenGuidesBackgroundOnlyAfterItIsGranted() {
+        val session = session(AccountRole.USER, Locations())
+        var granted = false
+        var foregroundRequests = 0
+        var backgroundRequests = 0
+        compose.setContent {
+            OliveTheme {
+                CompositionLocalProvider(
+                    LocalLocationPermissionRequest provides { foregroundRequests++; granted },
+                    LocalBackgroundLocationPermissionRequest provides { backgroundRequests++; false },
+                ) { LocationMapScreen(session) }
+            }
+        }
+        val retry = compose.onNodeWithTag("map_allow_location")
+        retry.assertIsDisplayed()
+        compose.runOnIdle { assertEquals(1, foregroundRequests); assertEquals(0, backgroundRequests); granted = true }
+        retry.performClick()
+        compose.onNodeWithTag("background_location_continue").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(2, foregroundRequests); assertEquals(0, backgroundRequests) }
+        compose.onNodeWithTag("background_location_continue").performClick()
+        compose.runOnIdle { assertEquals(1, backgroundRequests) }
+        compose.onNodeWithTag("map_allow_location").assertDoesNotExist()
     }
 }

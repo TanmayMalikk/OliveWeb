@@ -29,7 +29,7 @@ class SafetyDocumentRepositorySdkTest {
     private val firestore = mock(FirebaseFirestore::class.java)
     private val storage = mock(FirebaseStorage::class.java)
     private val media = mock(MediaTicketDataSource::class.java)
-    private val repository = SafetyDocumentRepository(firestore, storage, media)
+    private val repository = SafetyDocumentRepository(firestore, storage, media) { }
     private val key = EncryptionUtils.generateSymmetricKey()
 
     @Test

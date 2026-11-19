@@ -29,13 +29,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
 
     // Checks the accessible pin step with the test's sample data.
     private fun accessiblePin(pin: String) {
-        // The keypad is fixed on screen, outside the scrollable form used by settings.
-        pin.forEach { digit ->
-            compose.onNodeWithTag("pin_digit_$digit")
-                .performSemanticsAction(SemanticsActions.OnClick) { it() }
-        }
-        compose.onNodeWithTag("unlock_submit")
-            .performSemanticsAction(SemanticsActions.OnClick) { it() }
+        compose.onNodeWithTag("unlock_pin").performTextReplacement(pin)
+        hideKeyboard()
+        compose.onNodeWithTag("unlock_submit").performScrollTo().performClick()
     }
 
     // Checks the session step with the test's sample data.

@@ -215,8 +215,10 @@ private fun AdminDashboard(
         } else if (session.busy || session.message == null) {
             LoadingSkeleton(SkeletonLayout.DashboardCounts)
         } else Status(session)
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val emergencyDescription = uiText(R.string.admin_emergency_response) + ". " + uiText(R.string.admin_emergency_response_help)
+        OutlinedCard(onClick = onEmergencies, modifier = Modifier.fillMaxWidth()
+            .semantics { contentDescription = emergencyDescription }) {
+            Column(Modifier.padding(16.dp).clearAndSetSemantics { }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     uiText(R.string.admin_emergency_response),
                     style = MaterialTheme.typography.titleMedium,

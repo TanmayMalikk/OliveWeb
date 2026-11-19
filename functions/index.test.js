@@ -57,7 +57,8 @@ test("R2 upload tickets do not sign the checksum of an empty body", async () => 
 // Inputs: the values in this case. Expected: deployment keeps the existing callable endpoint names.
 test("deployment keeps the existing callable endpoint names", () => {
   const endpoints = require("./index");
-  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
+  const names = ["friendInviteCurrent", "friendInviteCreate", "friendInviteClaim", "messagingAuthorizePeer",
+    "adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",

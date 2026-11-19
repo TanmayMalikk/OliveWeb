@@ -28,7 +28,10 @@ import kotlinx.coroutines.flow.onStart
 import org.json.JSONObject
 
 
-class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+class MessagingRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val authorizePeer: suspend (String) -> Unit = ::authorizeMessagingPeer,
+) {
     suspend fun prepareSupportTickets() {
         FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable("supportTicketsPrepare").call().await()
@@ -72,10 +75,11 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         ).await()
     }
 
-    // Searches Firebase for an exact username that may be messaged.
+    // Resolves encryption identities only for existing authorized connections.
     suspend fun searchUsers(query: String, currentUid: String): List<DirectoryUser> {
         val normalized = query.trim().lowercase()
         require(normalized.matches(Regex("[a-z0-9_]{4,24}"))) { "Enter the exact 4-24 character username." }
+        authorizePeer(normalized)
         val row = firestore.collection("messageDirectory").document(normalized).get().await()
         val uid = row.getString("uid") ?: return emptyList()
         val username = row.getString("username") ?: return emptyList()

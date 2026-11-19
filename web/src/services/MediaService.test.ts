@@ -127,7 +127,7 @@ it("aborts a multipart upload with no receipt and allows a single PUT without an
   const send = vi.fn(async () => new Response(null));
   vi.stubGlobal("fetch", send);
   await expect(uploadBrowserDocument(file, owner)).rejects.toThrow("upload part receipt");
-  expect(mocks.callable.mock.calls.map(([name]) => name)).toEqual(["mediaCreateUpload", "mediaUploadPartTicket", "mediaAbortUpload"]);
+  expect(mocks.callable.mock.calls.map(([name]) => name)).toEqual(["messagingAuthorizePeer", "mediaCreateUpload", "mediaUploadPartTicket", "mediaAbortUpload"]);
   await configureUpload("SINGLE");
   send.mockClear();
   expect(await uploadBrowserDocument(file, owner)).toBe("fixture-media");

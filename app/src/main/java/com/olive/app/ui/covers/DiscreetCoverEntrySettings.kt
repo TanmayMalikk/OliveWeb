@@ -28,6 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.olive.app.ui.users.user.documents.sendCoverEmergency
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -59,38 +66,55 @@ internal fun DiscreetCoverEntry(
     enabled: Boolean,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    onEmergency: (() -> Unit)? = null,
+    onEmergencyFeedback: (() -> Unit)? = null,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val platformConfiguration = LocalViewConfiguration.current
+    val holdConfiguration = remember(platformConfiguration) {
+        object : ViewConfiguration by platformConfiguration { override val longPressTimeoutMillis = 2_000L }
+    }
+    val emergencyAction = onEmergency?.let { action -> {
+        if (onEmergencyFeedback != null) onEmergencyFeedback()
+        else if (!performEmergencyVibration(context)) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        action()
+    } }
     val oliveLabel = stringResource(R.string.olive_icon)
-    Canvas(
-        modifier.size(48.dp)
-            .testTag("discreet_cover_olive")
-            .semantics {
-                contentDescription = oliveLabel
-                if (enabled) onClick {
-                    onOpen()
-                    true
+    CompositionLocalProvider(LocalViewConfiguration provides holdConfiguration) {
+        Canvas(
+            modifier.size(48.dp)
+                .testTag("discreet_cover_olive")
+                .semantics {
+                    contentDescription = oliveLabel
+                    if (enabled && emergencyAction != null) onLongClick { emergencyAction(); true }
+                    if (enabled) onClick {
+                        onOpen()
+                        true
+                    }
                 }
+                .pointerInput(enabled, onOpen, emergencyAction) {
+                    if (enabled) detectTapGestures(onDoubleTap = { onOpen() },
+                        onLongPress = emergencyAction?.let { action -> { _: Offset -> action() } })
+                }
+        ) {
+            val oliveWidth = 16.dp.toPx()
+            val oliveHeight = 21.dp.toPx()
+            val center = Offset(size.width * .58f, size.height * .58f)
+            rotate(-18f, center) {
+                drawOval(
+                    color = OliveGreen,
+                    topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
+                    size = Size(oliveWidth, oliveHeight),
+                )
             }
-            .pointerInput(enabled) {
-                if (enabled) detectTapGestures(onDoubleTap = { onOpen() })
+            rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
+                drawOval(
+                    color = SageGreen,
+                    topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
+                    size = Size(8.dp.toPx(), 4.dp.toPx()),
+                )
             }
-    ) {
-        val oliveWidth = 16.dp.toPx()
-        val oliveHeight = 21.dp.toPx()
-        val center = Offset(size.width * .58f, size.height * .58f)
-        rotate(-18f, center) {
-            drawOval(
-                color = OliveGreen,
-                topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
-                size = Size(oliveWidth, oliveHeight),
-            )
-        }
-        rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
-            drawOval(
-                color = SageGreen,
-                topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
-                size = Size(8.dp.toPx(), 4.dp.toPx()),
-            )
         }
     }
 }
@@ -165,6 +189,8 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
         DiscreetCoverEntry(
             enabled = !session.busy,
             onOpen = session.account::beginDiscreetEntry,
+            onEmergency = if (session.coverAccountId != null && session.accountRole == AccountRole.USER)
+                session::sendCoverEmergency else null,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp),
         )
     }

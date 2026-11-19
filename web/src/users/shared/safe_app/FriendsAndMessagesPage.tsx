@@ -1,3 +1,4 @@
+import { FriendInviteControls } from "./FriendInviteControls";
 // All safe-app roles: shows friends and direct messages in the web safe app.
 import { useEffect, useId, useRef, useState } from "react";
 import {
@@ -6,10 +7,8 @@ import {
   FileText,
   MapPin,
   MessageCircle,
-  Search,
   Send,
   ShieldCheck,
-  UserPlus,
 } from "lucide-react";
 import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
 import { useSession } from "../../../session/SessionProvider";
@@ -29,7 +28,6 @@ import type {
   Friend,
   Request,
   Message,
-  DirectoryUser,
   Conversation,
 } from "../../../services/MessagingService";
 
@@ -52,7 +50,7 @@ export default function Messages() {
   const tabButtons = useRef<Partial<Record<ChatTab, HTMLButtonElement>>>({});
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [rows, setRows] = useState<Message[]>([]);
-  const [found, setFound] = useState<DirectoryUser | null>(null);
+
   const [feedback, setFeedback] = useState("");
   const [draft, setDraft] = useState("");
   const roomScope = conversation ? JSON.stringify([
@@ -260,52 +258,7 @@ export default function Messages() {
         ))}
         <div role="tabpanel" id={`${tabsId}-${chatTab}-panel`} aria-labelledby={`${tabsId}-${chatTab}`} tabIndex={0}>
           {chatTab === "dms" && <>
-            <Form
-              onSubmit={async (data) => {
-                await action(async () => {
-                  setFeedback("");
-                  const result = await messaging.searchUser(
-                    String(data.get("username")),
-                    identity.uid,
-                  );
-                  setFound(result);
-                  if (!result) setFeedback("No matching account found.");
-                });
-              }}
-            >
-              <Field
-                label="Find an exact username"
-                name="username"
-                required
-                minLength={4}
-                maxLength={24}
-              />
-              <Button type="submit" variant="outline" disabled={session.busy}>
-                <Search size={16} /> Find person
-              </Button>
-            </Form>
-            {found && (
-              <div className="request-row">
-                <span>@{found.username}</span>
-                {social.friends.some((f) => f.friendUid === found.uid) ? (
-                  <small>Already friends</small>
-                ) : social.outgoing.some((r) => r.recipientUid === found.uid) ? (
-                  <small>Request sent</small>
-                ) : (
-                  <Button
-                    variant="quiet"
-                    onClick={() =>
-                      void action(async () => {
-                        await messaging.sendRequest(identity, found);
-                        setFound(null);
-                      })
-                    }
-                  >
-                    <UserPlus size={16} /> Add
-                  </Button>
-                )}
-              </div>
-            )}
+            <FriendInviteControls />
             {social.incoming.length > 0 && <h3>Friend requests</h3>}
             {social.incoming.map((request) => (
               <div className="request-row" key={request.id}>

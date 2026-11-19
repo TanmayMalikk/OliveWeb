@@ -5,7 +5,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,11 +51,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -116,7 +114,7 @@ internal fun TodayPage(
             .testTag("fitness_today"),
         state = listState,
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -395,13 +393,7 @@ internal fun FoodSearchPage(
             emptyList()
         }
     }
-    val headingFocus = remember { FocusRequester() }
-
-    // Place TalkBack at the food-search heading when this submenu opens.
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        headingFocus.requestFocus()
-    }
+    val headingFocus = rememberEntryFocus(Unit)
 
     Column(
         Modifier.fillMaxSize().padding(padding).padding(16.dp),
@@ -410,12 +402,15 @@ internal fun FoodSearchPage(
         Text(
             stringResource(R.string.find_food),
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
+            modifier = Modifier.semantics { heading() },
         )
         if (library != null) Row(Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FoodLibrarySection.entries.forEach { option ->
                 FilterChip(selected = section == option, onClick = { section = option },
+                    modifier = Modifier.testTag("food_library_${option.name}").semantics { role = Role.Tab }
+                        .focusProperties { canFocus = true }.then(
+                        if (option == FoodLibrarySection.Search) Modifier.focusRequester(headingFocus) else Modifier),
                     enabled = enabled && !loading && !scanning, label = { Text(stringResource(option.label)) })
             }
         }
@@ -423,6 +418,7 @@ internal fun FoodSearchPage(
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(false to R.string.search_foods, true to R.string.nutrition_barcode).forEach { (mode, label) ->
                     FilterChip(selected = barcodeMode == mode, enabled = enabled && !loading && !scanning,
+                        modifier = if (library == null && !mode) Modifier.focusProperties { canFocus = true }.focusRequester(headingFocus) else Modifier,
                         onClick = { scanFailed = false; barcodeMode = mode; query = ""; searched = false; result = FoodSearchResult() },
                         label = { Text(stringResource(label)) })
                 }
@@ -469,8 +465,15 @@ internal fun FoodSearchPage(
             if (loading || scanning) {
                 LoadingSkeleton(SkeletonLayout.FoodResults)
             } else if (searched && result.foods.isEmpty()) {
-                val message = if (result.providerFailures >= 2) R.string.food_search_unavailable else R.string.no_food_results
+                val message = when {
+                    result.needsSignIn -> R.string.nutrition_sign_in_required
+                    result.providerFailures >= 2 -> R.string.food_search_unavailable
+                    else -> R.string.no_food_results
+                }
                 Text(stringResource(message))
+            }
+            if (!loading && result.needsSignIn && result.foods.isNotEmpty()) {
+                Text(stringResource(R.string.nutrition_sign_in_required), color = FitnessSubtle)
             }
             if (!loading && result.needsIpApproval) {
                 Text(stringResource(R.string.nutrition_ip_approval), color = MaterialTheme.colorScheme.error)
@@ -622,11 +625,10 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
     val phase by ripples.animateFloat(0f, (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "water_wave_phase")
     val description = stringResource(R.string.nutrition_water_progress, totalMl, goalMl)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
     Row(Modifier.clickable(enabled = enabled, role = Role.Button) { open = true }
         .semantics { contentDescription = description; progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) }
         .padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Canvas(Modifier.size(42.dp, 54.dp)) {
+        Canvas(Modifier.size(58.dp, 76.dp)) {
             val glass = Path().apply {
                 moveTo(size.width * .12f, size.height * .08f); lineTo(size.width * .88f, size.height * .08f)
                 lineTo(size.width * .76f, size.height * .92f); lineTo(size.width * .24f, size.height * .92f); close()
@@ -659,21 +661,21 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
             Text("$totalMl / $goalMl ml", style = MaterialTheme.typography.labelSmall)
         }
     }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onAdd(-250, goalMl) }, enabled = enabled && totalMl > 0) {
-                androidx.compose.material3.Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
-            }
-            Text("250 ml", style = MaterialTheme.typography.labelSmall)
-            IconButton(onClick = { onAdd(250, goalMl) }, enabled = enabled) {
-                androidx.compose.material3.Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_water_plus))
-            }
-        }
-    }
     if (open) {
         var amount by remember { mutableStateOf("250") }
         var goal by remember { mutableStateOf(goalMl.toString()) }
         AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.nutrition_add_water)) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onAdd(-250, goalMl) }, enabled = enabled && totalMl > 0) {
+                        androidx.compose.material3.Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
+                    }
+                    Text("250 ml", Modifier.clearAndSetSemantics { }, style = MaterialTheme.typography.labelMedium)
+                    IconButton(onClick = { onAdd(250, goalMl) }, enabled = enabled) {
+                        androidx.compose.material3.Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_water_plus))
+                    }
+                }
                 OutlinedTextField(amount, { amount = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_amount)) },
                     suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

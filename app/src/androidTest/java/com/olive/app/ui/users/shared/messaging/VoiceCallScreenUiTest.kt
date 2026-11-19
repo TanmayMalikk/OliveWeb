@@ -4,7 +4,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import com.olive.app.R
 import com.olive.app.data.messaging.VoipInvitation
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -44,11 +46,11 @@ class VoiceCallScreenUiTest {
             }
         }
 
-        compose.onNodeWithTag("mute_voice_call").assertIsDisplayed().performClick()
-        compose.onNodeWithTag("speaker_voice_call").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("mute_voice_call").assertContentDescriptionEquals(compose.activity.getString(R.string.ui_mute)).assertIsDisplayed().performClick()
+        compose.onNodeWithTag("speaker_voice_call").assertContentDescriptionEquals(compose.activity.getString(R.string.ui_speaker)).assertIsDisplayed().performClick()
         compose.onNodeWithTag("minimize_voice_call").assertIsDisplayed().performClick()
         compose.onNodeWithTag("call_quick_exit").assertIsDisplayed().performClick()
-        compose.onNodeWithTag("finish_voice_call").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("finish_voice_call").assertContentDescriptionEquals(compose.activity.getString(R.string.ui_end_call)).assertIsDisplayed().performClick()
 
         compose.runOnIdle {
             assertTrue(muted)
@@ -116,7 +118,7 @@ class VoiceCallScreenUiTest {
             }
         }
 
-        compose.onNodeWithText("Callingâ€¦").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.ui_calling)).assertIsDisplayed()
         compose.onNodeWithTag("finish_voice_call").assertIsDisplayed()
     }
 
@@ -173,7 +175,7 @@ class VoiceCallScreenUiTest {
         compose.runOnIdle { assertTrue(declined) }
         compose.onNodeWithTag("accept_voice_call").performClick()
         compose.onNodeWithText("Synthetic group").assertIsDisplayed()
-        compose.onNodeWithText(compose.activity.getString(R.string.ui_leave_call)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.ui_leave_call)).assertIsDisplayed()
         compose.onNodeWithTag("finish_voice_call").performClick()
         compose.runOnIdle { assertTrue(left) }
         compose.onNodeWithText("Synthetic connection error").assertIsDisplayed()

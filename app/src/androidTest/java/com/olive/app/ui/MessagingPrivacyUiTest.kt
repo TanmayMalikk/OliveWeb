@@ -40,8 +40,12 @@ class MessagingPrivacyUiTest {
         return session
     }
     @Test
-    fun privateNoteChooserKeepsDifferentPeoplesNotesSeparateAndAppendsWithoutReplacingHistory() {
+    fun privateNoteEditorReplacesOneBodyAndKeepsDifferentPeoplesNotesSeparate() {
         val session=session()
+        check(session.localMode)
+        session.runtime.store.savePrivateContactNote("privacy-fixture", "first-friend", "First fixture", "")
+        session.runtime.store.savePrivateContactNote("privacy-fixture", "second-friend", "Second fixture", "")
+        compose.runOnIdle { session.runtime.state.privateContactNotes = emptyMap() }
         val targets=listOf(DirectoryUser("first-friend","First fixture"),DirectoryUser("second-friend","Second fixture"))
         var dismissed=0
         compose.setContent {OliveTheme {PrivateContactNoteDialog(session,targets){dismissed++}}}
@@ -65,7 +69,17 @@ class MessagingPrivacyUiTest {
         compose.onNodeWithTag("private_contact_note_text").performTextReplacement("Synthetic additional observation")
         compose.onNodeWithTag("save_private_contact_note").performClick()
         compose.waitUntil(10000) {dismissed==3}
-        compose.runOnIdle {assertTrue(session.messages.privateContactNotes.getValue("first-friend").body.contains("additional observation"))}
+        compose.runOnIdle {
+            assertEquals("Synthetic additional observation", session.messages.privateContactNotes.getValue("first-friend").body)
+            assertEquals("Synthetic second observation", session.messages.privateContactNotes.getValue("second-friend").body)
+        }
+        compose.onNodeWithTag("private_contact_note_text").performTextReplacement("")
+        compose.onNodeWithTag("save_private_contact_note").performClick()
+        compose.waitUntil(10000) { dismissed == 4 }
+        compose.runOnIdle {
+            assertFalse(session.messages.privateContactNotes.containsKey("first-friend"))
+            assertEquals("Synthetic second observation", session.messages.privateContactNotes.getValue("second-friend").body)
+        }
     }
     @Test
     fun archivedConversationActionsRestoreTheChatAndOnlyOfferAcceptedFriendsAsPrivateNoteTargets() {

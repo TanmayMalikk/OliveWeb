@@ -350,7 +350,7 @@
 
 
     <string name="private_contact_note">ملاحظة خاصة لجهة الاتصال</string>
-    <string name="private_contact_note_explanation">أنت وحدك تستطيع قراءة هذه الملاحظة المشفرة على هذا الجهاز. يضاف النص الجديد في سطر جديد.</string>
+    <string name="private_contact_note_explanation">يمكنك وحدك قراءة هذه الملاحظة المشفرة على هذا الجهاز. عدّلها واحفظها هنا.</string>
     <string name="choose_person">اختر شخصًا</string>
     <string name="add_to_private_note">أضف إلى الملاحظة الخاصة</string>
     <string name="append_note">إضافة ملاحظة</string>

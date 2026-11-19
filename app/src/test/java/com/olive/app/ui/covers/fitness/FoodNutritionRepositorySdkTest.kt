@@ -103,4 +103,16 @@ class FoodNutritionRepositorySdkTest {
         assertThrows(CancellationException::class.java) { runBlocking { repo.lookupBarcode("123456") } }
         assertThrows(CancellationException::class.java) { runBlocking { repo.search("rice") } }
     }
+    @Test
+    fun missingSignInIsReportedWithoutHidingPackagedFoodResults() = runBlocking<Unit> {
+        failure = mock(FirebaseFunctionsException::class.java)
+        `when`((failure as FirebaseFunctionsException).code).thenReturn(FirebaseFunctionsException.Code.UNAUTHENTICATED)
+        val signedOutRepo = FoodNutritionRepository(client, signedIn = { false }) { functions }
+        val result = signedOutRepo.search("rice")
+        assertTrue(result.needsSignIn)
+        assertTrue(result.foods.isNotEmpty())
+        assertEquals(1, result.providerFailures)
+        val signedInRepo = FoodNutritionRepository(client, signedIn = { true }) { functions }
+        assertFalse(signedInRepo.search("rice").needsSignIn)
+    }
 }

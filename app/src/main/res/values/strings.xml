@@ -61,7 +61,7 @@
     <string name="no_stories_found">No stories found.</string>
     <string name="date_of_birth_required">Date of birth (required)</string>
     <string name="location_background_access">Enable background location</string>
-    <string name="location_background_settings">Background location keeps the admin map updated when the app is closed. In Android Settings, choose %1$s, then return here.</string>
+    <string name="location_background_settings">On the next Android permission screen, choose %1$s, then return to Olive. Android requires this setting to keep location updating when the app is in the background.</string>
     <string name="location_background_dialog">Background location keeps the admin map updated when the app is closed. Choose Allow all the time in the Android prompt.</string>
     <string name="year">Year</string>
     <string name="month">Month</string>
@@ -432,7 +432,7 @@
 
 
     <string name="private_contact_note">Private contact note</string>
-    <string name="private_contact_note_explanation">Only you can read this encrypted note on this device. New text is added on a new line.</string>
+    <string name="private_contact_note_explanation">Only you can read this encrypted note on this device. Edit and save it here.</string>
     <string name="choose_person">Choose a person</string>
     <string name="add_to_private_note">Add to private note</string>
     <string name="append_note">Add note</string>
