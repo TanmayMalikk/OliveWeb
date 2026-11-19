@@ -106,6 +106,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     val history = loaded?.second.orEmpty()
     var page by rememberSaveable(accountId) { mutableStateOf(FitnessPage.HOME) }
     var foodSection by rememberSaveable(accountId) { mutableStateOf(FoodLibrarySection.Search) }
+    var foodMeal by rememberSaveable(accountId) { mutableStateOf<MealType?>(null) }
     val pageFocus = remember { FocusRequester() }
     val pageLabel = when (page) {
         FitnessPage.HOME -> stringResource(R.string.home)
@@ -229,18 +230,28 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     snapshot = snapshot,
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
-                    onAddFood = { foodSection = FoodLibrarySection.Search; page = FitnessPage.FOOD_SEARCH },
+                    onAddFood = {
+                        foodMeal = null
+                        foodSection = FoodLibrarySection.Search
+                        page = FitnessPage.FOOD_SEARCH
+                    },
                     onRemoveFood = { pendingSnapshot = store.removeFood(it) },
                     onAddWater = { amount, goal -> pendingSnapshot = store.addWater(amount, goal) },
                     onUpdateFood = { pendingSnapshot = store.updateFood(it) },
                     library = foodLibrary,
-                    onOpenLibrary = { foodSection = it; page = FitnessPage.FOOD_SEARCH },
+                    onOpenLibrary = { foodMeal = null; foodSection = it; page = FitnessPage.FOOD_SEARCH },
+                    onLogMeal = {
+                        foodMeal = it
+                        foodSection = FoodLibrarySection.Search
+                        page = FitnessPage.FOOD_SEARCH
+                    },
                 )
                 FitnessPage.FOOD_SEARCH -> FoodSearchPage(
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
                     library = foodLibrary,
                     initialSection = foodSection,
+                    initialMeal = foodMeal,
                     recentFoods = store.recentFoods(),
                     onFoodAdded = { food, servings, meal ->
                         pendingSnapshot = store.addFood(food, servings, meal)

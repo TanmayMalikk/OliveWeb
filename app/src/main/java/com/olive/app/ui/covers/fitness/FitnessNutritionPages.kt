@@ -28,9 +28,12 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.BakeryDining
+import androidx.compose.material.icons.outlined.FreeBreakfast
+import androidx.compose.material.icons.outlined.LunchDining
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,24 +75,9 @@ import com.olive.app.R
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlinx.coroutines.launch
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.ui.graphics.Color
-import kotlin.math.PI
-import kotlin.math.sin
-import androidx.compose.animation.core.tween
-import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.semantics.*
 
 // Shows today's calorie and macro totals with meal logging.
@@ -104,6 +92,7 @@ internal fun TodayPage(
     onUpdateFood: (FoodLogEntry) -> Unit = {},
     library: FitnessFoodLibrary? = null,
     onOpenLibrary: (FoodLibrarySection) -> Unit = {},
+    onLogMeal: (MealType) -> Unit = { onAddFood() },
 ) {
     val savedFoods = rememberSavedFoods(library)
     var editingEntry by remember { mutableStateOf<FoodLogEntry?>(null) }
@@ -124,7 +113,7 @@ internal fun TodayPage(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
                 )
-                Text(stringResource(R.string.daily_nutrition), color = FitnessSubtle)
+                Text(stringResource(R.string.today), color = FitnessSubtle)
             }
         }
         item {
@@ -153,21 +142,13 @@ internal fun TodayPage(
         MealType.entries.forEach { meal ->
             val entries = snapshot.foodsToday.filter { it.meal == meal }
             item {
-                Text(
-                    meal.displayName,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.semantics { heading() },
-                )
+                MealHeader(meal, entries, enabled) { onLogMeal(meal) }
             }
-            // Show the empty diary message until the user logs food.
-            if (entries.isEmpty()) {
-                item { Text(stringResource(R.string.no_food_logged), color = FitnessSubtle) }
-            } else {
-                items(entries, key = FoodLogEntry::logId) { entry ->
-                    LoggedFoodRow(entry, enabled, onEdit = { editingEntry = entry; editDetails = false }, onRemove = { onRemoveFood(entry.logId) })
-                }
+            items(entries, key = FoodLogEntry::logId) { entry ->
+                LoggedFoodRow(entry, enabled, onEdit = { editingEntry = entry; editDetails = false }, onRemove = { onRemoveFood(entry.logId) })
             }
         }
+        item { OtherNutrients(snapshot.nutrition) }
         item { ProviderAttribution() }
     }
     editingEntry?.let { entry ->
@@ -185,13 +166,64 @@ internal fun TodayPage(
 
 }
 
-// fitness cover shows this daily nutrition card view so the user can view its details and use its actions.
 @Composable
-internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
+private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boolean, onLog: () -> Unit) {
+    val label = meal.localizedName()
+    val icon = when (meal) {
+        MealType.BREAKFAST -> Icons.Outlined.FreeBreakfast
+        MealType.LUNCH -> Icons.Outlined.LunchDining
+        MealType.DINNER -> Icons.Outlined.Restaurant
+        MealType.SNACK -> Icons.Outlined.BakeryDining
+    }
+    val calories = entries.sumOf { (it.food.calories * it.servings).toDouble() }.toFloat()
+    Card(colors = CardDefaults.cardColors(containerColor = FitnessSurface), shape = RoundedCornerShape(18.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Icon(icon, null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                if (entries.isNotEmpty()) Text(
+                    stringResource(R.string.fitness_diary_energy, calories.displayAmount()),
+                    style = MaterialTheme.typography.bodySmall, color = FitnessSubtle,
+                )
+            }
+            val action = stringResource(R.string.fitness_diary_log_meal, label)
+            FilledTonalButton(onClick = onLog, enabled = enabled, modifier = Modifier
+                .testTag("fitness_log_${meal.name}").semantics { contentDescription = action }) {
+                Text(stringResource(R.string.fitness_diary_log), Modifier.clearAndSetSemantics { })
+            }
+        }
+    }
+}
+
+@Composable
+internal fun MealType.localizedName(): String = stringResource(when (this) {
+    MealType.BREAKFAST -> R.string.fitness_diary_breakfast
+    MealType.LUNCH -> R.string.fitness_diary_lunch
+    MealType.DINNER -> R.string.fitness_diary_dinner
+    MealType.SNACK -> R.string.fitness_diary_snacks
+})
+
+@Composable
+private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CaloriesOverview(snapshot)
+        MacroOverview(snapshot)
+    }
+}
+
+@Composable
+private fun CaloriesOverview(snapshot: FitnessSnapshot) {
     val totals = snapshot.nutrition
     val profile = snapshot.profile
     val caloriesLabel = stringResource(R.string.calories)
-    var nutrientsExpanded by remember { mutableStateOf(false) }
+    val remaining = (profile.calorieGoal - totals.calories).coerceAtLeast(0f)
+    val remainingLabel = stringResource(R.string.fitness_diary_remaining, remaining.displayAmount())
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = FitnessWarmCard),
@@ -203,19 +235,26 @@ internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics {
                     contentDescription = "$caloriesLabel, " +
-                        "${totals.calories.displayAmount()} of ${profile.calorieGoal} kcal"
+                        "${totals.calories.displayAmount()} / ${profile.calorieGoal} kcal, $remainingLabel"
                 },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Column {
-                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.calories), color = FitnessSubtle)
+                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.calorie_goal) + " · " +
+                            stringResource(R.string.fitness_diary_energy, profile.calorieGoal.toString()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = FitnessSubtle,
+                    )
                 }
                 Text(
-                    "${profile.calorieGoal} kcal · ${stringResource(R.string.calorie_goal)}",
-                    color = FitnessSubtle,
+                    remainingLabel, Modifier.weight(1f).padding(start = 8.dp),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelLarge,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
             val calorieProgress = (totals.calories / profile.calorieGoal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
@@ -224,22 +263,52 @@ internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
                 modifier = Modifier.fillMaxWidth().height(9.dp).clip(CircleShape)
                     .clearAndSetSemantics { },
             )
-            NutritionProgress(stringResource(R.string.protein), totals.proteinGrams, profile.proteinGoal.toFloat(), "g")
-            NutritionProgress(stringResource(R.string.carbohydrates), totals.carbohydrateGrams, profile.carbohydrateGoal.toFloat(), "g")
-            NutritionProgress(stringResource(R.string.fat), totals.fatGrams, profile.fatGoal.toFloat(), "g")
-            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun MacroOverview(snapshot: FitnessSnapshot) {
+    val totals = snapshot.nutrition
+    val profile = snapshot.profile
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = FitnessSurface)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
+            val stacked = maxWidth < 280.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f
+            val metrics = listOf(
+                Triple(R.string.carbohydrates, totals.carbohydrateGrams, profile.carbohydrateGoal),
+                Triple(R.string.fat, totals.fatGrams, profile.fatGoal),
+                Triple(R.string.protein, totals.proteinGrams, profile.proteinGoal),
+            )
+            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                metrics.forEach { (label, total, goal) -> NutritionProgress(stringResource(label), total, goal) }
+            } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                metrics.forEach { (label, total, goal) ->
+                    NutritionProgress(stringResource(label), total, goal, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OtherNutrients(totals: NutritionTotals) {
+    var nutrientsExpanded by rememberSaveable { mutableStateOf(false) }
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = FitnessSurface)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { nutrientsExpanded = !nutrientsExpanded }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.nutrition_other_nutrients), modifier = Modifier.weight(1f))
                 Icon(if (nutrientsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
             }
             if (nutrientsExpanded) {
-            NutritionAmountRow(stringResource(R.string.saturated_fat), totals.saturatedFatGrams, "g")
-            NutritionAmountRow(stringResource(R.string.trans_fat), totals.transFatGrams, "g")
-            NutritionAmountRow(stringResource(R.string.fiber), totals.fiberGrams, "g")
-            NutritionAmountRow(stringResource(R.string.sugar), totals.sugarGrams, "g")
-            NutritionAmountRow(stringResource(R.string.sodium), totals.sodiumMilligrams, "mg")
-            NutritionAmountRow(stringResource(R.string.cholesterol), totals.cholesterolMilligrams, "mg")
-            NutritionAmountRow(stringResource(R.string.potassium), totals.potassiumMilligrams, "mg")
+            HorizontalDivider()
+                NutritionAmountRow(stringResource(R.string.saturated_fat), totals.saturatedFatGrams, "g")
+                NutritionAmountRow(stringResource(R.string.trans_fat), totals.transFatGrams, "g")
+                NutritionAmountRow(stringResource(R.string.fiber), totals.fiberGrams, "g")
+                NutritionAmountRow(stringResource(R.string.sugar), totals.sugarGrams, "g")
+                NutritionAmountRow(stringResource(R.string.sodium), totals.sodiumMilligrams, "mg")
+                NutritionAmountRow(stringResource(R.string.cholesterol), totals.cholesterolMilligrams, "mg")
+                NutritionAmountRow(stringResource(R.string.potassium), totals.potassiumMilligrams, "mg")
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
@@ -259,20 +328,17 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     }
 }
 // Draws progress toward one calorie or macro goal.
-@Suppress("SameParameterValue") // unit is always 'g' for gram.
 @Composable
-private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
-    val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+private fun NutritionProgress(label: String, value: Float, goal: Int, modifier: Modifier = Modifier) {
+    val progress = (value / goal.coerceAtLeast(1)).coerceIn(0f, 1f)
     Column(
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = "$label, ${value.displayAmount()} of ${goal.displayAmount()} $unit"
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = "$label, ${value.displayAmount()} / $goal g"
         },
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label)
-            Text("${value.displayAmount()} / ${goal.displayAmount()} $unit")
-        }
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text("${value.displayAmount()} / $goal g", style = MaterialTheme.typography.bodySmall, color = FitnessSubtle)
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
@@ -322,6 +388,7 @@ internal fun FoodSearchPage(
     library: FitnessFoodLibrary? = null,
     initialSection: FoodLibrarySection = FoodLibrarySection.Search,
     recentFoods: List<FoodLogEntry> = emptyList(),
+    initialMeal: MealType? = null,
 ) {
     val repository = remember(foodSource) { foodSource ?: FoodNutritionRepository() }
     val scope = rememberCoroutineScope()
@@ -400,7 +467,8 @@ internal fun FoodSearchPage(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            stringResource(R.string.find_food),
+            initialMeal?.let { stringResource(R.string.fitness_diary_log_meal, it.localizedName()) }
+                ?: stringResource(R.string.find_food),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.semantics { heading() },
         )
@@ -534,7 +602,7 @@ internal fun FoodSearchPage(
                 onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal)
             },
             initialServings = previousEntry?.servings ?: 1f,
-            initialMeal = previousEntry?.meal ?: MealType.BREAKFAST,
+            initialMeal = initialMeal ?: previousEntry?.meal ?: MealType.BREAKFAST,
             isSaved = savedFoods.any { it.id == food.id },
             onToggleSaved = library?.let { { saved: Boolean -> it.setSaved(food, saved) } },
         )
@@ -611,83 +679,5 @@ private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(stringResource(R.string.fatsecret_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
         Text(stringResource(R.string.open_food_facts_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
-    }
-}
-
-@Composable
-internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val target = (totalMl.toFloat() / goalMl.coerceAtLeast(1)).coerceIn(0f, 1f)
-    val fill by animateFloatAsState(target, animationSpec = tween(1000), label = "water_fill")
-    val outline = Color(0xFF176B9B)
-    val water = Color(0xFF258ED2)
-    val ripples = rememberInfiniteTransition(label = "water_ripples")
-    val phase by ripples.animateFloat(0f, (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "water_wave_phase")
-    val description = stringResource(R.string.nutrition_water_progress, totalMl, goalMl)
-    Row(Modifier.clickable(enabled = enabled, role = Role.Button) { open = true }
-        .semantics { contentDescription = description; progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) }
-        .padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Canvas(Modifier.size(58.dp, 76.dp)) {
-            val glass = Path().apply {
-                moveTo(size.width * .12f, size.height * .08f); lineTo(size.width * .88f, size.height * .08f)
-                lineTo(size.width * .76f, size.height * .92f); lineTo(size.width * .24f, size.height * .92f); close()
-            }
-            drawPath(glass, Color(0xFFE4F3FC))
-            clipPath(glass) {
-                if (fill > 0f) {
-                    val level = size.height * (.92f - .84f * fill)
-                    val amplitude = minOf(1.8.dp.toPx(), size.height * .84f * fill / 3f)
-                    fun wave(offset: Float): Path = Path().apply {
-                        moveTo(0f, size.height)
-                        for (step in 0..32) {
-                            val x = size.width * step / 32f
-                            val y = level + sin(x / size.width * 2f * PI.toFloat() + phase + offset) * amplitude
-                            lineTo(x, y)
-                        }
-                        lineTo(size.width, size.height)
-                        close()
-                    }
-                    drawPath(wave(PI.toFloat()), water.copy(alpha = .35f))
-                    drawPath(wave(0f), water.copy(alpha = .85f))
-                }
-                drawLine(Color.White.copy(alpha = .8f), Offset(size.width * .24f, size.height * .2f),
-                    Offset(size.width * .29f, size.height * .62f), strokeWidth = 1.5.dp.toPx())
-            }
-            drawPath(glass, outline, style = Stroke(2.dp.toPx()))
-        }
-        Column(Modifier.padding(start = 6.dp)) {
-            Text(stringResource(R.string.nutrition_water), style = MaterialTheme.typography.labelLarge)
-            Text("$totalMl / $goalMl ml", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-    if (open) {
-        var amount by remember { mutableStateOf("250") }
-        var goal by remember { mutableStateOf(goalMl.toString()) }
-        AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.nutrition_add_water)) },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onAdd(-250, goalMl) }, enabled = enabled && totalMl > 0) {
-                        androidx.compose.material3.Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
-                    }
-                    Text("250 ml", Modifier.clearAndSetSemantics { }, style = MaterialTheme.typography.labelMedium)
-                    IconButton(onClick = { onAdd(250, goalMl) }, enabled = enabled) {
-                        androidx.compose.material3.Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_water_plus))
-                    }
-                }
-                OutlinedTextField(amount, { amount = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_amount)) },
-                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(150, 250, 500).forEach { value ->
-                        SuggestionChip(onClick = { amount = value.toString() }, label = { Text("$value ml") })
-                    }
-                }
-                OutlinedTextField(goal, { goal = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_goal)) },
-                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            } },
-            confirmButton = { Button(onClick = { onAdd(amount.toInt(), goal.toInt()); open = false },
-                enabled = amount.toIntOrNull()?.let { it in 1..10000 } == true && goal.toIntOrNull()?.let { it in 250..10000 } == true) { Text(stringResource(R.string.nutrition_add_water)) } },
-            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } })
     }
 }

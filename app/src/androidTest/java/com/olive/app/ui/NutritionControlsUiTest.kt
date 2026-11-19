@@ -2,8 +2,6 @@ package com.olive.app.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -75,12 +73,15 @@ class NutritionControlsUiTest {
     }
 
     @Test fun extraNutrientsStartCollapsed() {
-        compose.setContent { OliveTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-            DailyNutritionCard(FitnessSnapshot(FitnessProfile(), 0, emptyList()))
-        } } }
+        compose.setContent { OliveTheme {
+            TodayPage(FitnessSnapshot(FitnessProfile(), 0, emptyList()), true, PaddingValues(0.dp), {}, {}, { _, _ -> })
+        } }
         compose.onNodeWithContentDescription(context.getString(R.string.sodium) + ", 0 mg").assertDoesNotExist()
+        compose.onNodeWithTag("fitness_today").performScrollToNode(hasText(context.getString(R.string.nutrition_other_nutrients)))
         compose.onNodeWithText(context.getString(R.string.nutrition_other_nutrients)).performClick()
-        compose.onNodeWithContentDescription(context.getString(R.string.sodium) + ", 0 mg").performScrollTo().assertIsDisplayed()
+        val sodium = hasContentDescription(context.getString(R.string.sodium) + ", 0 mg")
+        compose.onNodeWithTag("fitness_today").performScrollToNode(sodium)
+        compose.onNode(sodium).assertIsDisplayed()
     }
 
     @Test fun customServingWeightUpdatesSavedFactor() {
@@ -98,11 +99,14 @@ class NutritionControlsUiTest {
         var adjustment = 0
         compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { value, _ -> adjustment = value }) } }
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).assertDoesNotExist()
-        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).assertDoesNotExist()
+        val add = context.getString(R.string.fitness_diary_add_volume, 250)
+        compose.onNodeWithContentDescription(add).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).performClick()
-        compose.runOnIdle { assertEquals(-250, adjustment) }
-        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).performClick()
+        compose.runOnIdle { assertEquals(0, adjustment) }
+        compose.onNodeWithContentDescription(add).performClick()
+        compose.onNodeWithContentDescription(add).performClick()
+        compose.onNodeWithText(context.getString(R.string.save)).performClick()
         compose.runOnIdle { assertEquals(250, adjustment) }
     }
 
@@ -123,9 +127,8 @@ class NutritionControlsUiTest {
         var amount = 0
         compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { value, _ -> amount = value }) } }
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
-        compose.onNodeWithText("500 ml").performClick()
-        compose.onNodeWithText(context.getString(R.string.nutrition_add_water), useUnmergedTree = true)
-        compose.onAllNodesWithText(context.getString(R.string.nutrition_add_water)).onLast().performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.fitness_diary_add_volume, 500)).performClick()
+        compose.onNodeWithText(context.getString(R.string.save)).performClick()
         compose.runOnIdle { assertEquals(500, amount) }
     }
 

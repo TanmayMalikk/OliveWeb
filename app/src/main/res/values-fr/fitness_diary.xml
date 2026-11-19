@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_diary_log">Ajouter</string>
+    <string name="fitness_diary_log_meal">Ajouter au repas %1$s</string>
+    <string name="fitness_diary_breakfast">Petit-déjeuner</string>
+    <string name="fitness_diary_lunch">Déjeuner</string>
+    <string name="fitness_diary_dinner">Dîner</string>
+    <string name="fitness_diary_snacks">Collations</string>
+    <string name="fitness_diary_energy">%1$s kcal</string>
+    <string name="fitness_diary_remaining">%1$s kcal restantes</string>
+    <string name="fitness_diary_volume">%1$d ml</string>
+    <string name="fitness_diary_water_total">Total d’eau aujourd’hui</string>
+    <string name="fitness_diary_custom_water">Quantité personnalisée</string>
+    <string name="fitness_diary_add_volume">Ajouter %1$d ml d’eau</string>
+</resources>

@@ -51,7 +51,7 @@ class AccessibilityReviewUiTest {
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).assertHasClickAction()
-        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).assertHasClickAction()
+        compose.onNodeWithContentDescription(context.getString(R.string.fitness_diary_add_volume, 250)).assertHasClickAction()
         compose.onNodeWithText("250 ml").assertDoesNotExist()
     }
 

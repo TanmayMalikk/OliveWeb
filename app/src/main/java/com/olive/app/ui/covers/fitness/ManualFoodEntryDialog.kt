@@ -473,7 +473,7 @@ internal fun AddFoodDialog(
                     FilterChip(
                         selected = meal == option,
                         onClick = { meal = option },
-                        label = { Text(option.displayName) },
+                        label = { Text(option.localizedName()) },
                         leadingIcon = if (meal == option) {
                             { com.olive.app.ui.shared.LocalizedIcon(Icons.Outlined.Check, null) }
                         } else null,
