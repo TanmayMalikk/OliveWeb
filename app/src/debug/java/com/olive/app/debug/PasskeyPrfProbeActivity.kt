@@ -16,6 +16,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
 import com.olive.app.R
+import com.olive.app.security.PasskeyPrfProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -90,7 +91,7 @@ class PasskeyPrfProbeActivity : Activity() {
                 val registration = credentialManager.createCredential(
                     this@PasskeyPrfProbeActivity,
                     CreatePublicKeyCredentialRequest(
-                        PasskeyPrfProbeProtocol.creationRequest(createChallenge, userId),
+                        PasskeyPrfProtocol.probeCreationRequest(createChallenge, userId),
                     ),
                 ) as? CreatePublicKeyCredentialResponse ?: throw ProbeFailure
                 val credentialId = org.json.JSONObject(registration.registrationResponseJson)
@@ -127,7 +128,7 @@ class PasskeyPrfProbeActivity : Activity() {
                         GetCredentialRequest(
                             listOf(
                                 GetPublicKeyCredentialOption(
-                                    PasskeyPrfProbeProtocol.assertionRequest(
+                                    PasskeyPrfProtocol.probeAssertionRequest(
                                         assertionChallenge, pending.credentialId, pending.prfInput,
                                     ),
                                 ),
@@ -136,7 +137,7 @@ class PasskeyPrfProbeActivity : Activity() {
                     )
                 } ?: throw PasskeyPrfProbeTimeout
                 val response = providerResponse.credential as? PublicKeyCredential ?: throw ProbeFailure
-                val prfResult = PasskeyPrfProbeProtocol.prfOutputOrNull(response.authenticationResponseJson)
+                val prfResult = PasskeyPrfProtocol.prfOutputOrNull(response.authenticationResponseJson)
                     ?: throw PrfUnavailable
                 try {
                     status.text = getString(R.string.debug_prf_probe_supported)
