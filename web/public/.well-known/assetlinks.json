@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.olive.app",
+      "sha256_cert_fingerprints": [
+        "38:58:AD:BF:47:04:37:6D:30:D1:A1:36:8B:C4:10:BB:38:58:57:D9:67:06:6D:D0:87:4B:CA:86:48:71:B8:DD"
+      ]
+    }
+  }
+]
