@@ -9,6 +9,7 @@ import {
 } from "./LocalDataStore";
 import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
 import { readStoredObject } from "./StoredAccountJson";
+import type { UnlockedAccountKeyset } from "./PasskeyRecovery";
 import {
   emptyHistory,
   emptyProfile,
@@ -34,6 +35,20 @@ export const cloudMode = Boolean(
 );
 type Cloud = typeof import("./FirebaseClient");
 let cloud: Cloud | null = null;
+let unlockedAccountKeyset: UnlockedAccountKeyset | null = null;
+
+/** Keeps non-extractable recovery keys in this tab only and binds them to one signed-in account. */
+export const accountKeysetSession = {
+  install(keyset: UnlockedAccountKeyset) {
+    unlockedAccountKeyset = keyset;
+  },
+  current(uid: string) {
+    return unlockedAccountKeyset?.accountId === uid ? unlockedAccountKeyset : null;
+  },
+  clear() {
+    unlockedAccountKeyset = null;
+  },
+};
 // Opens Firebase once and waits until the saved sign-in session is ready.
 export async function firebase() {
   cloud ??= await import("./FirebaseClient");
@@ -337,6 +352,7 @@ export class Accounts {
     this.raw?.fill(0);
     this.raw = null;
     this.identity = null;
+    accountKeysetSession.clear();
   }
   async saveProfile(profile: Profile) {
     if (
