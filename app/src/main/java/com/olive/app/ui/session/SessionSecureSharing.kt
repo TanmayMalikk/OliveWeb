@@ -505,6 +505,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var activityCategory by mutableStateOf<ActivityCategory?>(null)
     var busy by mutableStateOf(false)
     var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
+    var passkeyCredentialRequest by mutableStateOf<PasskeyCredentialRequest?>(null)
     var message by mutableStateOf<String?>(null)
     var profile by mutableStateOf<UserProfile?>(null)
     var attempts by mutableStateOf(emptyList<FailedAttempt>())

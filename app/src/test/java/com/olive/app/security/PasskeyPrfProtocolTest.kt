@@ -58,6 +58,22 @@ class PasskeyPrfProtocolTest {
     }
 
     @Test
+    fun `registration response cannot forward unexpected PRF results`() {
+        val extensions = JSONObject().put("prf", JSONObject()
+            .put("enabled", true)
+            .put("results", JSONObject().put("first", encode(ByteArray(32) { 8 }))))
+        val response = JSONObject()
+            .put("id", "credential_abcdefghijklmnop")
+            .put("clientExtensionResults", extensions)
+            .toString()
+
+        val sanitized = JSONObject(PasskeyPrfProtocol.registrationResult(response))
+
+        assertFalse(sanitized.getJSONObject("clientExtensionResults")
+            .getJSONObject("prf").has("results"))
+    }
+
+    @Test
     fun `PRF response accepts only 32-byte base64url across malformed inputs`() {
         val malformed = listOf("", "!", encode(ByteArray(31)), encode(ByteArray(33)))
         for (value in malformed) {

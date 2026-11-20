@@ -167,11 +167,10 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-effect:$media3Version")
     implementation("androidx.media3:media3-transformer:$media3Version")
-    // The PRF compatibility probe exists only in src/debug. Keep its passkey libraries out of release APKs
-    // until a real Android/web recovery migration has passed the device compatibility test.
+    // Recovery and the debug compatibility probe use the same verified Credential Manager version.
     val credentialsVersion = "1.6.0"
-    debugImplementation("androidx.credentials:credentials:$credentialsVersion")
-    debugImplementation("androidx.credentials:credentials-play-services-auth:$credentialsVersion")
+    implementation("androidx.credentials:credentials:$credentialsVersion")
+    implementation("androidx.credentials:credentials-play-services-auth:$credentialsVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")

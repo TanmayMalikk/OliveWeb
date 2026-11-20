@@ -59,6 +59,15 @@ internal object PasskeyPrfProtocol {
         return AssertionResult(credentialId, response.toString(), output)
     }
 
+    fun registrationResult(registrationResponseJson: String): String {
+        val response = JSONObject(registrationResponseJson)
+        require(CREDENTIAL_ID.matches(response.optString("id"))) { "Invalid passkey credential ID" }
+        response.optJSONObject("clientExtensionResults")
+            ?.optJSONObject("prf")
+            ?.remove("results")
+        return response.toString()
+    }
+
     /** Debug-only request shape; it deliberately does not ask for PRF during creation. */
     fun probeCreationRequest(challenge: ByteArray, userId: ByteArray): String {
         requireLength(challenge, 32, "Create challenge")

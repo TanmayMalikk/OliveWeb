@@ -240,6 +240,22 @@ internal class DeviceLockRequest internal constructor(
     }
 }
 
+internal sealed interface PasskeyCredentialResult {
+    data class Registration(val serverResponseJson: String) : PasskeyCredentialResult
+    data class Assertion(val value: PasskeyPrfProtocol.AssertionResult) : PasskeyCredentialResult
+}
+
+/** One Activity-owned Credential Manager ceremony; raw PRF JSON never enters session state. */
+internal class PasskeyCredentialRequest internal constructor(
+    val requestJson: String,
+    val assertion: Boolean,
+) {
+    internal val result = CompletableDeferred<PasskeyCredentialResult?>()
+    fun complete(value: PasskeyCredentialResult?) {
+        result.complete(value)
+    }
+}
+
 // Authenticates the signed-in user via Android Keystore device lock.
 internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
     private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")

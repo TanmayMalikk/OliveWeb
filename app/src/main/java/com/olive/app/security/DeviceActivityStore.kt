@@ -29,6 +29,13 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PublicKeyCredential
 import com.olive.app.R
 import com.olive.app.data.account.HistoryRecord
 import com.olive.app.data.account.PrivateEntry
@@ -37,6 +44,11 @@ import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.trashExpired
 import com.olive.app.ui.session.DeviceLockRequest
+import com.olive.app.ui.session.PasskeyCredentialRequest
+import com.olive.app.ui.session.PasskeyCredentialResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 
 // Encrypted, account-scoped activity and private-entry storage; no authentication responsibilities.
@@ -552,5 +564,68 @@ internal class AndroidDeviceLock(
         pendingCipher = null
         prompt.cancelAuthentication()
         previous?.complete(null)
+    }
+}
+
+/** Runs Credential Manager only while an Activity is present and sanitizes results immediately. */
+internal class AndroidPasskeyCredentials(private val activity: FragmentActivity) {
+    private val credentials = CredentialManager.create(activity)
+    private var request: PasskeyCredentialRequest? = null
+    private var job: Job? = null
+    var awaitingCredential: Boolean = false
+        private set
+
+    fun show(value: PasskeyCredentialRequest) {
+        if (request === value) return
+        cancel()
+        request = value
+        awaitingCredential = true
+        job = activity.lifecycleScope.launch {
+            val result = try {
+                if (value.assertion) {
+                    val credential = credentials.getCredential(
+                        activity,
+                        GetCredentialRequest(listOf(GetPublicKeyCredentialOption(value.requestJson))),
+                    ).credential as? PublicKeyCredential
+                        ?: throw IllegalStateException("Credential provider returned an invalid assertion")
+                    PasskeyCredentialResult.Assertion(
+                        PasskeyPrfProtocol.assertionResult(credential.authenticationResponseJson),
+                    )
+                } else {
+                    val response = credentials.createCredential(
+                        activity,
+                        CreatePublicKeyCredentialRequest(value.requestJson),
+                    ) as? CreatePublicKeyCredentialResponse
+                        ?: throw IllegalStateException("Credential provider returned an invalid registration")
+                    PasskeyCredentialResult.Registration(
+                        PasskeyPrfProtocol.registrationResult(response.registrationResponseJson),
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            finish(value, result)
+        }
+    }
+
+    fun cancel() {
+        job?.cancel()
+        job = null
+        request?.complete(null)
+        request = null
+        awaitingCredential = false
+    }
+
+    private fun finish(value: PasskeyCredentialRequest, result: PasskeyCredentialResult?) {
+        if (request !== value) {
+            (result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)
+            return
+        }
+        job = null
+        request = null
+        awaitingCredential = false
+        value.complete(result)
     }
 }

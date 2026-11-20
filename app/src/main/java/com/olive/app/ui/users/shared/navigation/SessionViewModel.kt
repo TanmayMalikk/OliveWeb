@@ -58,6 +58,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val activityCategory get() = runtime.state.activityCategory
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
+    val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val profile get() = runtime.state.profile
