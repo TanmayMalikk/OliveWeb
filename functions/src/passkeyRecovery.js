@@ -17,6 +17,7 @@ const ENVELOPE_IV_BYTES = 12;
 const ENVELOPE_CIPHERTEXT_BYTES = 48;
 const MAX_CREDENTIAL_BYTES = 4096;
 const ALLOWED_TRANSPORTS = new Set(["ble", "hybrid", "internal", "nfc", "usb"]);
+const callableOptions = {enforceAppCheck: true, invoker: "public"};
 
 function authenticatedUid(request) {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in first.");
@@ -148,14 +149,14 @@ async function existingCredentials(uid) {
   return snapshot.docs.map((document) => storedCredential(document, uid));
 }
 
-exports.passkeyRecoveryListCredentials = onCall(async (request) => {
+exports.passkeyRecoveryListCredentials = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   return {
     credentials: (await existingCredentials(uid)).map(credentialSummary),
   };
 });
 
-exports.passkeyRecoveryRemoveCredential = onCall(async (request) => {
+exports.passkeyRecoveryRemoveCredential = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   const id = requiredCredentialId(request.data?.credentialId);
   const reference = root(uid).collection("credentials").doc(id);
@@ -166,7 +167,7 @@ exports.passkeyRecoveryRemoveCredential = onCall(async (request) => {
   return {removed: true, credentialId: id};
 });
 
-exports.passkeyRecoveryBeginEnrollment = onCall(async (request) => {
+exports.passkeyRecoveryBeginEnrollment = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   const options = await registrationOptions(uid, await existingCredentials(uid));
   const challengeId = crypto.randomBytes(24).toString("base64url");
@@ -183,7 +184,7 @@ exports.passkeyRecoveryBeginEnrollment = onCall(async (request) => {
   return {options, challengeId, prfInput, expiresAt: expiresAt.toISOString()};
 });
 
-exports.passkeyRecoveryContinueEnrollment = onCall(async (request) => {
+exports.passkeyRecoveryContinueEnrollment = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   const reference = challengeReference(uid, request.data?.challengeId);
   const challengeData = validChallenge(await reference.get(), uid, "REGISTER");
@@ -240,7 +241,7 @@ exports.passkeyRecoveryContinueEnrollment = onCall(async (request) => {
   };
 });
 
-exports.passkeyRecoveryCompleteEnrollment = onCall(async (request) => {
+exports.passkeyRecoveryCompleteEnrollment = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   rejectPrfResult(request.data?.response);
   const responseId = credentialId(request.data?.response?.id);
@@ -298,7 +299,7 @@ exports.passkeyRecoveryCompleteEnrollment = onCall(async (request) => {
   return {registered: true, credentialId: credential.credentialId};
 });
 
-exports.passkeyRecoveryBeginUnlock = onCall(async (request) => {
+exports.passkeyRecoveryBeginUnlock = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   const credentials = await existingCredentials(uid);
   if (credentials.length === 0) throw new HttpsError("not-found", "Passkey recovery is not configured.");
@@ -327,7 +328,7 @@ exports.passkeyRecoveryBeginUnlock = onCall(async (request) => {
   return {options, challengeId, prfInputs, expiresAt: expiresAt.toISOString()};
 });
 
-exports.passkeyRecoveryCompleteUnlock = onCall(async (request) => {
+exports.passkeyRecoveryCompleteUnlock = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
   rejectPrfResult(request.data?.response);
   const responseId = credentialId(request.data?.response?.id);
