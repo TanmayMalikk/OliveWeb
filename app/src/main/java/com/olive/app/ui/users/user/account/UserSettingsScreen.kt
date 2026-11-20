@@ -70,6 +70,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val cacheUid = session.coverAccountId
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
+        if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
     }
 
     FormColumn {
@@ -224,6 +225,49 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         if (userRole) {
             HorizontalDivider()
             SafeEntrySettings(session)
+            HorizontalDivider()
+            Text(
+                stringResource(R.string.passkey_recovery_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                stringResource(R.string.passkey_recovery_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+            )
+            if (session.passkeyRecoveryCredentials.isEmpty()) {
+                Text(stringResource(R.string.passkey_recovery_none))
+            } else {
+                session.passkeyRecoveryCredentials.forEachIndexed { index, credential ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(
+                                if (credential.backedUp) R.string.passkey_recovery_synced_factor
+                                else R.string.passkey_recovery_device_factor,
+                            ),
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedButton(
+                            onClick = { session.removePasskeyRecovery(credential.credentialId) },
+                            enabled = !session.busy,
+                            modifier = Modifier.testTag("remove_recovery_passkey_$index"),
+                        ) {
+                            Text(stringResource(R.string.passkey_recovery_remove))
+                        }
+                    }
+                }
+            }
+            Button(
+                onClick = session::enablePasskeyRecovery,
+                enabled = !session.busy,
+                modifier = Modifier.testTag("add_recovery_passkey"),
+            ) {
+                Text(stringResource(R.string.passkey_recovery_enable))
+            }
             HorizontalDivider()
             Text(
                 stringResource(R.string.documents_recent_cache_title),

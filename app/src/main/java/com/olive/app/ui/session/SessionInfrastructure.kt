@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.olive.app.R
 import com.olive.app.data.account.AccountRepository
+import com.olive.app.data.account.AccountKeysetRepository
+import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminRepository
 import com.olive.app.data.account.CoverType
@@ -75,6 +77,8 @@ internal class SessionDataSources(
     val safetyDocuments: SafetyDocumentDataSource?,
     val locations: LocationSharingRepository?,
     val adminLocations: AdminLocationRepository?,
+    val accountKeysets: AccountKeysetRepository?,
+    val passkeyRecovery: PasskeyRecoveryRepository?,
 ) {
     companion object {
         // Creates the cloud repository bundle used by a signed-in Firebase account.
@@ -100,6 +104,8 @@ internal class SessionDataSources(
                 },
                 locations = if (localMode) null else LocationSharingRepository(application),
                 adminLocations = if (localMode) null else AdminLocationRepository(),
+                accountKeysets = if (localMode) null else AccountKeysetRepository(),
+                passkeyRecovery = if (localMode) null else PasskeyRecoveryRepository(),
             )
         }
     }

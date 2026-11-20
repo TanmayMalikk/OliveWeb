@@ -29,6 +29,7 @@ import com.olive.app.data.account.FailedAttempt
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
@@ -373,6 +374,8 @@ internal class SessionRuntime(
     val mediaRepository get() = dataSources.media
     val safetyDocumentRepository get() = dataSources.safetyDocuments
     val locationSharingRepository get() = dataSources.locations
+    val accountKeysetRepository get() = dataSources.accountKeysets
+    val passkeyRecoveryRepository get() = dataSources.passkeyRecovery
     var enrollment by mutableStateOf<DeviceEnrollment?>(null)
     var pendingIdentity: AccountIdentity? = null
     var pendingProfile: UserProfile? = null
@@ -506,6 +509,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var busy by mutableStateOf(false)
     var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
     var passkeyCredentialRequest by mutableStateOf<PasskeyCredentialRequest?>(null)
+    var passkeyRecoveryCredentials by mutableStateOf(emptyList<PasskeyRecoveryRepository.Credential>())
     var message by mutableStateOf<String?>(null)
     var profile by mutableStateOf<UserProfile?>(null)
     var attempts by mutableStateOf(emptyList<FailedAttempt>())

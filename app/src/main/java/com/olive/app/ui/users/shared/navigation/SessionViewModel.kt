@@ -59,6 +59,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
     val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
+    val passkeyRecoveryCredentials get() = runtime.state.passkeyRecoveryCredentials
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val profile get() = runtime.state.profile
@@ -336,6 +337,10 @@ internal interface SessionAccountManagementActions {
     // Checks the current password before replacing it with the new password.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
+    fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
+    fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
+    fun removePasskeyRecovery(credentialId: String) =
+        runtime.settings.removePasskeyRecovery(credentialId)
 }
 
 // Connects cover, private note, activity, and privacy screens to their workflows.

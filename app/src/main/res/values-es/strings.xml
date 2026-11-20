@@ -467,4 +467,15 @@
     <string name="safety_assigned_staff_value">Asignado a %1$s</string>
     <string name="location_search_user">Buscar un usuario</string>
     <string name="location_search_no_users">No se encontraron usuarios que coincidan.</string>
+    <string name="passkey_recovery_title">Llaves de acceso para recuperar la cuenta</string>
+    <string name="passkey_recovery_help">Una llave de acceso sincronizada puede restaurar la clave de cifrado de esta cuenta en otro dispositivo compatible. Olive Branch y sus servidores no pueden leer esa clave.</string>
+    <string name="passkey_recovery_enable">Agregar llave de recuperación</string>
+    <string name="passkey_recovery_enabled">Se agregó la llave de recuperación.</string>
+    <string name="passkey_recovery_setup_failed">No se pudo agregar la llave de recuperación. Comprueba la conexión y el proveedor de credenciales e inténtalo de nuevo.</string>
+    <string name="passkey_recovery_remove">Eliminar llave</string>
+    <string name="passkey_recovery_removed">Se eliminó la llave de recuperación.</string>
+    <string name="passkey_recovery_remove_failed">No se pudo eliminar la llave de recuperación. Comprueba la conexión e inténtalo de nuevo.</string>
+    <string name="passkey_recovery_none">No hay llaves de recuperación registradas.</string>
+    <string name="passkey_recovery_synced_factor">Llave de recuperación sincronizada</string>
+    <string name="passkey_recovery_device_factor">Llave de recuperación del dispositivo</string>
 </resources>
