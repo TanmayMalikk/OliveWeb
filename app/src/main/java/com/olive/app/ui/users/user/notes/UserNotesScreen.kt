@@ -49,15 +49,31 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Validates incident date.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting valid incident date.
+ */
 private fun validIncidentDate(value: String) =
     value.isBlank() || com.olive.app.data.account.parseIncidentDate(value) != null
 
+/**
+ * Validates incident time.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param saved Optional saved supplied to [validIncidentTime].
+ * @return The resulting valid incident time.
+ */
 private fun validIncidentTime(value: String, saved: String?) =
     value.isBlank() || value == saved || (value.trim().matches(Regex("[0-9]{2}:[0-9]{2}")) &&
         runCatching { LocalTime.parse(value.trim()) }.isSuccess)
 
-// Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
-// UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
+/**
+ * Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor. UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun PrivateNotes(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -99,7 +115,11 @@ internal fun PrivateNotes(session: SessionViewModel) {
         ).withZone(ZoneId.systemDefault())
     }
 
-    // Opens a new or existing private note in the editor.
+    /**
+     * Opens a new or existing private note in the editor.
+     *
+     * @param entry Optional entry supplied to [openEditor].
+     */
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
         editorVersion++
@@ -121,6 +141,9 @@ internal fun PrivateNotes(session: SessionViewModel) {
     }
     val uid = session.coverAccountId
     val requestLocationPermission = LocalLocationPermissionRequest.current
+    /**
+     * Displays current location.
+     */
     fun showCurrentLocation() {
         scope.launch {
             if (findingLocation) return@launch
@@ -607,12 +630,26 @@ internal fun PrivateNotes(session: SessionViewModel) {
     }
 }
 
+/**
+ * Computes note board kind label.
+ *
+ * @param kind Optional kind supplied to [noteBoardKindLabel].
+ * @return The computed note board kind label numeric value.
+ */
 private fun noteBoardKindLabel(kind: PrivateEntryKind?): Int = when (kind) {
     PrivateEntryKind.Note -> R.string.notes_board_notes
     PrivateEntryKind.Incident -> R.string.notes_board_incidents
     null -> R.string.notes_board_all
 }
 
+/**
+ * Renders the note board controls composable.
+ *
+ * @param kind Optional kind supplied to [NoteBoardControls].
+ * @param newestFirst Whether to apply newest first.
+ * @param onKindChange Callback invoked when kind change changes or occurs.
+ * @param onOrderChange Callback invoked when order change changes or occurs.
+ */
 @Composable
 private fun NoteBoardControls(
     kind: PrivateEntryKind?,

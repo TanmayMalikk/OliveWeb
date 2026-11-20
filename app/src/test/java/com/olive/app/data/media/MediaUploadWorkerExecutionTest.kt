@@ -228,4 +228,30 @@ class MediaUploadWorkerExecutionTest {
             }
         } finally { executor.shutdownNow() }
     }
+
+    @Test
+    fun offlineMediaCleanupWorkerEnqueuesAndHandlesSuccessAndRetry() = runBlocking<Unit> {
+        val work = mock(WorkManagerImpl::class.java)
+        WorkManagerImpl.setDelegate(work)
+        try {
+            OfflineMediaCleanupWorker.enqueue(context, "cand-1")
+            assertEquals(1, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
+        } finally {
+            WorkManagerImpl.setDelegate(null)
+        }
+
+        val workerParams = mock(WorkerParameters::class.java).apply {
+            `when`(backgroundExecutor).thenReturn(java.util.concurrent.Executor(Runnable::run))
+            `when`(taskExecutor).thenReturn(mock(TaskExecutor::class.java))
+        }
+        val worker = OfflineMediaCleanupWorker(context, workerParams)
+        mockConstruction(OfflineMediaCache::class.java).use {
+            assertEquals(ListenableWorker.Result.success(), worker.doWork())
+        }
+        mockConstruction(OfflineMediaCache::class.java) { mockCache, _ ->
+            doThrow(IllegalStateException("Cache failure")).`when`(mockCache).cleanupExpiredCandidates()
+        }.use {
+            assertEquals(ListenableWorker.Result.retry(), worker.doWork())
+        }
+    }
 }

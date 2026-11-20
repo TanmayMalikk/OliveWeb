@@ -4,6 +4,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.*
 import com.google.firebase.functions.*
 import com.google.firebase.storage.*
+import com.olive.app.data.network.requireStringKeyedMap
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -39,6 +40,13 @@ class FirebaseAccountRepositorySdkTest {
             mock(StorageReference::class.java,Answer { call -> when(call.method.name) {
                 "child" -> ref(path.trimEnd('/')+"/"+call.getArgument<String>(0))
                 "getName" -> path.substringAfterLast('/')
+                "listAll" -> {
+                    val listing = mock(ListResult::class.java)
+                    val prefix = path.trimEnd('/') + "/"
+                    val children = rows.keys.filter { it.startsWith(prefix) }.sorted().map { ref(it) }
+                    `when`(listing.items).thenReturn(children)
+                    Tasks.forResult(listing)
+                }
                 "getBytes" -> Tasks.forResult(rows[path] ?: error("Missing synthetic object $path"))
                 "putBytes" -> {
                     val bytes=call.getArgument<ByteArray>(0)
@@ -202,6 +210,37 @@ class FirebaseAccountRepositorySdkTest {
             `when`(f.auth.signInWithEmailAndPassword(legacy, password)).thenReturn(Tasks.forResult(signedIn))
             assertEquals(identity, f.repository.authenticate(identity.username, password, AccountRole.SAFE_CONTACT))
             verify(f.auth).signInWithEmailAndPassword(legacy, password)
+        }
+    }
+
+    @Test
+    fun historyRecordsReadsAllCategoriesAndSignOutDelegatesAndHandlesMissingDisplayName() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val settingsBytes = SettingsEvent(id = "set-1234", timestamp = 10L, area = "Privacy", action = "Updated").toJson().toString().toByteArray()
+            val triggerBytes = TriggerEvent(id = "trig-1234", timestamp = 20L, source = "Cover").toJson().toString().toByteArray()
+            val entryBytes = PrivateEntry(id = "note-1234", timestamp = 30L, title = "T", body = "B", deletedAt = 100L).toJson().toString().toByteArray()
+            f.rows["/accounts/owner/history/settings/set-1234.json"] = settingsBytes
+            f.rows["/accounts/owner/history/triggers/trig-1234.json"] = triggerBytes
+            f.rows["/accounts/owner/history/private_entries/note-1234.json"] = entryBytes
+
+            val records = f.repository.historyRecords(identity)
+            assertEquals(3, records.size)
+            assertTrue(settingsBytes.all { it == 0.toByte() })
+            assertTrue(records.any { it.category == "settings" && it.id == "set-1234" })
+            assertTrue(records.any { it.category == "triggers" && it.id == "trig-1234" })
+            assertTrue(records.any { it.category == "private_entries" && it.id == "note-1234" })
+            assertEquals(1, PrivateEntry.fromJson(org.json.JSONObject(records.first { it.category == "private_entries" }.json)).trashDaysRemaining(100L))
+
+            `when`(f.user.displayName).thenReturn(null)
+            assertEquals("fixture_owner", f.repository.authenticatedUsername())
+
+            f.repository.signOut()
+            verify(f.auth).signOut()
+
+            assertThrows(IllegalStateException::class.java) {
+                "bad".requireStringKeyedMap("test")
+            }
+            assertEquals(mapOf("a" to 1), mapOf("a" to 1).requireStringKeyedMap("test"))
         }
     }
 }

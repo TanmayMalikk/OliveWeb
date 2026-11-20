@@ -95,7 +95,12 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, COACH, FOOD_SEARCH, GOALS, ACCOUNT }
 
-// Shows the fitness cover and keeps its selected page and saved health data in sync.
+/**
+ * Shows the fitness cover and keeps its selected page and saved health data in sync.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param interactive Whether to apply interactive.
+ */
 @Composable
 internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true) {
     val context = LocalContext.current
@@ -281,7 +286,16 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         }
     }
 }
-// Draws the fitness title and top navigation.
+/**
+ * Draws the fitness title and top navigation.
+ *
+ * @param page Page supplied to [FitnessHeader].
+ * @param pageLabel Page label supplied to [FitnessHeader].
+ * @param pageFocus Page focus supplied to [FitnessHeader].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onPage Callback invoked when page changes or occurs.
+ * @param onSettings Callback invoked when settings changes or occurs.
+ */
 @Composable
 private fun FitnessHeader(
     page: FitnessPage,
@@ -363,7 +377,16 @@ private fun FitnessHeader(
     }
 }
 
-// Draws one fitness navigation tab and marks it selected when active.
+/**
+ * Draws one fitness navigation tab and marks it selected when active.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param label Accessible label or display caption.
+ * @param selected Whether to apply selected.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onClick Callback invoked when the control is activated.
+ * @param icon Action or callback executed for icon.
+ */
 @Composable
 private fun FitnessTab(
     modifier: Modifier,
@@ -403,7 +426,14 @@ private fun FitnessTab(
     }
 }
 
-// Starts and stops the phone step sensor with the screen lifecycle.
+/**
+ * Starts and stops the phone step sensor with the screen lifecycle.
+ *
+ * @param store Store supplied to [FitnessStepSensor].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onPermissionSettled Callback invoked when permission settled changes or occurs.
+ * @param onUpdate Callback invoked when updated data is available.
+ */
 @Composable
 private fun FitnessStepSensor(store: FitnessStore, enabled: Boolean, onPermissionSettled: () -> Unit, onUpdate: (FitnessSnapshot) -> Unit) {
     val context = LocalContext.current
@@ -433,14 +463,23 @@ private fun FitnessStepSensor(store: FitnessStore, enabled: Boolean, onPermissio
         // Stop listening when the phone has no step sensor or activity permission.
         if (stepSensor == null || !permissionGranted) return@DisposableEffect onDispose { }
         val listener = object : SensorEventListener {
-            // Adds new step-counter readings to today's fitness total.
+            /**
+             * Adds new step-counter readings to today's fitness total.
+             *
+             * @param event Sensor, UI, or lifecycle event being processed.
+             */
             override fun onSensorChanged(event: SensorEvent) {
                 event.values.firstOrNull()?.roundToInt()?.let {
                     onUpdate(store.recordSensorValue(it))
                 }
             }
 
-            // The step counter does not need accuracy changes, so this callback stays empty.
+            /**
+             * The step counter does not need accuracy changes, so this callback stays empty.
+             *
+             * @param sensor Optional sensor supplied to [onAccuracyChanged].
+             * @param accuracy Accuracy supplied to [onAccuracyChanged].
+             */
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         sensorManager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
@@ -448,7 +487,14 @@ private fun FitnessStepSensor(store: FitnessStore, enabled: Boolean, onPermissio
     }
 }
 
-// Draws the fitness activity page for the fitness cover.
+/**
+ * Draws the fitness activity page for the fitness cover.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ * @param history Collection of history values to process.
+ * @param accountId Account ID supplied to [FitnessActivityPage].
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 private fun FitnessActivityPage(
     snapshot: FitnessSnapshot,
@@ -484,7 +530,14 @@ private fun FitnessActivityPage(
     }
 }
 
-// fitness cover shows this fitness goals page view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this fitness goals page view so the user can view its details and use its actions.
+ *
+ * @param profile Account profile details.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param padding Padding supplied to [FitnessGoalsPage].
+ * @param onSave Callback invoked when save changes or occurs.
+ */
 @Composable
 private fun FitnessGoalsPage(
     profile: FitnessProfile,
@@ -558,7 +611,14 @@ private fun FitnessGoalsPage(
     }
 }
 
-// Draws the goal field for the fitness cover.
+/**
+ * Draws the goal field for the fitness cover.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param onChange Callback invoked when the value or observed state changes.
+ * @param label Accessible label or display caption.
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 private fun GoalField(value: String, onChange: (String) -> Unit, label: String, enabled: Boolean) {
     OutlinedTextField(
@@ -583,7 +643,12 @@ internal object FitnessWatchSync {
     const val ACTIVE_ACCOUNT_ID = "active_account_id"
     const val SESSION_ID = "sessionId"
 
-    // Tells the paired watch which phone account owns future fitness readings.
+    /**
+     * Tells the paired watch which phone account owns future fitness readings.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Optional account ID supplied to [bindAccount].
+     */
     fun bindAccount(context: Context, accountId: String?) {
         val safeAccountId = accountId.orEmpty().trim()
         val prefs = context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE)
@@ -604,7 +669,13 @@ internal object FitnessWatchSync {
         Wearable.getDataClient(context).putDataItem(request)
     }
 
-    // Sends the latest phone fitness summary to the paired Wear OS app.
+    /**
+     * Sends the latest phone fitness summary to the paired Wear OS app.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Account ID supplied to [publish].
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     */
     @Synchronized fun publish(context: Context, accountId: String, snapshot: FitnessSnapshot) {
         if (accountId.isBlank() || accountId == "guest") return
         val prefs = context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE)

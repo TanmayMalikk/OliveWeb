@@ -39,6 +39,14 @@ import com.olive.app.R
 import kotlin.math.PI
 import kotlin.math.sin
 
+/**
+ * Composes the water tracker UI element.
+ *
+ * @param totalMl Total ml supplied to [WaterTracker].
+ * @param goalMl Goal ml supplied to [WaterTracker].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onAdd Callback invoked when add changes or occurs.
+ */
 @Composable
 internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -65,6 +73,15 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
     }
 }
 
+/**
+ * Displays the water log dialog overlay.
+ *
+ * @param totalMl Total ml supplied to [WaterLogDialog].
+ * @param goalMl Goal ml supplied to [WaterLogDialog].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSave Callback invoked when save changes or occurs.
+ */
 @Composable
 private fun WaterLogDialog(
     totalMl: Int,
@@ -79,6 +96,11 @@ private fun WaterLogDialog(
     var goal by rememberSaveable { mutableStateOf(goalMl.toString()) }
     val updatedGoal = goal.toIntOrNull()
     val total = (totalMl.toLong() + adjustment).coerceAtLeast(0)
+    /**
+     * Computes adjust.
+     *
+     * @param amount Amount supplied to [adjust].
+     */
     fun adjust(amount: Int) {
         adjustment = (adjustment + amount).coerceIn(-minOf(totalMl, 10_000), 10_000)
     }
@@ -164,6 +186,12 @@ private fun WaterLogDialog(
     }
 }
 
+/**
+ * Composes the water glass UI element.
+ *
+ * @param fraction Fraction supplied to [WaterGlass].
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun WaterGlass(fraction: Float, modifier: Modifier) {
     val target = (fraction).coerceIn(0f, 1f)
@@ -183,6 +211,12 @@ private fun WaterGlass(fraction: Float, modifier: Modifier) {
             if (fill > 0f) {
                 val level = size.height * (.92f - .84f * fill)
                 val amplitude = minOf(1.8.dp.toPx(), size.height * .84f * fill / 3f)
+                /**
+                 * Computes wave.
+                 *
+                 * @param offset Offset supplied to [wave].
+                 * @return The resulting [Path] instance.
+                 */
                 fun wave(offset: Float): Path = Path().apply {
                     moveTo(0f, size.height)
                     for (step in 0..32) {

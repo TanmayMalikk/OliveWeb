@@ -8,7 +8,13 @@ import java.io.IOException
 private const val MAP_ASSET_HOST = "appassets.androidplatform.net"
 internal const val MAP_ASSET_URL = "https://$MAP_ASSET_HOST/map/map.html"
 
-// A local HTTPS origin lets the vector renderer use workers without granting file access.
+/**
+ * A local HTTPS origin lets the vector renderer use workers without granting file access.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param url HTTPS URL to validate, fetch, or open.
+ * @return The resulting [WebResourceResponse], or `null` if unavailable.
+ */
 internal fun bundledMapAsset(context: Context, url: Uri): WebResourceResponse? {
     if (url.scheme != "https" || url.host != MAP_ASSET_HOST) return null
     val path = url.path.orEmpty().removePrefix("/")

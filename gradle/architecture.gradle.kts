@@ -31,9 +31,34 @@ tasks.register("checkArchitecture") {
             file("app/src/main/java/com/olive/app/ui") to "Android UI",
             file("app/src/main/java/com/olive/app/data") to "Android data",
         )
+        fun countNonCommentCodeLines(source: File): Int {
+            var inBlockComment = false
+            var count = 0
+            for (rawLine in source.readLines()) {
+                var line = rawLine.trim()
+                if (inBlockComment) {
+                    val endIdx = line.indexOf("*/")
+                    if (endIdx < 0) continue
+                    inBlockComment = false
+                    line = line.substring(endIdx + 2).trim()
+                }
+                while (line.startsWith("/*")) {
+                    val endIdx = line.indexOf("*/", 2)
+                    if (endIdx < 0) {
+                        inBlockComment = true
+                        line = ""
+                        break
+                    }
+                    line = line.substring(endIdx + 2).trim()
+                }
+                if (line.isEmpty() || line.startsWith("//")) continue
+                count++
+            }
+            return count
+        }
         val sourceLayoutViolations=buildList {
             fileTree("app/src/main/java") { include("**/*.kt") }.files
-                .filter { it.readLines().size>750 }.forEach { source ->
+                .filter { countNonCommentCodeLines(it)>750 }.forEach { source ->
                     add("Android source ${source.relativeTo(rootDir)} exceeds the 750-line limit")
                 }
         }

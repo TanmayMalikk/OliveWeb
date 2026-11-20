@@ -52,7 +52,11 @@ internal enum class WatchPage(val label: String) {
     VITALS("Vitals"),
     FOOD("Food"),
 }
-// Builds the light olive fitness theme used throughout the watch app.
+/**
+ * Builds the light olive fitness theme used throughout the watch app.
+ *
+ * @param state Current state instance to read or render.
+ */
 @Composable
 internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     MaterialTheme(
@@ -91,7 +95,11 @@ internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
         }
     }
 }
-// Shows the selected watch summary while keeping navigation usable on a round display.
+/**
+ * Shows the selected watch summary while keeping navigation usable on a round display.
+ *
+ * @param state Current state instance to read or render.
+ */
 @Composable
 private fun WatchDashboard(state: WatchFitnessState) {
     var selectedPageName by rememberSaveable { mutableStateOf(WatchPage.HOME.name) }

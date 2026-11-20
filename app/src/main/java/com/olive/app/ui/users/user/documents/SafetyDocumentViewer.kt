@@ -67,7 +67,13 @@ import java.util.zip.ZipFile
 import kotlin.math.abs
 
 
-// Opens an in-app image, video, PDF, or text viewer for a safety document.
+/**
+ * Opens an in-app image, video, PDF, or text viewer for a safety document.
+ *
+ * @param document Safety document metadata record.
+ * @param file Local file to read, hash, process, or write.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
@@ -121,7 +127,12 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         }
     }
 }
-// Fits an image inside the document viewer with zoom controls.
+/**
+ * Fits an image inside the document viewer with zoom controls.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param name Field, key, or display name.
+ */
 @Composable
 private fun ImageViewer(file: File, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -195,7 +206,11 @@ private fun ImageViewer(file: File, name: String) {
     }
 }
 
-// Plays a saved safety video inside the app.
+/**
+ * Plays a saved safety video inside the app.
+ *
+ * @param file Local file to read, hash, process, or write.
+ */
 @Composable
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
@@ -254,7 +269,11 @@ private fun VideoViewer(file: File) {
 
 private data class PdfPage(val bitmap: Bitmap, val count: Int, val index: Int)
 
-// Renders a saved PDF one page at a time inside the app.
+/**
+ * Renders a saved PDF one page at a time inside the app.
+ *
+ * @param file Local file to read, hash, process, or write.
+ */
 @Composable
 private fun PdfViewer(file: File) {
     var page by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
@@ -367,7 +386,13 @@ private fun PdfViewer(file: File) {
     }
 }
 
-// Renders one bounded PDF page into a bitmap for the in-app document viewer.
+/**
+ * Renders one bounded PDF page into a bitmap for the in-app document viewer.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param index Zero-based item index.
+ * @return The resulting [PdfPage] for render PDF page.
+ */
 private fun renderPdfPage(file: File, index: Int): PdfPage {
     ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
         PdfRenderer(descriptor).use { renderer ->
@@ -384,7 +409,12 @@ return PdfPage(bitmap, renderer.pageCount, safeIndex)
     }
 }
 
-// user safety document viewer shows this text viewer view so the user can view its details and use its actions.
+/**
+ * User safety document viewer shows this text viewer view so the user can view its details and use its actions.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param docx Whether to apply docx.
+ */
 @Composable
 private fun TextViewer(file: File, docx: Boolean) {
     var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
@@ -418,7 +448,16 @@ private fun TextViewer(file: File, docx: Boolean) {
     }
 }
 
-// Gives every saved-media viewer the same visible zoom buttons and current zoom level.
+/**
+ * Gives every saved-media viewer the same visible zoom buttons and current zoom level.
+ *
+ * @param scale Scale supplied to [ZoomControls].
+ * @param onZoomOut Callback invoked when zoom out changes or occurs.
+ * @param onReset Callback invoked when reset changes or occurs.
+ * @param onZoomIn Callback invoked when zoom in changes or occurs.
+ * @param onRotate Callback invoked when rotate changes or occurs.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun ZoomControls(
     scale: Float,
@@ -465,7 +504,12 @@ private fun ZoomControls(
     }
 }
 
-// Uses the photo's EXIF orientation so camera images are upright before the viewer adds user rotation.
+/**
+ * Uses the photo's EXIF orientation so camera images are upright before the viewer adds user rotation.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @return The resulting [Bitmap], or `null` if unavailable.
+ */
 private fun decodeImageWithExif(file: File): Bitmap? {
     val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
     val orientation = runCatching {
@@ -497,7 +541,12 @@ private fun decodeImageWithExif(file: File): Bitmap? {
     }
 }
 
-// Extracts readable paragraph text from the main XML file inside a DOCX archive.
+/**
+ * Extracts readable paragraph text from the main XML file inside a DOCX archive.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @return The resulting read docx string.
+ */
 private fun readDocx(file: File): String {
     ZipFile(file).use { zip ->
         val entry = zip.getEntry("word/document.xml") ?: error("Missing document content")
@@ -514,7 +563,9 @@ private fun readDocx(file: File): String {
     }
 }
 
-// user safety document viewer shows this unsupported viewer view so the user can view its details and use its actions.
+/**
+ * User safety document viewer shows this unsupported viewer view so the user can view its details and use its actions.
+ */
 @Composable
 private fun UnsupportedViewer() {
     Column(

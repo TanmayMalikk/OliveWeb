@@ -20,6 +20,12 @@ import com.paddle.ocr.model.OCRBox
 object BoxSorter {
     private const val ROW_THRESHOLD_Y = 10f
 
+    /**
+     * Sorts in reading order.
+     *
+     * @param boxes Collection of boxes values to process.
+     * @return List of resulting sort in reading order items.
+     */
     fun sortInReadingOrder(boxes: List<OCRBox>): List<OCRBox> {
         if (boxes.size <= 1) return boxes
 

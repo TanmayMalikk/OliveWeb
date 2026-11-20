@@ -29,6 +29,13 @@ import kotlin.math.max
 object QuadTextCrop {
     private const val VERTICAL_CROP_RATIO = 1.5
 
+    /**
+     * Crops the quad text crop.
+     *
+     * @param src Src supplied to [crop].
+     * @param box Box supplied to [crop].
+     * @return The resulting [Mat] instance.
+     */
     fun crop(src: Mat, box: OCRBox): Mat {
         // Align with PaddleX CropByPolys.get_minarea_rect_crop: recompute minAreaRect
         // from the detected quad before perspective transform.

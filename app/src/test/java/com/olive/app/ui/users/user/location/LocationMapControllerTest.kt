@@ -271,9 +271,69 @@ class LocationMapControllerTest {
         }
     }
 
+    @Test
+    @Config(sdk = [35])
+    @Suppress("DEPRECATION")
+    fun safeContactResolvesAddressGeocoderAndNavigationHandlesRouteFailures() {
+        val address = android.location.Address(java.util.Locale.CANADA).apply {
+            latitude = 53.5461
+            longitude = -113.4938
+        }
+        val contactSource = LocationFixture().apply { staticEnabled = true }
+        val main = CoroutineScope(Job() + Dispatchers.Main.immediate)
+        val map = LocationMapController(context, main, contactSource) { _, _ ->
+            throw IllegalStateException("Routing unavailable")
+        }
+        try {
+            mockConstruction(android.location.Geocoder::class.java) { geocoder, _ ->
+                doAnswer { inv ->
+                    @Suppress("UNCHECKED_CAST")
+                    inv.getArgument<android.location.Geocoder.GeocodeListener>(2).onGeocode(mutableListOf(address))
+                    null
+                }.`when`(geocoder).getFromLocationName(
+                    anyString(),
+                    anyInt(),
+                    any<android.location.Geocoder.GeocodeListener>() ?: android.location.Geocoder.GeocodeListener {},
+                )
+            }.use {
+                val safeConfig = configuration(role = AccountRole.SAFE_CONTACT).let {
+                    it.copy(
+                        profile = it.profile.copy(
+                            address = com.olive.app.data.account.DeliveryAddress(
+                                line1 = "100 Main St",
+                                city = "Edmonton",
+                                province = "AB",
+                                postalCode = "T5J 0N3",
+                            ),
+                        ),
+                    )
+                }
+                map.open(safeConfig) { false }
+                kotlinx.coroutines.runBlocking {
+                    val deadline = System.currentTimeMillis() + 5_000L
+                    while (map.state.ownPoint == null && System.currentTimeMillis() < deadline) {
+                        shadowOf(Looper.getMainLooper()).idle()
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
+                assertEquals(53.5461, map.state.ownPoint!!.latitude, 0.0001)
+                assertTrue(contactSource.staticWrites.last())
+                contactSource.liveUpdate?.invoke(listOf(point("trusted", live = true)))
+                map.startNavigation("No key", "Unavailable", "Route failed")
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals("trusted", map.state.navigationTargetUid)
+                assertEquals("Route failed", map.state.routeError)
+            }
+        } finally {
+            map.clear()
+            main.cancel()
+        }
+    }
+
     private fun point(uid: String, live: Boolean) = MapLocationPoint(uid, uid, 53.5, -113.5, 2000, live)
 
     private class LocationFixture : LocationSharingDataSource {
+        var staticEnabled = false
         var staticUpdate: ((List<MapLocationPoint>) -> Unit)? = null
         var liveUpdate: ((List<MapLocationPoint>) -> Unit)? = null
         var closed = 0
@@ -283,7 +343,7 @@ class LocationMapControllerTest {
         val staticWrites = mutableListOf<Boolean>()
         val recipientUpdates = mutableListOf<List<Friend>>()
 
-        override fun staticSharingEnabled(uid: String) = false
+        override fun staticSharingEnabled(uid: String) = staticEnabled
         override suspend fun setStaticSharing(
             identity: AccountIdentity, profile: UserProfile, friends: List<Friend>, enabled: Boolean,
         ) {

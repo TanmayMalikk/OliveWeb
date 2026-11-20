@@ -221,6 +221,43 @@ class MessagingRepositorySdkTest {
         assertEquals(2, driver.listeners.count { it.closed })
     }
 
+    @Test
+    fun conversationObserversAndListingSkipCachedResultsAndSurfaceErrors() = runBlocking<Unit> {
+        val driver = FirestoreTestDriver()
+        val source = MessagingRepository(driver.db)
+        driver.records["conversations/c1"] = mapOf(
+            "friendshipId" to "f1",
+            "participantIds" to listOf(user.uid, peer.uid),
+            "participantUsernames" to mapOf(user.uid to user.username, peer.uid to peer.username),
+            "updatedAt" to Timestamp(Date(200)),
+        )
+        driver.records["conversations/c2"] = mapOf(
+            "friendshipId" to "f2",
+            "participantIds" to listOf(user.uid, "third"),
+            "participantUsernames" to mapOf(user.uid to user.username, "third" to "third_user"),
+            "updatedAt" to Timestamp(Date(500)),
+        )
+        assertEquals(listOf("c2", "c1"), source.listConversations(user.uid).map { it.id })
+
+        val updates = mutableListOf<List<String>>()
+        val serverUpdates = mutableListOf<List<String>>()
+        val errors = mutableListOf<String>()
+        val subscription = source.observeConversations(
+            user.uid,
+            onUpdate = { list -> updates += list.map { it.id } },
+            onError = { errors += it },
+            onServerUpdate = { list -> serverUpdates += list.map { it.id } },
+        )
+        driver.emit("conversations", cached = true)
+        assertTrue(updates.isEmpty())
+        driver.emit("conversations", cached = false)
+        assertEquals(listOf(listOf("c2", "c1")), updates)
+        assertEquals(updates, serverUpdates)
+        driver.fail("conversations", FirebaseFirestoreException("Offline", FirebaseFirestoreException.Code.UNAVAILABLE))
+        assertEquals(listOf("Offline"), errors)
+        subscription.close()
+    }
+
     private fun document(parent: CollectionReference, id: String): DocumentReference =
         mock(DocumentReference::class.java).also { `when`(parent.document(id)).thenReturn(it) }
 
@@ -246,5 +283,21 @@ class MessagingRepositorySdkTest {
         `when`(metadata.isFromCache).thenReturn(cached)
         `when`(it.metadata).thenReturn(metadata)
         `when`(it.documents).thenReturn(rows)
+    }
+
+    @Test
+    fun outboxDrainableIgnoresPermanentFailuresAndMigratesV0Messages() {
+        val vault = FakeJsonVault()
+        val store = MessageOutboxStore(vault)
+        val msgV0 = OutgoingMessage("conv-1", "m-1", "hello", "alice", 1000L, 0L, MessageDeliveryStatus.PENDING)
+        val msgFailed = OutgoingMessage("conv-2", "m-2", "fail", "alice", 1000L, 1L, MessageDeliveryStatus.FAILED_PERMANENT)
+        store.put("alice", msgV0)
+        store.put("alice", msgFailed)
+
+        val drainable = store.drainableConversationIds("alice")
+        assertFalse(drainable.contains("conv-2"))
+
+        val all = store.all("alice")
+        assertTrue(all.any { it.id == "m-1" })
     }
 }

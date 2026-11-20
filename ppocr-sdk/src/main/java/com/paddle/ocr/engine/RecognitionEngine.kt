@@ -33,6 +33,12 @@ class RecognitionEngine(
         val inputShape: List<Int>,
     )
 
+    /**
+     * Runs OCR text recognition on the recognition result.
+     *
+     * @param crops Collection of crops values to process.
+     * @return The resulting [RecognitionResult] instance.
+     */
     fun recognize(crops: List<Mat>): RecognitionResult {
         // Preprocess
         val preStart = System.currentTimeMillis()

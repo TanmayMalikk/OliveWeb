@@ -60,7 +60,14 @@ internal data class NewsFeedActions(
     val refresh: () -> Unit,
     val openArticle: (NewsArticle) -> Unit,
 )
-// Shows loading, error, and article-list states for the Daily Digest.
+/**
+ * Shows loading, error, and article-list states for the Daily Digest.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param feed Feed supplied to [NewsFeed].
+ * @param actions Actions supplied to [NewsFeed].
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun NewsFeed(
     session: SessionViewModel,
@@ -268,7 +275,15 @@ internal fun NewsFeed(
     }
 }
 
-// UI sizing: Local/Global buttons stay 48dp tall with 18dp icons and 15dp corners.
+/**
+ * UI sizing: Local/Global buttons stay 48dp tall with 18dp icons and 15dp corners.
+ *
+ * @param label Accessible label or display caption.
+ * @param icon Icon supplied to [NewsScopeButton].
+ * @param selected Whether to apply selected.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun NewsScopeButton(
     label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean,
@@ -294,7 +309,11 @@ private fun NewsScopeButton(
 }
 
 
-// UI sizing/color: empty news states use 38dp vertical space, a 42dp Muted icon, and centered text.
+/**
+ * UI sizing/color: empty news states use 38dp vertical space, a 42dp Muted icon, and centered text.
+ *
+ * @param message Chat message or remote payload.
+ */
 @Composable
 private fun NewsEmptyState(message: String) {
     Column(

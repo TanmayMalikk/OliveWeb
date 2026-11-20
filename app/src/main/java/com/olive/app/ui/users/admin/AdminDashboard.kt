@@ -57,7 +57,11 @@ import kotlinx.coroutines.launch
 
 private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages, Emergencies }
 
-// admin dashboard shows this admin portal view so the user can view its details and use its actions.
+/**
+ * Admin dashboard shows this admin portal view so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun AdminPortal(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -72,6 +76,11 @@ internal fun AdminPortal(session: SessionViewModel) {
     var acknowledged by remember(session.coverAccountId) {
         mutableStateOf(alertPreferences.getStringSet(acknowledgementKey, emptySet())!!.toSet())
     }
+    /**
+     * Acknowledges the target.
+     *
+     * @param id ID supplied to [acknowledge].
+     */
     fun acknowledge(id: String) {
         acknowledged = acknowledged + id
         alertPreferences.edit().putStringSet(acknowledgementKey, acknowledged).apply()
@@ -167,7 +176,18 @@ internal fun AdminPortal(session: SessionViewModel) {
     }
 }
 
-// Draws the admin workspace navigation and selected section.
+/**
+ * Draws the admin workspace navigation and selected section.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onAccounts Callback invoked when accounts changes or occurs.
+ * @param onStaffManagement Callback invoked when staff management changes or occurs.
+ * @param onSettings Callback invoked when settings changes or occurs.
+ * @param onMap Callback invoked when map changes or occurs.
+ * @param onSafetyPlans Callback invoked when safety plans changes or occurs.
+ * @param onMessages Callback invoked when messages changes or occurs.
+ * @param onEmergencies Callback invoked when emergencies changes or occurs.
+ */
 @Composable
 private fun AdminDashboard(
     session: SessionViewModel,
@@ -268,7 +288,11 @@ private fun AdminDashboard(
     }
 }
 
-// Admin dashboard keeps open and closed support totals visible without opening the chat list.
+/**
+ * Admin dashboard keeps open and closed support totals visible without opening the chat list.
+ *
+ * @param counts Counts supplied to [TicketCountGrid].
+ */
 @Composable
 private fun TicketCountGrid(counts: AccountCounts) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -285,7 +309,13 @@ private fun TicketCountGrid(counts: AccountCounts) {
     }
 }
 
-// One ticket card reads as a single TalkBack item instead of separate count and label items.
+/**
+ * One ticket card reads as a single TalkBack item instead of separate count and label items.
+ *
+ * @param label Accessible label or display caption.
+ * @param count Count supplied to [TicketCountCard].
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modifier) {
     ElevatedCard(modifier.clearAndSetSemantics { contentDescription = "$count $label" }) {
@@ -296,7 +326,12 @@ private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modi
     }
 }
 
-// Admin staff management shows each staff member's active and completed plan and support work.
+/**
+ * Admin staff management shows each staff member's active and completed plan and support work.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
@@ -335,7 +370,11 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
     }
 }
 
-// A staff workload card summarizes plans and chats with completed counts kept beside their totals.
+/**
+ * A staff workload card summarizes plans and chats with completed counts kept beside their totals.
+ *
+ * @param account Account supplied to [StaffWorkloadCard].
+ */
 @Composable
 private fun StaffWorkloadCard(account: AdminAccountSummary) {
     val summary = pluralStringResource(
@@ -368,7 +407,14 @@ private fun StaffWorkloadCard(account: AdminAccountSummary) {
     }
 }
 
-// Each workload row keeps its total and finished count together for quick comparison.
+/**
+ * Each workload row keeps its total and finished count together for quick comparison.
+ *
+ * @param label Accessible label or display caption.
+ * @param total Total supplied to [WorkloadRow].
+ * @param finished Finished supplied to [WorkloadRow].
+ * @param finishedLabel Finished label supplied to [WorkloadRow].
+ */
 @Composable
 private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -377,6 +423,12 @@ private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel:
     }
 }
 
+/**
+ * Composes the observe emergency alerts UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @return The resulting [Pair] for observe emergency alerts.
+ */
 @Composable
 internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<EmergencyAlert>?, String?> {
     var alerts by remember(session.coverAccountId, session.localMode) {
@@ -400,6 +452,15 @@ internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<Emerge
     return alerts to error
 }
 
+/**
+ * Renders the emergency response screen UI.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param alerts Collection of alerts values to process.
+ * @param error Throwable or error message describing a failure, or null when not provided.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onTrack Callback invoked when track changes or occurs.
+ */
 @Composable
 internal fun EmergencyResponseScreen(
     session: SessionViewModel,
@@ -490,6 +551,12 @@ internal fun EmergencyResponseScreen(
     }
 }
 
+/**
+ * Composes the emergency location preview UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param ownerUid Firebase UID of the resource owner.
+ */
 @Composable
 internal fun EmergencyLocationPreview(session: SessionViewModel, ownerUid: String) {
     var points by remember(session.coverAccountId, ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }

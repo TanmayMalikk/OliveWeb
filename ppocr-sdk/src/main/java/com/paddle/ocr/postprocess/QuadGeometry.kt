@@ -18,6 +18,12 @@ import org.opencv.core.Point
 
 // Groups the data and actions for quad geometry.
 internal object QuadGeometry {
+    /**
+     * Computes order minimum area rect points.
+     *
+     * @param points Collection of points values to process.
+     * @return List of resulting order minimum area rect points items.
+     */
     fun orderMinAreaRectPoints(points: Array<Point>): List<Point> {
         val sorted = points.sortedBy { it.x }
         val topLeft: Point

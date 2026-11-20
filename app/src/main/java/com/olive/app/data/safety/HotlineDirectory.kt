@@ -37,18 +37,33 @@ class HotlineDirectory private constructor(
     val resources: List<HotlineResource>,
     private val cities: Map<String, String>,
 ) {
-    // Uses the Canadian hotline list when the selected country is Canada.
+    /**
+     * Uses the Canadian hotline list when the selected country is Canada.
+     *
+     * @param address Address supplied to [isCanada].
+     * @return `true` if is canada, or `false` otherwise.
+     */
     fun isCanada(address: DeliveryAddress): Boolean {
         val country = normalize(address.country)
         return country in setOf("canada", "ca", "can", "كندا", "加拿大") ||
                 (country.isBlank() && inferRegion(address) != null)
     }
 
-    // Normalizes the province or territory name before looking up local hotlines.
+    /**
+     * Normalizes the province or territory name before looking up local hotlines.
+     *
+     * @param address Address supplied to [regionFor].
+     * @return The resulting region for string, or `null` when unavailable.
+     */
     fun regionFor(address: DeliveryAddress): String? =
         if (isCanada(address)) inferRegion(address) else null
 
-    // Finds the province or territory that matches the saved region text.
+    /**
+     * Finds the province or territory that matches the saved region text.
+     *
+     * @param address Address supplied to [inferRegion].
+     * @return The resulting infer region string, or `null` when unavailable.
+     */
     private fun inferRegion(address: DeliveryAddress): String? {
         val province = normalize(address.province).removePrefix("ca ")
         CanadianRegion.entries.firstOrNull { region -> region.aliases.any { normalize(it) == province } }
@@ -84,7 +99,14 @@ class HotlineDirectory private constructor(
         return cities[normalize(address.city)]
     }
 
-    // Checks whether a hotline serves the selected province or territory.
+    /**
+     * Checks whether a hotline serves the selected province or territory.
+     *
+     * @param region Region supplied to [matching].
+     * @param city City supplied to [matching].
+     * @param query Search query string entered by the user.
+     * @return List of resulting matching items.
+     */
     fun matching(region: String, city: String, query: String = ""): List<HotlineResource> {
         val normalizedQuery = normalize(query)
         val normalizedCity = normalize(city)
@@ -107,12 +129,22 @@ class HotlineDirectory private constructor(
     companion object {
         private const val DATASET_DATE = "2026-10-15"
 
-        // Formats a hotline phone number for display.
+        /**
+         * Formats a hotline phone number for display.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting normalize.
+         */
         fun normalize(value: String) =
             Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
                 .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
-        // Reads province files from saved text.
+        /**
+         * Reads province files from saved text.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @return The resulting [HotlineDirectory] for read bundled.
+         */
         fun readBundled(context: Context): HotlineDirectory = parseProvinceFiles(
             context.assets.list("hotlines/provinces").orEmpty().associate { name ->
                 name.removePrefix("Resources").removeSuffix(".json") to
@@ -120,6 +152,12 @@ class HotlineDirectory private constructor(
             }
         )
 
+        /**
+         * Parses province files.
+         *
+         * @param files Key-value mapping of files entries.
+         * @return The resulting [HotlineDirectory] for parse province files.
+         */
         fun parseProvinceFiles(files: Map<String, String>): HotlineDirectory {
             val expected = CanadianRegion.entries.map { it.code }.toSet()
             require(files.keys == expected) { "A hotline dataset is required for every Canadian province and territory" }
@@ -167,7 +205,12 @@ class HotlineDirectory private constructor(
             return HotlineDirectory(DATASET_DATE, resources, cities)
         }
 
-        // Adds HTTPS to a hotline website when its saved address has no scheme.
+        /**
+         * Adds HTTPS to a hotline website when its saved address has no scheme.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting secure website string.
+         */
         private fun secureWebsite(value: String): String {
             val normalized = when {
                 value.startsWith("https://", true) -> value
@@ -180,7 +223,12 @@ class HotlineDirectory private constructor(
             return normalized
         }
 
-        // Turns a region name into the stable key used by the hotline list.
+        /**
+         * Turns a region name into the stable key used by the hotline list.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting slug.
+         */
         private fun slug(value: String) = normalize(value).replace(' ', '-')
     }
 }
@@ -243,7 +291,12 @@ enum class CanadianRegion(val code: String, vararg val aliases: String) {
     YT("YT", "YT", "Yukon", "Yukón", "يوكون", "育空地区")
 }
 
-// Gives the safety plan the hotline dial number it needs.
+/**
+ * Gives the safety plan the hotline dial number it needs.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting hotline dial number string, or `null` when unavailable.
+ */
 internal fun hotlineDialNumber(value: String): String? {
     if (!value.startsWith("tel:")) return null
     return value.removePrefix("tel:").substringBefore('?')

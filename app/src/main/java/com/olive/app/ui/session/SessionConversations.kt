@@ -46,7 +46,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     var loadingConversation by mutableStateOf(false)
         private set
 
-    /** Cancels the loading timeout and clears the conversation's loading indicator. */
+    /**
+     * Cancels the loading timeout and clears the conversation's loading indicator.
+     */
     private fun finishLoadingConversation() {
         messageLoadTimeout?.cancel()
         messageLoadTimeout = null
@@ -218,7 +220,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Cancels the pending open and stops listening for the current chat's key and device changes. */
+    /**
+     * Cancels the pending open and stops listening for the current chat's key and device changes.
+     */
     fun stopKeyObservation() {
         finishLoadingConversation()
         openingChat?.cancel()
@@ -229,7 +233,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         observedKeys.clear()
     }
 
-    /** Closes the active chat, stops its listeners, and clears its messages and room key from the session. */
+    /**
+     * Closes the active chat, stops its listeners, and clears its messages and room key from the session.
+     */
     fun closeConversation() {
         stopKeyObservation()
         with(runtime) {
@@ -372,7 +378,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Hides the quick-exit hint in the current chat. */
+    /**
+     * Hides the quick-exit hint in the current chat.
+     */
     fun dismissChatQuickExitHint() {
         with(runtime) {
             with(state) {

@@ -47,7 +47,19 @@ private enum class ReadinessIssue(val explanation: Int, val action: Int) {
     TrackingNotifications(R.string.emergency_readiness_notifications, R.string.emergency_readiness_notification_settings),
 }
 
+/**
+ * Computes emergency readiness issues for this context.
+ *
+ * @param localMode Whether to apply local mode.
+ * @return List of resulting emergency readiness issues items.
+ */
 private fun Context.emergencyReadinessIssues(localMode: Boolean): List<ReadinessIssue> = buildList {
+    /**
+     * Computes granted.
+     *
+     * @param permission Permission supplied to [granted].
+     * @return The resulting granted.
+     */
     fun granted(permission: String) =
         ContextCompat.checkSelfPermission(this@emergencyReadinessIssues, permission) == PackageManager.PERMISSION_GRANTED
 
@@ -74,6 +86,12 @@ private fun Context.emergencyReadinessIssues(localMode: Boolean): List<Readiness
     }
 }
 
+/**
+ * Renders the emergency readiness card composable.
+ *
+ * @param accountId Account ID supplied to [EmergencyReadinessCard].
+ * @param localMode Whether to apply local mode.
+ */
 @Composable
 internal fun EmergencyReadinessCard(accountId: String, localMode: Boolean) {
     val context = LocalContext.current
@@ -90,6 +108,9 @@ internal fun EmergencyReadinessCard(accountId: String, localMode: Boolean) {
     var issues by remember(accountId, localMode) { mutableStateOf(emptyList<ReadinessIssue>()) }
     var opening by remember(accountId) { mutableStateOf(false) }
     var settingsError by remember(accountId) { mutableStateOf(false) }
+    /**
+     * Checks the target.
+     */
     fun check() {
         issues = if (System.currentTimeMillis() < remindAt) emptyList()
         else context.emergencyReadinessIssues(localMode)
@@ -104,9 +125,19 @@ internal fun EmergencyReadinessCard(accountId: String, localMode: Boolean) {
     }
     if (issues.isEmpty()) return
 
+    /**
+     * Opens settings.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
     fun openSettings(intent: Intent) {
         settingsError = !openSystem(intent)
     }
+    /**
+     * Requests access.
+     *
+     * @param request Function used to transform or provide request.
+     */
     fun requestAccess(request: suspend () -> Boolean) {
         opening = true
         scope.launch {

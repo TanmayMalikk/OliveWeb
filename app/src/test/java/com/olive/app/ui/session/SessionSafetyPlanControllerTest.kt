@@ -191,4 +191,62 @@ class SessionSafetyPlanControllerTest {
             controller.close()
         }
     }
+
+    @Test
+    fun resolvePendingProposalConsultAttachDocumentsAndFlushWorkAcrossNetworkStates() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.USER).use { fixture ->
+            val runtime = fixture.runtime
+            runtime.state.page = SafePage.SafetyPlan
+            val repository = mock(SafetyPlanRepository::class.java)
+            val docsRepo = mock(SafetyDocumentDataSource::class.java)
+            val fields = mapOf(
+                "primary_documents" to SafetyField(
+                    writeSafetyChecklist(listOf(SafetyChecklistItem("row-1", "Passport"))),
+                    revision = 2,
+                ),
+            )
+            val conflictPlan = plan().copy(
+                fields = fields,
+                pendingConflicts = mapOf("primary_documents" to SafetyConflict("Incoming", "mut-1")),
+                consultationConversationId = "chat-consult",
+                staffUid = "staff-1",
+                safeContactUids = listOf("safe-1"),
+            )
+            val store = SafetyPlanStore(fixture.application, false)
+            store.write("owner", "owner", conflictPlan)
+            `when`(repository.observe(eq("owner") ?: "", any<(SafetyPlan) -> Unit>() ?: {}, any<(Exception) -> Unit>() ?: {}))
+                .thenReturn(mock(ListenerRegistration::class.java))
+            `when`(repository.observeAccess(eq("owner") ?: "", any<() -> Unit>() ?: {})).thenReturn(mock(ListenerRegistration::class.java))
+            `when`(repository.sync(any<SafetyPlan>() ?: conflictPlan, any())).thenReturn(conflictPlan)
+            `when`(repository.consult("request")).thenReturn(conflictPlan)
+            `when`(repository.mediaRecipients()).thenReturn(mapOf("staff-1" to "staff_user"))
+            `when`(repository.shareContacts(emptyList())).thenReturn(conflictPlan)
+            `when`(repository.observeRecipientDevices(emptyList()) {}).thenReturn(listOf(mock(ListenerRegistration::class.java)))
+            val doc = SafetyDocument(
+                "doc-1", "owner", "", "Passport.pdf", "application/pdf", listOf("owner"),
+                tags = listOf(safetyChecklistAttachmentTag("primary_documents", "row-1")),
+            )
+            `when`(docsRepo.getFor("owner", "doc-1")).thenReturn(doc)
+            `when`(fixture.messaging.listConversations("owner")).thenReturn(emptyList())
+
+            val controller = SessionSafetyPlans(runtime) { repository }
+            controller.observeAccess()
+            controller.open("owner", "Owner", emptyMap(), Any())
+
+            controller.resolve("primary_documents", keepMine = true)
+            fixture.await { controller.saving == 0 }
+            assertEquals(mapOf("staff-1" to "staff_user"), controller.mediaRecipients())
+            assertNotNull(controller.observeRecipientDevices(emptyList()) {})
+            controller.attachPublishedDocuments(listOf(doc))
+            controller.flushEdits()
+            controller.retrySave()
+            controller.setSupportContact("safe-1")
+            controller.shareWithContacts(emptyList())
+            controller.consult(stop = false)
+            controller.openConsultation("chat-consult")
+            fixture.await { controller.saving == 0 }
+
+            controller.close()
+        }
+    }
 }

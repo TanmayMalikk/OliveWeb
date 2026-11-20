@@ -14,9 +14,33 @@ internal data class CoachMembership(val active: Boolean, val canManage: Boolean)
 internal data class CoachPayment(val publishableKey: String, val clientSecret: String)
 
 internal interface FitnessCoachService {
+    /**
+     * Returns the membership.
+     *
+     * @return The resulting [CoachMembership] instance.
+     */
     suspend fun membership(): CoachMembership
+    /**
+     * Returns the billing portal.
+     *
+     * @return The resulting [Uri] for billing portal.
+     */
     suspend fun billingPortal(): Uri
+    /**
+     * Returns the payment sheet.
+     *
+     * @return The resulting [CoachPayment] for payment sheet.
+     */
     suspend fun paymentSheet(): CoachPayment
+    /**
+     * Sends the fitness coach service.
+     *
+     * @param text Text string to display, parse, or send.
+     * @param turns Collection of turns values to process.
+     * @param profile Account profile details.
+     * @param history Collection of history values to process.
+     * @return The resulting [CoachReply] instance.
+     */
     suspend fun send(
         text: String,
         turns: List<CoachTurn>,
@@ -32,6 +56,13 @@ internal class FitnessCoachClient(
 ) : FitnessCoachService {
     constructor(uid: String) : this(uid, { FirebaseFunctions.getInstance("northamerica-northeast1") })
 
+    /**
+     * Invokes the fitness coach client.
+     *
+     * @param name Field, key, or display name.
+     * @param input Input stream, matrix, or value to process.
+     * @return Map containing the resulting call entries.
+     */
     private suspend fun call(name: String, input: Map<String, Any>): Map<*, *> {
         check(FirebaseAuth.getInstance().currentUser?.uid == uid)
         val result = functions()
@@ -40,11 +71,21 @@ internal class FitnessCoachClient(
         return result as? Map<*, *> ?: error("Invalid coach response")
     }
 
+    /**
+     * Returns the membership.
+     *
+     * @return The resulting [CoachMembership] instance.
+     */
     override suspend fun membership(): CoachMembership {
         val data = call("fitnessAiBilling", mapOf("action" to "status"))
         return CoachMembership(data["active"] == true, data["canManage"] == true)
     }
 
+    /**
+     * Returns the billing portal.
+     *
+     * @return The resulting [Uri] for billing portal.
+     */
     override suspend fun billingPortal(): Uri {
         val data = call("fitnessAiBilling", mapOf("action" to "portal"))
         val uri = Uri.parse(data["url"] as? String ?: error("Missing billing URL"))
@@ -52,6 +93,11 @@ internal class FitnessCoachClient(
         return uri
     }
 
+    /**
+     * Returns the payment sheet.
+     *
+     * @return The resulting [CoachPayment] for payment sheet.
+     */
     override suspend fun paymentSheet(): CoachPayment {
         val data = call("fitnessAiBilling", mapOf("action" to "paymentSheet"))
         val key = data["publishableKey"] as? String ?: error("Missing publishable key")
@@ -60,6 +106,15 @@ internal class FitnessCoachClient(
         return CoachPayment(key, secret)
     }
 
+    /**
+     * Sends the fitness coach client.
+     *
+     * @param text Text string to display, parse, or send.
+     * @param turns Collection of turns values to process.
+     * @param profile Account profile details.
+     * @param history Collection of history values to process.
+     * @return The resulting [CoachReply] instance.
+     */
     override suspend fun send(
         text: String,
         turns: List<CoachTurn>,
@@ -84,11 +139,22 @@ internal class FitnessCoachClient(
     }
 }
 
+/**
+ * Computes coach goals.
+ *
+ * @param profile Account profile details.
+ * @return The resulting coach goals.
+ */
 internal fun coachGoals(profile: FitnessProfile) = mapOf(
     "steps" to profile.stepGoal, "calories" to profile.calorieGoal, "protein" to profile.proteinGoal,
     "carbohydrates" to profile.carbohydrateGoal, "fat" to profile.fatGoal, "waterMl" to profile.waterGoalMl,
 )
 
+/**
+ * Computes with coach goals for this fitness profile.
+ *
+ * @param goals Key-value mapping of goals entries.
+ */
 internal fun FitnessProfile.withCoachGoals(goals: Map<String, Int>) = copy(
     stepGoal = goals["steps"]?.takeIf { it in 500..100_000 } ?: stepGoal,
     calorieGoal = goals["calories"]?.takeIf { it in 500..10_000 } ?: calorieGoal,
@@ -98,6 +164,16 @@ internal fun FitnessProfile.withCoachGoals(goals: Map<String, Int>) = copy(
     waterGoalMl = goals["waterMl"]?.takeIf { it in 250..10_000 } ?: waterGoalMl,
 )
 
+/**
+ * Computes automatic coach goals.
+ *
+ * @param before Before supplied to [automaticCoachGoals].
+ * @param current Current supplied to [automaticCoachGoals].
+ * @param proposed Key-value mapping of proposed entries.
+ * @param lastUpdate Last update supplied to [automaticCoachGoals].
+ * @param today Today supplied to [automaticCoachGoals].
+ * @return Map containing the resulting automatic coach goals entries.
+ */
 internal fun automaticCoachGoals(
     before: FitnessProfile,
     current: FitnessProfile,

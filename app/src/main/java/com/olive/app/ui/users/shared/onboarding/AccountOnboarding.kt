@@ -45,7 +45,13 @@ import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.random.Random
 
-// Requirement bullets begin neutral, then turn green or red as the user types.
+/**
+ * Requirement bullets begin neutral, then turn green or red as the user types.
+ *
+ * @param text Text string to display, parse, or send.
+ * @param met Whether to apply met.
+ * @param active Whether to apply active.
+ */
 @Composable
 internal fun RequirementBullet(text: String, met: Boolean, active: Boolean) {
     val color = when {
@@ -84,7 +90,16 @@ internal fun RequirementBullet(text: String, met: Boolean, active: Boolean) {
     }
 }
 
-// Every onboarding page ends with the same Back and Next arrow controls.
+/**
+ * Every onboarding page ends with the same Back and Next arrow controls.
+ *
+ * @param back Action or callback executed for back.
+ * @param next Action or callback executed for next.
+ * @param last Whether to apply last.
+ * @param nextTag Next tag supplied to [OnboardingNavigation].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param nextLabel Optional next label supplied to [OnboardingNavigation].
+ */
 @Composable
 internal fun OnboardingNavigation(
     back: () -> Unit, next: () -> Unit, last: Boolean = false, nextTag: String = "onboarding_next",
@@ -116,8 +131,15 @@ internal fun OnboardingNavigation(
     }
 }
 
-// Multi-page onboarding gets a width-filling branch with page-specific leaf layouts and fixed-size olives/leaves.
-// TalkBack receives one progress summary instead of separate decorative drawing nodes.
+/**
+ * Multi-page onboarding gets a width-filling branch with page-specific leaf layouts and fixed-size olives/leaves. TalkBack receives one progress summary instead of separate decorative drawing nodes.
+ *
+ * @param completed Completed supplied to [OnboardingProgress].
+ * @param total Total supplied to [OnboardingProgress].
+ * @param page Page supplied to [OnboardingProgress].
+ * @param pages Pages supplied to [OnboardingProgress].
+ * @param pageComplete Collection of page complete values to process.
+ */
 @Composable
 internal fun OnboardingProgress(
     completed: Int,
@@ -248,7 +270,15 @@ internal fun OnboardingProgress(
     }
 }
 
-// Offshoots and leaf tips lean right, giving the branch a clear direction of growth.
+/**
+ * Offshoots and leaf tips lean right, giving the branch a clear direction of growth.
+ *
+ * @param base Base supplied to [drawOnboardingSprig].
+ * @param spacing Spacing supplied to [drawOnboardingSprig].
+ * @param sprig Sprig supplied to [drawOnboardingSprig].
+ * @param stemColor Stem color supplied to [drawOnboardingSprig].
+ * @param leafColor Leaf color supplied to [drawOnboardingSprig].
+ */
 private fun DrawScope.drawOnboardingSprig(
     base: Offset,
     spacing: Float,
@@ -258,7 +288,13 @@ private fun DrawScope.drawOnboardingSprig(
 ) {
     val reach = spacing * sprig.reach
     val rise = sprig.rise.dp.toPx()
-    // Converts an address map point into the account's stored coordinate format.
+    /**
+     * Converts an address map point into the account's stored coordinate format.
+     *
+     * @param x X supplied to [point].
+     * @param y Y supplied to [point].
+     * @return The resulting point.
+     */
     fun point(x: Float, y: Float) = base + Offset(reach * x, rise * y)
     val tip = point(1f, 1f)
     val sprigPath = Path().apply {
@@ -277,7 +313,13 @@ private fun DrawScope.drawOnboardingSprig(
     )
 }
 
-// Two curved edges form a narrow olive leaf; its vein points back to the stem.
+/**
+ * Two curved edges form a narrow olive leaf; its vein points back to the stem.
+ *
+ * @param base Base supplied to [drawOnboardingLeaf].
+ * @param tip Tip supplied to [drawOnboardingLeaf].
+ * @param color Color supplied to [drawOnboardingLeaf].
+ */
 private fun DrawScope.drawOnboardingLeaf(base: Offset, tip: Offset, color: Color) {
     val direction = tip - base
     val side = Offset(-direction.y, direction.x) / direction.getDistance() * 4.dp.toPx()
@@ -335,7 +377,14 @@ internal class OnboardingBranchLayout(pages: Int) {
         }
 }
 
-// One numbered olive owns its animation, orientation and test identity.
+/**
+ * One numbered olive owns its animation, orientation and test identity.
+ *
+ * @param index Zero-based item index.
+ * @param done Whether to apply done.
+ * @param active Whether to apply active.
+ * @param stepOffset Step offset supplied to [OnboardingOlive].
+ */
 @Composable
 private fun OnboardingOlive(index: Int, done: Boolean, active: Boolean, stepOffset: Float) {
     val oliveColor by animateColorAsState(

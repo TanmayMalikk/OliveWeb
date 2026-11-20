@@ -32,6 +32,12 @@ object RecPreprocessor {
     private const val FIXED_HEIGHT = 48
     private const val MAX_IMG_W = 3200
 
+    /**
+     * Computes preprocess batch.
+     *
+     * @param crops Collection of crops values to process.
+     * @return The resulting [RecPreprocessResult] for preprocess batch.
+     */
     fun preprocessBatch(crops: List<Mat>): RecPreprocessResult {
         // Convert BGR to RGB and resize to fixed height while preserving aspect ratio
         val resizedMats = mutableListOf<Mat>()

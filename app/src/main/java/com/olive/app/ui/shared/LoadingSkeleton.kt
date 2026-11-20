@@ -34,7 +34,13 @@ internal enum class SkeletonLayout {
     DocumentPage, TextDocument,
 }
 
-/** Draws the shape of the incoming content without showing sample data or controls. */
+/**
+ * Draws the shape of the incoming content without showing sample data or controls.
+ *
+ * @param layout Layout supplied to [LoadingSkeleton].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param rows Rows supplied to [LoadingSkeleton].
+ */
 @Composable
 internal fun LoadingSkeleton(
     layout: SkeletonLayout,
@@ -238,6 +244,12 @@ internal fun LoadingSkeleton(
     }
 }
 
+/**
+ * Renders the skeleton card composable.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 private fun SkeletonCard(
     modifier: Modifier = Modifier.fillMaxWidth(),
@@ -248,6 +260,13 @@ private fun SkeletonCard(
     }
 }
 
+/**
+ * Composes the skeleton lines UI element.
+ *
+ * @param widths Variable number of widths arguments.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param height Target or source height in pixels or layout units.
+ */
 @Composable
 private fun SkeletonLines(
     vararg widths: Float,
@@ -259,6 +278,12 @@ private fun SkeletonLines(
     }
 }
 
+/**
+ * Renders the metric row composable.
+ *
+ * @param columns Columns supplied to [MetricRow].
+ * @param compact Whether the layout should render in compact phone sizing.
+ */
 @Composable
 private fun MetricRow(columns: Int, compact: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -279,6 +304,11 @@ private fun MetricRow(columns: Int, compact: Boolean = false) {
     }
 }
 
+/**
+ * Composes the skeleton actions UI element.
+ *
+ * @param count Count supplied to [SkeletonActions].
+ */
 @Composable
 private fun SkeletonActions(count: Int) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -286,6 +316,9 @@ private fun SkeletonActions(count: Int) {
     }
 }
 
+/**
+ * Composes the food result placeholder UI element.
+ */
 @Composable
 private fun FoodResultPlaceholder() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -295,6 +328,9 @@ private fun FoodResultPlaceholder() {
     }
 }
 
+/**
+ * Composes the fitness chart placeholder UI element.
+ */
 @Composable
 private fun FitnessChartPlaceholder() {
     SkeletonCard {
@@ -309,6 +345,13 @@ private fun FitnessChartPlaceholder() {
     }
 }
 
+/**
+ * Composes the skeleton block UI element.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param shape Shape supplied to [SkeletonBlock].
+ * @param color Color supplied to [SkeletonBlock].
+ */
 @Composable
 internal fun SkeletonBlock(
     modifier: Modifier,
@@ -318,7 +361,11 @@ internal fun SkeletonBlock(
     Spacer(modifier.background(color, shape))
 }
 
-/** Uses the app's existing polite live-region pattern for an in-progress secure file open. */
+/**
+ * Uses the app's existing polite live-region pattern for an in-progress secure file open.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun SecureFileOpeningIndicator(modifier: Modifier = Modifier) {
     Row(

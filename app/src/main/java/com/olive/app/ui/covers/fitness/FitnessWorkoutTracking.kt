@@ -21,14 +21,11 @@ import com.olive.app.R
 import com.olive.app.data.location.DeviceCoordinates
 import com.olive.app.data.location.DeviceLocation
 import com.olive.app.data.location.DeviceLocationUpdates
+import com.olive.app.data.location.supportDistanceMeters
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 import java.time.LocalDate
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 import com.google.firebase.auth.FirebaseAuth
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -43,7 +40,12 @@ internal enum class OutdoorWorkoutType(val storedName: String) {
     HIKE("hike");
 
     companion object {
-        // Creates a value from stored for fitness cover.
+        /**
+         * Creates a value from stored for fitness cover.
+         *
+         * @param value Input value to store, parse, or format, or null when not provided.
+         * @return The resulting from stored.
+         */
         fun fromStored(value: String?) = entries.firstOrNull { it.storedName == value } ?: WALK
     }
 }
@@ -65,7 +67,12 @@ internal data class OutdoorWorkoutSnapshot(
     val distanceMeters: Double = 0.0,
     val route: List<WorkoutRoutePoint> = emptyList(),
 ) {
-    // Calculates active workout time without including paused time.
+    /**
+     * Calculates active workout time without including paused time.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     * @return The computed elapsed milliseconds numeric value.
+     */
     fun elapsedMillis(now: Long = System.currentTimeMillis()): Long {
         if (startedAt <= 0L) return 0L
         val end = when {
@@ -79,26 +86,35 @@ internal data class OutdoorWorkoutSnapshot(
 }
 
 internal object FitnessWorkoutMath {
-    // Adds the distance between each valid pair of workout route points.
-    fun distanceMeters(first: WorkoutRoutePoint, second: WorkoutRoutePoint): Double {
-        val earthRadius = 6_371_000.0
-        val latitudeDelta = Math.toRadians(second.latitude - first.latitude)
-        val longitudeDelta = Math.toRadians(second.longitude - first.longitude)
-        val firstLatitude = Math.toRadians(first.latitude)
-        val secondLatitude = Math.toRadians(second.latitude)
-        val haversine = sin(latitudeDelta / 2.0) * sin(latitudeDelta / 2.0) +
-            cos(firstLatitude) * cos(secondLatitude) *
-            sin(longitudeDelta / 2.0) * sin(longitudeDelta / 2.0)
-        return earthRadius * 2.0 * asin(sqrt(haversine.coerceIn(0.0, 1.0)))
-    }
+    /**
+     * Adds the distance between each valid pair of workout route points.
+     *
+     * @param first First supplied to [distanceMeters].
+     * @param second Second supplied to [distanceMeters].
+     * @return The computed distance meters numeric value.
+     */
+    fun distanceMeters(first: WorkoutRoutePoint, second: WorkoutRoutePoint): Double =
+        supportDistanceMeters(first.latitude, first.longitude, second.latitude, second.longitude)
 
-    // Gives the fitness cover the pace minutes per kilometre it needs.
+    /**
+     * Gives the fitness cover the pace minutes per kilometre it needs.
+     *
+     * @param distanceMeters Distance meters supplied to [paceMinutesPerKilometre].
+     * @param elapsedMillis Duration or timestamp for elapsed, in milliseconds.
+     * @return The computed pace minutes per kilometre number, or `null` if unavailable.
+     */
     fun paceMinutesPerKilometre(distanceMeters: Double, elapsedMillis: Long): Double? {
         if (distanceMeters < 10.0 || elapsedMillis <= 0L) return null
         return elapsedMillis / 60_000.0 / (distanceMeters / 1_000.0)
     }
 
-    // Keeps only the five newest completed outdoor workouts.
+    /**
+     * Keeps only the five newest completed outdoor workouts.
+     *
+     * @param existing Collection of existing values to process.
+     * @param finished Finished supplied to [keepRecentWorkouts].
+     * @return List of resulting keep recent workouts items.
+     */
     fun keepRecentWorkouts(
         existing: List<OutdoorWorkoutSnapshot>,
         finished: OutdoorWorkoutSnapshot,
@@ -112,7 +128,11 @@ internal object FitnessWorkoutMath {
 internal class FitnessWorkoutStore(context: Context, accountId: String) {
     private val preferences = fitnessPreferences(context, accountId, workout = true)
 
-    // Loads the snapshot needed by the fitness cover.
+    /**
+     * Loads the snapshot needed by the fitness cover.
+     *
+     * @return The resulting [OutdoorWorkoutSnapshot] instance.
+     */
     fun snapshot(): OutdoorWorkoutSnapshot = OutdoorWorkoutSnapshot(
         active = preferences.getBoolean("active", false),
         paused = preferences.getBoolean("paused", false),
@@ -125,7 +145,11 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         route = decodeRoute(preferences.getString("route", null)),
     )
 
-    // Loads the five most recent outdoor workouts.
+    /**
+     * Loads the five most recent outdoor workouts.
+     *
+     * @return List of resulting history items.
+     */
     fun history(): List<OutdoorWorkoutSnapshot> {
         val savedHistory = decodeHistory(preferences.getString("workout_history", null))
         if (savedHistory.isNotEmpty()) return savedHistory
@@ -137,7 +161,12 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Starts a new outdoor workout and clears the previous live route.
+    /**
+     * Starts a new outdoor workout and clears the previous live route.
+     *
+     * @param type Type supplied to [start].
+     * @param now Current epoch timestamp in milliseconds.
+     */
     fun start(type: OutdoorWorkoutType, now: Long = System.currentTimeMillis()) {
         val preservedHistory = history()
         preferences.edit {
@@ -159,7 +188,11 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Pauses workout time and GPS recording.
+    /**
+     * Pauses workout time and GPS recording.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     */
     fun pause(now: Long = System.currentTimeMillis()) {
         val current = snapshot()
         if (!current.active || current.paused) return
@@ -169,7 +202,11 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Resumes workout time and GPS recording.
+    /**
+     * Resumes workout time and GPS recording.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     */
     fun resume(now: Long = System.currentTimeMillis()) {
         val current = snapshot()
         if (!current.active || !current.paused) return
@@ -183,7 +220,11 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Finishes the active workout and saves it to workout history.
+    /**
+     * Finishes the active workout and saves it to workout history.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     */
     fun finish(now: Long = System.currentTimeMillis()) {
         val current = snapshot()
         if (!current.active) return
@@ -211,7 +252,11 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Adds a valid GPS point and updates workout distance.
+    /**
+     * Adds a valid GPS point and updates workout distance.
+     *
+     * @param location Location supplied to [addLocation].
+     */
     fun addLocation(location: DeviceCoordinates) {
         val current = snapshot()
         if (!current.active || current.paused ||
@@ -235,7 +280,12 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }
 
-    // Converts the saved workout route between JSON and map points.
+    /**
+     * Converts the saved workout route between JSON and map points.
+     *
+     * @param points Collection of points values to process.
+     * @return The resulting encode route.
+     */
     private fun encodeRoute(points: List<WorkoutRoutePoint>) = JSONArray().apply {
         points.forEach { point ->
             put(
@@ -245,7 +295,12 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }.toString()
 
-    // Fitness cover: Converts route.
+    /**
+     * Fitness cover: Converts route.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return List of resulting decode route items.
+     */
     private fun decodeRoute(value: String?): List<WorkoutRoutePoint> {
         if (value.isNullOrBlank()) return emptyList()
         return runCatching {
@@ -265,7 +320,12 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }.getOrDefault(emptyList())
     }
 
-    // Converts completed workout history between JSON and app models.
+    /**
+     * Converts completed workout history between JSON and app models.
+     *
+     * @param workouts Collection of workouts values to process.
+     * @return The resulting encode history.
+     */
     private fun encodeHistory(workouts: List<OutdoorWorkoutSnapshot>) = JSONArray().apply {
         workouts.forEach { workout ->
             put(
@@ -279,7 +339,12 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
         }
     }.toString()
 
-    // Fitness cover: Converts history.
+    /**
+     * Fitness cover: Converts history.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return List of resulting decode history items.
+     */
     private fun decodeHistory(value: String?): List<OutdoorWorkoutSnapshot> {
         if (value.isNullOrBlank()) return emptyList()
         return runCatching {
@@ -309,29 +374,57 @@ internal class FitnessWorkoutStore(context: Context, accountId: String) {
 }
 
 internal object FitnessWorkoutController {
-    // Sends the start command to the outdoor workout service.
+    /**
+     * Sends the start command to the outdoor workout service.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Account ID supplied to [start].
+     * @param type Type supplied to [start].
+     */
     fun start(context: Context, accountId: String, type: OutdoorWorkoutType) {
         val intent = workoutIntent(context, FitnessWorkoutService.ACTION_START, accountId)
             .putExtra(FitnessWorkoutService.EXTRA_TYPE, type.storedName)
         ContextCompat.startForegroundService(context, intent)
     }
 
-    // Pauses workout time and GPS recording.
+    /**
+     * Pauses workout time and GPS recording.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Account ID supplied to [pause].
+     */
     fun pause(context: Context, accountId: String) {
         context.startService(workoutIntent(context, FitnessWorkoutService.ACTION_PAUSE, accountId))
     }
 
-    // Resumes workout time and GPS recording.
+    /**
+     * Resumes workout time and GPS recording.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Account ID supplied to [resume].
+     */
     fun resume(context: Context, accountId: String) {
         context.startService(workoutIntent(context, FitnessWorkoutService.ACTION_RESUME, accountId))
     }
 
-    // Finishes the active workout and saves it to workout history.
+    /**
+     * Finishes the active workout and saves it to workout history.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Account ID supplied to [finish].
+     */
     fun finish(context: Context, accountId: String) {
         context.startService(workoutIntent(context, FitnessWorkoutService.ACTION_FINISH, accountId))
     }
 
-    // Creates the service command for one workout action.
+    /**
+     * Creates the service command for one workout action.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param action Action supplied to [workoutIntent].
+     * @param accountId Account ID supplied to [workoutIntent].
+     * @return The resulting workout intent.
+     */
     private fun workoutIntent(context: Context, action: String, accountId: String) =
         Intent(context, FitnessWorkoutService::class.java).setAction(action)
             .putExtra(FitnessWorkoutService.EXTRA_ACCOUNT_ID, accountId)
@@ -341,13 +434,22 @@ internal class FitnessWorkoutService : Service() {
     private var store: FitnessWorkoutStore? = null
     private var locationUpdates: DeviceLocationUpdates? = null
 
-    // Prepares GPS tracking and the foreground notification for outdoor workouts.
+    /**
+     * Prepares GPS tracking and the foreground notification for outdoor workouts.
+     */
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
     }
 
-    // Starts, pauses, resumes, or stops the outdoor workout from the service action.
+    /**
+     * Starts, pauses, resumes, or stops the outdoor workout from the service action.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @param flags Flags supplied to [onStartCommand].
+     * @param startId Start ID supplied to [onStartCommand].
+     * @return The computed on start command numeric value.
+     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val accountId = intent?.getStringExtra(EXTRA_ACCOUNT_ID)
             ?: getSharedPreferences(SERVICE_PREFERENCES, MODE_PRIVATE)
@@ -394,7 +496,9 @@ internal class FitnessWorkoutService : Service() {
         return START_STICKY
     }
 
-    // Requests one-second GPS updates while an outdoor workout is active.
+    /**
+     * Requests one-second GPS updates while an outdoor workout is active.
+     */
     private fun requestLocations() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
@@ -418,7 +522,11 @@ internal class FitnessWorkoutService : Service() {
         }
     }
 
-    // Finishes and saves the workout before stopping the service.
+    /**
+     * Finishes and saves the workout before stopping the service.
+     *
+     * @param workoutStore Workout store supplied to [finishWorkout].
+     */
     private fun finishWorkout(workoutStore: FitnessWorkoutStore) {
         stopLocationUpdates()
         workoutStore.finish()
@@ -426,7 +534,9 @@ internal class FitnessWorkoutService : Service() {
         stopSelf()
     }
 
-    // Starts the required foreground notification while GPS workout tracking runs.
+    /**
+     * Starts the required foreground notification while GPS workout tracking runs.
+     */
     private fun showForegroundNotification() {
         ServiceCompat.startForeground(
             this,
@@ -440,13 +550,19 @@ internal class FitnessWorkoutService : Service() {
         )
     }
 
-    // Refreshes elapsed time and distance in the workout notification.
+    /**
+     * Refreshes elapsed time and distance in the workout notification.
+     */
     private fun updateNotification() {
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(NOTIFICATION_ID, workoutNotification())
     }
 
-    // Builds the workout notification shown while the fitness cover is running.
+    /**
+     * Builds the workout notification shown while the fitness cover is running.
+     *
+     * @return The resulting [Notification] for workout notification.
+     */
     private fun workoutNotification(): android.app.Notification {
         val snapshot = store?.snapshot() ?: OutdoorWorkoutSnapshot()
         val distance = String.format(Locale.ROOT, "%.2f km", snapshot.distanceMeters / 1_000.0)
@@ -471,7 +587,9 @@ internal class FitnessWorkoutService : Service() {
             .build()
     }
 
-    // Creates the Android channel used by workout tracking notifications.
+    /**
+     * Creates the Android channel used by workout tracking notifications.
+     */
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL,
@@ -481,16 +599,25 @@ internal class FitnessWorkoutService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    // This workout service is command-based, so screens do not bind to it.
+    /**
+     * This workout service is command-based, so screens do not bind to it.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @return The resulting [IBinder], or `null` if unavailable.
+     */
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // Stops GPS updates when Android destroys the workout service.
+    /**
+     * Stops GPS updates when Android destroys the workout service.
+     */
     override fun onDestroy() {
         stopLocationUpdates()
         super.onDestroy()
     }
 
-    // Removes GPS callbacks when the workout pauses or ends.
+    /**
+     * Removes GPS callbacks when the workout pauses or ends.
+     */
     private fun stopLocationUpdates() {
         locationUpdates?.stop()
         locationUpdates = null
@@ -512,7 +639,11 @@ internal class FitnessWorkoutService : Service() {
 // Fitness cover users: receives the paired Watch6 daily step total for the active account.
 
 internal class FitnessWatchListenerService : WearableListenerService() {
-    // Saves fitness data received from the connected Wear OS watch.
+    /**
+     * Saves fitness data received from the connected Wear OS watch.
+     *
+     * @param events Data event buffer delivered by the wearable data layer.
+     */
     override fun onDataChanged(events: DataEventBuffer) {
         events.forEach { event ->
             if (event.type != DataEvent.TYPE_CHANGED ||

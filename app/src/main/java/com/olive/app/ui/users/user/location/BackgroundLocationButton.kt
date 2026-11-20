@@ -17,6 +17,13 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import kotlinx.coroutines.launch
 
+/**
+ * Renders the background location button composable.
+ *
+ * @param requestPermission Function used to transform or provide request permission.
+ * @param autoExplain Whether to apply auto explain.
+ * @param onExplained Callback invoked when explained changes or occurs.
+ */
 @Composable
 internal fun BackgroundLocationButton(
     requestPermission: suspend () -> Boolean,
@@ -50,6 +57,12 @@ internal fun BackgroundLocationButton(
     )
 }
 
+/**
+ * Displays the background location permission dialog overlay.
+ *
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onContinue Callback invoked when continue changes or occurs.
+ */
 @Composable
 internal fun BackgroundLocationPermissionDialog(onDismiss: () -> Unit, onContinue: () -> Unit) {
     val context = LocalContext.current

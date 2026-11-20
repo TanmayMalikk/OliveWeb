@@ -55,11 +55,21 @@ internal data class CapturedMedia(
     val previewFile: File? = null,
 )
 
-// Marks a document scan for review when OCR confidence is below 75 percent.
+/**
+ * Marks a document scan for review when OCR confidence is below 75 percent.
+ *
+ * @param result Result payload delivered to the callback.
+ * @return `true` if is low OCR confidence, or `false` otherwise.
+ */
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
-// Embedded camera whose temporary media stays inside the app cache until it reaches safe storage.
+/**
+ * Embedded camera whose temporary media stays inside the app cache until it reaches safe storage.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param viewModel View model supplied to [CameraScreen].
+ */
 @Composable
 internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel = viewModel()) {
     val context = LocalContext.current
@@ -83,6 +93,12 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val pinchDetector = remember(viewModel) {
         ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            /**
+             * Handles the scale event.
+             *
+             * @param detector Detector supplied to [onScale].
+             * @return `true` if on scale, or `false` otherwise.
+             */
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 viewModel.zoomBy(detector.scaleFactor)
                 return true
@@ -96,9 +112,23 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
-    // Stores the new camera result so the preview can show it.
+    /**
+     * Stores the new camera result so the preview can show it.
+     *
+     * @param extension Extension supplied to [newCapture].
+     * @return The resulting new capture.
+     */
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
-    // Accepts the captured photo, video, or document and returns its file.
+    /**
+     * Accepts the captured photo, video, or document and returns its file.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param mime Mime supplied to [accept].
+     * @param name Field, key, or display name.
+     * @param kind Kind supplied to [accept].
+     * @param ocrResult Optional OCR result supplied to [accept].
+     * @param previewFile Optional preview file supplied to [accept].
+     */
     fun accept(
         file: File,
         mime: String,
@@ -113,7 +143,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
             CapturedMedia(file, mime, name, kind, ocrResult, previewFile)
     }
 
-    // Deletes the temporary capture when the user retakes or cancels it.
+    /**
+     * Deletes the temporary capture when the user retakes or cancels it.
+     */
     fun discardCapture() {
         captured?.file?.delete()
         captured?.previewFile?.takeIf { it != captured?.file }?.delete()
@@ -360,7 +392,14 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
 }
 
-// Keeps the three capture modes equal in size so their labels do not collide on smaller phones.
+/**
+ * Keeps the three capture modes equal in size so their labels do not collide on smaller phones.
+ *
+ * @param mode Mode supplied to [CameraModeSelector].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onModeSelected Callback invoked when mode selected changes or occurs.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun CameraModeSelector(
     mode: CameraMode,
@@ -398,7 +437,15 @@ private fun CameraModeSelector(
     }
 }
 
-// Shows one camera mode as a full-width text button with a clear selected state.
+/**
+ * Shows one camera mode as a full-width text button with a clear selected state.
+ *
+ * @param label Accessible label or display caption.
+ * @param selected Whether to apply selected.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param tag Tag supplied to [CameraModeButton].
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun RowScope.CameraModeButton(
     label: String,
@@ -432,7 +479,12 @@ private fun RowScope.CameraModeButton(
     }
 }
 
-// Explains why camera access is needed and lets the user request it.
+/**
+ * Explains why camera access is needed and lets the user request it.
+ *
+ * @param request Action or callback executed for request.
+ * @param back Action or callback executed for back.
+ */
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     Column(
@@ -447,7 +499,16 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     }
 }
 
-// Draws the shutter button and gives TalkBack its action label.
+/**
+ * Draws the shutter button and gives TalkBack its action label.
+ *
+ * @param mode Mode supplied to [CameraShutter].
+ * @param recording Whether to apply recording.
+ * @param busy Whether to apply busy.
+ * @param ready Whether to apply ready.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun CameraShutter(
     mode: CameraMode,
@@ -485,7 +546,15 @@ private fun CameraShutter(
         )
     }
 }
-// Previews the captured file before the user saves or retakes it.
+/**
+ * Previews the captured file before the user saves or retakes it.
+ *
+ * @param media Media supplied to [CameraReview].
+ * @param controllerLoading Whether to apply controller loading.
+ * @param uploadError Optional upload error supplied to [CameraReview].
+ * @param onRetake Callback invoked when retake changes or occurs.
+ * @param onSave Callback invoked when save changes or occurs.
+ */
 @Composable
 internal fun CameraReview(
     media: CapturedMedia,

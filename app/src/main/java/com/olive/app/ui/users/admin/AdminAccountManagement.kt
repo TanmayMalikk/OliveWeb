@@ -33,7 +33,14 @@ import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
 import com.olive.app.ui.users.shared.navigation.*
 
 
-// admin account management shows this admin accounts view so the user can view its details and use its actions.
+/**
+ * Admin account management shows this admin accounts view so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onCreate Callback invoked when create changes or occurs.
+ * @param onDelete Callback invoked when delete changes or occurs.
+ */
 @Composable
 internal fun AdminAccounts(
     session: SessionViewModel,
@@ -146,7 +153,14 @@ internal fun AdminAccounts(
     }
 }
 
-// Admin account management groups accounts by role so a large organization list stays easy to scan.
+/**
+ * Admin account management groups accounts by role so a large organization list stays easy to scan.
+ *
+ * @param role Account role determining workspace permissions.
+ * @param accountCount Account count supplied to [AccountRoleHeader].
+ * @param expanded Whether the expandable section is currently open.
+ * @param onExpandedChange Callback invoked when expanded change changes or occurs.
+ */
 @Composable
 private fun AccountRoleHeader(
     role: AccountRole,
@@ -172,7 +186,11 @@ private fun AccountRoleHeader(
         }
     }
 }
-// Shows user, trusted-contact, staff, and admin totals as accessible cards.
+/**
+ * Shows user, trusted-contact, staff, and admin totals as accessible cards.
+ *
+ * @param counts Counts supplied to [AccountCountGrid].
+ */
 @Composable
 internal fun AccountCountGrid(counts: AccountCounts) {
     val uiText = rememberResourceText()
@@ -205,7 +223,14 @@ internal fun AccountCountGrid(counts: AccountCounts) {
         }
     }
 }
-// Shows one managed account and the actions allowed for it.
+/**
+ * Shows one managed account and the actions allowed for it.
+ *
+ * @param account Account supplied to [AccountRow].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onNote Callback invoked when note changes or occurs.
+ * @param onDelete Callback invoked when delete changes or occurs.
+ */
 @Composable
 private fun AccountRow(
     account: AdminAccountSummary,
@@ -261,7 +286,12 @@ private fun AccountRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-// Collects and validates the details an admin uses to create a managed staff or admin account.
+/**
+ * Collects and validates the details an admin uses to create a managed staff or admin account.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Unit) {
     val uiText = rememberResourceText()
     var role by remember { mutableStateOf(AccountRole.USER) }

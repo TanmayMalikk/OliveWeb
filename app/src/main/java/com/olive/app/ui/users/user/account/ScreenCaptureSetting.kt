@@ -13,6 +13,11 @@ import androidx.compose.ui.semantics.semantics
 import com.olive.app.R
 import com.olive.app.security.ScreenCapturePreferences
 
+/**
+ * Composes the screen capture setting UI element.
+ *
+ * @param uid Firebase UID of the target user account, or null when not provided.
+ */
 @Composable
 internal fun ScreenCaptureSetting(uid: String?) {
     val context = LocalContext.current

@@ -36,6 +36,11 @@ import kotlin.math.pow
 /**
  * Keeps the next screen covered while the branch grows, then reveals it as the olive falls.
  * The drawing itself is still handled by the supplied stateless animation below.
+ *
+ * @param backgroundColor Background color supplied to [PinSafeOliveTransition].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param durationMs Duration or timestamp for duration, in milliseconds.
+ * @param onAnimationEnd Callback invoked when animation end changes or occurs.
  */
 @Composable
 internal fun PinSafeOliveTransition(
@@ -68,7 +73,12 @@ internal fun PinSafeOliveTransition(
     }
 }
 
-/** The old screen stays covered until the olive starts falling, then clears by the landing point. */
+/**
+ * The old screen stays covered until the olive starts falling, then clears by the landing point.
+ *
+ * @param progress Progress supplied to [pinSafeBackgroundAlpha].
+ * @return The computed PIN safe background alpha numeric value.
+ */
 internal fun pinSafeBackgroundAlpha(progress: Float): Float = when {
     progress <= 0.52f -> 1f
     progress >= 0.88f -> 0f
@@ -78,6 +88,10 @@ internal fun pinSafeBackgroundAlpha(progress: Float): Float = when {
 /**
  * Stateless animation canvas driven by an external progress float (0f..1f).
  * Ideal for manual scrubbing, transition coordinators, or Gesture/Scroll drivers.
+ *
+ * @param progress Progress supplied to [OliveBranchAnimationContent].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onOliveDropPosition Callback invoked when olive drop position changes or occurs.
  */
 @Composable
 internal fun OliveBranchAnimationContent(
@@ -269,6 +283,13 @@ internal fun OliveBranchAnimationContent(
 
 /**
  * Draws an olive leaf with silvery-green gradient and central vein
+ *
+ * @param center Center supplied to [drawOliveLeaf].
+ * @param angle Angle supplied to [drawOliveLeaf].
+ * @param scale Scale supplied to [drawOliveLeaf].
+ * @param length Length supplied to [drawOliveLeaf].
+ * @param width Target or source width in pixels or layout units.
+ * @param alpha Alpha supplied to [drawOliveLeaf].
  */
 private fun DrawScope.drawOliveLeaf(
     center: Offset,
@@ -324,6 +345,11 @@ private fun DrawScope.drawOliveLeaf(
 
 /**
  * Draws a plump botanical olive with 3D radial shading and specular gloss
+ *
+ * @param center Center supplied to [drawOliveFruit].
+ * @param radius Radius supplied to [drawOliveFruit].
+ * @param rotationDegrees Rotation degrees supplied to [drawOliveFruit].
+ * @param alpha Alpha supplied to [drawOliveFruit].
  */
 private fun DrawScope.drawOliveFruit(
     center: Offset,
@@ -368,12 +394,22 @@ internal class ResourceText(private val resolve: (Int, Array<out Any?>) -> Strin
         if (arguments.isEmpty()) resources.getString(id) else resources.getString(id, *arguments)
     })
 
-    // Lets screens request translated text by calling this object like a function.
+    /**
+     * Lets screens request translated text by calling this object like a function.
+     *
+     * @param id ID supplied to [invoke].
+     * @param arguments Variable number of arguments arguments.
+     * @return The resulting invoke string.
+     */
     operator fun invoke(@StringRes id: Int, vararg arguments: Any?): String =
         resolve(id, arguments)
 }
 
-// Returns a helper that reads translated Android text inside Compose.
+/**
+ * Returns a helper that reads translated Android text inside Compose.
+ *
+ * @return The resulting [ResourceText] for remember resource text.
+ */
 @Composable
 internal fun rememberResourceText(): ResourceText {
     val resources = LocalResources.current
@@ -384,11 +420,22 @@ internal fun rememberResourceText(): ResourceText {
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
-// Returns translated fallback text when an operation fails.
+/**
+ * Returns translated fallback text when an operation fails.
+ *
+ * @param error Throwable or error message describing a failure.
+ * @param fallback Fallback supplied to [failure].
+ * @return The resulting failure string.
+ */
 internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): String =
     if (error is ResourceFailure) this(error.textId, *error.arguments) else this(fallback)
 
-// Returns the translated title for an account role.
+/**
+ * Returns the translated title for an account role.
+ *
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized title.
+ */
 internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     // Chooses the translated title for the active screen or cover.
     when (this) {
@@ -399,7 +446,12 @@ internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     }
 )
 
-// Returns the translated description for an account role.
+/**
+ * Returns the translated description for an account role.
+ *
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized description.
+ */
 internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     // Chooses the translated description for the active cover.
     when (this) {
@@ -410,7 +462,12 @@ internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     }
 )
 
-// Returns the translated title for a cover app.
+/**
+ * Returns the translated title for a cover app.
+ *
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized title.
+ */
 internal fun CoverType.localizedTitle(text: ResourceText) = text(
     // Chooses the translated title for the active screen or cover.
     when (this) {
@@ -424,7 +481,12 @@ internal object AppLocaleManager {
 
     val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Chinese")
 
-    // Reads Android's current language tag for app formatting.
+    /**
+     * Reads Android's current language tag for app formatting.
+     *
+     * @param language Language supplied to [getLanguageTag].
+     * @return The resulting get language tag string.
+     */
     fun getLanguageTag(language: String): String {
         return when (language.trim().lowercase()) {
             "french", "fr", "français" -> "fr"
@@ -435,7 +497,12 @@ internal object AppLocaleManager {
         }
     }
 
-    // Returns the readable name of Android's current language.
+    /**
+     * Returns the readable name of Android's current language.
+     *
+     * @param language Language supplied to [getDisplayLanguage].
+     * @return The resulting get display language string.
+     */
     fun getDisplayLanguage(language: String): String {
         return when (getLanguageTag(language)) {
             "fr" -> "Français"
@@ -446,7 +513,11 @@ internal object AppLocaleManager {
         }
     }
 
-    // Reads the phone's language tag, such as en-CA or fr-CA.
+    /**
+     * Reads the phone's language tag, such as en-CA or fr-CA.
+     *
+     * @return The resulting resolve system default language tag string.
+     */
     fun resolveSystemDefaultLanguageTag(): String {
         val systemLocale = Locale.getDefault()
         val lang = systemLocale.language.lowercase()
@@ -460,7 +531,11 @@ internal object AppLocaleManager {
         }
     }
 
-    // Reads the phone's language name for the language picker.
+    /**
+     * Reads the phone's language name for the language picker.
+     *
+     * @return The resulting resolve system default language name string.
+     */
     fun resolveSystemDefaultLanguageName(): String {
         return when (resolveSystemDefaultLanguageTag()) {
             "fr" -> "French"

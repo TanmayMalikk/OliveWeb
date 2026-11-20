@@ -34,7 +34,12 @@ import com.olive.app.R
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
-// Gives every long form the same spacing, scrolling, and room above Quick exit.
+/**
+ * Gives every long form the same spacing, scrolling, and room above Quick exit.
+ *
+ * @param scrollResetKey Optional scroll reset key supplied to [FormColumn].
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun FormColumn(
     scrollResetKey: Any? = null,
@@ -51,7 +56,14 @@ internal fun FormColumn(
     )
 }
 
-// Shows the app name, page title, and help text, then moves TalkBack focus to the new page title.
+/**
+ * Shows the app name, page title, and help text, then moves TalkBack focus to the new page title.
+ *
+ * @param title Primary display title text.
+ * @param subtitle Secondary descriptive text.
+ * @param appName App name supplied to [Heading].
+ * @param focusKey Optional focus key supplied to [Heading].
+ */
 @Composable
 internal fun Heading(
     title: String,
@@ -76,7 +88,11 @@ internal fun Heading(
     if (subtitle.isNotBlank()) Text(subtitle, color = Muted)
 }
 
-// Warns testers when data is only being saved on the current device.
+/**
+ * Warns testers when data is only being saved on the current device.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun ModeNotice(session: SessionViewModel) {
     if (session.localMode) Surface(
@@ -91,7 +107,12 @@ internal fun ModeNotice(session: SessionViewModel) {
     }
 }
 
-// Announces status changes to TalkBack and shows when the app is busy.
+/**
+ * Announces status changes to TalkBack and shows when the app is busy.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param showMessage Whether to show message.
+ */
 @Composable
 internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
     // Shows the account form message only when there is text to explain.
@@ -114,7 +135,22 @@ internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
     }
 }
 
-// Builds a text field with consistent validation, password controls, and keyboard behavior.
+/**
+ * Builds a text field with consistent validation, password controls, and keyboard behavior.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param tag Tag supplied to [Field].
+ * @param secret Whether to apply secret.
+ * @param numeric Whether to apply numeric.
+ * @param showSecretToggle Whether to show secret toggle.
+ * @param multiline Whether to apply multiline.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param error Throwable or error message describing a failure, or null when not provided.
+ * @param onFocus Callback invoked when focus changes or occurs.
+ * @param newPassword Whether to apply new password.
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @Composable
 internal fun Field(
     label: String,

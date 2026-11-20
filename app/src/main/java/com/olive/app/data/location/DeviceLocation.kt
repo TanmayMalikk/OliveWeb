@@ -63,7 +63,9 @@ internal class DeviceLocationUpdates internal constructor(
     private val fusedLocation: FusedLocationProviderClient,
     private val callback: LocationCallback,
 ) {
-    // Cancels location callbacks when the request is no longer needed.
+    /**
+     * Cancels location callbacks when the request is no longer needed.
+     */
     fun stop() {
         fusedLocation.removeLocationUpdates(callback)
     }
@@ -71,7 +73,15 @@ internal class DeviceLocationUpdates internal constructor(
 
 // Safe App and cover features: provides private one-off or continuous device GPS readings.
 internal object DeviceLocation {
-    // Uses the same high-accuracy GPS source for safe-app maps and private fitness routes.
+    /**
+     * Uses the same high-accuracy GPS source for safe-app maps and private fitness routes.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param intervalMillis Minimum update interval in milliseconds.
+     * @param minimumDistanceMeters Minimum distance meters supplied to [startUpdates].
+     * @param onLocation Callback invoked when location changes or occurs.
+     * @return The resulting [DeviceLocationUpdates], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     fun startUpdates(
         context: Context,
@@ -93,7 +103,11 @@ internal object DeviceLocation {
 
         val fusedLocation = LocationServices.getFusedLocationProviderClient(context.applicationContext)
         val callback = object : LocationCallback() {
-            // Converts the newest Android location into the app's map format.
+            /**
+             * Converts the newest Android location into the app's map format.
+             *
+             * @param result Result payload delivered to the callback.
+             */
             override fun onLocationResult(result: LocationResult) {
                 result.locations.forEach { location ->
                     onLocation(
@@ -117,7 +131,12 @@ internal object DeviceLocation {
         return DeviceLocationUpdates(fusedLocation, callback)
     }
 
-    // Reads coordinates from the best available device location.
+    /**
+     * Reads coordinates from the best available device location.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [DeviceCoordinates], or `null` if unavailable.
+     */
     suspend fun currentCoordinates(context: Context): DeviceCoordinates? {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -142,7 +161,13 @@ internal object DeviceLocation {
         }
     }
 
-    // Geocodes a typed address into map coordinates.
+    /**
+     * Geocodes a typed address into map coordinates.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param address Address supplied to [coordinatesForAddress].
+     * @return The resulting [Pair], or `null` if unavailable.
+     */
     suspend fun coordinatesForAddress(
         context: Context,
         address: DeliveryAddress
@@ -160,7 +185,12 @@ internal object DeviceLocation {
         return address.latitude to address.longitude
     }
 
-    // Reads the phone location and converts it into the account's general address.
+    /**
+     * Reads the phone location and converts it into the account's general address.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [DeliveryAddress], or `null` if unavailable.
+     */
     suspend fun address(context: Context): DeliveryAddress? {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -187,7 +217,12 @@ internal object DeviceLocation {
         }
     }
 
-    // Rejects an old cached GPS point when a fresh location is required.
+    /**
+     * Rejects an old cached GPS point when a fresh location is required.
+     *
+     * @param manager Manager supplied to [recent].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun recent(manager: LocationManager): Location? {
         val now = System.currentTimeMillis()
@@ -200,7 +235,12 @@ internal object DeviceLocation {
             }
     }
 
-    // Requests a fresh location from Google Play services.
+    /**
+     * Requests a fresh location from Google Play services.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [Location], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun fusedCurrent(context: Context): Location? {
         val cancellation = CancellationTokenSource()
@@ -219,7 +259,13 @@ internal object DeviceLocation {
         }
     }
 
-    // Requests the best available current device location.
+    /**
+     * Requests the best available current device location.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param manager Manager supplied to [current].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun current(context: Context, manager: LocationManager): Location? =
         suspendCancellableCoroutine { continuation ->
@@ -243,7 +289,13 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         }
 
-    // Builds the reverse-geocoding request that turns coordinates into an address.
+    /**
+     * Builds the reverse-geocoding request that turns coordinates into an address.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param location Location supplied to [geocode].
+     * @return The resulting [Address], or `null` if unavailable.
+     */
     private suspend fun geocode(context: Context, location: Location): Address? {
         val geocoder = Geocoder(context, Locale.getDefault())
         return if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
@@ -254,12 +306,20 @@ internal object DeviceLocation {
                     1,
                     // Runs the geocode callback when location sharing finishes that step.
                     object : Geocoder.GeocodeListener {
-                        // Runs the geocode callback when location sharing finishes that step.
+                        /**
+                         * Runs the geocode callback when location sharing finishes that step.
+                         *
+                         * @param addresses Collection of addresses values to process.
+                         */
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
-                        // Returns a readable location error when the device request fails.
+                        /**
+                         * Returns a readable location error when the device request fails.
+                         *
+                         * @param errorMessage Optional error message supplied to [onError].
+                         */
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }
@@ -268,18 +328,32 @@ internal object DeviceLocation {
         } else legacyReverseGeocode(geocoder, location)
     }
 
-    // Builds the address search request that returns map coordinates.
+    /**
+     * Builds the address search request that returns map coordinates.
+     *
+     * @param geocoder Geocoder supplied to [forwardGeocode].
+     * @param query Search query string entered by the user.
+     * @return The resulting [Address], or `null` if unavailable.
+     */
     private suspend fun forwardGeocode(geocoder: Geocoder, query: String): Address? =
         // Skip the next action unless the Android version is at least 33.
         if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
             runCatching {
                 geocoder.getFromLocationName(query, 1, object : Geocoder.GeocodeListener {
-                    // Runs the geocode callback when location sharing finishes that step.
+                    /**
+                     * Runs the geocode callback when location sharing finishes that step.
+                     *
+                     * @param addresses Collection of addresses values to process.
+                     */
                     override fun onGeocode(addresses: MutableList<Address>) {
                         if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                     }
 
-                    // Returns a readable location error when the device request fails.
+                    /**
+                     * Returns a readable location error when the device request fails.
+                     *
+                     * @param errorMessage Optional error message supplied to [onError].
+                     */
                     override fun onError(errorMessage: String?) {
                         if (continuation.isActive) continuation.resume(null)
                     }
@@ -287,7 +361,13 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         } else legacyForwardGeocode(geocoder, query)
 
-    // Gives location sharing the legacy forward geocode it needs.
+    /**
+     * Gives location sharing the legacy forward geocode it needs.
+     *
+     * @param geocoder Geocoder supplied to [legacyForwardGeocode].
+     * @param query Search query string entered by the user.
+     * @return The resulting [Address], or `null` if unavailable.
+     */
     @Suppress("DEPRECATION")
     private suspend fun legacyForwardGeocode(geocoder: Geocoder, query: String): Address? =
         withContext(Dispatchers.IO) {
@@ -295,7 +375,13 @@ internal object DeviceLocation {
             runCatching { geocoder.getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
         }
 
-    // Uses Android's older geocoder callback on devices below Android 13.
+    /**
+     * Uses Android's older geocoder callback on devices below Android 13.
+     *
+     * @param geocoder Geocoder supplied to [legacyReverseGeocode].
+     * @param location Location supplied to [legacyReverseGeocode].
+     * @return The resulting [Address], or `null` if unavailable.
+     */
     @Suppress("DEPRECATION")
     private suspend fun legacyReverseGeocode(geocoder: Geocoder, location: Location): Address? =
         withContext(Dispatchers.IO) {
@@ -326,13 +412,25 @@ data class LocationRoute(
     val durationSeconds: Double,
     val directions: List<RouteDirection>,
 ) {
-    // Finds the next turn after the route point closest to the user's location.
+    /**
+     * Finds the next turn after the route point closest to the user's location.
+     *
+     * @param latitude Latitude supplied to [nextDirection].
+     * @param longitude Longitude supplied to [nextDirection].
+     * @return The resulting [RouteDirection], or `null` if unavailable.
+     */
     fun nextDirection(latitude: Double, longitude: Double): RouteDirection? {
         val currentIndex = nearestCoordinateIndex(latitude, longitude)
         return directions.firstOrNull { it.toIndex >= currentIndex } ?: directions.lastOrNull()
     }
 
-    // Estimates the distance and time left from the nearest route point.
+    /**
+     * Estimates the distance and time left from the nearest route point.
+     *
+     * @param latitude Latitude supplied to [progress].
+     * @param longitude Longitude supplied to [progress].
+     * @return The resulting [RouteProgress] instance.
+     */
     fun progress(latitude: Double, longitude: Double): RouteProgress {
         val index = nearestCoordinateIndex(latitude, longitude)
         val segmentLengths = coordinates.zipWithNext { first, second ->
@@ -345,7 +443,13 @@ data class LocationRoute(
         return RouteProgress(distanceMeters * remainingRatio, durationSeconds * remainingRatio)
     }
 
-    // Finds which route point is closest to the supplied latitude and longitude.
+    /**
+     * Finds which route point is closest to the supplied latitude and longitude.
+     *
+     * @param latitude Latitude supplied to [nearestCoordinateIndex].
+     * @param longitude Longitude supplied to [nearestCoordinateIndex].
+     * @return The computed nearest coordinate index numeric value.
+     */
     private fun nearestCoordinateIndex(latitude: Double, longitude: Double): Int =
         coordinates.indices.minByOrNull { index ->
             val point = coordinates[index]
@@ -357,7 +461,15 @@ data class LocationRoute(
 internal object MapboxDirectionsClient {
     val configured get() = BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()
 
-    // Requests a driving route and converts the response into map points and directions.
+    /**
+     * Requests a driving route and converts the response into map points and directions.
+     *
+     * @param startLatitude Start latitude supplied to [drivingRoute].
+     * @param startLongitude Start longitude supplied to [drivingRoute].
+     * @param endLatitude End latitude supplied to [drivingRoute].
+     * @param endLongitude End longitude supplied to [drivingRoute].
+     * @return The resulting [LocationRoute], or `null` if unavailable.
+     */
     suspend fun drivingRoute(
         startLatitude: Double,
         startLongitude: Double,
@@ -392,7 +504,12 @@ internal object MapboxDirectionsClient {
         }
     }
 
-    // Reads the shortest valid route from the Mapbox response.
+    /**
+     * Reads the shortest valid route from the Mapbox response.
+     *
+     * @param json JSON object containing serialized fields.
+     * @return The resulting [LocationRoute], or `null` if unavailable.
+     */
     internal fun parseResponse(json: String): LocationRoute? {
         val root = JSONObject(json)
         if (root.optString("code") != "Ok") return null
@@ -411,7 +528,12 @@ internal object MapboxDirectionsClient {
         )
     }
 
-    // Converts GeoJSON longitude-latitude pairs into the app's route points.
+    /**
+     * Converts GeoJSON longitude-latitude pairs into the app's route points.
+     *
+     * @param rows Rows supplied to [parseCoordinates].
+     * @return The resulting parse coordinates.
+     */
     private fun parseCoordinates(rows: JSONArray) = buildList {
         for (index in 0 until rows.length()) {
             val row = rows.optJSONArray(index) ?: continue
@@ -422,7 +544,13 @@ internal object MapboxDirectionsClient {
         }
     }
 
-    // Matches each written turn instruction to its nearest route point.
+    /**
+     * Matches each written turn instruction to its nearest route point.
+     *
+     * @param legs Optional legs supplied to [parseDirections].
+     * @param routeCoordinates Collection of route coordinates values to process.
+     * @return The resulting parse directions.
+     */
     private fun parseDirections(
         legs: JSONArray?,
         routeCoordinates: List<RouteCoordinate>,
@@ -446,11 +574,23 @@ internal object MapboxDirectionsClient {
         }
     }
 
-    // Escapes the API token before placing it in the request URL.
+    /**
+     * Escapes the API token before placing it in the request URL.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting encode.
+     */
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 }
 
-// Calculates how far a location is from the nearest part of a route.
+/**
+ * Calculates how far a location is from the nearest part of a route.
+ *
+ * @param latitude Latitude supplied to [distanceFromRouteMeters].
+ * @param longitude Longitude supplied to [distanceFromRouteMeters].
+ * @param route Route supplied to [distanceFromRouteMeters].
+ * @return The computed distance from route meters numeric value.
+ */
 internal fun distanceFromRouteMeters(
     latitude: Double,
     longitude: Double,
@@ -458,7 +598,12 @@ internal fun distanceFromRouteMeters(
 ): Double {
     if (route.coordinates.isEmpty()) return Double.POSITIVE_INFINITY
     val originLatitudeRadians = Math.toRadians(latitude)
-    // Projects nearby map coordinates onto a flat metre grid for this calculation.
+    /**
+     * Projects nearby map coordinates onto a flat metre grid for this calculation.
+     *
+     * @param point Point supplied to [projected].
+     * @return The resulting [Pair] instance.
+     */
     fun projected(point: RouteCoordinate): Pair<Double, Double> {
         val x = Math.toRadians(point.longitude - longitude) * cos(originLatitudeRadians) * EARTH_RADIUS_METERS
         val y = Math.toRadians(point.latitude - latitude) * EARTH_RADIUS_METERS
@@ -475,7 +620,15 @@ internal fun distanceFromRouteMeters(
     } ?: 0.0
 }
 
-// Compares two nearby coordinates without doing an unnecessary square root.
+/**
+ * Compares two nearby coordinates without doing an unnecessary square root.
+ *
+ * @param firstLatitude First latitude supplied to [squaredDistance].
+ * @param firstLongitude First longitude supplied to [squaredDistance].
+ * @param secondLatitude Second latitude supplied to [squaredDistance].
+ * @param secondLongitude Second longitude supplied to [squaredDistance].
+ * @return The computed squared distance numeric value.
+ */
 private fun squaredDistance(
     firstLatitude: Double,
     firstLongitude: Double,
@@ -488,16 +641,15 @@ private fun squaredDistance(
     return latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
 }
 
-// Uses the haversine formula to measure the distance between two route points.
-private fun coordinateDistanceMeters(first: RouteCoordinate, second: RouteCoordinate): Double {
-    val latitudeDelta = Math.toRadians(second.latitude - first.latitude)
-    val longitudeDelta = Math.toRadians(second.longitude - first.longitude)
-    val firstLatitude = Math.toRadians(first.latitude)
-    val secondLatitude = Math.toRadians(second.latitude)
-    val a = sin(latitudeDelta / 2).pow(2) +
-            cos(firstLatitude) * cos(secondLatitude) * sin(longitudeDelta / 2).pow(2)
-    return EARTH_RADIUS_METERS * 2 * atan2(sqrt(a), sqrt(1 - a))
-}
+/**
+ * Uses the haversine formula to measure the distance between two route points.
+ *
+ * @param first First supplied to [coordinateDistanceMeters].
+ * @param second Second supplied to [coordinateDistanceMeters].
+ * @return The computed coordinate distance meters numeric value.
+ */
+private fun coordinateDistanceMeters(first: RouteCoordinate, second: RouteCoordinate): Double =
+    supportDistanceMeters(first.latitude, first.longitude, second.latitude, second.longitude)
 
 private const val EARTH_RADIUS_METERS = 6_371_000.0
 
@@ -507,18 +659,34 @@ private const val EARTH_RADIUS_METERS = 6_371_000.0
 internal class AdminLocationRepository(
     private val databaseProvider: () -> FirebaseDatabase = LocationDatabase::instance,
 ) {
-    // Keeps the admin map updated whenever a user's phone publishes a new location.
+    /**
+     * Keeps the admin map updated whenever a user's phone publishes a new location.
+     *
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observe(
         onUpdate: (List<MapLocationPoint>) -> Unit,
         onError: (String) -> Unit,
     ): ChatSubscription {
         val reference = databaseProvider().reference.child(ADMIN_LOCATION_PATH)
         val listener = object : ValueEventListener {
+            /**
+             * Handles the data change event.
+             *
+             * @param snapshot Firestore or data snapshot containing the latest state.
+             */
             override fun onDataChange(snapshot: DataSnapshot) {
                 val points = snapshot.children.mapNotNull(::locationPoint).sortedBy { it.name }
                 onUpdate(points)
             }
 
+            /**
+             * Handles the cancelled event.
+             *
+             * @param error Throwable or error message describing a failure.
+             */
             override fun onCancelled(error: DatabaseError) {
                 onError(error.message)
             }
@@ -527,7 +695,12 @@ internal class AdminLocationRepository(
         return ChatSubscription { reference.removeEventListener(listener) }
     }
 
-    // Rejects incomplete or invalid Firebase rows before they reach the map.
+    /**
+     * Rejects incomplete or invalid Firebase rows before they reach the map.
+     *
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @return The resulting [MapLocationPoint], or `null` if unavailable.
+     */
     private fun locationPoint(snapshot: DataSnapshot): MapLocationPoint? {
         val uid = snapshot.key?.takeIf(String::isNotBlank) ?: return null
         val latitude = snapshot.child("latitude").getValue(Double::class.java) ?: return null
@@ -562,17 +735,38 @@ internal data class NearbySupportResult(val radiusKm: Int, val services: List<Ne
 internal data class SupportMapCenter(val latitude: Double, val longitude: Double)
 
 internal data class LoadedSupportArea(val center: SupportMapCenter, val result: NearbySupportResult) {
+    /**
+     * Computes covers.
+     *
+     * @param point Point supplied to [covers].
+     * @return `true` if covers, or `false` otherwise.
+     */
     fun covers(point: SupportMapCenter): Boolean =
         supportDistanceMeters(center.latitude, center.longitude, point.latitude, point.longitude) <= result.radiusKm * 1_000
 }
 
+/**
+ * Computes support distance meters.
+ *
+ * @param lat Latitude supplied to [supportDistanceMeters].
+ * @param lon Longitude supplied to [supportDistanceMeters].
+ * @param targetLat Target latitude supplied to [supportDistanceMeters].
+ * @param targetLon Target longitude supplied to [supportDistanceMeters].
+ * @return The computed support distance meters numeric value.
+ */
 internal fun supportDistanceMeters(lat: Double, lon: Double, targetLat: Double, targetLon: Double): Double {
     val dLat = Math.toRadians(targetLat - lat)
     val dLon = Math.toRadians(targetLon - lon)
     val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat)) * cos(Math.toRadians(targetLat)) * sin(dLon / 2).pow(2)
-    return 6_371_000 * 2 * asin(sqrt(a.coerceIn(0.0, 1.0)))
+    return EARTH_RADIUS_METERS * 2 * asin(sqrt(a.coerceIn(0.0, 1.0)))
 }
 
+/**
+ * Searches support radii.
+ *
+ * @param fetch Function used to transform or provide fetch.
+ * @return The resulting [NearbySupportResult] for search support radii.
+ */
 internal suspend fun searchSupportRadii(fetch: suspend (Int) -> List<NearbySupportService>): NearbySupportResult {
     for (radius in listOf(15, 25, 50)) {
         val services = fetch(radius).distinctBy { it.id }
@@ -581,9 +775,24 @@ internal suspend fun searchSupportRadii(fetch: suspend (Int) -> List<NearbySuppo
     error("No search radius")
 }
 
+/**
+ * Opens support connection.
+ *
+ * @param url HTTPS URL to validate, fetch, or open.
+ * @return The resulting [HttpsURLConnection] for open support connection.
+ */
 private fun openSupportConnection(url: URL): HttpsURLConnection = url.openConnection() as HttpsURLConnection
 
 internal object NearbySupportServices {
+    /**
+     * Finds the nearby support services.
+     *
+     * @param latitude Latitude supplied to [find].
+     * @param longitude Longitude supplied to [find].
+     * @param accessToken Access token supplied to [find].
+     * @param openConnection Function used to transform or provide open connection.
+     * @return The resulting [NearbySupportResult] instance.
+     */
     suspend fun find(
         latitude: Double,
         longitude: Double,
@@ -614,6 +823,14 @@ internal object NearbySupportServices {
         }
     }
 
+    /**
+     * Searches parameters.
+     *
+     * @param latitude Latitude supplied to [searchParameters].
+     * @param longitude Longitude supplied to [searchParameters].
+     * @param radiusKm Radius km supplied to [searchParameters].
+     * @return Map containing the resulting search parameters entries.
+     */
     private fun searchParameters(latitude: Double, longitude: Double, radiusKm: Int): Map<String, String> {
         val angularRadius = radiusKm / 6_371.0
         val latitudeDelta = Math.toDegrees(angularRadius)
@@ -630,6 +847,14 @@ internal object NearbySupportServices {
         }
     }
 
+    /**
+     * Searches the nearby support services.
+     *
+     * @param endpoint Endpoint supplied to [search].
+     * @param parameters WorkManager parameters supplied for this worker execution.
+     * @param openConnection Function used to transform or provide open connection.
+     * @return List of resulting search items.
+     */
     private suspend fun search(
         endpoint: String,
         parameters: Map<String, String>,
@@ -651,12 +876,23 @@ internal object NearbySupportServices {
     }
 }
 
-// Mapbox may return a broad POI match for a support-related query. Only show recognizable services.
+/**
+ * Mapbox may return a broad POI match for a support-related query. Only show recognizable services.
+ *
+ * @param name Field, key, or display name.
+ * @return `true` if is named support service, or `false` otherwise.
+ */
 private fun isNamedSupportService(name: String): Boolean =
     listOf("family violence", "domestic violence", "sexual assault", "crisis", "distress", "hotline", "shelter")
         .any { name.contains(it, ignoreCase = true) } &&
         listOf("animal shelter", "picnic shelter", "bus shelter").none { name.contains(it, ignoreCase = true) }
 
+/**
+ * Parses support places.
+ *
+ * @param raw Raw supplied to [parseSupportPlaces].
+ * @return List of resulting parse support places items.
+ */
 internal fun parseSupportPlaces(raw: String): List<NearbySupportService> {
     val features = checkNotNull(JSONObject(raw).optJSONArray("features")) { "Mapbox returned no feature collection." }
     return (0 until features.length()).mapNotNull { index ->

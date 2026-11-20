@@ -31,7 +31,14 @@ import kotlinx.coroutines.tasks.await
 
 // Owns staff and administrator account workflows.
 internal class OrganizationAccounts(private val runtime: SessionRuntime) {
-    // Checks and saves the staff or admin organization profile.
+    /**
+     * Checks and saves the staff or admin organization profile.
+     *
+     * @param fullName Full name supplied to [saveOrganizationProfile].
+     * @param dob Date of birth supplied to [saveOrganizationProfile].
+     * @param email Email supplied to [saveOrganizationProfile].
+     * @param phone Phone supplied to [saveOrganizationProfile].
+     */
     fun saveOrganizationProfile(fullName: String, dob: String, email: String, phone: String) {
         with(runtime) {
             with(state) {
@@ -67,7 +74,14 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
-    // Updates organization profile.
+    /**
+     * Updates organization profile.
+     *
+     * @param fullName Full name supplied to [updateOrganizationProfile].
+     * @param dob Date of birth supplied to [updateOrganizationProfile].
+     * @param email Email supplied to [updateOrganizationProfile].
+     * @param phone Phone supplied to [updateOrganizationProfile].
+     */
     fun updateOrganizationProfile(fullName: String, dob: String, email: String, phone: String) {
         with(runtime) {
             with(state) {
@@ -95,11 +109,26 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Refreshes admin summary.
+     *
+     * @return The resulting refresh admin summary.
+     */
     fun refreshAdminSummary() = runtime.adminPreloader.summary(force = true)
+    /**
+     * Refreshes admin accounts.
+     *
+     * @return The resulting refresh admin accounts.
+     */
     fun refreshAdminAccounts() = runtime.adminPreloader.accounts(force = true, showLoading = true)
+    /**
+     * Refreshes admin staff.
+     */
     fun refreshAdminStaff() = runtime.adminPreloader.staff(force = true, showLoading = true)
 
-    // Start small independent reads after authentication; none of them lock the portal UI.
+    /**
+     * Start small independent reads after authentication; none of them lock the portal UI.
+     */
     fun queueAdminRefresh() {
         val owner = runtime.coverAccountId ?: return
         val token = runtime.epoch
@@ -114,7 +143,11 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
-    // Creates managed account.
+    /**
+     * Creates managed account.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun createManagedAccount(value: AdminAccountDraft) {
         with(runtime) {
             with(state) {
@@ -153,7 +186,11 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
-    // Deletes managed account.
+    /**
+     * Deletes managed account.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun deleteManagedAccount(value: AdminAccountSummary) {
         with(runtime) {
             with(state) {
@@ -182,7 +219,9 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
 
 // Owns private note edits, trash and restoration.
 internal class SessionNotes(private val runtime: SessionRuntime) {
-    // Removes the last private-note success or error message before a new action begins.
+    /**
+     * Removes the last private-note success or error message before a new action begins.
+     */
     fun clearPrivateEntryStatus() {
         with(runtime) {
             with(state) {
@@ -191,7 +230,20 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Creates or updates one encrypted private note.
+    /**
+     * Creates or updates one encrypted private note.
+     *
+     * @param id Optional ID supplied to [savePrivateEntry].
+     * @param kind Kind supplied to [savePrivateEntry].
+     * @param title Primary display title text.
+     * @param body Body text content.
+     * @param incidentDate Incident date supplied to [savePrivateEntry].
+     * @param incidentTime Incident time supplied to [savePrivateEntry].
+     * @param incidentLocation Incident location supplied to [savePrivateEntry].
+     * @param incidentLatitude Optional incident latitude supplied to [savePrivateEntry].
+     * @param incidentLongitude Optional incident longitude supplied to [savePrivateEntry].
+     * @param attachmentIds Collection of attachment IDs values to process.
+     */
     fun savePrivateEntry(
         id: String?, kind: PrivateEntryKind, title: String, body: String,
         incidentDate: String, incidentTime: String, incidentLocation: String,
@@ -220,7 +272,13 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }
                 val changes = existing?.let { old ->
                     buildList {
-                        // Records a profile field only when its value really changed.
+                        /**
+                         * Records a profile field only when its value really changed.
+                         *
+                         * @param field Field supplied to [changed].
+                         * @param before Before supplied to [changed].
+                         * @param after After supplied to [changed].
+                         */
                         fun changed(field: String, before: String, after: String) {
                             if (before != after) add(FieldChange(field, before, after))
                         }
@@ -272,7 +330,11 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Switches private entry PIN on or off.
+    /**
+     * Switches private entry PIN on or off.
+     *
+     * @param id ID supplied to [togglePrivateEntryPin].
+     */
     fun togglePrivateEntryPin(id: String) {
         with(runtime) {
             with(state) {
@@ -294,7 +356,11 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Removes private entry from the signed-in session.
+    /**
+     * Removes private entry from the signed-in session.
+     *
+     * @param id ID supplied to [trashPrivateEntry].
+     */
     fun trashPrivateEntry(id: String) {
         with(runtime) {
             with(state) {
@@ -320,7 +386,11 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Restores private entry.
+    /**
+     * Restores private entry.
+     *
+     * @param id ID supplied to [restorePrivateEntry].
+     */
     fun restorePrivateEntry(id: String) {
         with(runtime) {
             with(state) {
@@ -334,7 +404,13 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Encrypts and saves an edited private note, then reports success or failure to its screen.
+    /**
+     * Encrypts and saves an edited private note, then reports success or failure to its screen.
+     *
+     * @param entry Entry supplied to [updatePrivateEntry].
+     * @param failure Exception or failure reason encountered during execution.
+     * @param success Success supplied to [updatePrivateEntry].
+     */
     fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
         with(runtime) {
             with(state) {
@@ -359,13 +435,20 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
 internal class SessionEntrySettings(private val runtime: SessionRuntime) {
     private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
 
-    // Allows entry settings only for a user who has an active device enrollment.
+    /**
+     * Allows entry settings only for a user who has an active device enrollment.
+     */
     private fun editable() = with(runtime) {
         !state.busy && state.screen == SessionScreen.Safe &&
                 state.page == SafePage.Settings && !state.privacyBlackout && state.accountRole == AccountRole.USER
     }
 
-    // Validates and saves the selected private-entry method.
+    /**
+     * Validates and saves the selected private-entry method.
+     *
+     * @param method Method supplied to [select].
+     * @param currentPin Current PIN supplied to [select].
+     */
     fun select(method: SafeEntryMethod, currentPin: String) {
         if (!editable()) return
         val device = runtime.enrollment ?: return
@@ -376,7 +459,14 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         change(currentPin, null, method)
     }
 
-    // Checks both PIN fields and saves the new backup app PIN.
+    /**
+     * Checks both PIN fields and saves the new backup app PIN.
+     *
+     * @param currentPin Current PIN supplied to [savePin].
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [savePin].
+     * @param usePin Whether to use PIN.
+     */
     fun savePin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) {
         if (!editable()) return
         if (!InputPolicy.validPin(pin)) {
@@ -392,7 +482,13 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         change(currentPin, pin, if (usePin) SafeEntryMethod.APP_PIN else null)
     }
 
-    // Checks the current PIN, then changes the private entry PIN or method.
+    /**
+     * Checks the current PIN, then changes the private entry PIN or method.
+     *
+     * @param currentPin Current PIN supplied to [change].
+     * @param pin User-entered PIN string, or null when not provided.
+     * @param method Optional method supplied to [change].
+     */
     private fun change(currentPin: String, pin: String?, method: SafeEntryMethod?): Unit =
         with(runtime) {
             val device = enrollment ?: return
@@ -421,7 +517,12 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                 application.getString(R.string.entry_settings_failed),
                 timeoutMillis = 120_000
             ) { token ->
-                // Reads the current private-entry settings before changing them.
+                /**
+                 * Reads the current private-entry settings before changing them.
+                 *
+                 * @param expected Expected supplied to [current].
+                 * @return The resulting current.
+                 */
                 fun current(expected: DeviceEnrollment = device) =
                     epoch == token && enrollment == expected && state.screen == SessionScreen.Safe &&
                             state.page == SafePage.Settings && !state.privacyBlackout
@@ -513,6 +614,13 @@ internal data class EmergencyAlert(
 
 // Owns the remote emergency operations; Compose only observes results and sends actions.
 internal class EmergencyResponseController(private val context: Context) {
+    /**
+     * Starts observing alerts.
+     *
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeAlerts(
         onUpdate: (List<EmergencyAlert>) -> Unit,
         onError: (String?) -> Unit,
@@ -535,11 +643,25 @@ internal class EmergencyResponseController(private val context: Context) {
         return ChatSubscription { listener.remove() }
     }
 
+    /**
+     * Starts observing locations.
+     *
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeLocations(
         onUpdate: (List<MapLocationPoint>) -> Unit,
         onError: (String) -> Unit,
     ): ChatSubscription = AdminLocationRepository().observe(onUpdate, onError)
 
+    /**
+     * Sets resolved.
+     *
+     * @param accountId Optional account ID supplied to [setResolved].
+     * @param alertId Alert ID supplied to [setResolved].
+     * @param resolved Whether to apply resolved.
+     */
     suspend fun setResolved(accountId: String?, alertId: String, resolved: Boolean) {
         val user = FirebaseAuth.getInstance().currentUser
         check(accountId != null && user?.uid == accountId) { "Sign in again to resolve this request." }

@@ -48,15 +48,36 @@ import java.time.format.TextStyle
 private const val FIRST_BIRTH_YEAR = 1927
 private const val YEARS_PER_GROUP = 10
 
+/**
+ * Computes birthday years.
+ *
+ * @param today Today supplied to [birthdayYears].
+ * @return List of resulting birthday years items.
+ */
 internal fun birthdayYears(today: LocalDate): List<IntRange> =
     (maxOf(FIRST_BIRTH_YEAR, today.minusYears(130).year)..today.year)
         .chunked(YEARS_PER_GROUP).asReversed().map { it.first()..it.last() }
 
+/**
+ * Composes the remember birthday input UI element.
+ *
+ * @param initialDate Initial date supplied to [rememberBirthdayInput].
+ */
 @Composable
 internal fun rememberBirthdayInput(initialDate: String = "") = rememberSaveable(initialDate) {
     mutableStateOf(initialDate)
 }
 
+/**
+ * Renders the birthday picker composable.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param tag Tag supplied to [BirthdayPicker].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param showErrors Whether to show errors.
+ * @param required Whether to apply required.
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @Composable
 internal fun BirthdayPicker(
     value: String,
@@ -117,6 +138,14 @@ private enum class BirthdayStep(val title: Int, val columns: Int) {
     Day(R.string.dob_pick_day, 4),
 }
 
+/**
+ * Displays the birthday picker dialog overlay.
+ *
+ * @param tag Tag supplied to [BirthdayPickerDialog].
+ * @param today Today supplied to [BirthdayPickerDialog].
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSelect Callback invoked when select changes or occurs.
+ */
 @Composable
 private fun BirthdayPickerDialog(
     tag: String,
@@ -228,4 +257,9 @@ private fun BirthdayPickerDialog(
     )
 }
 
+/**
+ * Computes spoken year for this int.
+ *
+ * @return The resulting spoken year string.
+ */
 private fun Int.spokenYear(): String = toString()

@@ -11,6 +11,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class DebugVoipTokenReceiver : BroadcastReceiver() {
+    /**
+     * Handles the receive event.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_ROTATE) return
         val pendingResult = goAsync()

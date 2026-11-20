@@ -30,7 +30,13 @@ class CameraManager(private val context: Context) {
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
 
-    // Connects CameraX to the selected lens and the Safe App preview.
+    /**
+     * Connects CameraX to the selected lens and the Safe App preview.
+     *
+     * @param lifecycleOwner Lifecycle owner supplied to [bindCamera].
+     * @param previewView Preview view supplied to [bindCamera].
+     * @param frontFacing Whether to apply front facing.
+     */
     suspend fun bindCamera(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
@@ -71,7 +77,12 @@ class CameraManager(private val context: Context) {
         provider = cameraProvider
     }
 
-    // Changes the live preview zoom and keeps the requested value inside the camera's supported range.
+    /**
+     * Changes the live preview zoom and keeps the requested value inside the camera's supported range.
+     *
+     * @param multiplier Multiplier supplied to [changeZoom].
+     * @return The computed change zoom numeric value.
+     */
     fun changeZoom(multiplier: Float): Float {
         val activeCamera = checkNotNull(boundCamera) { "Camera not ready" }
         val zoomState = checkNotNull(activeCamera.cameraInfo.zoomState.value) { "Camera zoom is unavailable" }
@@ -85,7 +96,12 @@ class CameraManager(private val context: Context) {
         return requested
     }
 
-    // Takes a photo and saves it to the private capture file.
+    /**
+     * Takes a photo and saves it to the private capture file.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @return The resulting [File] for capture photo.
+     */
     suspend fun capturePhoto(file: File): File = suspendCancellableCoroutine { continuation ->
         val capture = imageCapture
         if (capture == null) {
@@ -96,12 +112,20 @@ class CameraManager(private val context: Context) {
             ImageCapture.OutputFileOptions.Builder(file).build(), cameraExecutor,
             // Runs the image saved callback when the safety plan finishes that step.
             object : ImageCapture.OnImageSavedCallback {
-                // Runs the image saved callback when the safety plan finishes that step.
+                /**
+                 * Runs the image saved callback when the safety plan finishes that step.
+                 *
+                 * @param result Result payload delivered to the callback.
+                 */
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     if (continuation.isActive) continuation.resume(file)
                 }
 
-                // Reports camera errors so the capture screen can explain what went wrong.
+                /**
+                 * Reports camera errors so the capture screen can explain what went wrong.
+                 *
+                 * @param error Throwable or error message describing a failure.
+                 */
                 override fun onError(error: ImageCaptureException) {
                     file.delete()
                     if (continuation.isActive) continuation.resumeWithException(error)
@@ -110,7 +134,14 @@ class CameraManager(private val context: Context) {
         continuation.invokeOnCancellation { file.delete() }
     }
 
-    // Starts video recording and sends the saved file back to the Safe App.
+    /**
+     * Starts video recording and sends the saved file back to the Safe App.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param includeAudio Whether to include audio.
+     * @param onStarted Callback invoked when started changes or occurs.
+     * @param onFinished Callback invoked when finished changes or occurs.
+     */
     fun startVideo(
         file: File,
         includeAudio: Boolean,
@@ -146,18 +177,24 @@ class CameraManager(private val context: Context) {
             }
     }
 
-    // Safety: Stops video.
+    /**
+     * Safety: Stops video.
+     */
     fun stopVideo() {
         recording?.stop()
     }
 
-    // Stops the current video recording without keeping an unfinished capture.
+    /**
+     * Stops the current video recording without keeping an unfinished capture.
+     */
     fun cancelVideo() {
         recording?.close()
         recording = null
     }
 
-    // Stops camera recording and releases CameraX resources.
+    /**
+     * Stops camera recording and releases CameraX resources.
+     */
     fun unbind() {
         cancelVideo()
         provider?.unbindAll()
@@ -168,14 +205,24 @@ class CameraManager(private val context: Context) {
             null
     }
 
-    // Safety: Releases the resources used by the feature.
+    /**
+     * Safety: Releases the resources used by the feature.
+     */
     fun release() {
         unbind()
         cameraExecutor.shutdown()
     }
 }
 
-// Calculates one camera zoom step without allowing invalid or unsupported values.
+/**
+ * Calculates one camera zoom step without allowing invalid or unsupported values.
+ *
+ * @param current Current supplied to [nextCameraZoom].
+ * @param minimum Minimum supplied to [nextCameraZoom].
+ * @param maximum Maximum supplied to [nextCameraZoom].
+ * @param multiplier Multiplier supplied to [nextCameraZoom].
+ * @return The computed next camera zoom numeric value.
+ */
 internal fun nextCameraZoom(
     current: Float,
     minimum: Float,

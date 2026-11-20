@@ -31,6 +31,22 @@ object DBPostProcessor {
     private const val MIN_SIZE_BEFORE_UNCLIP = 3f
     private const val MIN_SIZE_AFTER_UNCLIP = 5f
 
+    /**
+     * Processes the DB post processor.
+     *
+     * @param pred Numeric array of pred values.
+     * @param predShape Numeric array of pred shape values.
+     * @param thresh Thresh supplied to [process].
+     * @param boxThresh Box thresh supplied to [process].
+     * @param unclipRatio Unclip ratio supplied to [process].
+     * @param maxCandidates Maximum candidates supplied to [process].
+     * @param useDilation Whether to use dilation.
+     * @param scoreMode Score mode supplied to [process].
+     * @param boxType Box type supplied to [process].
+     * @param originalH Original h supplied to [process].
+     * @param originalW Original w supplied to [process].
+     * @return List of resulting process items.
+     */
     fun process(
         pred: FloatArray,
         predShape: LongArray,
@@ -149,6 +165,16 @@ object DBPostProcessor {
         }
     }
 
+    /**
+     * Scales point.
+     *
+     * @param point Point supplied to [scalePoint].
+     * @param scaleX Scale x supplied to [scalePoint].
+     * @param scaleY Scale y supplied to [scalePoint].
+     * @param originalW Original w supplied to [scalePoint].
+     * @param originalH Original h supplied to [scalePoint].
+     * @return The resulting [PointF] for scale point.
+     */
     private fun scalePoint(
         point: Point,
         scaleX: Double,
@@ -162,6 +188,13 @@ object DBPostProcessor {
         )
     }
 
+    /**
+     * Computes box score.
+     *
+     * @param probMap Prob map supplied to [computeBoxScore].
+     * @param points Collection of points values to process.
+     * @return The computed compute box score numeric value.
+     */
     private fun computeBoxScore(probMap: Mat, points: List<Point>): Float {
         if (points.isEmpty()) return 0f
 

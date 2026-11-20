@@ -33,7 +33,12 @@ import com.olive.app.ui.users.user.location.ShareDurationDialog
 
 private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
 
-// Shows photo, video, document, and camera choices for a chat attachment.
+/**
+ * Shows photo, video, document, and camera choices for a chat attachment.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AttachmentPicker(

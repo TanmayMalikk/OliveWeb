@@ -52,8 +52,12 @@ import com.olive.app.ui.users.user.location.LocationMapScreen
 import com.olive.app.ui.users.user.notes.PrivateNotes
 import kotlinx.coroutines.launch
 
-// Route account-owner pages to focused screen files; Safe Contacts use their separate workspace.
-// SafeHomeScreen owns the feature tiles; individual screens own their layout and accessibility semantics.
+/**
+ * Route account-owner pages to focused screen files; Safe Contacts use their separate workspace. SafeHomeScreen owns the feature tiles; individual screens own their layout and accessibility semantics.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ */
 @Composable
 internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
     val profile = session.profile ?: return
@@ -84,7 +88,11 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// Requests a staff assignment, keeps the user informed, then opens the assigned support chat.
+/**
+ * Requests a staff assignment, keeps the user informed, then opens the assigned support chat.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun StaffHelpScreen(session: SessionViewModel) {
     val controller = session.staffSupport
@@ -136,7 +144,16 @@ private fun StaffHelpScreen(session: SessionViewModel) {
     }
 }
 
-// The overlay owns both corners so an expanded menu never blocks the real Quick exit control.
+/**
+ * The overlay owns both corners so an expanded menu never blocks the real Quick exit control.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ * @param showExit Whether to show exit.
+ * @param showSupport Whether to show support.
+ * @param expanded Whether the expandable section is currently open.
+ * @param onExpanded Callback invoked when expanded changes or occurs.
+ */
 @Composable
 internal fun SafeSupportControls(
     session: SessionViewModel, exit: () -> Unit, showExit: Boolean,
@@ -150,7 +167,9 @@ internal fun SafeSupportControls(
     val emergencyFailureMessage = stringResource(R.string.emergency_report_failed)
     val emergencyVerificationFailureMessage = stringResource(R.string.emergency_report_device_verification_failed)
 
-    // The emergency action adds the completed report to the user's encrypted Documents list.
+    /**
+     * The emergency action adds the completed report to the user's encrypted Documents list.
+     */
     fun createEmergencyReport() {
         if (emergencyExportBusy) return
         val profile = session.profile ?: return
@@ -192,6 +211,9 @@ internal fun SafeSupportControls(
     }
 
     val requestLocationPermission = LocalLocationPermissionRequest.current
+    /**
+     * Starts emergency report.
+     */
     fun beginEmergencyReport() {
         scope.launch {
             requestLocationPermission()
@@ -358,7 +380,17 @@ internal fun SafeSupportControls(
     }
 }
 
-// Draws one support-menu button and delays its entrance so the list opens smoothly.
+/**
+ * Draws one support-menu button and delays its entrance so the list opens smoothly.
+ *
+ * @param labelId String resource ID for the accessible display label.
+ * @param icon Icon supplied to [SupportAction].
+ * @param tag Tag supplied to [SupportAction].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param delayMillis Delay duration before running or animating, in milliseconds.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun AnimatedVisibilityScope.SupportAction(
     labelId: Int, icon: ImageVector, tag: String, enabled: Boolean,
@@ -395,7 +427,12 @@ private fun AnimatedVisibilityScope.SupportAction(
     }
 }
 
-// The safe home screen owns feature discovery and pending activity.
+/**
+ * The safe home screen owns feature discovery and pending activity.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
     OlivePrivateDesign {
@@ -486,6 +523,13 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
     }
 }
 
+/**
+ * Renders the safe home bar composable.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param title Primary display title text.
+ * @param compact Whether the layout should render in compact phone sizing.
+ */
 @Composable
 private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boolean) {
     val color by animateColorAsState(
@@ -531,6 +575,11 @@ private enum class SafeHomeFeature(val page: SafePage, val label: Int, val icon:
     Documents(SafePage.Documents, R.string.support_documents, Icons.Outlined.FolderOpen, "safe_documents")
 }
 
+/**
+ * Composes the safe feature grid UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun SafeFeatureGrid(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -561,6 +610,16 @@ private fun SafeFeatureGrid(session: SessionViewModel) {
     }
 }
 
+/**
+ * Renders the safe feature card composable.
+ *
+ * @param label Accessible label or display caption.
+ * @param feature Feature supplied to [SafeFeatureCard].
+ * @param pendingMessages Pending messages supplied to [SafeFeatureCard].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun SafeFeatureCard(
     label: String,
@@ -612,6 +671,11 @@ private fun SafeFeatureCard(
     }
 }
 
+/**
+ * Composes the safe home shortcuts UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun SafeHomeShortcuts(session: SessionViewModel) {
     val fontScale = LocalDensity.current.fontScale
@@ -639,6 +703,14 @@ private fun SafeHomeShortcuts(session: SessionViewModel) {
     }
 }
 
+/**
+ * Composes the safe home shortcut UI element.
+ *
+ * @param label Accessible label or display caption.
+ * @param icon Icon supplied to [SafeHomeShortcut].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun SafeHomeShortcut(
     label: String,

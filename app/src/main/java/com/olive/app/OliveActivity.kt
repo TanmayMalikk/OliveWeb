@@ -51,11 +51,24 @@ import com.olive.app.data.messaging.VoipCallForegroundService
 import kotlinx.coroutines.launch
 
 
-// Prevents Android from showing private content in the recent-apps preview.
+/**
+ * Prevents Android from showing private content in the recent-apps preview.
+ *
+ * @param protectionEnabled Whether to apply protection enabled.
+ * @param sensitive Whether to apply sensitive.
+ * @return `true` if should blank recent preview, or `false` otherwise.
+ */
 internal fun shouldBlankRecentPreview(protectionEnabled: Boolean, sensitive: Boolean) =
     protectionEnabled && sensitive
 
-// Gives the task a discreet label and colour in Android recents.
+/**
+ * Gives the task a discreet label and colour in Android recents.
+ *
+ * @param applied Optional applied supplied to [shouldApplyTaskIdentity].
+ * @param type Type supplied to [shouldApplyTaskIdentity].
+ * @param role Account role determining workspace permissions.
+ * @return `true` if should apply task identity, or `false` otherwise.
+ */
 internal fun shouldApplyTaskIdentity(
     applied: Pair<CoverType, AccountRole>?,
     type: CoverType,
@@ -77,6 +90,12 @@ class OliveActivity : FragmentActivity() {
     }
     private val session: SessionViewModel by viewModels()
     private val callActionReceiver = object : BroadcastReceiver() {
+        /**
+         * Handles the receive event.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param intent Android intent containing the action and optional extras for this component.
+         */
         override fun onReceive(context: Context, intent: Intent) {
             val callId = intent.data?.lastPathSegment ?: return
             if (!session.calls.canHandleNotification(callId)) return
@@ -109,7 +128,11 @@ class OliveActivity : FragmentActivity() {
             session.syncLocalNotificationHandler()
         }
 
-    // Starts the root Compose UI and restores the correct cover or account screen.
+    /**
+     * Starts the root Compose UI and restores the correct cover or account screen.
+     *
+     * @param savedInstanceState Previously saved instance state bundle, or null on a fresh creation.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
@@ -187,6 +210,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
+    /**
+     * Cleans up listeners and allocated resources before the component is destroyed.
+     */
     override fun onDestroy() {
         com.olive.app.security.ScreenCapturePreferences.store(this)
             .unregisterOnSharedPreferenceChangeListener(capturePreferencesListener)
@@ -194,12 +220,22 @@ class OliveActivity : FragmentActivity() {
         super.onDestroy()
     }
 
+    /**
+     * Handles the new intent event.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         receiveIncomingCallIntent(intent)
     }
 
+    /**
+     * Computes receive incoming call intent.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
     private fun receiveIncomingCallIntent(intent: Intent?) {
         val callId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID).orEmpty()
         val callerId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID).orEmpty()
@@ -211,7 +247,9 @@ class OliveActivity : FragmentActivity() {
         intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME)
     }
 
-    // Leaving the foreground locks the User safe area; the account preference controls the extra privacy cover.
+    /**
+     * Leaving the foreground locks the User safe area; the account preference controls the extra privacy cover.
+     */
     override fun onPause() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
@@ -224,7 +262,9 @@ class OliveActivity : FragmentActivity() {
         super.onPause()
     }
 
-    // Android calls this as the user heads for Home or the recent-apps screen, so swap to cover before they get there.
+    /**
+     * Android calls this as the user heads for Home or the recent-apps screen, so swap to cover before they get there.
+     */
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
@@ -235,7 +275,9 @@ class OliveActivity : FragmentActivity() {
         super.onUserLeaveHint()
     }
 
-    // Coming back just refreshes screen protection; it never auto-reopens private pages.
+    /**
+     * Coming back just refreshes screen protection; it never auto-reopens private pages.
+     */
     override fun onResume() {
         super.onResume()
         locationPermissionVersion++
@@ -259,13 +301,17 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
-    // Resets the privacy timer whenever the user touches or types in the app.
+    /**
+     * Resets the privacy timer whenever the user touches or types in the app.
+     */
     override fun onUserInteraction() {
         super.onUserInteraction()
         session.noteInteraction()
     }
 
-    // FLAG_SECURE blacks out captures; these callbacks log only attempts Android actually reports.
+    /**
+     * FLAG_SECURE blacks out captures; these callbacks log only attempts Android actually reports.
+     */
     override fun onStart() {
         super.onStart()
         if (!screenCaptureProtectionEnabled) return
@@ -293,7 +339,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
-    // Applies the privacy policy when the app is no longer visible.
+    /**
+     * Applies the privacy policy when the app is no longer visible.
+     */
     override fun onStop() {
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
             !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
@@ -332,6 +380,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
+    /**
+     * Closes after quick exit.
+     */
     private fun closeAfterQuickExit() {
         // The task can be snapshotted before Compose redraws the cover or dashboard.
         closingForQuickExit = true
@@ -342,7 +393,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
-    // Lifecycle methods register the capture callbacks separately.
+    /**
+     * Lifecycle methods register the capture callbacks separately.
+     */
     private fun applyScreenCaptureProtection() {
         val protect = screenCaptureProtectionEnabled || closingForQuickExit
         if (protect) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -350,7 +403,9 @@ class OliveActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!protect)
     }
 
-    // When capture protection is enabled, cover sensitive content and remove its native accessibility descendants together.
+    /**
+     * When capture protection is enabled, cover sensitive content and remove its native accessibility descendants together.
+     */
     private fun showRecentPrivacyCover() {
         if (!shouldBlankRecentPreview(screenCaptureProtectionEnabled, session.sensitive)) return
         accessibilityContent.importantForAccessibility =
@@ -375,7 +430,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
-    // After two resumed frames, remove the native cover and restore accessibility only if no newer blackout replaced it.
+    /**
+     * After two resumed frames, remove the native cover and restore accessibility only if no newer blackout replaced it.
+     */
     private fun removeRecentPrivacyCoverAfterRedraw() {
         val expectedEpoch = privacyCoverEpoch
         window.decorView.postOnAnimation {
@@ -392,7 +449,9 @@ class OliveActivity : FragmentActivity() {
         }
     }
 
-    // Applies system bar contrast.
+    /**
+     * Applies system bar contrast.
+     */
     private fun applySystemBarContrast() {
         val transparent = Color.TRANSPARENT
         val camera = session.screen == SessionScreen.Safe && session.page == SafePage.Camera
@@ -404,7 +463,12 @@ class OliveActivity : FragmentActivity() {
         )
     }
 
-    // Keep the recent-apps title and icon aligned with the chosen launcher cover.
+    /**
+     * Keep the recent-apps title and icon aligned with the chosen launcher cover.
+     *
+     * @param type Type supplied to [updateRecentAppIdentity].
+     * @param role Account role determining workspace permissions.
+     */
     private fun updateRecentAppIdentity(type: CoverType, role: AccountRole) {
         val identity = type to role
         if (!shouldApplyTaskIdentity(appliedTaskIdentity, type, role)) return
@@ -440,7 +504,9 @@ class OliveActivity : FragmentActivity() {
 // All app roles: sets up app-wide services before any screen opens.
 
 class OliveApplication : Application() {
-    // Creates app-wide notification channels and background services at startup.
+    /**
+     * Creates app-wide notification channels and background services at startup.
+     */
     override fun onCreate() {
         super.onCreate()
         cacheDir.listFiles { file ->
@@ -471,7 +537,11 @@ class OliveApplication : Application() {
 
 // Android Studio launches through here so changing cover icons never breaks the Run button.
 class OliveLauncher : Activity() {
-    // Sends launcher taps into OliveActivity and closes this small forwarding activity.
+    /**
+     * Sends launcher taps into OliveActivity and closes this small forwarding activity.
+     *
+     * @param savedInstanceState Previously saved instance state bundle, or null on a fresh creation.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         startActivity(Intent(this, OliveActivity::class.java))

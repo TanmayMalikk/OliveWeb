@@ -32,6 +32,15 @@ import java.time.format.FormatStyle
 
 private enum class IncidentPicker { Date, Time }
 
+/**
+ * Renders the incident date time fields composable.
+ *
+ * @param date Date supplied to [IncidentDateTimeFields].
+ * @param time Time supplied to [IncidentDateTimeFields].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onDateChange Callback invoked when date change changes or occurs.
+ * @param onTimeChange Callback invoked when time change changes or occurs.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun IncidentDateTimeFields(
@@ -82,8 +91,20 @@ internal fun IncidentDateTimeFields(
                 initialSelectedDateMillis = calendarDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
                 yearRange = minOf(1900, calendarDate.year)..today.year,
                 selectableDates = object : SelectableDates {
+                    /**
+                     * Checks whether selectable date.
+                     *
+                     * @param utcTimeMillis Duration or timestamp for utc time, in milliseconds.
+                     * @return `true` if is selectable date, or `false` otherwise.
+                     */
                     override fun isSelectableDate(utcTimeMillis: Long): Boolean =
                         !Instant.ofEpochMilli(utcTimeMillis).atOffset(ZoneOffset.UTC).toLocalDate().isAfter(today)
+                    /**
+                     * Checks whether selectable year.
+                     *
+                     * @param year Year supplied to [isSelectableYear].
+                     * @return `true` if is selectable year, or `false` otherwise.
+                     */
                     override fun isSelectableYear(year: Int): Boolean = year <= today.year
                 },
             )
@@ -159,6 +180,18 @@ internal fun IncidentDateTimeFields(
     }
 }
 
+/**
+ * Renders the incident picker field composable.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param tag Tag supplied to [IncidentPickerField].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param icon Action or callback executed for icon.
+ * @param clearLabel Clear label supplied to [IncidentPickerField].
+ * @param onClear Callback invoked when clear changes or occurs.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 private fun IncidentPickerField(
     label: String,

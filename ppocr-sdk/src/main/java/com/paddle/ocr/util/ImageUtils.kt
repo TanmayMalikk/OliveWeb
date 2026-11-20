@@ -21,6 +21,15 @@ import org.opencv.imgproc.Imgproc
 // Groups the data and actions for image utils.
 object ImageUtils {
 
+    /**
+     * Resizes to multiple of 32.
+     *
+     * @param src Src supplied to [resizeToMultipleOf32].
+     * @param limitSideLen Limit side len supplied to [resizeToMultipleOf32].
+     * @param limitType Limit type supplied to [resizeToMultipleOf32].
+     * @param maxSideLimit Maximum side limit supplied to [resizeToMultipleOf32].
+     * @return The resulting [Mat] for resize to multiple of 32.
+     */
     fun resizeToMultipleOf32(
         src: Mat,
         limitSideLen: Int,

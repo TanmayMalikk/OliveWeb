@@ -18,12 +18,20 @@ import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.users.shared.navigation.*
 
-// The same PIN verifier and lockout rules, with Android's numeric password keyboard for everyone.
+/**
+ * The same PIN verifier and lockout rules, with Android's numeric password keyboard for everyone.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param challenge Challenge supplied to [SystemPinPrompt].
+ */
 @Composable
 internal fun SystemPinPrompt(session: SessionViewModel, challenge: Int) {
     var pin by remember(challenge) { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    /**
+     * Computes submit.
+     */
     fun submit() {
         if (session.account.busy || session.privacyBlackout || session.screen != SessionScreen.Pin ||
             session.pinChallengeVersion != challenge || !InputPolicy.validPin(pin)) return

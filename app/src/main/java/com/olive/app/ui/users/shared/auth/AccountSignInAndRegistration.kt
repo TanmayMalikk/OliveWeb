@@ -20,9 +20,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.olive.app.data.account.AccountRole
 
 
-// ALL ACCOUNT TYPES: role selection routes each person into the correct onboarding path.
-// USER and SAFE CONTACT can create accounts here; STAFF and ADMIN use administrator-issued logins.
-// UI sizing/text: the role menu inherits FormColumn spacing; descriptions intentionally use bodySmall and Muted so long translations can wrap.
+/**
+ * ALL ACCOUNT TYPES: role selection routes each person into the correct onboarding path. USER and SAFE CONTACT can create accounts here; STAFF and ADMIN use administrator-issued logins. UI sizing/text: the role menu inherits FormColumn spacing; descriptions intentionally use bodySmall and Muted so long translations can wrap.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Welcome(session: SessionViewModel) {
@@ -102,8 +104,12 @@ internal fun Welcome(session: SessionViewModel) {
     }
 }
 
-// ALL ACCOUNT TYPES: username/password sign-in. New-account creation is available only to USER and SAFE CONTACT.
-// UI sizing/text: credential fields use the shared full-width field size; password guidance uses bodySmall and Muted.
+/**
+ * ALL ACCOUNT TYPES: username/password sign-in. New-account creation is available only to USER and SAFE CONTACT. UI sizing/text: credential fields use the shared full-width field size; password guidance uses bodySmall and Muted.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param create Whether to apply create.
+ */
 @Composable
 internal fun Credentials(session: SessionViewModel, create: Boolean) {
     val uiText = rememberResourceText()
@@ -296,11 +302,20 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
 
 // All safe-app roles: shows PIN entry before opening the safe app.
 
-// USER ONLY: enrollment chooses a separate app PIN or Android device authentication.
+/**
+ * USER ONLY: enrollment chooses a separate app PIN or Android device authentication.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun DevicePin(session: SessionViewModel) = SafeEntrySetup(session)
 
-// UI sizing/text: PIN setup uses the shared form spacing and full-width fields; warning copy uses the Muted color.
+/**
+ * UI sizing/text: PIN setup uses the shared form spacing and full-width fields; warning copy uses the Muted color.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
@@ -370,8 +385,11 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     }
 }
 
-// USER ONLY: a cover trigger opens this local PIN challenge before private content is available.
-// App PIN entry uses the system numeric password keyboard for every user.
+/**
+ * USER ONLY: a cover trigger opens this local PIN challenge before private content is available. App PIN entry uses the system numeric password keyboard for every user.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun PinPrompt(session: SessionViewModel) {
     val challenge = session.pinChallengeVersion

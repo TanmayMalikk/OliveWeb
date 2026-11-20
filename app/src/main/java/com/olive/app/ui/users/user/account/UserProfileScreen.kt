@@ -48,7 +48,11 @@ import com.olive.app.ui.users.shared.safetyplan.TrustedContactLinkPicker
 import java.util.UUID
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
-// UI sizing/text: this back action keeps Material button sizing and localized text rather than a custom fixed size.
+/**
+ * UI sizing/text: this back action keeps Material button sizing and localized text rather than a custom fixed size.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafeBack(session: SessionViewModel) {
     TextButton(
@@ -60,8 +64,12 @@ internal fun SafeBack(session: SessionViewModel) {
     }
 }
 
-// Trusted people can be added or cleaned up here, but the app never auto-calls or auto-messages them.
-// UI sizing/text: contact cards use 16dp padding and Material title text; edits stay in shared full-width fields.
+/**
+ * Trusted people can be added or cleaned up here, but the app never auto-calls or auto-messages them. UI sizing/text: contact cards use 16dp padding and Material title text; edits stay in shared full-width fields.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -250,8 +258,12 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
     }
 }
 
-// Edit the private profile, safe-entry methods and authenticated trigger settings.
-// UI sizing/text: settings reuse shared form spacing and Material titleLarge section headings so translated labels can wrap.
+/**
+ * Edit the private profile, safe-entry methods and authenticated trigger settings. UI sizing/text: settings reuse shared form spacing and Material titleLarge section headings so translated labels can wrap.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()

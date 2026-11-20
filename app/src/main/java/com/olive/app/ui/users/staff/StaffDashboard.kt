@@ -43,7 +43,11 @@ import com.olive.app.data.safety.SafetyConsultation
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
-// Shows the staff workspace with assigned users, tickets, map, and settings.
+/**
+ * Shows the staff workspace with assigned users, tickets, map, and settings.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun StaffPortal(session: SessionViewModel) {
     LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
@@ -75,7 +79,15 @@ internal fun StaffPortal(session: SessionViewModel) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// Draws the staff workspace navigation and selected section.
+/**
+ * Draws the staff workspace navigation and selected section.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onSettings Callback invoked when settings changes or occurs.
+ * @param onSafetyPlans Callback invoked when safety plans changes or occurs.
+ * @param onMessages Callback invoked when messages changes or occurs.
+ * @param onMap Callback invoked when map changes or occurs.
+ */
 @Composable
 private fun StaffDashboard(
     session: SessionViewModel,
@@ -141,8 +153,12 @@ private fun StaffDashboard(
     }
 }
 
-// Staff: shows safety-plan consultation requests to staff.
-// Lists the plan-consult tickets assigned to this staff member.
+/**
+ * Staff: shows safety-plan consultation requests to staff. Lists the plan-consult tickets assigned to this staff member.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) {
     var selected by remember { mutableStateOf<SafetyConsultation?>(null) }
@@ -252,7 +268,16 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     }
 }
 
-// Staff and admins use the same collapsible consultation list so shared plan work looks consistent.
+/**
+ * Staff and admins use the same collapsible consultation list so shared plan work looks consistent.
+ *
+ * @param title Primary display title text.
+ * @param consultations Collection of consultations values to process.
+ * @param expanded Whether the expandable section is currently open.
+ * @param onExpandedChange Callback invoked when expanded change changes or occurs.
+ * @param showStaffName Whether to show staff name.
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun ConsultationGroup(
     title: String,

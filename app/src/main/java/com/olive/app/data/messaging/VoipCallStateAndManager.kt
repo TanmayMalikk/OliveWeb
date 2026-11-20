@@ -57,16 +57,31 @@ data class VoipCall(
     val endReason: String = "",
 )
 
+/**
+ * Computes connected participant count for this VoIP call.
+ *
+ * @return The computed connected participant count numeric value.
+ */
 fun VoipCall.connectedParticipantCount(): Int =
     participants.count { it.status == VoipParticipantStatus.ACCEPTED }
 
+/**
+ * Checks whether the caller can be rejoined by.
+ *
+ * @param userId User ID supplied to [canBeRejoinedBy].
+ * @return `true` if can be rejoined by, or `false` otherwise.
+ */
 fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
     status == VoipCallStatus.ACTIVE &&
         connectedParticipantCount() >= 2 &&
         participants.any { it.userId == userId && it.status == VoipParticipantStatus.DECLINED }
 
-// Lets an invited chat member enter an active call from its chat log.
-// Pending members accept the invitation, while disconnected members rejoin an established room.
+/**
+ * Lets an invited chat member enter an active call from its chat log. Pending members accept the invitation, while disconnected members rejoin an established room.
+ *
+ * @param userId User ID supplied to [canBeJoinedBy].
+ * @return `true` if can be joined by, or `false` otherwise.
+ */
 fun VoipCall.canBeJoinedBy(userId: String): Boolean {
     return status == VoipCallStatus.ACTIVE && when (participants.firstOrNull { it.userId == userId }?.status) {
         VoipParticipantStatus.PENDING, VoipParticipantStatus.ACCEPTED -> true
@@ -75,6 +90,12 @@ fun VoipCall.canBeJoinedBy(userId: String): Boolean {
     }
 }
 
+/**
+ * Computes other party name for this VoIP call.
+ *
+ * @param currentUid Current user ID supplied to [otherPartyName].
+ * @return The resulting other party name string.
+ */
 internal fun VoipCall.otherPartyName(currentUid: String): String =
     if (callerId == currentUid) name else callerName.ifBlank { name }
 
@@ -102,6 +123,12 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
+/**
+ * Checks whether VoIP API configured.
+ *
+ * @param apiBaseUrl API base URL supplied to [isVoipApiConfigured].
+ * @return `true` if is VoIP API configured, or `false` otherwise.
+ */
 internal fun isVoipApiConfigured(apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL): Boolean =
     apiBaseUrl.isNotBlank()
 
@@ -142,7 +169,16 @@ class VoipManager(
         }
     }
 
-    // Creates a new call record and invites each selected participant.
+    /**
+     * Creates a new call record and invites each selected participant.
+     *
+     * @param name Field, key, or display name.
+     * @param callerId Firebase UID of the caller initiating the call.
+     * @param participantIds Collection of participant IDs values to process.
+     * @param callerName Caller name supplied to [startCall].
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @return The resulting [VoipCall] for start call.
+     */
     suspend fun startCall(
         name: String,
         callerId: String,
@@ -170,6 +206,12 @@ class VoipManager(
         return parseCall(request("POST", "/api/calls", body))
     }
 
+    /**
+     * Returns live kit connection details.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @return The resulting [LiveKitConnectionDetails] for get live kit connection details.
+     */
     suspend fun getLiveKitConnectionDetails(callId: String): LiveKitConnectionDetails {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
         val response = request(
@@ -184,13 +226,22 @@ class VoipManager(
         )
     }
 
-    // Loads every call record currently visible to the signed-in client.
+    /**
+     * Loads every call record currently visible to the signed-in client.
+     *
+     * @return List of resulting list calls items.
+     */
     suspend fun listCalls(): List<VoipCall> {
         val response = request("GET", "/api/calls")
         return response.getJSONArray("calls").toCallList()
     }
 
-    // Loads the unanswered call invitations for one user.
+    /**
+     * Loads the unanswered call invitations for one user.
+     *
+     * @param userId User ID supplied to [getIncomingCalls].
+     * @return List of resulting get incoming calls items.
+     */
     suspend fun getIncomingCalls(userId: String): List<VoipInvitation> {
         require(userId.isNotBlank()) { "User ID must not be blank" }
         val encodedUserId = withContext(Dispatchers.IO) {
@@ -200,7 +251,13 @@ class VoipManager(
         return response.getJSONArray("invitations").toInvitationList()
     }
 
-    // Polls the server and updates the ringing state until the collector stops.
+    /**
+     * Polls the server and updates the ringing state until the collector stops.
+     *
+     * @param userId User ID supplied to [receiveCalls].
+     * @param pollingIntervalMillis Duration or timestamp for polling interval, in milliseconds.
+     * @return The resulting [Flow] for receive calls.
+     */
     fun receiveCalls(
         userId: String,
         pollingIntervalMillis: Long = DEFAULT_POLLING_INTERVAL_MILLIS
@@ -222,27 +279,52 @@ class VoipManager(
         }.distinctUntilChanged()
     }
 
-    // Accepts the incoming VoIP call and starts its audio session.
+    /**
+     * Accepts the incoming VoIP call and starts its audio session.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @param userId User ID supplied to [acceptCall].
+     * @return The resulting [VoipCall] for accept call.
+     */
     suspend fun acceptCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "accept")
 
-    // Declines the incoming VoIP call and closes its session.
+    /**
+     * Declines the incoming VoIP call and closes its session.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @param userId User ID supplied to [declineCall].
+     * @return The resulting [VoipCall] for decline call.
+     */
     suspend fun declineCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "decline")
 
-    // Deletes the server call record after the call has ended.
+    /**
+     * Deletes the server call record after the call has ended.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     */
     suspend fun endCall(callId: String) {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
         request("POST", "/calls/end", JSONObject().put("callId", callId))
     }
 
-    // Removes this phone from a group call without disconnecting everyone else.
+    /**
+     * Removes this phone from a group call without disconnecting everyone else.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     */
     suspend fun leaveCall(callId: String) {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
         request("POST", "/api/calls/${encodePathSegment(callId)}/leave", JSONObject())
     }
 
-    // Restores a previous member while at least two people are still in the group call.
+    /**
+     * Restores a previous member while at least two people are still in the group call.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @return The resulting [VoipCall] for rejoin call.
+     */
     suspend fun rejoinCall(callId: String): VoipCall {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
         return parseCall(
@@ -250,6 +332,12 @@ class VoipManager(
         )
     }
 
+    /**
+     * Registers push token.
+     *
+     * @param deviceId Stable identifier for this device installation.
+     * @param token Authentication, push notification, or session token.
+     */
     suspend fun registerPushToken(deviceId: String, token: String) {
         require(deviceId.isNotBlank()) { "Device ID must not be blank" }
         require(token.isNotBlank()) { "Push token must not be blank" }
@@ -260,12 +348,24 @@ class VoipManager(
         )
     }
 
+    /**
+     * Unregisters push token.
+     *
+     * @param deviceId Stable identifier for this device installation.
+     */
     suspend fun unregisterPushToken(deviceId: String) {
         require(deviceId.isNotBlank()) { "Device ID must not be blank" }
         request("DELETE", "/notifications/register", JSONObject().put("deviceId", deviceId))
     }
 
-    // Sends one user's accept or decline choice to the matching call endpoint.
+    /**
+     * Sends one user's accept or decline choice to the matching call endpoint.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @param userId User ID supplied to [respondToInvitation].
+     * @param response Response supplied to [respondToInvitation].
+     * @return The resulting [VoipCall] for respond to invitation.
+     */
     private suspend fun respondToInvitation(
         callId: String,
         userId: String,
@@ -277,7 +377,14 @@ class VoipManager(
         return parseCall(request("POST", "/api/calls/${encodePathSegment(callId)}/$response", body))
     }
 
-    // Runs one authenticated API request and converts its response into JSON.
+    /**
+     * Runs one authenticated API request and converts its response into JSON.
+     *
+     * @param method Method supplied to [request].
+     * @param path Path supplied to [request].
+     * @param body Body text content, or null when not provided.
+     * @return JSON object representing request.
+     */
     private suspend fun request(method: String, path: String, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
             check(isVoipApiConfigured(baseUrl)) {
@@ -295,7 +402,15 @@ class VoipManager(
             }
         }
 
-    // Builds one request with the Firebase identity currently available for this signed-in account.
+    /**
+     * Builds one request with the Firebase identity currently available for this signed-in account.
+     *
+     * @param method Method supplied to [authenticatedRequest].
+     * @param path Path supplied to [authenticatedRequest].
+     * @param body Body text content, or null when not provided.
+     * @param bearerToken Optional bearer token supplied to [authenticatedRequest].
+     * @return The resulting [Request] for authenticated request.
+     */
     private fun authenticatedRequest(
         method: String,
         path: String,
@@ -312,7 +427,12 @@ class VoipManager(
         return requestBuilder.build()
     }
 
-    // Retries only DNS lookup failures, then parses the server response or reports its exact error.
+    /**
+     * Retries only DNS lookup failures, then parses the server response or reports its exact error.
+     *
+     * @param request Request supplied to [executeWithDnsRetries].
+     * @return JSON object representing execute with dns retries.
+     */
     private suspend fun executeWithDnsRetries(request: Request): JSONObject {
             // Unknown-host failures happen before a request reaches the server, so retrying cannot
             // create a duplicate call. This gives Android time to refresh a recently changed DNS entry.
@@ -352,7 +472,12 @@ class VoipManager(
             )
     }
 
-    // Converts one call JSON object into the model used by the app.
+    /**
+     * Converts one call JSON object into the model used by the app.
+     *
+     * @param json JSON object containing serialized fields.
+     * @return The resulting [VoipCall] for parse call.
+     */
     private fun parseCall(json: JSONObject): VoipCall =
         VoipCall(
             callId = json.getString("callId"),
@@ -372,11 +497,19 @@ class VoipManager(
             endReason = json.optString("endReason"),
         )
 
-    // Converts a server array into call models.
+    /**
+     * Converts a server array into call models.
+     *
+     * @return List of resulting to call list items.
+     */
     private fun JSONArray.toCallList(): List<VoipCall> =
         (0 until length()).map { parseCall(getJSONObject(it)) }
 
-    // Converts a server array into invitation models for the ringing screen.
+    /**
+     * Converts a server array into invitation models for the ringing screen.
+     *
+     * @return List of resulting to invitation list items.
+     */
     private fun JSONArray.toInvitationList(): List<VoipInvitation> =
         (0 until length()).map { index ->
             getJSONObject(index).let {
@@ -390,7 +523,11 @@ class VoipManager(
             }
         }
 
-    // Converts a server array into the participants and their current responses.
+    /**
+     * Converts a server array into the participants and their current responses.
+     *
+     * @return List of resulting to participant list items.
+     */
     private fun JSONArray.toParticipantList(): List<VoipParticipant> =
         (0 until length()).map { index ->
             getJSONObject(index).let {
@@ -401,7 +538,12 @@ class VoipManager(
             }
         }
 
-    // Validates a server status before exposing it to the rest of the app.
+    /**
+     * Validates a server status before exposing it to the rest of the app.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting [VoipParticipantStatus] for parse participant status.
+     */
     private fun parseParticipantStatus(value: String): VoipParticipantStatus =
         try {
             VoipParticipantStatus.valueOf(value.uppercase(Locale.ROOT))
@@ -409,6 +551,12 @@ class VoipManager(
             throw IOException("VoIP API returned an unknown participant status", error)
         }
 
+    /**
+     * Parses call status.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting [VoipCallStatus] for parse call status.
+     */
     private fun parseCallStatus(value: String): VoipCallStatus =
         try {
             VoipCallStatus.valueOf(value.uppercase(Locale.ROOT))
@@ -416,7 +564,12 @@ class VoipManager(
             throw IOException("VoIP API returned an unknown call status", error)
         }
 
-    // Escapes a call ID so special characters cannot change the request path.
+    /**
+     * Escapes a call ID so special characters cannot change the request path.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting encode path segment string.
+     */
     private fun encodePathSegment(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
 

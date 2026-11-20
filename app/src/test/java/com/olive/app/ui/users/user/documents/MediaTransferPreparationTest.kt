@@ -146,6 +146,49 @@ class MediaTransferPreparationTest {
                             it.arguments[0] == MediaUploadWorker.workName(id) &&
                             it.arguments[1] == ExistingWorkPolicy.REPLACE
                     })
+                    val cancelled = mock(WorkInfo::class.java)
+                    `when`(cancelled.state).thenReturn(WorkInfo.State.CANCELLED)
+                    f.workerUpdates.value = listOf(cancelled)
+                    f.session.await { (f.controller.state as? MediaTransferState.Failed)?.retryable == true }
+
+                    val enqueued = mock(WorkInfo::class.java)
+                    `when`(enqueued.state).thenReturn(WorkInfo.State.ENQUEUED)
+                    f.workerUpdates.value = listOf(enqueued)
+                    f.session.await { f.controller.state == MediaTransferState.Queued(id) }
+
+                    val succeeded = mock(WorkInfo::class.java)
+                    `when`(succeeded.state).thenReturn(WorkInfo.State.SUCCEEDED)
+                    `when`(succeeded.outputData).thenReturn(workDataOf(MediaUploadWorker.MEDIA_ID to "media-9"))
+                    f.workerUpdates.value = listOf(succeeded)
+                    f.session.await { f.controller.state == MediaTransferState.Completed(id, "media-9") }
+
+                    f.store.write(
+                        initial.copy(
+                            status = MediaTransferStatus.UPLOADING,
+                            partSize = 10L,
+                            completedParts = mapOf(1 to "e1", 2 to "e2"),
+                        ),
+                    )
+                    var failedRetake = ""
+                    f.controller.queueDocument(
+                        Uri.fromFile(source),
+                        owner,
+                        OcrReview.RETAKE_RECOMMENDED,
+                        onQueued = { fail() },
+                        onFailure = { failedRetake = it },
+                    )
+                    assertTrue(failedRetake.contains("quality review"))
+
+                    var failedMissing = ""
+                    f.controller.queueDocument(
+                        Uri.parse("file:///nonexistent/missing-document.bin"),
+                        owner,
+                        OcrReview.NOT_APPLICABLE,
+                        onQueued = { fail() },
+                        onFailure = { failedMissing = it },
+                    )
+                    f.session.await { failedMissing.isNotEmpty() }
+
                     f.controller.clearState()
                     assertEquals(MediaTransferState.Idle, f.controller.state)
                     assertTrue(f.controller.uploads.isEmpty())
@@ -158,4 +201,27 @@ class MediaTransferPreparationTest {
         }
     }
 
+
+    @Test
+    fun pendingVoiceMessageSerializationAndJobConversion() {
+        val voice = PendingVoiceMessage("conv-1", "alice", "wrapped-key", "meta")
+        val json = voice.toJson()
+        val parsed = PendingVoiceMessage.fromJson(json)
+        assertEquals(voice, parsed)
+
+        val entity = MediaUploadJobEntity(
+            id = "job-1",
+            filePath = "/path/to/voice.olive",
+            ciphertextSize = 100L,
+            ciphertextSha256 = "abc",
+            encryptedMetadata = "enc-meta",
+            wrappedKeys = mapOf("alice" to "wrapped"),
+            allowedUsers = listOf("alice"),
+            targetObjectKey = "key-1",
+            createdAt = 1000L,
+            voiceDraft = voice,
+        )
+        val model = entity.toModel()
+        assertEquals(voice, model.voiceDraft)
+    }
 }

@@ -37,6 +37,16 @@ object DetPreprocessor {
     private val std = doubleArrayOf(0.229, 0.224, 0.225)
     private const val scale = 1.0 / 255.0
 
+    /**
+     * Computes preprocess.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @param limitSideLen Limit side len supplied to [preprocess].
+     * @param limitType Limit type supplied to [preprocess].
+     * @param maxSideLimit Maximum side limit supplied to [preprocess].
+     * @param imgMode Img mode supplied to [preprocess].
+     * @return The resulting [DetPreprocessResult] instance.
+     */
     fun preprocess(
         bitmap: Bitmap,
         limitSideLen: Int,
@@ -52,6 +62,16 @@ object DetPreprocessor {
         }
     }
 
+    /**
+     * Computes preprocess.
+     *
+     * @param src Src supplied to [preprocess].
+     * @param limitSideLen Limit side len supplied to [preprocess].
+     * @param limitType Limit type supplied to [preprocess].
+     * @param maxSideLimit Maximum side limit supplied to [preprocess].
+     * @param imgMode Img mode supplied to [preprocess].
+     * @return The resulting [DetPreprocessResult] instance.
+     */
     fun preprocess(
         src: Mat,
         limitSideLen: Int,

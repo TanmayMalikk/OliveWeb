@@ -6,7 +6,21 @@ import com.olive.app.R
 import com.olive.app.data.account.*
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 import java.util.concurrent.ConcurrentHashMap
+
+internal data class AdminPreloaderUiState(
+    val foregroundLoads: Set<String> = emptySet(),
+    val accountsCache: List<AdminAccountSummary>? = null,
+    val staffCache: List<AdminAccountSummary>? = null,
+    val loadingAccounts: Boolean = false,
+    val loadingStaff: Boolean = false,
+    val accountsError: Int? = null,
+    val staffError: Int? = null,
+)
 
 // In-memory admin data belongs to one authenticated session, including legitimately empty results.
 internal class AdminDataPreloader(private val runtime: SessionRuntime) {
@@ -14,28 +28,65 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
     private val jobs = ConcurrentHashMap<Dataset, Job>()
     private val refreshedAt = ConcurrentHashMap<Dataset, Long>()
     private var owner: Pair<String, Long>? = null
-    private var foregroundLoads by mutableStateOf(emptySet<Dataset>())
-    private var accountsCache by mutableStateOf<List<AdminAccountSummary>?>(null)
-    private var staffCache by mutableStateOf<List<AdminAccountSummary>?>(null)
-    var loadingAccounts by mutableStateOf(false)
-        private set
-    var loadingStaff by mutableStateOf(false)
-        private set
-    var accountsError by mutableStateOf<Int?>(null)
-        private set
-    var staffError by mutableStateOf<Int?>(null)
-        private set
+    private val uiStateFlow = MutableStateFlow(AdminPreloaderUiState())
+    val uiState: StateFlow<AdminPreloaderUiState> = uiStateFlow.asStateFlow()
+    private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
+
+    private inline fun updateUiState(transform: (AdminPreloaderUiState) -> AdminPreloaderUiState) {
+        uiStateSnapshot = uiStateFlow.updateAndGet(transform)
+    }
+
+    private var foregroundLoads: Set<String>
+        get() = uiStateSnapshot.foregroundLoads
+        set(value) = updateUiState { it.copy(foregroundLoads = value) }
+    private var accountsCache: List<AdminAccountSummary>?
+        get() = uiStateSnapshot.accountsCache
+        set(value) = updateUiState { it.copy(accountsCache = value) }
+    private var staffCache: List<AdminAccountSummary>?
+        get() = uiStateSnapshot.staffCache
+        set(value) = updateUiState { it.copy(staffCache = value) }
+    var loadingAccounts: Boolean
+        get() = uiStateSnapshot.loadingAccounts
+        private set(value) = updateUiState { it.copy(loadingAccounts = value) }
+    var loadingStaff: Boolean
+        get() = uiStateSnapshot.loadingStaff
+        private set(value) = updateUiState { it.copy(loadingStaff = value) }
+    var accountsError: Int?
+        get() = uiStateSnapshot.accountsError
+        private set(value) = updateUiState { it.copy(accountsError = value) }
+    var staffError: Int?
+        get() = uiStateSnapshot.staffError
+        private set(value) = updateUiState { it.copy(staffError = value) }
+    /**
+     * Returns the session.
+     *
+     * @return The resulting session.
+     */
     private fun session() = runtime.coverAccountId?.let { it to runtime.epoch }
+    /**
+     * Computes authorized.
+     *
+     * @param token Authentication, push notification, or session token.
+     * @return The resulting authorized.
+     */
     private fun authorized(token: Pair<String, Long>) = session() == token &&
         runtime.state.accountRole == AccountRole.ADMIN && runtime.state.screen == SessionScreen.Portal
+    /**
+     * Returns the owns cache.
+     *
+     * @return The resulting owns cache.
+     */
     private fun ownsCache() = owner == session() && runtime.state.accountRole == AccountRole.ADMIN
     val accounts get() = if (ownsCache() || owner == null && runtime.state.accountRole == AccountRole.ADMIN) accountsCache ?: runtime.state.adminAccounts else emptyList()
     val staff get() = if (ownsCache() || owner == null && runtime.state.accountRole == AccountRole.ADMIN) staffCache ?: runtime.state.adminAccounts.filter { it.role == AccountRole.STAFF } else emptyList()
     val accountsReady get() = ownsCache() && accountsCache != null
     val staffReady get() = ownsCache() && staffCache != null
-    val showAccountsSkeleton get() = loadingAccounts && (!accountsReady || Dataset.Accounts in foregroundLoads)
-    val showStaffSkeleton get() = loadingStaff && (!staffReady || Dataset.Staff in foregroundLoads)
+    val showAccountsSkeleton get() = loadingAccounts && (!accountsReady || Dataset.Accounts.name in foregroundLoads)
+    val showStaffSkeleton get() = loadingStaff && (!staffReady || Dataset.Staff.name in foregroundLoads)
 
+    /**
+     * Clears the admin data preloader.
+     */
     fun clear() {
         jobs.values.toList().forEach(Job::cancel)
         jobs.clear()
@@ -52,16 +103,42 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
         runtime.state.setAdminSummary("", AccountCounts())
     }
 
+    /**
+     * Computes preload.
+     */
     fun preload() {
         summary()
         accounts()
         staff()
     }
+    /**
+     * Computes summary.
+     *
+     * @param force Whether to apply force.
+     * @return The resulting summary.
+     */
     fun summary(force: Boolean = false) = load(Dataset.Summary, force)
+    /**
+     * Computes accounts.
+     *
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
     fun accounts(force: Boolean = false, showLoading: Boolean = false) = load(Dataset.Accounts, force, showLoading)
+    /**
+     * Computes staff.
+     *
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
     fun staff(force: Boolean = false, showLoading: Boolean = false) = load(Dataset.Staff, force, showLoading)
 
-    // A mutation replaces the directory immediately; workload totals refresh independently.
+    /**
+     * A mutation replaces the directory immediately; workload totals refresh independently.
+     *
+     * @param rows Collection of rows values to process.
+     * @param counts Counts supplied to [adopt].
+     */
     fun adopt(rows: List<AdminAccountSummary>, counts: AccountCounts) {
         val token = session() ?: return
         if (!authorized(token)) return
@@ -73,7 +150,7 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
         runtime.state.adminAccounts = rows
         runtime.state.setAdminSummary(token.first, counts)
         loadingAccounts = false
-        foregroundLoads = foregroundLoads - Dataset.Accounts
+        foregroundLoads = foregroundLoads - Dataset.Accounts.name
         accountsError = null
         refreshedAt[Dataset.Accounts] = SystemClock.elapsedRealtime()
         refreshedAt[Dataset.Summary] = SystemClock.elapsedRealtime()
@@ -81,18 +158,25 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
         staff(force = true)
     }
 
+    /**
+     * Loads the admin data preloader.
+     *
+     * @param dataset Dataset supplied to [load].
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
     private fun load(dataset: Dataset, force: Boolean, showLoading: Boolean = false) {
         val token = session() ?: return
         val repository = runtime.adminRepository ?: return
         if (!authorized(token)) return
         if (owner != token) { clear(); owner = token }
         if (jobs[dataset]?.isActive == true) {
-            if (showLoading) foregroundLoads = foregroundLoads + dataset
+            if (showLoading) foregroundLoads = foregroundLoads + dataset.name
             return
         }
         val now = SystemClock.elapsedRealtime()
         if (!force && refreshedAt[dataset]?.let { now - it < 90_000 } == true) return
-        foregroundLoads = if (showLoading) foregroundLoads + dataset else foregroundLoads - dataset
+        foregroundLoads = if (showLoading) foregroundLoads + dataset.name else foregroundLoads - dataset.name
         when (dataset) {
             Dataset.Accounts -> { loadingAccounts = true; accountsError = null }
             Dataset.Staff -> { loadingStaff = true; staffError = null }
@@ -124,7 +208,7 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
             } finally {
                 if (jobs[dataset] === coroutineContext.job) {
                     jobs.remove(dataset)
-                    foregroundLoads = foregroundLoads - dataset
+                    foregroundLoads = foregroundLoads - dataset.name
                     if (dataset == Dataset.Accounts) loadingAccounts = false
                     if (dataset == Dataset.Staff) loadingStaff = false
                 }

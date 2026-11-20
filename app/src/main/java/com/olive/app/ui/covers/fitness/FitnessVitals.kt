@@ -61,7 +61,11 @@ import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-// Shows daily heart-rate ranges, averages, and watch status.
+/**
+ * Shows daily heart-rate ranges, averages, and watch status.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -139,7 +143,13 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     }
 }
 
-// Draws up to 14 days of heart-rate ranges and the selected-day summary.
+/**
+ * Draws up to 14 days of heart-rate ranges and the selected-day summary.
+ *
+ * @param history Collection of history values to process.
+ * @param selectedDate Selected date supplied to [HeartRateGraphCard].
+ * @param onDateSelected Callback invoked when date selected changes or occurs.
+ */
 @Composable
 private fun HeartRateGraphCard(
     history: List<HeartRateVitals>,
@@ -376,7 +386,12 @@ private fun HeartRateGraphCard(
     }
 }
 
-// Explains whether recent Wear OS heart-rate data is available.
+/**
+ * Explains whether recent Wear OS heart-rate data is available.
+ *
+ * @param vitals Vitals supplied to [WatchStatusCard].
+ * @param watchConnected Whether to apply watch connected.
+ */
 @Composable
 private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
@@ -444,7 +459,11 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     }
 }
 
-// Shows peak, lowest, resting, and average heart rate for the selected day.
+/**
+ * Shows peak, lowest, resting, and average heart rate for the selected day.
+ *
+ * @param vitals Vitals supplied to [VitalsGrid].
+ */
 @Composable
 private fun VitalsGrid(vitals: HeartRateVitals) {
     val bpm = stringResource(R.string.fitness_bpm)
@@ -480,7 +499,14 @@ private fun VitalsGrid(vitals: HeartRateVitals) {
     }
 }
 
-// Draws one heart-rate value with its label and unit.
+/**
+ * Draws one heart-rate value with its label and unit.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param unit Unit supplied to [VitalsMetricCard].
+ */
 @Composable
 private fun VitalsMetricCard(
     modifier: Modifier,
@@ -512,7 +538,11 @@ private fun VitalsMetricCard(
     }
 }
 
-// Shows setup help when no Wear OS data has been received.
+/**
+ * Shows setup help when no Wear OS data has been received.
+ *
+ * @param message Chat message or remote payload.
+ */
 @Composable
 private fun WatchMessageCard(message: String) {
     Card(

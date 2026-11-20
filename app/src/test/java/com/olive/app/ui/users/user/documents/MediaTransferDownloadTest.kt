@@ -198,4 +198,27 @@ class MediaTransferDownloadTest {
             opened.delete()
         }
     }
+
+    @Test
+    fun recentUploadPromotionRevalidationAndHttpErrorsAreHandledCleanly() = runBlocking<Unit> {
+        Fixture().use { f ->
+            `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(true)
+            `when`(f.cache.verifiedCiphertext("owner", f.document)).thenReturn(null, f.encrypted, null, f.encrypted, null)
+            val promoted = f.controller.downloadFile(f.document, "owner")
+            assertArrayEquals(f.plaintext, promoted.readBytes())
+            promoted.delete()
+
+            `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(false)
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.REVALIDATION_REQUIRED)
+            f.ticket()
+            val revalidated = f.controller.downloadFile(f.document, "owner")
+            assertArrayEquals(f.plaintext, revalidated.readBytes())
+            verify(f.cache).markRevalidated("owner", "doc")
+            revalidated.delete()
+
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.status = 500
+            assertThrows(IllegalStateException::class.java) { runBlocking { f.controller.downloadFile(f.document, "owner") } }
+        }
+    }
 }

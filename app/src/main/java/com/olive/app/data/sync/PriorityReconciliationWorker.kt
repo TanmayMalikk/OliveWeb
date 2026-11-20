@@ -29,6 +29,7 @@ import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.data.messaging.ChatCacheStore
 import com.olive.app.data.messaging.MessageOutboxStore
 import com.olive.app.data.messaging.MessagingRepository
+import com.olive.app.data.network.cloudStringMap
 import com.olive.app.data.safety.DocumentIndexStore
 import com.olive.app.data.safety.DocumentListSource
 import com.olive.app.data.safety.SafetyAccessIndexStore
@@ -51,6 +52,11 @@ class PriorityReconciliationWorker(
     context: Context,
     parameters: WorkerParameters,
 ) : CoroutineWorker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result {
         if (!BuildConfig.FIREBASE_CONFIGURED) return Result.success()
         val uid = inputData.getString(INPUT_UID)?.takeIf(String::isNotBlank) ?: return Result.failure()
@@ -97,6 +103,14 @@ class PriorityReconciliationWorker(
         }
     }
 
+    /**
+     * Revokes the priority reconciliation worker.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param checkpoints Checkpoints supplied to [revoke].
+     * @param auth Auth supplied to [revoke].
+     * @return The resulting [Result] instance.
+     */
     private fun revoke(
         uid: String,
         checkpoints: SyncCheckpointDataSource,
@@ -109,6 +123,12 @@ class PriorityReconciliationWorker(
         return Result.success()
     }
 
+    /**
+     * Purges revoked account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param checkpoints Checkpoints supplied to [purgeRevokedAccount].
+     */
     private fun purgeRevokedAccount(uid: String, checkpoints: SyncCheckpointDataSource) {
         MessageOutboxStore(applicationContext).purge(uid)
         ChatCacheStore(applicationContext).purge(uid)
@@ -128,6 +148,14 @@ class PriorityReconciliationWorker(
 
         private val scheduledRevisions = ConcurrentHashMap<String, Long>()
 
+        /**
+         * Enqueues the priority reconciliation worker.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param uid Firebase UID of the target user account.
+         * @param revision Optional revision supplied to [enqueue].
+         * @param expedited Whether to apply expedited.
+         */
         fun enqueue(
             context: Context,
             uid: String,
@@ -162,6 +190,12 @@ class PriorityReconciliationWorker(
             )
         }
 
+        /**
+         * Cancels the priority reconciliation worker.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param uid Firebase UID of the target user account.
+         */
         fun cancel(context: Context, uid: String) {
             scheduledRevisions.remove(uid)
             WorkManager.getInstance(context.applicationContext)
@@ -176,6 +210,12 @@ internal class SyncCheckpointStore(
 ) : SyncCheckpointDataSource {
     constructor(context: Context) : this(EncryptedVault(context.applicationContext, "priority-sync"))
 
+    /**
+     * Reads the sync checkpoint store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SyncCheckpoint] instance.
+     */
     override fun read(uid: String): SyncCheckpoint {
         require(validUid(uid))
         val value = runCatching { vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(uid) }
@@ -197,6 +237,12 @@ internal class SyncCheckpointStore(
         }
     }
 
+    /**
+     * Writes the sync checkpoint store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param checkpoint Checkpoint supplied to [write].
+     */
     override fun write(uid: String, checkpoint: SyncCheckpoint) {
         require(validUid(uid))
         val revisions = checkpoint.revisions
@@ -211,12 +257,29 @@ internal class SyncCheckpointStore(
         }
     }
 
+    /**
+     * Purges the sync checkpoint store.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override fun purge(uid: String) {
         require(validUid(uid))
         runCatching { vault.update { it.optJSONObject(ACCOUNTS)?.remove(uid) } }
     }
 
+    /**
+     * Computes non negative for this JSON object.
+     *
+     * @param name Field, key, or display name.
+     * @return The computed non negative numeric value.
+     */
     private fun JSONObject.nonNegative(name: String): Long = getLong(name).also { require(it >= 0) }
+    /**
+     * Validates user ID.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting valid user ID.
+     */
     private fun validUid(uid: String) = uid.isNotBlank() && uid.length <= 128
 
     private companion object {
@@ -231,23 +294,46 @@ internal class SyncCheckpointStore(
     }
 }
 
-// Signed-in accounts: lets active screens reload encrypted local results without adding backend listeners.
-internal object SyncCompletionEvents {
-    private val mutableEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
+internal open class UidEventBus(extraBufferCapacity: Int) {
+    private val mutableEvents = MutableSharedFlow<String>(extraBufferCapacity = extraBufferCapacity)
     val events = mutableEvents.asSharedFlow()
-    fun publish(uid: String) { mutableEvents.tryEmit(uid) }
+
+    /**
+     * Publishes a user ID event to active collectors.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
+    fun publish(uid: String) {
+        mutableEvents.tryEmit(uid)
+    }
 }
+
+// Signed-in accounts: lets active screens reload encrypted local results without adding backend listeners.
+internal object SyncCompletionEvents : UidEventBus(8)
 
 // Signed-in accounts: closes an active private session after authoritative account revocation.
-internal object AccountRevocationEvents {
-    private val mutableEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val events = mutableEvents.asSharedFlow()
-    fun publish(uid: String) { mutableEvents.tryEmit(uid) }
-}
+internal object AccountRevocationEvents : UidEventBus(1)
 
 internal interface SyncCheckpointDataSource {
+    /**
+     * Reads the sync checkpoint data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SyncCheckpoint] instance.
+     */
     fun read(uid: String): SyncCheckpoint
+    /**
+     * Writes the sync checkpoint data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param checkpoint Checkpoint supplied to [write].
+     */
     fun write(uid: String, checkpoint: SyncCheckpoint)
+    /**
+     * Purges the sync checkpoint data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun purge(uid: String)
 }
 
@@ -257,6 +343,11 @@ internal data class SyncCheckpoint(
 )
 
 internal fun interface PriorityDomainReconciler {
+    /**
+     * Reconciles the priority domain reconciler.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun reconcile(uid: String)
 }
 
@@ -267,6 +358,13 @@ internal class PriorityReconciliationRunner(
     private val activeUid: () -> String?,
     private val reconcilers: Map<SyncDomain, PriorityDomainReconciler>,
 ) {
+    /**
+     * Reconciles the priority reconciliation runner.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param target Target destination or output object to write to.
+     * @return The resulting [ReconciliationOutcome] instance.
+     */
     suspend fun reconcile(uid: String, target: SyncRevisions): ReconciliationOutcome {
         if (activeUid() != uid) return ReconciliationOutcome.STALE_ACCOUNT
         var checkpoint = checkpoints.read(uid)
@@ -302,6 +400,11 @@ internal class PriorityReconciliationRunner(
 internal class AccountAccessReconciler(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) : PriorityDomainReconciler {
+    /**
+     * Reconciles the account access reconciler.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun reconcile(uid: String) {
         val user = auth.currentUser ?: error("Authentication is unavailable")
         check(user.uid == uid) { "Signed-in account changed" }
@@ -316,6 +419,11 @@ internal class ConversationAccessReconciler(
 ) : PriorityDomainReconciler {
     private val cache = ChatCacheStore(context.applicationContext)
 
+    /**
+     * Reconciles the conversation access reconciler.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun reconcile(uid: String) {
         val conversations = repository.listConversations(uid)
         check(FirebaseAuth.getInstance().currentUser?.uid == uid) { "Signed-in account changed" }
@@ -329,6 +437,11 @@ internal class DocumentAccessReconciler(
 ) : PriorityDomainReconciler {
     private val application = context.applicationContext
 
+    /**
+     * Reconciles the document access reconciler.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun reconcile(uid: String) {
         val snapshot = SafetyDocumentRepository(media = MediaRepository()).listFor(uid)
         check(snapshot.source == DocumentListSource.SERVER)
@@ -348,6 +461,11 @@ internal class SafetyPlanReconciler(
     private val store = SafetyPlanStore(context.applicationContext, false)
     private val accessIndex = SafetyAccessIndexStore(context.applicationContext)
 
+    /**
+     * Reconciles the safety plan reconciler.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun reconcile(uid: String) {
         val user = auth.currentUser ?: error("Authentication is unavailable")
         check(user.uid == uid) { "Signed-in account changed" }
@@ -367,17 +485,6 @@ internal class SafetyPlanReconciler(
             val remote = repository.get(owner) ?: continue
             check(auth.currentUser?.uid == uid) { "Signed-in account changed" }
             store.mergeRemote(uid, remote)
-        }
-    }
-}
-
-/** Reads a complete string-keyed record without trusting erased Firebase generic types. */
-internal fun Any?.cloudStringMap(): Map<String, String>? {
-    val fields = this as? Map<*, *> ?: return null
-    return buildMap {
-        for ((key, value) in fields) {
-            if (key !is String || value !is String) return null
-            put(key, value)
         }
     }
 }

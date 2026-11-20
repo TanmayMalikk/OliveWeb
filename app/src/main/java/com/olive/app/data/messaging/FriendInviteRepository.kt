@@ -4,6 +4,9 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.network.requireLong
+import com.olive.app.data.network.requireString
+import com.olive.app.data.network.requireStringKeyedMap
 import kotlinx.coroutines.tasks.await
 
 data class FriendInvite(val code: String, val link: String, val expiresAt: Long)
@@ -22,9 +25,9 @@ class FriendInviteRepository(
     suspend fun create(refresh: Boolean = false): FriendInvite {
         val uid = currentUid()
         val data = functions().getHttpsCallable("friendInviteCreate")
-            .call(mapOf("refresh" to refresh)).await().data as Map<*, *>
+            .call(mapOf("refresh" to refresh)).await().data.requireStringKeyedMap("friendInviteCreate")
         check(currentUid() == uid) { "Your account changed. Open Invite again." }
-        return FriendInvite(data["code"] as String, data["link"] as String, (data["expiresAt"] as Number).toLong())
+        return FriendInvite(data.requireString("code"), data.requireString("link"), data.requireLong("expiresAt"))
     }
 
     /**
@@ -39,9 +42,9 @@ class FriendInviteRepository(
         val username = checkNotNull(user.email).substringBefore('@')
         MessagingRepository().registerUser(AccountIdentity(uid, username))
         val data = functions().getHttpsCallable("friendInviteClaim")
-            .call(mapOf("code" to code.trim())).await().data as Map<*, *>
+            .call(mapOf("code" to code.trim())).await().data.requireStringKeyedMap("friendInviteClaim")
         check(currentUid() == uid) { "Your account changed. Reopen Messages." }
-        return data["username"] as String
+        return data.requireString("username")
     }
 
     /**

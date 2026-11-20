@@ -45,6 +45,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
+/**
+ * Renders the fitness coach page UI.
+ *
+ * @param accountId Account ID supplied to [FitnessCoachPage].
+ * @param cloudAvailable Whether to apply cloud available.
+ * @param store Store supplied to [FitnessCoachPage].
+ * @param history Collection of history values to process.
+ * @param dataLoading Whether to apply data loading.
+ * @param onGoalsSaved Callback invoked when goals saved changes or occurs.
+ */
 @Composable
 internal fun FitnessCoachPage(
     accountId: String,
@@ -58,6 +68,17 @@ internal fun FitnessCoachPage(
     FitnessCoachPage(accountId, cloudAvailable, store, history, dataLoading, coachClient, onGoalsSaved)
 }
 
+/**
+ * Renders the fitness coach page UI.
+ *
+ * @param accountId Account ID supplied to [FitnessCoachPage].
+ * @param cloudAvailable Whether to apply cloud available.
+ * @param store Store supplied to [FitnessCoachPage].
+ * @param history Collection of history values to process.
+ * @param dataLoading Whether to apply data loading.
+ * @param client Client supplied to [FitnessCoachPage].
+ * @param onGoalsSaved Callback invoked when goals saved changes or occurs.
+ */
 @Composable
 internal fun FitnessCoachPage(
     accountId: String,
@@ -90,6 +111,12 @@ internal fun FitnessCoachPage(
     var autoGoals by remember { mutableStateOf(store.preferences.getBoolean("coach_auto_goals", false)) }
     var showSettings by remember { mutableStateOf(false) }
 
+    /**
+     * Executes billing.
+     *
+     * @param action Action supplied to [runBilling].
+     * @param verifyPayment Whether to apply verify payment.
+     */
     fun runBilling(action: String, verifyPayment: Boolean = false) {
         if (!cloudAvailable || billingBusy || paymentOpen) return
         billingBusy = true
@@ -160,6 +187,13 @@ internal fun FitnessCoachPage(
         }
     }
 
+    /**
+     * Saves goals.
+     *
+     * @param goals Key-value mapping of goals entries.
+     * @param automaticDate Optional automatic date supplied to [saveGoals].
+     * @return Map containing the resulting save goals entries.
+     */
     fun saveGoals(goals: Map<String, Int>, automaticDate: LocalDate? = null): Map<String, Int> {
         val before = store.profile()
         val updated = before.withCoachGoals(goals)
@@ -172,6 +206,9 @@ internal fun FitnessCoachPage(
         return goals.filter { (name, value) -> saved[name] == value && previous[name] != value }
     }
 
+    /**
+     * Sends the target.
+     */
     fun send() {
         val previousTurns = turns ?: return
         if (dataLoading || pendingMessage != null || billingBusy || membership?.active != true || draft.isBlank()) return
@@ -300,6 +337,21 @@ internal fun FitnessCoachPage(
     }
 }
 
+/**
+ * Composes the fitness coach chat UI element.
+ *
+ * @param turns Collection of turns values to process.
+ * @param pendingMessage Optional pending message supplied to [FitnessCoachChat].
+ * @param draft Draft supplied to [FitnessCoachChat].
+ * @param onDraftChange Callback invoked when draft change changes or occurs.
+ * @param onSend Callback invoked when send changes or occurs.
+ * @param onSettings Callback invoked when settings changes or occurs.
+ * @param billingBusy Whether to apply billing busy.
+ * @param error Throwable or error message describing a failure, or null when not provided.
+ * @param appliedGoals Key-value mapping of applied goals entries.
+ * @param proposed Key-value mapping of proposed entries.
+ * @param onApplyGoals Callback invoked when apply goals changes or occurs.
+ */
 @Composable
 private fun FitnessCoachChat(
     turns: List<CoachTurn>,
@@ -425,6 +477,12 @@ private fun FitnessCoachChat(
     }
 }
 
+/**
+ * Composes the coach bubble UI element.
+ *
+ * @param fromUser Whether to apply from user.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 private fun CoachBubble(fromUser: Boolean, content: @Composable () -> Unit) {
     val colors = MaterialTheme.colorScheme
@@ -454,6 +512,14 @@ private fun CoachBubble(fromUser: Boolean, content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * Renders the coach goals card composable.
+ *
+ * @param title Primary display title text.
+ * @param goals Key-value mapping of goals entries.
+ * @param onApply Callback invoked when apply changes or occurs.
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 private fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() -> Unit)? = null, enabled: Boolean = true) {
     OutlinedCard(Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
@@ -469,6 +535,14 @@ private fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() -> 
     }
 }
 
+/**
+ * Composes the fitness coach settings UI element.
+ *
+ * @param autoGoals Whether to apply auto goals.
+ * @param onAutoGoalsChange Callback invoked when auto goals change changes or occurs.
+ * @param onManageBilling Callback invoked when manage billing changes or occurs.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 @Composable
 private fun FitnessCoachSettings(
     autoGoals: Boolean,
@@ -511,6 +585,12 @@ private fun FitnessCoachSettings(
     )
 }
 
+/**
+ * Composes the fitness coach locked UI element.
+ *
+ * @param message Chat message or remote payload.
+ * @param actions Action or callback executed for actions.
+ */
 @Composable
 private fun FitnessCoachLocked(message: String, actions: @Composable ColumnScope.() -> Unit = {}) {
     OutlinedCard(Modifier.fillMaxWidth().testTag("fitness_coach_locked")) {

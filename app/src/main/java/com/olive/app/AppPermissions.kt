@@ -20,9 +20,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * Determines whether the app should request notifications.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param asked Whether to apply asked.
+ * @param granted Whether to apply granted.
+ * @return `true` if should request notifications, or `false` otherwise.
+ */
 internal fun shouldRequestNotifications(enabled: Boolean, asked: Boolean, granted: Boolean) =
     enabled && !asked && !granted
 
+/**
+ * Determines whether the app should open location settings.
+ *
+ * @param asked Whether to apply asked.
+ * @param fineRationale Whether to apply fine rationale.
+ * @param coarseRationale Whether to apply coarse rationale.
+ * @return `true` if should open location settings, or `false` otherwise.
+ */
 internal fun shouldOpenLocationSettings(asked: Boolean, fineRationale: Boolean, coarseRationale: Boolean) =
     asked && !fineRationale && !coarseRationale
 
@@ -63,10 +79,19 @@ internal class AppPermissions(
             finishLocationRequest(hasBackgroundLocation())
         }
 
+    /**
+     * Returns the app location settings.
+     *
+     * @return The resulting app location settings.
+     */
     private fun appLocationSettings() =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${activity.packageName}".toUri())
 
-    // Checks whether Android granted approximate or precise location access.
+    /**
+     * Checks whether Android granted approximate or precise location access.
+     *
+     * @return `true` if has location, or `false` otherwise.
+     */
     fun hasLocation() = listOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -74,13 +99,19 @@ internal class AppPermissions(
         ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    // Checks background location on Android 10 and newer; older versions do not need a separate grant.
+    /**
+     * Checks background location on Android 10 and newer; older versions do not need a separate grant.
+     *
+     * @return `true` if has background location, or `false` otherwise.
+     */
     fun hasBackgroundLocation() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(
         activity,
         Manifest.permission.ACCESS_BACKGROUND_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    // Notifications support tickets, calls, and updates after account setup.
+    /**
+     * Notifications support tickets, calls, and updates after account setup.
+     */
     fun afterOnboarding() {
         activity.lifecycleScope.launch {
             activity.lifecycle.withResumed {
@@ -103,6 +134,11 @@ internal class AppPermissions(
         }
     }
 
+    /**
+     * Requests location.
+     *
+     * @return `true` if request location, or `false` otherwise.
+     */
     suspend fun requestLocation(): Boolean = locationRequests.withLock {
         locationResult?.await()
         hasLocation() || launchLocationRequest {
@@ -119,6 +155,11 @@ internal class AppPermissions(
         }
     }
 
+    /**
+     * Requests background location.
+     *
+     * @return `true` if request background location, or `false` otherwise.
+     */
     suspend fun requestBackgroundLocation(): Boolean {
         if (!requestLocation()) return false
         return locationRequests.withLock {
@@ -139,6 +180,12 @@ internal class AppPermissions(
         }
     }
 
+    /**
+     * Launches location request.
+     *
+     * @param launch Action or callback executed for launch.
+     * @return `true` if launch location request, or `false` otherwise.
+     */
     private suspend fun launchLocationRequest(launch: () -> Unit): Boolean {
         val pending = CompletableDeferred<Boolean>()
         activity.lifecycle.withResumed {
@@ -155,6 +202,11 @@ internal class AppPermissions(
         return activity.lifecycle.withResumed { granted }
     }
 
+    /**
+     * Finishes location request.
+     *
+     * @param granted Whether to apply granted.
+     */
     private fun finishLocationRequest(granted: Boolean) {
         val pending = locationResult
         locationResult = null

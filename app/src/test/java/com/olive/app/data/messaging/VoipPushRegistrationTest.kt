@@ -139,6 +139,60 @@ class VoipPushRegistrationTest {
         }
     }
 
+    @Test
+    fun directTokenLifecycleAndWorkerBranchesWorkWhenEnabledInPreferences() = withAuth {
+        val work = mock(WorkManagerImpl::class.java)
+        val messaging = mock(FirebaseMessaging::class.java)
+        val installations = mock(FirebaseInstallations::class.java)
+        `when`(messaging.register()).thenReturn(Tasks.forResult(null))
+        `when`(messaging.unregister()).thenReturn(Tasks.forResult(null))
+        `when`(installations.id).thenReturn(Tasks.forResult("rotated-token"))
+        `when`(installations.delete()).thenReturn(Tasks.forResult(null))
+        WorkManagerImpl.setDelegate(work)
+        try {
+            `when`(auth.currentUser).thenReturn(null)
+            assertTrue(runCatching { VoipPushTokenRegistration.registerCurrentToken(context) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(runCatching { VoipPushTokenRegistration.unregisterCurrentDevice(context) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(runCatching { VoipPushTokenRegistration.rotateCurrentToken(context) }.exceptionOrNull() is IllegalStateException)
+
+            `when`(auth.currentUser).thenReturn(user)
+            assertTrue(runCatching { VoipPushTokenRegistration.registerCurrentToken(context) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(runCatching { VoipPushTokenRegistration.onTokenRefreshed(context, " ") }.exceptionOrNull() is IllegalArgumentException)
+            VoipPushTokenRegistration.onTokenRefreshed(context, "initial-token")
+            assertEquals("initial-token", preferences.getString("token", null))
+
+            preferences.edit().putBoolean("enabled_for_account", true).commit()
+            mockStatic(FirebaseMessaging::class.java).use { firebaseMessaging ->
+                firebaseMessaging.`when`<FirebaseMessaging> { FirebaseMessaging.getInstance() }.thenReturn(messaging)
+                mockStatic(FirebaseInstallations::class.java).use { firebaseInstallations ->
+                    firebaseInstallations.`when`<FirebaseInstallations> { FirebaseInstallations.getInstance() }.thenReturn(installations)
+                    mockConstruction(VoipManager::class.java).use { managers ->
+                        VoipPushTokenRegistration.rotateCurrentToken(context)
+                        VoipPushTokenRegistration.configureForRole(context, AccountRole.ADMIN)
+                        assertEquals("rotated-token", preferences.getString("token", null))
+                        assertFalse(VoipPushTokenRegistration.isEnabled(context))
+                        verify(work).cancelUniqueWork("voip-push-token-registration")
+                        assertEquals(3, managers.constructed().size)
+                    }
+                }
+            }
+
+            var workerInput = workDataOf("token" to "token", "device_id" to "device")
+            val workerParams = mock(WorkerParameters::class.java).apply {
+                `when`(backgroundExecutor).thenReturn(Executor(Runnable::run))
+                `when`(taskExecutor).thenReturn(mock(TaskExecutor::class.java))
+                `when`(inputData).thenAnswer { workerInput }
+            }
+            val worker = VoipPushTokenRegistrationWorker(context, workerParams)
+            assertEquals(Result.success(), worker.doWork())
+            workerInput = workDataOf("token" to "token")
+            assertEquals(Result.failure(), worker.doWork())
+        } finally {
+            preferences.edit().clear().commit()
+            WorkManagerImpl.setDelegate(null)
+        }
+    }
+
     private fun withAuth(action: suspend () -> Unit) = runBlocking<Unit> {
         mockStatic(FirebaseAuth::class.java).use {
             it.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(auth)

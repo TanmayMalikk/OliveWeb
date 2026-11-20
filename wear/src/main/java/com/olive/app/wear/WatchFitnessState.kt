@@ -17,7 +17,13 @@ internal data class WatchHeartRateSummary(
             (restingTotalBpm / restingSampleCount).toInt()
         }
 
-    // Watch vitals: adds one safe sensor reading to today's summary.
+    /**
+     * Watch vitals: adds one safe sensor reading to today's summary.
+     *
+     * @param bpm BPM supplied to [record].
+     * @param resting Whether to apply resting.
+     * @return The resulting [WatchHeartRateSummary] instance.
+     */
     fun record(bpm: Int, resting: Boolean): WatchHeartRateSummary {
         if (bpm !in 30..240) return this
         if (sampleCount == Int.MAX_VALUE || totalBpm > Long.MAX_VALUE - bpm) return this

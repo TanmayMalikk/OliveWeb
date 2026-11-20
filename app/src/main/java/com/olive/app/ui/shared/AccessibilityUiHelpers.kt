@@ -55,18 +55,33 @@ internal enum class AccessibilityTraversalOrder(val index: Float) {
     PersistentActions(2f),
 }
 
-// Marks a layout as the boundary where TalkBack applies the shared traversal order.
+/**
+ * Marks a layout as the boundary where TalkBack applies the shared traversal order.
+ *
+ * @return The resulting [Modifier] for accessibility traversal group.
+ */
 internal fun Modifier.accessibilityTraversalGroup(): Modifier = semantics {
     isTraversalGroup = true
 }
 
-// Assigns one part of an overlapping layout to its place in the shared TalkBack order.
+/**
+ * Assigns one part of an overlapping layout to its place in the shared TalkBack order.
+ *
+ * @param order Order supplied to [accessibilityTraversal].
+ * @return The resulting [Modifier] for accessibility traversal.
+ */
 internal fun Modifier.accessibilityTraversal(order: AccessibilityTraversalOrder): Modifier =
     semantics { traversalIndex = order.index }
 
 /**
  * Exposes status changes through Compose semantics. Live regions let TalkBack
  * announce new content while preserving the user's current reading position.
+ *
+ * @param text Text string to display, parse, or send.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param color Color supplied to [AccessibleMessage].
+ * @param style Style supplied to [AccessibleMessage].
+ * @param showText Whether to show text.
  */
 @Composable
 internal fun AccessibleMessage(
@@ -95,7 +110,14 @@ internal fun AccessibleMessage(
     Text(text, color = color, style = style, modifier = semantics)
 }
 
-// Callers resolve action labels from Android resources; decorative icons keep a null description.
+/**
+ * Callers resolve action labels from Android resources; decorative icons keep a null description.
+ *
+ * @param imageVector Image vector supplied to [LocalizedIcon].
+ * @param contentDescription Optional content description supplied to [LocalizedIcon].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param tint Tint supplied to [LocalizedIcon].
+ */
 @Composable
 internal fun LocalizedIcon(
     imageVector: ImageVector,
@@ -106,7 +128,12 @@ internal fun LocalizedIcon(
     Icon(imageVector, contentDescription, modifier, tint)
 }
 
-// Identifies accessibility actions that should also reset the privacy timer.
+/**
+ * Identifies accessibility actions that should also reset the privacy timer.
+ *
+ * @param eventType Event type supplied to [isAccessibilityUserInteraction].
+ * @return `true` if is accessibility user interaction, or `false` otherwise.
+ */
 internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType in setOf(
     AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,
     AccessibilityEvent.TYPE_VIEW_CLICKED,
@@ -115,11 +142,23 @@ internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType
     AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY,
 )
 
-// Observe the existing outer content view, preserving its delegate and the Compose/WebView delegates below it.
+/**
+ * Observe the existing outer content view, preserving its delegate and the Compose/WebView delegates below it.
+ *
+ * @param view View supplied to [observeAccessibilityInteractions].
+ * @param onInteraction Callback invoked when interaction changes or occurs.
+ */
 internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: () -> Unit) {
     val previous = ViewCompat.getAccessibilityDelegate(view)
     ViewCompat.setAccessibilityDelegate(view, object : AccessibilityDelegateCompat() {
-        // Resets the privacy timer before Android sends a TalkBack event.
+        /**
+         * Resets the privacy timer before Android sends a TalkBack event.
+         *
+         * @param host Host supplied to [onRequestSendAccessibilityEvent].
+         * @param child Child supplied to [onRequestSendAccessibilityEvent].
+         * @param event Sensor, UI, or lifecycle event being processed.
+         * @return `true` if on request send accessibility event, or `false` otherwise.
+         */
         override fun onRequestSendAccessibilityEvent(
             host: ViewGroup,
             child: View,
@@ -131,7 +170,13 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             return accepted
         }
 
-        // Adds the whole field rule to one TalkBack event instead of reading separate pieces.
+        /**
+         * Adds the whole field rule to one TalkBack event instead of reading separate pieces.
+         *
+         * @param host Host supplied to [dispatchPopulateAccessibilityEvent].
+         * @param event Sensor, UI, or lifecycle event being processed.
+         * @return `true` if dispatch populate accessibility event, or `false` otherwise.
+         */
         override fun dispatchPopulateAccessibilityEvent(
             host: View,
             event: AccessibilityEvent
@@ -139,17 +184,32 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             previous?.dispatchPopulateAccessibilityEvent(host, event)
                 ?: super.dispatchPopulateAccessibilityEvent(host, event)
 
-        // Finds the Android accessibility node provider used by TalkBack.
+        /**
+         * Finds the Android accessibility node provider used by TalkBack.
+         *
+         * @param host Host supplied to [getAccessibilityNodeProvider].
+         * @return The resulting [AccessibilityNodeProviderCompat], or `null` if unavailable.
+         */
         override fun getAccessibilityNodeProvider(host: View): AccessibilityNodeProviderCompat? =
             previous?.getAccessibilityNodeProvider(host) ?: super.getAccessibilityNodeProvider(host)
 
-        // Adds the control description to the TalkBack event.
+        /**
+         * Adds the control description to the TalkBack event.
+         *
+         * @param host Host supplied to [onInitializeAccessibilityEvent].
+         * @param event Sensor, UI, or lifecycle event being processed.
+         */
         override fun onInitializeAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onInitializeAccessibilityEvent(host, event)
             else super.onInitializeAccessibilityEvent(host, event)
         }
 
-        // Adds the control role and description to the TalkBack node.
+        /**
+         * Adds the control role and description to the TalkBack node.
+         *
+         * @param host Host supplied to [onInitializeAccessibilityNodeInfo].
+         * @param info Info supplied to [onInitializeAccessibilityNodeInfo].
+         */
         override fun onInitializeAccessibilityNodeInfo(
             host: View,
             info: AccessibilityNodeInfoCompat
@@ -158,24 +218,46 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             else super.onInitializeAccessibilityNodeInfo(host, info)
         }
 
-        // Adds readable text when TalkBack announces this custom control.
+        /**
+         * Adds readable text when TalkBack announces this custom control.
+         *
+         * @param host Host supplied to [onPopulateAccessibilityEvent].
+         * @param event Sensor, UI, or lifecycle event being processed.
+         */
         override fun onPopulateAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onPopulateAccessibilityEvent(host, event)
             else super.onPopulateAccessibilityEvent(host, event)
         }
 
-        // Accessibility ui helpers: Performs accessibility action.
+        /**
+         * Accessibility ui helpers: Performs accessibility action.
+         *
+         * @param host Host supplied to [performAccessibilityAction].
+         * @param action Action supplied to [performAccessibilityAction].
+         * @param args Optional args supplied to [performAccessibilityAction].
+         * @return `true` if perform accessibility action, or `false` otherwise.
+         */
         override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean =
             previous?.performAccessibilityAction(host, action, args)
                 ?: super.performAccessibilityAction(host, action, args)
 
-        // Sends accessibility event.
+        /**
+         * Sends accessibility event.
+         *
+         * @param host Host supplied to [sendAccessibilityEvent].
+         * @param eventType Event type supplied to [sendAccessibilityEvent].
+         */
         override fun sendAccessibilityEvent(host: View, eventType: Int) {
             if (previous != null) previous.sendAccessibilityEvent(host, eventType)
             else super.sendAccessibilityEvent(host, eventType)
         }
 
-        // Sends accessibility event unchecked.
+        /**
+         * Sends accessibility event unchecked.
+         *
+         * @param host Host supplied to [sendAccessibilityEventUnchecked].
+         * @param event Sensor, UI, or lifecycle event being processed.
+         */
         override fun sendAccessibilityEventUnchecked(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.sendAccessibilityEventUnchecked(host, event)
             else super.sendAccessibilityEventUnchecked(host, event)
@@ -183,8 +265,11 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
     })
 }
 
-// Recheck after focus changes and throughout keyboard resizing. Scrolling reveals the field
-// without requesting focus, so it cannot steal input or TalkBack focus from another control.
+/**
+ * Recheck after focus changes and throughout keyboard resizing. Scrolling reveals the field without requesting focus, so it cannot steal input or TalkBack focus from another control.
+ *
+ * @return The resulting [Modifier] for keep visible while typing.
+ */
 internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
     val requester = remember { BringIntoViewRequester() }
     var focused by remember { mutableStateOf(false) }
@@ -199,8 +284,12 @@ internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
     this.bringIntoViewRequester(requester).onFocusChanged { focused = it.isFocused }
 }
 
-// UI sizing: every scrollbar is 4dp wide, sits 3dp from the edge, and keeps at least a 28dp thumb.
-// Shared Olive scrollbar for forms and other regular vertically scrolling content.
+/**
+ * UI sizing: every scrollbar is 4dp wide, sits 3dp from the edge, and keeps at least a 28dp thumb. Shared Olive scrollbar for forms and other regular vertically scrolling content.
+ *
+ * @param state Current state instance to read or render.
+ * @return The resulting [Modifier] for olive scrollbar.
+ */
 internal fun Modifier.oliveScrollbar(state: ScrollState): Modifier = drawWithContent {
     drawContent()
     if (state.maxValue <= 0) return@drawWithContent
@@ -218,7 +307,12 @@ internal fun Modifier.oliveScrollbar(state: ScrollState): Modifier = drawWithCon
     drawRoundRect(ScrollThumb, Offset(x, thumbTop), Size(width, thumbHeight), CornerRadius(width))
 }
 
-// Include partial rows so the thumb follows each scroll pixel instead of jumping between item indices.
+/**
+ * Include partial rows so the thumb follows each scroll pixel instead of jumping between item indices.
+ *
+ * @param state Current state instance to read or render.
+ * @return The resulting [Modifier] for olive scrollbar.
+ */
 internal fun Modifier.oliveScrollbar(state: LazyListState): Modifier = drawWithContent {
     drawContent()
     val info = state.layoutInfo
@@ -237,7 +331,12 @@ internal fun Modifier.oliveScrollbar(state: LazyListState): Modifier = drawWithC
     )
 }
 
-// Measure partial grid rows together; full-width headings and incomplete rows retain their actual item counts.
+/**
+ * Measure partial grid rows together; full-width headings and incomplete rows retain their actual item counts.
+ *
+ * @param state Current state instance to read or render.
+ * @return The resulting [Modifier] for olive scrollbar.
+ */
 internal fun Modifier.oliveScrollbar(state: LazyGridState): Modifier = drawWithContent {
     drawContent()
     val info = state.layoutInfo
@@ -261,7 +360,15 @@ internal fun Modifier.oliveScrollbar(state: LazyGridState): Modifier = drawWithC
     )
 }
 
-// Draws lazy scrollbar.
+/**
+ * Draws lazy scrollbar.
+ *
+ * @param start Start supplied to [drawLazyScrollbar].
+ * @param end End supplied to [drawLazyScrollbar].
+ * @param total Total supplied to [drawLazyScrollbar].
+ * @param canBack Whether can back.
+ * @param canForward Whether can forward.
+ */
 private fun DrawScope.drawLazyScrollbar(
     start: Float,
     end: Float,
@@ -292,7 +399,13 @@ private fun DrawScope.drawLazyScrollbar(
     )
 }
 
-// Focus a visible control once its window and content are ready, without refocusing on later updates.
+/**
+ * Focus a visible control once its window and content are ready, without refocusing on later updates.
+ *
+ * @param key Lookup key or cryptographic key, or null when not provided.
+ * @param ready Whether to apply ready.
+ * @return The resulting [FocusRequester] for remember entry focus.
+ */
 @Composable
 internal fun rememberEntryFocus(key: Any?, ready: Boolean = true): androidx.compose.ui.focus.FocusRequester {
     val requester = remember(key) { androidx.compose.ui.focus.FocusRequester() }

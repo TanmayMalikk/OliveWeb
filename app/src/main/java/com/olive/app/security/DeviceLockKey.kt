@@ -31,7 +31,13 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
 // A separate authentication-bound key guards device-lock entry. Cover storage stays usable while locked.
 internal class DeviceLockKey(private val namespace: String) {
-    // Device lock key: Prepares the feature data.
+    /**
+     * Device lock key: Prepares the feature data.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param saved Optional saved supplied to [prepare].
+     * @return The resulting [DeviceLockChallenge] instance.
+     */
     fun prepare(uid: String, saved: JSONObject?): DeviceLockChallenge {
         val keyId = saved?.getString("keyId") ?: UUID.randomUUID().toString()
         require(keyId.matches(Regex("[a-f0-9-]{36}")))
@@ -70,7 +76,11 @@ internal class DeviceLockKey(private val namespace: String) {
         }
     }
 
-    // Builds the Android Keystore settings used on older Android versions.
+    /**
+     * Builds the Android Keystore settings used on older Android versions.
+     *
+     * @param spec Spec supplied to [configureLegacyAuthentication].
+     */
     @Suppress("DEPRECATION")
     private fun configureLegacyAuthentication(spec: KeyGenParameterSpec.Builder) {
         // Android 9/10 require this API; setUserAuthenticationParameters starts at Android 11.
@@ -83,12 +93,16 @@ class DeviceLockChallenge internal constructor(
     private val keyId: String, private val alias: String,
 ) {
     private var committed = false
-    // Reports whether this phone finished creating its device-lock key.
+    /**
+     * Reports whether this phone finished creating its device-lock key.
+     */
     internal fun markEnrolled() {
         committed = true
     }
 
-    // Clears the short-lived device-lock key after private authentication ends.
+    /**
+     * Clears the short-lived device-lock key after private authentication ends.
+     */
     internal fun close() {
         // Remove an unfinished key when enrollment is cancelled.
         if (enrolling && !committed) runCatching {
@@ -105,9 +119,17 @@ class DeviceLockChallenge internal constructor(
     // API 30+ binds this exact operation to BiometricPrompt. Legacy devices initialize only after credentials succeed.
     internal val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
     private var credentialCipher: Cipher? = null
-    // Creates the legacy cipher that protects app security.
+    /**
+     * Creates the legacy cipher that protects app security.
+     *
+     * @return The resulting [Cipher] for legacy cipher.
+     */
     internal fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
-    // Creates the cipher that wraps or unwraps the account key after device authentication.
+    /**
+     * Creates the cipher that wraps or unwraps the account key after device authentication.
+     *
+     * @return The resulting [Cipher] for new cipher.
+     */
     private fun newCipher(): Cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
         if (saved == null) init(Cipher.ENCRYPT_MODE, key)
         else init(
@@ -117,7 +139,12 @@ class DeviceLockChallenge internal constructor(
         )
     }
 
-    // Ends the authentication request once and sends its final result.
+    /**
+     * Ends the authentication request once and sends its final result.
+     *
+     * @param cipher Cipher supplied to [finish].
+     * @return JSON object representing finish.
+     */
     internal fun finish(cipher: Cipher): JSONObject? {
         check(cipher === (promptCipher ?: credentialCipher))
         if (saved == null) {
@@ -148,6 +175,8 @@ object EncryptionUtils {
     /**
      * Generates a secure symmetric key.
      * Used for encrypting notes or generating the Group Chat Room Key.
+     *
+     * @return The resulting [SecretKey] for generate symmetric key.
      */
     fun generateSymmetricKey(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(ALGORITHM)
@@ -158,6 +187,10 @@ object EncryptionUtils {
     /**
      * Encrypts a plaintext string and returns a Base64 encoded string.
      * Safe to store directly in Firestore NoSQL documents.
+     *
+     * @param plaintext Plaintext supplied to [encryptText].
+     * @param key Lookup key or cryptographic key.
+     * @return The resulting encrypt text string.
      */
     fun encryptText(plaintext: String, key: SecretKey): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -176,6 +209,10 @@ object EncryptionUtils {
 
     /**
      * Decrypts a Base64 encoded string back into readable plaintext.
+     *
+     * @param encryptedBase64 Encrypted base 64 supplied to [decryptText].
+     * @param key Lookup key or cryptographic key.
+     * @return The resulting decrypt text string.
      */
     fun decryptText(encryptedBase64: String, key: SecretKey): String {
         val combined = JavaBase64.getDecoder().decode(encryptedBase64)
@@ -198,6 +235,10 @@ object EncryptionUtils {
      *
      * The returned payload contains the random IV followed by the authenticated ciphertext:
      * [12-byte IV][ciphertext and 16-byte authentication tag].
+     *
+     * @param plaintext Raw plaintext byte array.
+     * @param secretKey Secret key supplied to [encryptBytes].
+     * @return The resulting [ByteArray] for encrypt bytes.
      */
     fun encryptBytes(plaintext: ByteArray, secretKey: SecretKey): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -212,6 +253,10 @@ object EncryptionUtils {
 
     /**
      * Decrypts and authenticates a payload produced by [encryptBytes].
+     *
+     * @param encryptedPayload Raw encrypted payload byte array.
+     * @param secretKey Secret key supplied to [decryptBytes].
+     * @return The resulting [ByteArray] for decrypt bytes.
      */
     fun decryptBytes(encryptedPayload: ByteArray, secretKey: SecretKey): ByteArray {
         val minimumPayloadLength = IV_LENGTH + TAG_LENGTH / Byte.SIZE_BITS
@@ -229,12 +274,20 @@ object EncryptionUtils {
     /**
      * Helper functions to convert the raw AES key into a string
      * so it can be securely wrapped/stored later.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @return The resulting encode key to string string.
      */
     fun encodeKeyToString(key: SecretKey): String {
         return JavaBase64.getEncoder().encodeToString(key.encoded)
     }
 
-    // Encryption utils: Converts string to key.
+    /**
+     * Encryption utils: Converts string to key.
+     *
+     * @param base64Key Base 64 key supplied to [decodeStringToKey].
+     * @return The resulting [SecretKey] for decode string to key.
+     */
     fun decodeStringToKey(base64Key: String): SecretKey {
         val decoded = JavaBase64.getDecoder().decode(base64Key)
         return SecretKeySpec(decoded, ALGORITHM)
@@ -245,8 +298,21 @@ object EncryptionUtils {
 
 /** Small JSON persistence contract that keeps cache/index tests independent from Android Keystore. */
 interface JsonVault {
+    /**
+     * Reads the JSON vault.
+     *
+     * @return JSON object representing read.
+     */
     fun read(): JSONObject
+    /**
+     * Updates the JSON vault.
+     *
+     * @param change Action or callback executed for change.
+     */
     fun update(change: (JSONObject) -> Unit)
+    /**
+     * Clears the JSON vault.
+     */
     fun clear()
 }
 
@@ -258,7 +324,11 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
-    // Gets the phone-only key that locks and unlocks this private file.
+    /**
+     * Gets the phone-only key that locks and unlocks this private file.
+     *
+     * @return The resulting [SecretKey] instance.
+     */
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
@@ -276,9 +346,17 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         }
     }
 
-    // Decrypts and reads the complete private file.
+    /**
+     * Decrypts and reads the complete private file.
+     *
+     * @return JSON object representing read.
+     */
     override fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
-    // Reads and parses the encrypted vault file while the caller holds the shared file lock.
+    /**
+     * Reads and parses the encrypted vault file while the caller holds the shared file lock.
+     *
+     * @return JSON object representing read unlocked.
+     */
     private fun readUnlocked(): JSONObject {
         if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
         val bytes = file.openRead().use { it.readBytes() }
@@ -293,7 +371,11 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         }
     }
 
-    // Changes the private data, encrypts it again, and replaces the file safely.
+    /**
+     * Changes the private data, encrypts it again, and replaces the file safely.
+     *
+     * @param change Action or callback executed for change.
+     */
     override fun update(change: (JSONObject) -> Unit) = synchronized(fileLock) {
         val root = readUnlocked()
         change(root)
@@ -318,7 +400,9 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         Unit
     }
 
-    /** Deletes a disposable encrypted store without removing its Android Keystore key. */
+    /**
+     * Deletes a disposable encrypted store without removing its Android Keystore key.
+     */
     override fun clear() = synchronized(fileLock) { file.delete() }
 
     private companion object {
@@ -326,7 +410,12 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     }
 }
 
-// Returns an existing JSON section or adds an empty one when it is missing.
+/**
+ * Returns an existing JSON section or adds an empty one when it is missing.
+ *
+ * @param name Field, key, or display name.
+ * @return JSON object representing child.
+ */
 fun JSONObject.child(name: String): JSONObject =
     optJSONObject(name) ?: JSONObject().also { put(name, it) }
 
@@ -354,7 +443,12 @@ object MediaCipher {
     const val HEADERBYTES=6+IVLENGTH
     const val AUTHENTICATIONTAGBYTES=TAGBITS/Byte.SIZE_BITS
 
-    /** Returns the exact container size without reading or allocating the plaintext. */
+    /**
+     * Returns the exact container size without reading or allocating the plaintext.
+     *
+     * @param plainSize Plain size supplied to [encryptedSize].
+     * @return The computed encrypted size numeric value.
+     */
     fun encryptedSize(plainSize:Long):Long {
         require(plainSize>=0)
         return HEADERBYTES+plainSize+AUTHENTICATIONTAGBYTES
@@ -363,6 +457,11 @@ object MediaCipher {
     /**
      * Streams plaintext from [input] and writes one complete authenticated container to [output].
      * Neither the whole plaintext nor ciphertext is retained in memory.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param output Output stream or target receiving processed data.
+     * @param key Lookup key or cryptographic key.
+     * @param onProgress Callback invoked when progress changes or occurs.
      */
     fun encrypt(input:InputStream,output:OutputStream,key:SecretKey,onProgress:(Long)->Unit={}) {
         // GCM requires a unique unpredictable IV for every encryption under a key.
@@ -378,6 +477,11 @@ object MediaCipher {
      * Validates the versioned header and streams authenticated plaintext to [output].
      * Callers should write to a temporary file and publish it only after this method returns, because
      * GCM authenticates the final tag at the end of the stream.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param output Output stream or target receiving processed data.
+     * @param key Lookup key or cryptographic key.
+     * @param onProgress Callback invoked when progress changes or occurs.
      */
     fun decrypt(input:InputStream,output:OutputStream,key:SecretKey,onProgress:(Long)->Unit={}) {
         val source=DataInputStream(input)
@@ -392,7 +496,14 @@ object MediaCipher {
         transform(source,output,cipher,onProgress)
     }
 
-    /** Shared bounded-memory transform used in both encryption and decryption directions. */
+    /**
+     * Shared bounded-memory transform used in both encryption and decryption directions.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param output Output stream or target receiving processed data.
+     * @param cipher Cipher supplied to [transform].
+     * @param onProgress Callback invoked when progress changes or occurs.
+     */
     private fun transform(input:InputStream,output:OutputStream,cipher:Cipher,onProgress:(Long)->Unit) {
         val buffer=ByteArray(BUFFERSIZE)
         var processed=0L

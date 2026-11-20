@@ -25,6 +25,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Computes install updates permission intent.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @return The resulting install updates permission intent.
+ */
 internal fun installUpdatesPermissionIntent(context: Context) =
     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri())
 
@@ -42,6 +48,11 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         finish()
     }
 
+    /**
+     * Initializes the component and sets up its state or UI when created by Android.
+     *
+     * @param savedInstanceState Previously saved instance state bundle, or null on a fresh creation.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         release = intent.getStringExtra(EXTRA_RELEASE_JSON)?.let { raw ->
@@ -56,11 +67,19 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         if (savedInstanceState?.getBoolean(INSTALLING) == true) stage = AppUpdateStage.Installing else prepare()
     }
 
+    /**
+     * Handles the save instance state event.
+     *
+     * @param outState Out state supplied to [onSaveInstanceState].
+     */
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(INSTALLING, stage == AppUpdateStage.Installing)
         super.onSaveInstanceState(outState)
     }
 
+    /**
+     * Prepares the app update installer activity.
+     */
     private fun prepare() {
         stage = AppUpdateStage.Preparing
         lifecycleScope.launch {
@@ -75,6 +94,9 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Opens permission.
+     */
     private fun openPermission() {
         try {
             permission.launch(installUpdatesPermissionIntent(this))
@@ -83,6 +105,9 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Computes continue install.
+     */
     private fun continueInstall() {
         val file = preparedFile ?: return
         if (!packageManager.canRequestPackageInstalls()) {
@@ -107,6 +132,15 @@ class AppUpdateInstallerActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Composes the app update installer content UI element.
+ *
+ * @param version Version supplied to [AppUpdateInstallerContent].
+ * @param stage Stage supplied to [AppUpdateInstallerContent].
+ * @param onPermission Callback invoked when permission changes or occurs.
+ * @param onRetry Callback invoked when retry changes or occurs.
+ * @param onCancel Callback invoked when cancel changes or occurs.
+ */
 @Composable
 internal fun AppUpdateInstallerContent(
     version: String,

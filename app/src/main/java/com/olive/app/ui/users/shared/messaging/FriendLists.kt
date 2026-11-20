@@ -45,7 +45,18 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 
-// Keeps the four friend-related lists together while the parent screen handles chat lists.
+/**
+ * Keeps the four friend-related lists together while the parent screen handles chat lists.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param pendingExpanded Whether to apply pending expanded.
+ * @param onPendingExpandedChange Callback invoked when pending expanded change changes or occurs.
+ * @param outgoingExpanded Whether to apply outgoing expanded.
+ * @param onOutgoingExpandedChange Callback invoked when outgoing expanded change changes or occurs.
+ * @param friendsExpanded Whether to apply friends expanded.
+ * @param onFriendsExpandedChange Callback invoked when friends expanded change changes or occurs.
+ * @param onNoteTargets Callback invoked when note targets changes or occurs.
+ */
 internal fun LazyListScope.friendLists(
     session: SessionViewModel,
     pendingExpanded: Boolean,
@@ -168,7 +179,12 @@ internal fun LazyListScope.friendLists(
         }
     }
 }
-// Shows one username result and the friend action currently allowed.
+/**
+ * Shows one username result and the friend action currently allowed.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param request Request supplied to [IncomingRequestRow].
+ */
 @Composable
 private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
@@ -193,7 +209,12 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
         }
     }
 }
-// Shows a sent friend request and lets the user cancel it.
+/**
+ * Shows a sent friend request and lets the user cancel it.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param request Request supplied to [OutgoingRequestRow].
+ */
 @Composable
 private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
@@ -220,7 +241,13 @@ private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request:
     }
 }
 
-// shared safe app friend lists shows this friend row view so the user can view its details and use its actions.
+/**
+ * Shared safe app friend lists shows this friend row view so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param friend Friend relationship record.
+ * @param onNoteTargets Callback invoked when note targets changes or occurs.
+ */
 @Composable
 private fun LazyItemScope.FriendRow(
     session: SessionViewModel,
@@ -245,7 +272,15 @@ private fun LazyItemScope.FriendRow(
 // All safe-app roles: shows messages, attachments, and chat actions.
 
 
-// Shows text or the correct viewer button for one chat message.
+/**
+ * Shows text or the correct viewer button for one chat message.
+ *
+ * @param chat Chat supplied to [ChatMessageBody].
+ * @param session Shared session view model owning application state and actions.
+ * @param mine Whether to apply mine.
+ * @param sender Sender supplied to [ChatMessageBody].
+ * @param onOpenMedia Callback invoked when open media changes or occurs.
+ */
 @Composable
 internal fun ChatMessageBody(
     chat: ChatMessage, session: SessionViewModel, mine: Boolean,
@@ -375,7 +410,16 @@ internal fun ChatMessageBody(
     }
 }
 
-// shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
+/**
+ * Shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
+ *
+ * @param id ID supplied to [SharedMediaMessage].
+ * @param name Field, key, or display name.
+ * @param session Shared session view model owning application state and actions.
+ * @param mine Whether to apply mine.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param sender Optional sender supplied to [SharedMediaMessage].
+ */
 @Composable
 internal fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
@@ -456,5 +500,11 @@ internal fun SharedMediaMessage(
     }
 }
 
+/**
+ * Checks whether the caller can manage shared media offline copy.
+ *
+ * @param role Account role determining workspace permissions.
+ * @return `true` if can manage shared media offline copy, or `false` otherwise.
+ */
 internal fun canManageSharedMediaOfflineCopy(role: AccountRole) =
     role == AccountRole.USER || role == AccountRole.SAFE_CONTACT

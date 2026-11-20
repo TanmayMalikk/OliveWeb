@@ -10,13 +10,15 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.edit
+import com.olive.app.data.media.sha256Hex
+import com.olive.app.data.network.decodeJsonObject
+import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.ui.shared.AppLocaleManager
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -38,7 +40,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -46,45 +47,48 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.xmlpull.v1.XmlPullParser
 
+@Serializable
 data class NewsArticle(
     val title: String,
-    val summary: String,
+    val summary: String = "",
     val link: String,
-    val source: String,
-    val published: String,
+    val source: String = "",
+    val published: String = "",
     val imageUrl: String = "",
     val topic: String = "",
     val isPaywalled: Boolean? = null,
     val publisherUrl: String = ""
 ) {
-    // News: Converts this record into JSON.
-    fun toJson(): JSONObject =
-        JSONObject().put("title", title).put("summary", summary).put("link", link)
-            .put("source", source).put("published", published)
-            .put("imageUrl", imageUrl).put("topic", topic)
-            .put("isPaywalled", isPaywalled ?: JSONObject.NULL).put("publisherUrl", publisherUrl)
+    /**
+     * News: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
     companion object {
-        // Rebuilds one cached news story from its saved JSON fields.
-        fun fromJson(json: JSONObject) = NewsArticle(
-            json.getString("title"),
-            json.optString("summary"),
-            json.getString("link"),
-            json.optString("source"),
-            json.optString("published"),
-            json.optString("imageUrl"),
-            json.optString("topic"),
-            if (json.isNull("isPaywalled")) null else json.optBoolean("isPaywalled"),
-            json.optString("publisherUrl")
-        )
+        /**
+         * Rebuilds one cached news story from its saved JSON fields.
+         *
+         * @param json JSON object containing serialized fields.
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(json: JSONObject): NewsArticle = json.decodeJsonObject()
     }
 }
 
 enum class NewsScope { LOCAL, GLOBAL }
 
 // Daily Digest uses Google's live RSS feeds and keeps the original story links.
-class GoogleNewsRepository {
-    // Builds the Google News language and country query for the selected locale.
+class GoogleNewsRepository(
+    private val openConnection: (URL) -> HttpsURLConnection = { it.openConnection() as HttpsURLConnection },
+) {
+    /**
+     * Builds the Google News language and country query for the selected locale.
+     *
+     * @param language Language supplied to [rssLocaleQuery].
+     * @return The resulting rss locale query string.
+     */
     fun rssLocaleQuery(language: String): String {
         val langTag = AppLocaleManager.getLanguageTag(language)
         return when (langTag) {
@@ -97,7 +101,14 @@ class GoogleNewsRepository {
         }
     }
 
-    // Loads the newest news articles from cache and available feeds.
+    /**
+     * Loads the newest news articles from cache and available feeds.
+     *
+     * @param language Language supplied to [latest].
+     * @param scope Scope supplied to [latest].
+     * @param place Place supplied to [latest].
+     * @return List of resulting latest items.
+     */
     suspend fun latest(language: String, scope: NewsScope, place: String): List<NewsArticle> =
         withContext(Dispatchers.IO) {
             val locale = rssLocaleQuery(language)
@@ -110,7 +121,7 @@ class GoogleNewsRepository {
                 NewsScope.GLOBAL -> "/rss/headlines/section/topic/WORLD?$locale"
             }
             val connection =
-                (URL("https://news.google.com$path").openConnection() as HttpsURLConnection).apply {
+                openConnection(URL("https://news.google.com$path")).apply {
                     connectTimeout = 8_000
                     readTimeout = 8_000
                     instanceFollowRedirects = true
@@ -180,7 +191,12 @@ class GoogleNewsRepository {
         }
 }
 
-// Turn Google's timestamp into the phone's local time zone before showing it.
+/**
+ * Turn Google's timestamp into the phone's local time zone before showing it.
+ *
+ * @param language Language supplied to [localPublishedDate].
+ * @return The resulting local published date string.
+ */
 fun NewsArticle.localPublishedDate(language: String): String = runCatching {
     val locale = Locale.forLanguageTag(AppLocaleManager.getLanguageTag(language))
     ZonedDateTime.parse(published, DateTimeFormatter.RFC_1123_DATE_TIME)
@@ -188,7 +204,12 @@ fun NewsArticle.localPublishedDate(language: String): String = runCatching {
         .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
 }.getOrDefault(published)
 
-// Allows only HTTPS article links in the news reader.
+/**
+ * Allows only HTTPS article links in the news reader.
+ *
+ * @param url HTTPS URL to validate, fetch, or open.
+ * @return `true` if is secure news URL, or `false` otherwise.
+ */
 internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
     val uri = URI(url)
     uri.scheme.equals(
@@ -202,10 +223,19 @@ internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
     val isPaywalled: Boolean? = null, val description: String = ""
 ) {
-    // Converts this article into JSON for the local news cache.
-    fun toJson(): JSONObject = JSONObject(cacheJson.encodeToString(this))
+    /**
+     * Converts this article into JSON for the local news cache.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
-    // Fills missing article fields with publisher metadata while preserving existing feed values.
+    /**
+     * Fills missing article fields with publisher metadata while preserving existing feed values.
+     *
+     * @param article Article supplied to [applyTo].
+     * @return The resulting [NewsArticle] for apply to.
+     */
     fun applyTo(article: NewsArticle): NewsArticle = article.copy(
         publisherUrl = publisherUrl.ifBlank { article.publisherUrl },
         imageUrl = imageUrl.ifBlank { article.imageUrl },
@@ -214,16 +244,23 @@ internal data class NewsArticleMetadata(
         summary = description.ifBlank { article.summary })
 
     companion object {
-        private val cacheJson = Json {
-            encodeDefaults = true
-            ignoreUnknownKeys = true
-        }
-
-        fun fromJson(value: JSONObject): NewsArticleMetadata = cacheJson.decodeFromString(value.toString())
+        /**
+         * Deserializes a news article metadata from the provided JSON representation.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(value: JSONObject): NewsArticleMetadata = value.decodeJsonObject()
     }
 }
 
-// Publisher section data wins. These broad headline categories are only a fallback, never paywall evidence.
+/**
+ * Publisher section data wins. These broad headline categories are only a fallback, never paywall evidence.
+ *
+ * @param title Primary display title text.
+ * @param fallback Fallback supplied to [fallbackNewsTopic].
+ * @return The resulting fallback news topic string.
+ */
 internal fun fallbackNewsTopic(title: String, fallback: String = "News"): String {
     val words = title.lowercase()
     val categories = listOf(
@@ -239,7 +276,14 @@ internal fun fallbackNewsTopic(title: String, fallback: String = "News"): String
     return categories.firstOrNull { Regex(it.second).containsMatchIn(words) }?.first ?: fallback
 }
 
-// Use a publisher-declared card-sized version of the same photo, preserving crop and photo identity.
+/**
+ * Use a publisher-declared card-sized version of the same photo, preserving crop and photo identity.
+ *
+ * @param document Safety document metadata record.
+ * @param original Original supplied to [responsiveArticleImage].
+ * @param pageUrl Page URL supplied to [responsiveArticleImage].
+ * @return The resulting responsive article image string.
+ */
 private fun responsiveArticleImage(
     document: Document,
     original: String,
@@ -247,7 +291,12 @@ private fun responsiveArticleImage(
 ): String {
     if (original.isBlank()) return original
     val sizingKeys = setOf("w", "width", "h", "height", "q", "quality", "dpr", "size")
-    // Cleans publisher text so the article card shows a readable source name.
+    /**
+     * Cleans publisher text so the article card shows a readable source name.
+     *
+     * @param uri Content or file URI identifying the selected local item.
+     * @return List of resulting identity items.
+     */
     fun identity(uri: URI): List<Any?> = listOf(
         uri.host?.lowercase(), uri.port, uri.rawPath,
         uri.rawQuery.orEmpty().split('&')
@@ -277,11 +326,22 @@ private fun responsiveArticleImage(
         ?: original
 }
 
-// Reads news article metadata from saved text.
+/**
+ * Reads news article metadata from saved text.
+ *
+ * @param html HTML supplied to [parseNewsArticleMetadata].
+ * @param pageUrl Page URL supplied to [parseNewsArticleMetadata].
+ * @return The resulting [NewsArticleMetadata] for parse news article metadata.
+ */
 internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticleMetadata {
     require(isSecureNewsUrl(pageUrl))
     val document = Jsoup.parse(html, pageUrl)
-    // Combines the publisher and date shown under an article title.
+    /**
+     * Combines the publisher and date shown under an article title.
+     *
+     * @param names Variable number of names arguments.
+     * @return The resulting meta string.
+     */
     fun meta(vararg names: String): String = document.select("meta").firstOrNull { element ->
         names.any { name ->
             element.attr("property").equals(name, true) || element.attr("name")
@@ -289,7 +349,13 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         }
     }?.attr("content").orEmpty()
 
-    // Reads one article from the RSS or Atom feed node.
+    /**
+     * Reads one article from the RSS or Atom feed node.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @param depth Depth supplied to [articleNode].
+     * @return JSON object representing article node.
+     */
     fun articleNode(value: Any?, depth: Int = 0): JSONObject? {
         if (depth > 20) return null
         // Reads article details from whichever supported feed shape is present.
@@ -321,7 +387,12 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         runCatching { articleNode(JSONTokener(it.data()).nextValue()) }.getOrNull()
     }
 
-    // Trims feed text and removes markup that should not appear in article cards.
+    /**
+     * Trims feed text and removes markup that should not appear in article cards.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return The resulting text string.
+     */
     fun text(value: Any?): String = when (value) {
         is String -> value
         is JSONArray -> (0 until value.length()).firstNotNullOfOrNull {
@@ -333,7 +404,12 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> ""
     }
 
-    // Finds the best article image in supported feed tags or page metadata.
+    /**
+     * Finds the best article image in supported feed tags or page metadata.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return The resulting image string.
+     */
     fun image(value: Any?): String = when (value) {
         is String -> value
         is JSONObject -> text(value.opt("contentUrl")).ifBlank {
@@ -353,7 +429,12 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> ""
     }
 
-    // Reads a publisher's free-access value as a true, false, or missing result.
+    /**
+     * Reads a publisher's free-access value as a true, false, or missing result.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return `true` or `false` indicating free flag, or `null` if unknown.
+     */
     fun freeFlag(value: Any?): Boolean? = when (value) {
         is Boolean -> value
         is String -> value.trim().lowercase()
@@ -362,7 +443,12 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> null
     }
 
-    // Searches article metadata for any section marked as paid-only.
+    /**
+     * Searches article metadata for any section marked as paid-only.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     * @return `true` if paid part, or `false` otherwise.
+     */
     fun paidPart(value: Any?): Boolean = when (value) {
         is JSONObject -> freeFlag(value.opt("isAccessibleForFree")) == false
         is JSONArray -> (0 until value.length()).any { paidPart(value.opt(it)) }
@@ -399,19 +485,23 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
 }
 
 // Visible cards load concurrently with bounded network and disposable Google redirect views.
-internal class NewsMetadataRepository(context: Context) {
+internal class NewsMetadataRepository(
+    context: Context,
+    private val openConnection: (URL) -> HttpsURLConnection = { it.openConnection() as HttpsURLConnection },
+) {
     private val appContext = context.applicationContext
     private val preferences =
         appContext.getSharedPreferences("daily_digest_article_metadata", Context.MODE_PRIVATE)
 
-    // Creates the stable cache key used for this news request.
-    private fun key(link: String): String =
-        MessageDigest.getInstance("SHA-256").digest(link.toByteArray())
-            .joinToString("") { "%02x".format(it.toInt() and 255) }
-
-    // Reads cached article details and rejects entries that are too old unless allowed.
+    /**
+     * Reads cached article details and rejects entries that are too old unless allowed.
+     *
+     * @param link Web link or URL associated with the item.
+     * @param allowStale Whether to allow stale.
+     * @return The resulting [NewsArticleMetadata], or `null` if unavailable.
+     */
     fun cached(link: String, allowStale: Boolean = false): NewsArticleMetadata? = runCatching {
-        val value = JSONObject(preferences.getString(key(link), null) ?: return@runCatching null)
+        val value = JSONObject(preferences.getString(sha256Hex(link), null) ?: return@runCatching null)
         val expired = value.optLong("expiresAt") < System.currentTimeMillis()
         if (expired && !allowStale) null else NewsArticleMetadata.fromJson(value).let {
             // Keep the photo visible during refresh, but do not reuse an expired paywall verdict.
@@ -419,7 +509,12 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }.getOrNull()
 
-    // Loads cached news stories saved on this phone.
+    /**
+     * Loads cached news stories saved on this phone.
+     *
+     * @param article Article supplied to [load].
+     * @return The resulting [NewsArticleMetadata] instance.
+     */
     suspend fun load(article: NewsArticle): NewsArticleMetadata {
         cached(article.link)?.let { return it }
         if (article.imageUrl.isNotBlank() && article.topic.isNotBlank() && article.isPaywalled != null)
@@ -449,7 +544,7 @@ internal class NewsMetadataRepository(context: Context) {
             val metadata =
                 result ?: cached(article.link, allowStale = true) ?: NewsArticleMetadata()
             val ttl = if (result == null) 300_000L else 21_600_000L
-            val cacheKey = key(article.link)
+            val cacheKey = sha256Hex(article.link)
             preferences.edit {
                 putString(
                     cacheKey,
@@ -467,14 +562,24 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
-    // Reads a clean publisher name from article metadata or its web address.
+    /**
+     * Reads a clean publisher name from article metadata or its web address.
+     *
+     * @param link Web link or URL associated with the item.
+     * @return The resulting resolve publisher string, or `null` when unavailable.
+     */
     private suspend fun resolvePublisher(link: String): String? {
         if (!isSecureNewsUrl(link)) return null
         if (!URI(link).host.equals("news.google.com", true)) return link
         return redirectSlots.withPermit { resolveGooglePublisher(link) }
     }
 
-    // Google News redirects require JavaScript. This resolver allows HTTPS navigation only and exposes no native bridge.
+    /**
+     * Google News redirects require JavaScript. This resolver allows HTTPS navigation only and exposes no native bridge.
+     *
+     * @param link Web link or URL associated with the item.
+     * @return The resulting resolve google publisher string, or `null` when unavailable.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun resolveGooglePublisher(link: String): String? {
         var resolver: WebView? = null
@@ -492,7 +597,13 @@ internal class NewsMetadataRepository(context: Context) {
                             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             settings.javaScriptCanOpenWindowsAutomatically = false
                             webViewClient = object : WebViewClient() {
-                                // Keeps safe article links in the reader and blocks unsupported link types.
+                                /**
+                                 * Keeps safe article links in the reader and blocks unsupported link types.
+                                 *
+                                 * @param view View supplied to [shouldOverrideUrlLoading].
+                                 * @param request Request supplied to [shouldOverrideUrlLoading].
+                                 * @return `true` if should override URL loading, or `false` otherwise.
+                                 */
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -507,7 +618,12 @@ internal class NewsMetadataRepository(context: Context) {
                                     return !isSecureNewsUrl(url)
                                 }
 
-                                // Saves the final publisher URL after the article page finishes loading.
+                                /**
+                                 * Saves the final publisher URL after the article page finishes loading.
+                                 *
+                                 * @param view View supplied to [onPageFinished].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 */
                                 override fun onPageFinished(view: WebView, url: String) {
                                     if (isSecureNewsUrl(url) && !isGoogleHost(URI(url).host) && continuation.isActive) continuation.resume(
                                         url
@@ -529,12 +645,17 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
-    // Loads article metadata from the publisher page when the feed is incomplete.
+    /**
+     * Loads article metadata from the publisher page when the feed is incomplete.
+     *
+     * @param initialUrl Initial URL supplied to [fetch].
+     * @return The resulting [NewsArticleMetadata], or `null` if unavailable.
+     */
     private fun fetch(initialUrl: String): NewsArticleMetadata? {
         var current = initialUrl
         repeat(6) {
             if (!isSecureNewsUrl(current)) return null
-            val connection = URL(current).openConnection() as HttpsURLConnection
+            val connection = openConnection(URL(current))
             connection.connectTimeout = 6_000
             connection.readTimeout =
                 6_000
@@ -590,7 +711,12 @@ internal class NewsMetadataRepository(context: Context) {
         val articleLocks = Array(64) { Mutex() }
         val networkSlots = Semaphore(3)
         val redirectSlots = Semaphore(2)
-        // Detects Google News links that need their publisher address resolved.
+        /**
+         * Detects Google News links that need their publisher address resolved.
+         *
+         * @param host Optional host supplied to [isGoogleHost].
+         * @return `true` if is google host, or `false` otherwise.
+         */
         fun isGoogleHost(host: String?): Boolean =
             host?.lowercase()?.let { it == "google.com" || it.endsWith(".google.com") } ?: false
     }
@@ -604,7 +730,13 @@ data class CachedNewsFeed(val place: String, val articles: List<NewsArticle>)
 class NewsFeedCacheStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-    // Loads cached news stories saved on this phone.
+    /**
+     * Loads cached news stories saved on this phone.
+     *
+     * @param language Language supplied to [load].
+     * @param scope Scope supplied to [load].
+     * @return The resulting [CachedNewsFeed], or `null` if unavailable.
+     */
     fun load(language: String, scope: NewsScope): CachedNewsFeed? = runCatching {
         val raw = preferences.getString(key(language, scope), null) ?: return@runCatching null
         val root = JSONObject(raw)
@@ -615,7 +747,14 @@ class NewsFeedCacheStore(context: Context) {
         if (articles.isEmpty()) null else CachedNewsFeed(root.optString(PLACE), articles)
     }.getOrNull()
 
-    // Saves the latest news response in the local feed cache.
+    /**
+     * Saves the latest news response in the local feed cache.
+     *
+     * @param language Language supplied to [save].
+     * @param scope Scope supplied to [save].
+     * @param place Place supplied to [save].
+     * @param articles Collection of articles values to process.
+     */
     fun save(language: String, scope: NewsScope, place: String, articles: List<NewsArticle>) {
         if (articles.isEmpty()) return
         val root = JSONObject()
@@ -624,7 +763,13 @@ class NewsFeedCacheStore(context: Context) {
         preferences.edit { putString(key(language, scope), root.toString()) }
     }
 
-    // Creates the stable cache key used for this news request.
+    /**
+     * Creates the stable cache key used for this news request.
+     *
+     * @param language Language supplied to [key].
+     * @param scope Scope supplied to [key].
+     * @return The resulting key.
+     */
     private fun key(language: String, scope: NewsScope) =
         "${language.lowercase()}_${scope.name.lowercase()}"
 

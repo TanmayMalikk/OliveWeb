@@ -12,6 +12,9 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.BuildConfig
 import com.olive.app.R
 
+/**
+ * Renders the app version footer composable.
+ */
 @Composable
 internal fun AppVersionFooter() {
     Text(

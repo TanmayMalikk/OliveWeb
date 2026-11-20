@@ -80,7 +80,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.semantics.*
 
-// Shows today's calorie and macro totals with meal logging.
+/**
+ * Shows today's calorie and macro totals with meal logging.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param padding Padding supplied to [TodayPage].
+ * @param onAddFood Callback invoked when add food changes or occurs.
+ * @param onRemoveFood Callback invoked when remove food changes or occurs.
+ * @param onAddWater Callback invoked when add water changes or occurs.
+ * @param onUpdateFood Callback invoked when update food changes or occurs.
+ * @param library Optional library supplied to [TodayPage].
+ * @param onOpenLibrary Callback invoked when open library changes or occurs.
+ * @param onLogMeal Callback invoked when log meal changes or occurs.
+ */
 @Composable
 internal fun TodayPage(
     snapshot: FitnessSnapshot,
@@ -166,6 +179,14 @@ internal fun TodayPage(
 
 }
 
+/**
+ * Renders the meal header composable.
+ *
+ * @param meal Meal supplied to [MealHeader].
+ * @param entries Collection of entries values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onLog Callback invoked when log changes or occurs.
+ */
 @Composable
 private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boolean, onLog: () -> Unit) {
     val label = meal.localizedName()
@@ -201,6 +222,11 @@ private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boo
     }
 }
 
+/**
+ * Composes the localized name UI element.
+ *
+ * @return The resulting localized name string.
+ */
 @Composable
 internal fun MealType.localizedName(): String = stringResource(when (this) {
     MealType.BREAKFAST -> R.string.fitness_diary_breakfast
@@ -209,6 +235,11 @@ internal fun MealType.localizedName(): String = stringResource(when (this) {
     MealType.SNACK -> R.string.fitness_diary_snacks
 })
 
+/**
+ * Renders the daily nutrition card composable.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -217,6 +248,11 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
     }
 }
 
+/**
+ * Composes the calories overview UI element.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 private fun CaloriesOverview(snapshot: FitnessSnapshot) {
     val totals = snapshot.nutrition
@@ -267,6 +303,11 @@ private fun CaloriesOverview(snapshot: FitnessSnapshot) {
     }
 }
 
+/**
+ * Composes the macro overview UI element.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 private fun MacroOverview(snapshot: FitnessSnapshot) {
     val totals = snapshot.nutrition
@@ -290,6 +331,11 @@ private fun MacroOverview(snapshot: FitnessSnapshot) {
     }
 }
 
+/**
+ * Composes the other nutrients UI element.
+ *
+ * @param totals Totals supplied to [OtherNutrients].
+ */
 @Composable
 private fun OtherNutrients(totals: NutritionTotals) {
     var nutrientsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -314,7 +360,13 @@ private fun OtherNutrients(totals: NutritionTotals) {
     }
 }
 
-// Shows eaten, target, and remaining calories in one row.
+/**
+ * Shows eaten, target, and remaining calories in one row.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param unit Unit supplied to [NutritionAmountRow].
+ */
 @Composable
 private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     Row(
@@ -327,7 +379,14 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
         Text("${value.displayAmount()} $unit")
     }
 }
-// Draws progress toward one calorie or macro goal.
+/**
+ * Draws progress toward one calorie or macro goal.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param goal Goal supplied to [NutritionProgress].
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun NutritionProgress(label: String, value: Float, goal: Int, modifier: Modifier = Modifier) {
     val progress = (value / goal.coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -346,7 +405,14 @@ private fun NutritionProgress(label: String, value: Float, goal: Int, modifier: 
     }
 }
 
-// Shows one diary food with nutrients and a remove action.
+/**
+ * Shows one diary food with nutrients and a remove action.
+ *
+ * @param entry Entry supplied to [LoggedFoodRow].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onEdit Callback invoked when edit changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ */
 @Composable
 private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> Unit, onRemove: () -> Unit) {
     Card(
@@ -378,7 +444,18 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> U
         }
     }
 }
-// Searches nutrition providers and lets the user add a food result.
+/**
+ * Searches nutrition providers and lets the user add a food result.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param padding Padding supplied to [FoodSearchPage].
+ * @param onFoodAdded Callback invoked when food added changes or occurs.
+ * @param foodSource Optional food source supplied to [FoodSearchPage].
+ * @param library Optional library supplied to [FoodSearchPage].
+ * @param initialSection Initial section supplied to [FoodSearchPage].
+ * @param recentFoods Collection of recent foods values to process.
+ * @param initialMeal Optional initial meal supplied to [FoodSearchPage].
+ */
 @Composable
 internal fun FoodSearchPage(
     enabled: Boolean,
@@ -423,6 +500,11 @@ internal fun FoodSearchPage(
         } finally { scanning = false }
     }, onError = { scanning = false; scanFailed = true })
     var page by remember { mutableIntStateOf(0) }
+    /**
+     * Searches the target.
+     *
+     * @param more Whether to apply more.
+     */
     fun search(more: Boolean = false) {
         if (loading) return
         loading = true
@@ -609,7 +691,13 @@ internal fun FoodSearchPage(
     }
 }
 
-// fitness cover shows this food search result card view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this food search result card view so the user can view its details and use its actions.
+ *
+ * @param food Food supplied to [FoodSearchResultCard].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onAdd Callback invoked when add changes or occurs.
+ */
 @Composable
 private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: () -> Unit) {
     val description = buildString {
@@ -673,7 +761,9 @@ private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: (
     }
 }
 
-// Shows the required FatSecret and Open Food Facts credits.
+/**
+ * Shows the required FatSecret and Open Food Facts credits.
+ */
 @Composable
 private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

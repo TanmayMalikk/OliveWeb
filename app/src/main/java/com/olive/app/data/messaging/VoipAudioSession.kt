@@ -47,11 +47,39 @@ data class LiveKitConnectionDetails(
 
 /** Audio session interface for connecting to LiveKit. */
 interface VoipAudioSession {
+    /**
+     * Sets on disconnected.
+     *
+     * @param listener Action or callback executed for listener.
+     */
     fun setOnDisconnected(listener: (String?) -> Unit)
+    /**
+     * Sets on participant count changed.
+     *
+     * @param listener Action or callback executed for listener.
+     */
     fun setOnParticipantCountChanged(listener: (Int) -> Unit)
+    /**
+     * Connects the VoIP audio session.
+     *
+     * @param details Details supplied to [connect].
+     */
     suspend fun connect(details: LiveKitConnectionDetails)
+    /**
+     * Sets microphone muted.
+     *
+     * @param muted Whether to apply muted.
+     */
     suspend fun setMicrophoneMuted(muted: Boolean)
+    /**
+     * Sets speaker enabled.
+     *
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     suspend fun setSpeakerEnabled(enabled: Boolean)
+    /**
+     * Disconnects the VoIP audio session.
+     */
     suspend fun disconnect()
 }
 
@@ -75,14 +103,29 @@ class LiveKitAudioSession internal constructor(
     private var previousSpeakerEnabled = false
     private var audioFocusRequest: AudioFocusRequest? = null
 
+    /**
+     * Sets on disconnected.
+     *
+     * @param listener Action or callback executed for listener.
+     */
     override fun setOnDisconnected(listener: (String?) -> Unit) {
         onDisconnected = listener
     }
 
+    /**
+     * Sets on participant count changed.
+     *
+     * @param listener Action or callback executed for listener.
+     */
     override fun setOnParticipantCountChanged(listener: (Int) -> Unit) {
         onParticipantCountChanged = listener
     }
 
+    /**
+     * Connects the live kit audio session.
+     *
+     * @param details Details supplied to [connect].
+     */
     override suspend fun connect(details: LiveKitConnectionDetails) = mutex.withLock {
         check(room == null) { "A LiveKit room is already connected" }
         check(
@@ -135,6 +178,11 @@ class LiveKitAudioSession internal constructor(
         }
     }
 
+    /**
+     * Sets microphone muted.
+     *
+     * @param muted Whether to apply muted.
+     */
     override suspend fun setMicrophoneMuted(muted: Boolean) = mutex.withLock {
         val connectedRoom = room ?: error("No LiveKit room is connected")
         check(connectedRoom.localParticipant.setMicrophoneEnabled(!muted)) {
@@ -142,12 +190,21 @@ class LiveKitAudioSession internal constructor(
         }
     }
 
+    /**
+     * Sets speaker enabled.
+     *
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     override suspend fun setSpeakerEnabled(enabled: Boolean) = mutex.withLock {
         check(room != null) { "No LiveKit room is connected" }
         applySpeakerRoute(enabled)
     }
 
-    /** Moves call audio between the private earpiece and the loudspeaker. */
+    /**
+     * Moves call audio between the private earpiece and the loudspeaker.
+     *
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     private fun applySpeakerRoute(enabled: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val type = if (enabled) {
@@ -172,6 +229,9 @@ class LiveKitAudioSession internal constructor(
         }
     }
 
+    /**
+     * Disconnects the live kit audio session.
+     */
     override suspend fun disconnect() = mutex.withLock {
         val connectedRoom = room ?: return@withLock
         try {
@@ -187,6 +247,9 @@ class LiveKitAudioSession internal constructor(
         }
     }
 
+    /**
+     * Prepares call audio.
+     */
     private fun prepareCallAudio() {
         previousAudioMode = audioManager.mode
         @Suppress("DEPRECATION")
@@ -203,6 +266,9 @@ class LiveKitAudioSession internal constructor(
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
     }
 
+    /**
+     * Restores audio route.
+     */
     private fun restoreAudioRoute() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) audioManager.clearCommunicationDevice()
         @Suppress("DEPRECATION")
@@ -258,12 +324,29 @@ class VoipSessionController(
     }
 
     companion object {
+        /**
+         * Creates the VoIP session controller.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param voipManager VoIP manager supplied to [create].
+         * @return The resulting create.
+         */
         fun create(
             context: Context,
             voipManager: VoipManager = VoipManager()
         ) = VoipSessionController(voipManager, LiveKitAudioSession(context))
     }
 
+    /**
+     * Starts and join.
+     *
+     * @param name Field, key, or display name.
+     * @param callerId Firebase UID of the caller initiating the call.
+     * @param participantIds Collection of participant IDs values to process.
+     * @param callerName Caller name supplied to [startAndJoin].
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @return The resulting [VoipCall] for start and join.
+     */
     suspend fun startAndJoin(
         name: String,
         callerId: String,
@@ -276,6 +359,13 @@ class VoipSessionController(
         joinAudio(call)
     }
 
+    /**
+     * Accepts and join.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @param userId User ID supplied to [acceptAndJoin].
+     * @return The resulting [VoipCall] for accept and join.
+     */
     suspend fun acceptAndJoin(
         callId: String,
         userId: String
@@ -285,6 +375,12 @@ class VoipSessionController(
         joinAudio(call)
     }
 
+    /**
+     * Joins call.
+     *
+     * @param call Call supplied to [joinCall].
+     * @return The resulting [VoipCall] for join call.
+     */
     suspend fun joinCall(
         call: VoipCall
     ): VoipCall = mutex.withLock {
@@ -296,6 +392,12 @@ class VoipSessionController(
         joinAudio(call)
     }
 
+    /**
+     * Computes rejoin call.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @return The resulting [VoipCall] for rejoin call.
+     */
     suspend fun rejoinCall(callId: String): VoipCall = mutex.withLock {
         check(mutableState.value == VoipSessionState.Idle) {
             "A VoIP session is already in progress"
@@ -303,6 +405,12 @@ class VoipSessionController(
         joinAudio(voipManager.rejoinCall(callId))
     }
 
+    /**
+     * Sets microphone muted.
+     *
+     * @param muted Whether to apply muted.
+     * @return The resulting set microphone muted.
+     */
     suspend fun setMicrophoneMuted(muted: Boolean) = mutex.withLock {
         val active = mutableState.value as? VoipSessionState.Active
             ?: error("No active VoIP session")
@@ -318,6 +426,12 @@ class VoipSessionController(
         }
     }
 
+    /**
+     * Sets speaker enabled.
+     *
+     * @param enabled Whether this feature or control is currently enabled.
+     * @return The resulting set speaker enabled.
+     */
     suspend fun setSpeakerEnabled(enabled: Boolean) = mutex.withLock {
         val active = mutableState.value as? VoipSessionState.Active
             ?: error("No active VoIP session")
@@ -333,6 +447,11 @@ class VoipSessionController(
         }
     }
 
+    /**
+     * Leaves call.
+     *
+     * @return The resulting leave call.
+     */
     suspend fun leaveCall() = mutex.withLock {
         val call = when (val current = mutableState.value) {
             is VoipSessionState.Connecting -> current.call
@@ -359,6 +478,11 @@ class VoipSessionController(
         }
     }
 
+    /**
+     * Ends call.
+     *
+     * @return The resulting end call.
+     */
     suspend fun endCall() = mutex.withLock {
         val call = when (val current = mutableState.value) {
             is VoipSessionState.Connecting -> current.call
@@ -392,12 +516,20 @@ class VoipSessionController(
         }
     }
 
-    /** Closes an unrecoverable/stale call screen without making another failing server request. */
+    /**
+     * Closes an unrecoverable/stale call screen without making another failing server request.
+     */
     suspend fun dismiss() = mutex.withLock {
         runCatching { audioSession.disconnect() }
         mutableState.value = VoipSessionState.Idle
     }
 
+    /**
+     * Joins audio.
+     *
+     * @param call Call supplied to [joinAudio].
+     * @return The resulting [VoipCall] for join audio.
+     */
     private suspend fun joinAudio(call: VoipCall): VoipCall {
         mutableState.value = VoipSessionState.Connecting(call)
         remoteParticipantCount = 0

@@ -33,9 +33,17 @@ import com.olive.app.ui.users.user.account.SettingsSection
 import com.olive.app.ui.users.user.account.SettingsCategory
 import com.olive.app.ui.users.user.account.SettingsHeading
 import com.olive.app.ui.users.user.account.accountSettingsTabs
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 
-// Shows profile and password settings for staff and admin accounts.
+/**
+ * Shows profile and password settings for staff and admin accounts.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
@@ -138,7 +146,11 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
 
 // All safe-app roles: collects staff and admin setup details.
 
-// Staff and administrators complete organization contact details on first login.
+/**
+ * Staff and administrators complete organization contact details on first login.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -153,7 +165,11 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val pages = listOf(uiText(R.string.ui_personal_details), uiText(R.string.ui_contact_details))
     val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val required = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), emailValid)
-    // Enables the next button only when every field on the current setup page is valid.
+    /**
+     * Enables the next button only when every field on the current setup page is valid.
+     *
+     * @return The resulting page valid.
+     */
     fun pageValid() =
         if (page == 0) fullName.isNotBlank() && InputPolicy.validDob(dob) else emailValid
     FormColumn {
@@ -227,7 +243,13 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
 
 // Staff and admins: shows every available user location on the protected organization map.
 
-/** Opens the organization feed and draws each user as a red live or last-known marker. */
+/**
+ * Opens the organization feed and draws each user as a red live or last-known marker.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param initialFollowUid Optional initial follow user ID supplied to [OrganizationMap].
+ */
 @Composable
 internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, initialFollowUid: String? = null) {
     BackHandler(onBack = onBack)
@@ -283,7 +305,15 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
 
 // Staff and admins: shows account and support totals on dashboard cards.
 
-/** A large, readable portal action with enough context to explain where it goes. */
+/**
+ * A large, readable portal action with enough context to explain where it goes.
+ *
+ * @param icon Icon supplied to [OrganizationDashboardCard].
+ * @param title Primary display title text.
+ * @param description Description supplied to [OrganizationDashboardCard].
+ * @param onClick Callback invoked when the control is activated.
+ * @param badgeCount Badge count supplied to [OrganizationDashboardCard].
+ */
 @Composable
 internal fun OrganizationDashboardCard(
     icon: ImageVector,
@@ -332,11 +362,22 @@ internal data class AdminLocationMapState(
 internal class AdminLocationMapController(
     private val repository: AdminLocationRepository?,
 ) {
-    var state by mutableStateOf(AdminLocationMapState())
-        private set
+    private val stateMutableFlow = MutableStateFlow(AdminLocationMapState())
+    val stateFlow: StateFlow<AdminLocationMapState> = stateMutableFlow.asStateFlow()
+    private var stateSnapshot by mutableStateOf(stateMutableFlow.value)
+    var state: AdminLocationMapState
+        get() = stateSnapshot
+        private set(value) {
+            stateMutableFlow.value = value
+            stateSnapshot = value
+        }
     private var subscription: ChatSubscription? = null
 
-    // Starts the organization feed only for an authenticated staff or admin account.
+    /**
+     * Starts the organization feed only for an authenticated staff or admin account.
+     *
+     * @param role Account role determining workspace permissions.
+     */
     fun open(role: AccountRole) {
         if (role !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || repository == null || subscription != null) return
         state = AdminLocationMapState(loading = true)
@@ -346,7 +387,9 @@ internal class AdminLocationMapController(
         )
     }
 
-    // Stops Firebase updates and clears sensitive map data from memory.
+    /**
+     * Stops Firebase updates and clears sensitive map data from memory.
+     */
     fun close() {
         subscription?.close()
         subscription = null

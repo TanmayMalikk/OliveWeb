@@ -48,7 +48,25 @@ import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
 import kotlin.math.ceil
 
-// Expands the same map for browsing or route guidance.
+/**
+ * Expands the same map for browsing or route guidance.
+ *
+ * @param points Collection of points values to process.
+ * @param ownPoint Optional own point supplied to [FullScreenLocationMap].
+ * @param route Optional route supplied to [FullScreenLocationMap].
+ * @param destinationName Destination name supplied to [FullScreenLocationMap].
+ * @param routeWorking Whether to apply route working.
+ * @param routeError Optional route error supplied to [FullScreenLocationMap].
+ * @param navigating Whether to apply navigating.
+ * @param showOwnPointInBlue Whether to show own point in blue.
+ * @param onExitFullScreen Callback invoked when exit full screen changes or occurs.
+ * @param onStopNavigation Callback invoked when stop navigation changes or occurs.
+ * @param supportServices Collection of support services values to process.
+ * @param onSupportSelected Callback invoked when support selected changes or occurs.
+ * @param onViewportCenterChanged Callback invoked when viewport center changed changes or occurs.
+ * @param onLoadMoreSupport Callback invoked when load more support changes or occurs.
+ * @param loadingMoreSupport Whether to apply loading more support.
+ */
 @Composable
 internal fun FullScreenLocationMap(
     points: List<MapLocationPoint>,
@@ -162,16 +180,31 @@ internal fun FullScreenLocationMap(
     }
 }
 
-// Formats route length as metres or kilometres for the navigation summary.
+/**
+ * Formats route length as metres or kilometres for the navigation summary.
+ *
+ * @param meters Meters supplied to [formatRouteDistance].
+ * @return The resulting format route distance string.
+ */
 internal fun formatRouteDistance(meters: Double): String =
     if (meters < 1_000) "${meters.toInt()} m"
     else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1_000)
 
-// Rounds the remaining route time up to a whole number of minutes.
+/**
+ * Rounds the remaining route time up to a whole number of minutes.
+ *
+ * @param seconds Seconds supplied to [formatRouteDuration].
+ * @return The resulting format route duration string.
+ */
 internal fun formatRouteDuration(seconds: Double): String =
     "${ceil(seconds / 60.0).toInt().coerceAtLeast(1)} min"
 
-// Lets a user choose how long trusted contacts may see their live location.
+/**
+ * Lets a user choose how long trusted contacts may see their live location.
+ *
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) {
     var custom by remember { mutableStateOf("") }
@@ -226,7 +259,12 @@ internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Un
     )
 }
 
-// Formats a location-sharing expiry time using the phone's time style.
+/**
+ * Formats a location-sharing expiry time using the phone's time style.
+ *
+ * @param timestamp Epoch timestamp in milliseconds.
+ * @return The resulting format share time string.
+ */
 @Composable
 internal fun formatShareTime(timestamp: Long): String {
     if (timestamp <= 0L) return ""

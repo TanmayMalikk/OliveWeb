@@ -79,7 +79,24 @@ import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
-// user location map shows this interactive location map view so the user can view its details and use its actions.
+/**
+ * User location map shows this interactive location map view so the user can view its details and use its actions.
+ *
+ * @param points Collection of points values to process.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param ownPointUid Optional own point user ID supplied to [InteractiveLocationMap].
+ * @param showOwnPointInBlue Whether to show own point in blue.
+ * @param route Optional route supplied to [InteractiveLocationMap].
+ * @param navigationActive Whether to apply navigation active.
+ * @param detailsOnlyForSelectedPoint Whether to apply details only for selected point.
+ * @param userSearchEnabled Whether to apply user search enabled.
+ * @param initialFollowUid Optional initial follow user ID supplied to [InteractiveLocationMap].
+ * @param selectedLocation Optional selected location supplied to [InteractiveLocationMap].
+ * @param onSelectedLocationChange Callback invoked when selected location change changes or occurs.
+ * @param supportServices Collection of support services values to process.
+ * @param onSupportSelected Callback invoked when support selected changes or occurs.
+ * @param onViewportCenterChanged Callback invoked when viewport center changed changes or occurs.
+ */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun InteractiveLocationMap(
@@ -129,7 +146,12 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Loading) loadState = MapLoadState.Error
     }
 
-    // Sends the latest user and safe-contact markers to the embedded map and optionally recentres it.
+    /**
+     * Sends the latest user and safe-contact markers to the embedded map and optionally recentres it.
+     *
+     * @param view View supplied to [updatePoints].
+     * @param moveCamera Whether to apply move camera.
+     */
     fun updatePoints(view: WebView, moveCamera: Boolean) {
         val encoded = JSONArray().apply {
             points.forEach { point ->
@@ -174,6 +196,11 @@ internal fun InteractiveLocationMap(
         )
     }
 
+    /**
+     * Updates support services.
+     *
+     * @param view View supplied to [updateSupportServices].
+     */
     fun updateSupportServices(view: WebView) {
         val encoded = JSONArray().apply {
             supportServices.forEach { service -> put(JSONObject().apply {
@@ -186,7 +213,12 @@ internal fun InteractiveLocationMap(
         if (fit) supportWereFitted = true
     }
 
-    // Draws the current navigation route and can fit the camera around it.
+    /**
+     * Draws the current navigation route and can fit the camera around it.
+     *
+     * @param view View supplied to [updateRoute].
+     * @param fitRoute Whether to apply fit route.
+     */
     fun updateRoute(view: WebView, fitRoute: Boolean) {
         val encoded = JSONArray().apply {
             route?.coordinates?.forEach { coordinate ->
@@ -196,7 +228,11 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveSetRoute($encoded,$fitRoute);", null)
     }
 
-    // Tells the map its visible height after the Compose layout changes.
+    /**
+     * Tells the map its visible height after the Compose layout changes.
+     *
+     * @param view View supplied to [resizeMap].
+     */
     fun resizeMap(view: WebView) {
         if (view.height <= 0) return
         val cssHeight =
@@ -204,7 +240,11 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);", null)
     }
 
-    // Keeps the incident pushpin in sync when an address suggestion changes the coordinates.
+    /**
+     * Keeps the incident pushpin in sync when an address suggestion changes the coordinates.
+     *
+     * @param view View supplied to [updateSelection].
+     */
     fun updateSelection(view: WebView) {
         val latitude = selectedLocation?.first ?: 0.0
         val longitude = selectedLocation?.second ?: 0.0
@@ -254,7 +294,12 @@ internal fun InteractiveLocationMap(
                         private var touchDownX = 0f
                         private var touchDownY = 0f
 
-                        // Lets map gestures work without dragging the Compose screen behind them.
+                        /**
+                         * Lets map gestures work without dragging the Compose screen behind them.
+                         *
+                         * @param event Sensor, UI, or lifecycle event being processed.
+                         * @return `true` if on touch event, or `false` otherwise.
+                         */
                         override fun onTouchEvent(event: MotionEvent): Boolean {
                             // Keep map drags and zoom gestures from scrolling the page behind it.
                             when (event.actionMasked) {
@@ -282,7 +327,11 @@ internal fun InteractiveLocationMap(
                             return super.onTouchEvent(event)
                         }
 
-                        // Reports simple map taps as proper Android click events.
+                        /**
+                         * Reports simple map taps as proper Android click events.
+                         *
+                         * @return `true` if perform click, or `false` otherwise.
+                         */
                         override fun performClick(): Boolean {
                             super.performClick()
                             return true
@@ -315,7 +364,12 @@ internal fun InteractiveLocationMap(
                             )
                         }
                         webChromeClient = object : WebChromeClient() {
-                            // The bundled map uses its page title to report that JavaScript is ready.
+                            /**
+                             * The bundled map uses its page title to report that JavaScript is ready.
+                             *
+                             * @param view View supplied to [onReceivedTitle].
+                             * @param title Primary display title text, or null when not provided.
+                             */
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 if (webView[0] !== view) return
                                 if (title == "olive-map-error") loadState = MapLoadState.Error
@@ -326,23 +380,47 @@ internal fun InteractiveLocationMap(
                             }
                         }
                         webViewClient = object : WebViewClient() {
+                            /**
+                             * Determines whether the app should intercept request.
+                             *
+                             * @param view View supplied to [shouldInterceptRequest].
+                             * @param request Request supplied to [shouldInterceptRequest].
+                             * @return `true` or `false` indicating should intercept request, or `null` if unknown.
+                             */
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest,
                             ): WebResourceResponse? = bundledMapAsset(context, request.url)
 
-                            // Matches the map height to its container after the page loads.
+                            /**
+                             * Matches the map height to its container after the page loads.
+                             *
+                             * @param view View supplied to [onPageFinished].
+                             * @param url HTTPS URL to validate, fetch, or open.
+                             */
                             override fun onPageFinished(view: WebView, url: String) {
                                 view.post { resizeMap(view) }
                             }
 
-                            // Blocks the bundled map from opening any outside link.
+                            /**
+                             * Blocks the bundled map from opening any outside link.
+                             *
+                             * @param view View supplied to [shouldOverrideUrlLoading].
+                             * @param request Request supplied to [shouldOverrideUrlLoading].
+                             * @return `true` if should override URL loading, or `false` otherwise.
+                             */
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
                             ) = true
 
-                            // Shows the retry state when the main map page cannot load.
+                            /**
+                             * Shows the retry state when the main map page cannot load.
+                             *
+                             * @param view View supplied to [onReceivedError].
+                             * @param request Request supplied to [onReceivedError].
+                             * @param error Throwable or error message describing a failure.
+                             */
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
@@ -554,6 +632,12 @@ private class LocationSelectionBridge(
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * Computes selected.
+     *
+     * @param latitude Latitude supplied to [selected].
+     * @param longitude Longitude supplied to [selected].
+     */
     @JavascriptInterface
     fun selected(latitude: Double, longitude: Double) {
         if (latitude in -90.0..90.0 && longitude in -180.0..180.0) {
@@ -565,6 +649,11 @@ private class LocationSelectionBridge(
 
 private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
+    /**
+     * Computes selected.
+     *
+     * @param id ID supplied to [selected].
+     */
     @JavascriptInterface fun selected(id: String) {
         if (id.length in 1..512) handler.post { onSelected(id) }
     }

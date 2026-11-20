@@ -28,7 +28,22 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.SafetyDocument
 
 
-// User safety-document card used to view details and actions.
+/**
+ * User safety-document card used to view details and actions.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param currentUid Current user ID supplied to [SafetyDocumentCard].
+ * @param friends List of friend records.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param offline Offline supplied to [SafetyDocumentCard].
+ * @param onShare Callback invoked when share changes or occurs.
+ * @param onDelete Callback invoked when delete changes or occurs.
+ * @param onMakeOffline Callback invoked when make offline changes or occurs.
+ * @param onRemoveOffline Callback invoked when remove offline changes or occurs.
+ * @param opening Whether to apply opening.
+ * @param evidenceUpdating Whether to apply evidence updating.
+ * @param onEvidenceChange Callback invoked when evidence change changes or occurs.
+ */
 @Composable
 internal fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
@@ -180,7 +195,16 @@ internal fun SafetyDocumentCard(
         }
     }
 }
-// Lets the user choose which trusted contacts may open a document.
+/**
+ * Lets the user choose which trusted contacts may open a document.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param currentUid Current user ID supplied to [DocumentSharingDialog].
+ * @param friends List of friend records.
+ * @param contacts Collection of contact records.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSave Callback invoked when save changes or occurs.
+ */
 @Composable
 internal fun DocumentSharingDialog(
     file: SafetyDocument,

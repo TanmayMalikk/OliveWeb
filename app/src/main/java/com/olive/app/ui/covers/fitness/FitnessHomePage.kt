@@ -46,7 +46,12 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.math.roundToInt
 
-// Shows a quick summary of steps, calories, macros, and goals.
+/**
+ * Shows a quick summary of steps, calories, macros, and goals.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ * @param onGoals Callback invoked when goals changes or occurs.
+ */
 @Composable
 internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -119,7 +124,13 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
         }
     }
 }
-// Draws one large summary value on the fitness home page.
+/**
+ * Draws one large summary value on the fitness home page.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ * @param icon Icon supplied to [SummaryMetric].
+ */
 @Composable
 private fun SummaryMetric(value: String, label: String, icon: ImageVector) {
     Row(
@@ -139,7 +150,11 @@ private fun SummaryMetric(value: String, label: String, icon: ImageVector) {
     }
 }
 
-// fitness cover shows this step summary card view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this step summary card view so the user can view its details and use its actions.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 private fun StepSummaryCard(snapshot: FitnessSnapshot) {
     val progress = (snapshot.stepsToday.toFloat() / snapshot.profile.stepGoal).coerceIn(0f, 1f)

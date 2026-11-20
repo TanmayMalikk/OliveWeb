@@ -58,6 +58,15 @@ private data class ChecklistCompletion(val prepared: Int, val total: Int) {
     val complete get() = total > 0 && prepared == total
 }
 
+/**
+ * Composes the plan picker chip UI element.
+ *
+ * @param selected Whether to apply selected.
+ * @param complete Whether to apply complete.
+ * @param onClick Callback invoked when the control is activated.
+ * @param label Accessible label or display caption.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun PlanPickerChip(
     selected: Boolean,
@@ -87,7 +96,16 @@ private fun PlanPickerChip(
     )
 }
 
-// shared safe app safety plan screen shows this safety plan screen so the user can view its details and use its actions.
+/**
+ * Shared safe app safety plan screen shows this safety plan screen so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param ownerUid Firebase UID of the resource owner.
+ * @param ownerName Owner name supplied to [SafetyPlanScreen].
+ * @param displayOwnerName Display owner name supplied to [SafetyPlanScreen].
+ * @param onCompleteConsultation Callback invoked when complete consultation changes or occurs.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun SafetyPlanScreen(
     session: SessionViewModel, ownerUid: String = session.coverAccountId.orEmpty(),
@@ -103,7 +121,9 @@ internal fun SafetyPlanScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     var pendingDocumentAttachment by remember { mutableStateOf<SafetyAttachmentTarget?>(null) }
     var openedDocument by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
-    // Hides the keyboard before leaving or switching safety-plan sections.
+    /**
+     * Hides the keyboard before leaving or switching safety-plan sections.
+     */
     fun leaveEditor() {
         focus.clearFocus(force = true)
         keyboard?.hide()
@@ -476,7 +496,11 @@ internal fun SafetyPlanScreen(
     )
 }
 
-// Lets a trusted contact view the safety plans shared with them.
+/**
+ * Lets a trusted contact view the safety plans shared with them.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
@@ -497,6 +521,16 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     )
 }
 
+/**
+ * Composes the shared safety plan list UI element.
+ *
+ * @param plans Collection of plans values to process.
+ * @param loading Whether an asynchronous operation is currently in progress.
+ * @param localMode Whether to apply local mode.
+ * @param error Throwable or error message describing a failure, or null when not provided.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onOpen Callback invoked when open changes or occurs.
+ */
 @Composable
 internal fun SharedSafetyPlanList(
     plans: List<SharedSafetyPlan>,
@@ -562,7 +596,12 @@ internal fun SharedSafetyPlanList(
     }
 }
 
-// Draws the safety contact sharing controls for the safety plan.
+/**
+ * Draws the safety contact sharing controls for the safety plan.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param plan Safety plan data model.
+ */
 @Composable
 private fun SafetyContactSharingControls(session: SessionViewModel, plan: SafetyPlan) {
     var selected by remember(plan.safeContactUids) { mutableStateOf(plan.safeContactUids.toSet()) }
@@ -614,7 +653,12 @@ private fun SafetyContactSharingControls(session: SessionViewModel, plan: Safety
     }
 }
 
-// Lets a user request or cancel a separate plan-consult ticket.
+/**
+ * Lets a user request or cancel a separate plan-consult ticket.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param plan Safety plan data model.
+ */
 @Composable
 private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPlan) {
     val controller = session.safetyPlans
@@ -661,6 +705,11 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
     }
 }
 
+/**
+ * Composes the safety conflict property label UI element.
+ *
+ * @param property Property supplied to [safetyConflictPropertyLabel].
+ */
 @Composable
 private fun safetyConflictPropertyLabel(property: String) = stringResource(
     when (property) {
@@ -672,6 +721,12 @@ private fun safetyConflictPropertyLabel(property: String) = stringResource(
     },
 )
 
+/**
+ * Composes the safety conflict value label UI element.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting safety conflict value label string.
+ */
 @Composable
 private fun safetyConflictValueLabel(value: String): String {
     val resource = when (value) {
@@ -685,6 +740,15 @@ private fun safetyConflictValueLabel(value: String): String {
     return stringResource(resource)
 }
 
+/**
+ * Displays the safety conflict dialog overlay.
+ *
+ * @param key Lookup key or cryptographic key.
+ * @param mine Mine supplied to [SafetyConflictDialog].
+ * @param incoming Incoming supplied to [SafetyConflictDialog].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param resolve Action or callback executed for resolve.
+ */
 @Composable
 private fun SafetyConflictDialog(key: String, mine: String, incoming: String, enabled: Boolean, resolve: (Boolean) -> Unit) {
     var keepMine by remember(key, mine, incoming) { mutableStateOf(false) }
@@ -722,7 +786,12 @@ private fun SafetyConflictDialog(key: String, mine: String, incoming: String, en
     )
 }
 
-// Match the arrow-only navigation used by Notes and Messages while retaining a localized TalkBack label.
+/**
+ * Match the arrow-only navigation used by Notes and Messages while retaining a localized TalkBack label.
+ *
+ * @param onClick Callback invoked when the control is activated.
+ * @param tag Tag supplied to [SafetyBackButton].
+ */
 @Composable
 private fun SafetyBackButton(onClick: () -> Unit, tag: String) {
     IconButton(onClick = onClick, modifier = Modifier.testTag(tag)) {
