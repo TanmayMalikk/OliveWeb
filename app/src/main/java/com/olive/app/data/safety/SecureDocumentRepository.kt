@@ -13,7 +13,7 @@ import javax.crypto.SecretKey
 import java.util.UUID
 import android.content.Context
 import com.olive.app.data.account.PrivateEntry
-import com.olive.app.data.media.AccountKeysetWrappedKey
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import org.json.JSONArray

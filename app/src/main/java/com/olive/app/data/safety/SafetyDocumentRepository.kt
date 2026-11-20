@@ -10,7 +10,7 @@ import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
-import com.olive.app.data.media.AccountKeysetWrappedKey
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import java.io.File

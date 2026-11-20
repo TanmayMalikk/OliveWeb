@@ -1,6 +1,5 @@
 package com.olive.app.security
 
-import com.olive.app.data.media.AccountKeysetWrappedKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

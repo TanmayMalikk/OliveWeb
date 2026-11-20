@@ -2,7 +2,7 @@ package com.olive.app.data
 
 import android.content.Context
 import com.olive.app.data.messaging.ChatSubscription
-import com.olive.app.data.media.AccountKeysetWrappedKey
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.safety.DocumentIndexStore
 import com.olive.app.data.safety.DocumentListSnapshot
 import com.olive.app.data.safety.DocumentListSource

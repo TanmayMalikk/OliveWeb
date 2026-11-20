@@ -3,10 +3,7 @@ package com.olive.app.data.media
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
-import javax.crypto.SecretKey
-import com.olive.app.security.KeyManager
-import com.olive.app.security.UnlockedAccountKeyset
+import com.olive.app.security.AccountKeysetWrappedKey
 
 /** Approved upper bound for one encrypted R2 media object. */
 internal const val MAX_MEDIA_CIPHERTEXT_BYTES=250L*1024L*1024L
@@ -38,50 +35,6 @@ enum class OcrReview { NOT_APPLICABLE, NOT_RUN, PASSED, RETAKE_RECOMMENDED, RETA
 
 /** Transfer strategy selected by the trusted Firebase control plane from ciphertext size. */
 enum class MediaUploadMode { SINGLE, MULTIPART }
-
-/** Opaque AES-key copy encrypted for one recoverable account keyset. */
-data class AccountKeysetWrappedKey(
-    val keyId:String,
-    val epoch:Long,
-    val algorithm:String,
-    val wrappedKey:String,
-) {
-    init {
-        require(runCatching { UUID.fromString(keyId) }.isSuccess) { "Invalid account key ID" }
-        require(epoch>=1) { "Invalid account key epoch" }
-        require(algorithm==ALGORITHM) { "Unsupported account key algorithm" }
-        require(wrappedKey.isNotBlank() && wrappedKey.length<=768) { "Invalid account-wrapped key" }
-    }
-
-    internal fun toJson()=JSONObject().apply {
-        put("keyId",keyId);put("epoch",epoch);put("algorithm",algorithm);put("wrappedKey",wrappedKey)
-    }
-
-    internal fun toMap():Map<String,Any> = mapOf(
-        "keyId" to keyId,"epoch" to epoch,"algorithm" to algorithm,"wrappedKey" to wrappedKey,
-    )
-
-    internal fun unwrap(keyset:UnlockedAccountKeyset):SecretKey {
-        require(keyset.keyId==keyId && keyset.epoch==epoch) { "Account wrapper uses another keyset" }
-        return KeyManager.unwrapKey(wrappedKey,keyset.privateKey,1)
-    }
-
-    companion object {
-        private const val ALGORITHM="RSA-OAEP-256"
-
-        internal fun fromJson(value:JSONObject)=AccountKeysetWrappedKey(
-            value.getString("keyId"),value.getLong("epoch"),value.getString("algorithm"),
-            value.getString("wrappedKey"),
-        )
-
-        internal fun fromMap(value:Map<*,*>)=AccountKeysetWrappedKey(
-            value["keyId"] as? String ?: error("Missing keyId"),
-            (value["epoch"] as? Number)?.toLong() ?: error("Missing epoch"),
-            value["algorithm"] as? String ?: error("Missing algorithm"),
-            value["wrappedKey"] as? String ?: error("Missing wrappedKey"),
-        )
-    }
-}
 
 /** Durable upload state persisted by [MediaTransferStore] and advanced by [MediaUploadWorker]. */
 enum class MediaTransferStatus { QUEUED, CREATING_SESSION, UPLOADING, FINALIZING, COMPLETE, FAILED, CANCELLED }

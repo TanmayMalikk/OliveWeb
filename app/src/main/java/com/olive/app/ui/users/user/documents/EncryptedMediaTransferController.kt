@@ -15,7 +15,7 @@ import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
-import com.olive.app.data.media.AccountKeysetWrappedKey
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.media.MAX_MEDIA_CIPHERTEXT_BYTES
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.copyAndVerifyEncryptedDownload

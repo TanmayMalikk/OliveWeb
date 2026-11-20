@@ -39,6 +39,50 @@ internal data class UnlockedAccountKeyset(
     val privateKey: PrivateKey,
 )
 
+/** Opaque AES-key copy encrypted for one recoverable account keyset. */
+data class AccountKeysetWrappedKey(
+    val keyId:String,
+    val epoch:Long,
+    val algorithm:String,
+    val wrappedKey:String,
+) {
+    init {
+        require(runCatching { UUID.fromString(keyId) }.isSuccess) { "Invalid account key ID" }
+        require(epoch>=1) { "Invalid account key epoch" }
+        require(algorithm==ALGORITHM) { "Unsupported account key algorithm" }
+        require(wrappedKey.isNotBlank() && wrappedKey.length<=768) { "Invalid account-wrapped key" }
+    }
+
+    internal fun toJson()=JSONObject().apply {
+        put("keyId",keyId);put("epoch",epoch);put("algorithm",algorithm);put("wrappedKey",wrappedKey)
+    }
+
+    internal fun toMap():Map<String,Any> = mapOf(
+        "keyId" to keyId,"epoch" to epoch,"algorithm" to algorithm,"wrappedKey" to wrappedKey,
+    )
+
+    internal fun unwrap(keyset:UnlockedAccountKeyset):SecretKey {
+        require(keyset.keyId==keyId && keyset.epoch==epoch) { "Account wrapper uses another keyset" }
+        return KeyManager.unwrapKey(wrappedKey,keyset.privateKey,1)
+    }
+
+    companion object {
+        private const val ALGORITHM="RSA-OAEP-256"
+
+        internal fun fromJson(value:JSONObject)=AccountKeysetWrappedKey(
+            value.getString("keyId"),value.getLong("epoch"),value.getString("algorithm"),
+            value.getString("wrappedKey"),
+        )
+
+        internal fun fromMap(value:Map<*,*>)=AccountKeysetWrappedKey(
+            value["keyId"] as? String ?: error("Missing keyId"),
+            (value["epoch"] as? Number)?.toLong() ?: error("Missing epoch"),
+            value["algorithm"] as? String ?: error("Missing algorithm"),
+            value["wrappedKey"] as? String ?: error("Missing wrappedKey"),
+        )
+    }
+}
+
 /** Account keyset material is unusable if an authenticated envelope cannot be parsed or unlocked. */
 internal class AccountKeysetException(message: String, cause: Throwable? = null) :
     IllegalStateException(message, cause)
