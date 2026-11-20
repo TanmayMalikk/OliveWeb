@@ -64,20 +64,63 @@ jobs:
         id: live_check
         if: env.SITE_URL != ''
         run: |
-          TARGET_URL="${SITE_URL:-https://yourolivebranch.ca}"
-          sleep 15
-          LAST_CODE="000"
-          for i in $(seq 1 12); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL" || true)
-            LAST_CODE="$CODE"
-            echo "Check $i: HTTP $CODE"
-            if [ "$CODE" -ge 200 ] && [ "$CODE" -lt 400 ]; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Last HTTP status: $LAST_CODE" > health.log
-          exit 1
+          python3 - << 'EOF'
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          DEFAULT_URL = "https://yourolivebranch.ca"
+          raw = os.environ.get("SITE_URL", "").strip().strip('"').strip("'").strip()
+          if not raw:
+              raw = DEFAULT_URL
+          if "://" not in raw:
+              raw = f"https://{raw}"
+
+          parsed = urllib.parse.urlparse(raw)
+          if parsed.scheme not in ("http", "https") or not parsed.netloc:
+              print(f"Invalid SITE_URL {raw!r}; falling back to {DEFAULT_URL}", flush=True)
+              target_url = f"{DEFAULT_URL}/api/health"
+          elif parsed.path in ("", "/"):
+              target_url = f"{parsed.scheme}://{parsed.netloc}/api/health"
+          else:
+              target_url = raw
+
+          print(f"Checking live site at: {target_url}", flush=True)
+          time.sleep(15)
+
+          last_status = "No response"
+          headers = {
+              "User-Agent": "OliveWeb-Deploy-Check/1.0",
+              "Accept": "application/json, text/html, */*",
+          }
+
+          for attempt in range(1, 13):
+              try:
+                  req = urllib.request.Request(target_url, headers=headers)
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      code = resp.status
+                      last_status = f"HTTP {code}"
+                      print(f"Check {attempt}: {last_status} ({target_url})", flush=True)
+                      if 200 <= code < 400:
+                          raise SystemExit(0)
+              except urllib.error.HTTPError as exc:
+                  last_status = f"HTTP {exc.code}"
+                  print(f"Check {attempt}: {last_status} ({target_url})", flush=True)
+              except SystemExit:
+                  raise
+              except Exception as exc:
+                  last_status = f"{type(exc).__name__}: {exc}"
+                  print(f"Check {attempt}: {last_status} ({target_url})", flush=True)
+
+              if attempt < 12:
+                  time.sleep(10)
+
+          with open("health.log", "w", encoding="utf-8") as fh:
+              fh.write(f"Last status: {last_status} for {target_url}\n")
+          raise SystemExit(1)
+          EOF
 
       - name: Notify Success
         if: success() && env.WEBHOOK_URL != ''
