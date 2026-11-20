@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
@@ -74,7 +75,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val recoveryCredentials = session.passkeyRecoveryCredentials
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
-        if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
+        if (BuildConfig.DEBUG && userRole && cacheUid != null) session.refreshPasskeyRecovery()
     }
 
     FormColumn {
@@ -229,70 +230,72 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         if (userRole) {
             HorizontalDivider()
             SafeEntrySettings(session)
-            HorizontalDivider()
-            Text(
-                stringResource(R.string.passkey_recovery_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                stringResource(R.string.passkey_recovery_help),
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-            )
-            if (recoveryCredentials == null) {
-                Text(stringResource(R.string.passkey_recovery_list_unavailable))
-            } else if (recoveryCredentials.isEmpty()) {
-                Text(stringResource(R.string.passkey_recovery_none))
-            } else {
-                recoveryCredentials.forEachIndexed { index, credential ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(
-                                if (credential.backedUp) R.string.passkey_recovery_synced_factor
-                                else R.string.passkey_recovery_device_factor,
-                            ),
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlinedButton(
-                            onClick = { recoveryCredentialToRemove = credential.credentialId },
-                            enabled = !session.busy,
-                            modifier = Modifier.testTag("remove_recovery_passkey_$index"),
+            if (BuildConfig.DEBUG) {
+                HorizontalDivider()
+                Text(
+                    stringResource(R.string.passkey_recovery_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    stringResource(R.string.passkey_recovery_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                )
+                if (recoveryCredentials == null) {
+                    Text(stringResource(R.string.passkey_recovery_list_unavailable))
+                } else if (recoveryCredentials.isEmpty()) {
+                    Text(stringResource(R.string.passkey_recovery_none))
+                } else {
+                    recoveryCredentials.forEachIndexed { index, credential ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.passkey_recovery_remove))
+                            Text(
+                                stringResource(
+                                    if (credential.backedUp) R.string.passkey_recovery_synced_factor
+                                    else R.string.passkey_recovery_device_factor,
+                                ),
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedButton(
+                                onClick = { recoveryCredentialToRemove = credential.credentialId },
+                                enabled = !session.busy,
+                                modifier = Modifier.testTag("remove_recovery_passkey_$index"),
+                            ) {
+                                Text(stringResource(R.string.passkey_recovery_remove))
+                            }
                         }
                     }
                 }
-            }
-            Button(
-                onClick = session::enablePasskeyRecovery,
-                enabled = !session.busy,
-                modifier = Modifier.testTag("add_recovery_passkey"),
-            ) {
-                Text(stringResource(R.string.passkey_recovery_enable))
-            }
-            recoveryCredentialToRemove?.let { credentialId ->
-                AlertDialog(
-                    onDismissRequest = { recoveryCredentialToRemove = null },
-                    title = { Text(stringResource(R.string.passkey_recovery_remove_confirm_title)) },
-                    text = { Text(stringResource(R.string.passkey_recovery_remove_confirm_help)) },
-                    confirmButton = {
-                        Button(onClick = {
-                            recoveryCredentialToRemove = null
-                            session.removePasskeyRecovery(credentialId)
-                        }) {
-                            Text(stringResource(R.string.passkey_recovery_remove))
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { recoveryCredentialToRemove = null }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    },
-                )
+                Button(
+                    onClick = session::enablePasskeyRecovery,
+                    enabled = !session.busy,
+                    modifier = Modifier.testTag("add_recovery_passkey"),
+                ) {
+                    Text(stringResource(R.string.passkey_recovery_enable))
+                }
+                recoveryCredentialToRemove?.let { credentialId ->
+                    AlertDialog(
+                        onDismissRequest = { recoveryCredentialToRemove = null },
+                        title = { Text(stringResource(R.string.passkey_recovery_remove_confirm_title)) },
+                        text = { Text(stringResource(R.string.passkey_recovery_remove_confirm_help)) },
+                        confirmButton = {
+                            Button(onClick = {
+                                recoveryCredentialToRemove = null
+                                session.removePasskeyRecovery(credentialId)
+                            }) {
+                                Text(stringResource(R.string.passkey_recovery_remove))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { recoveryCredentialToRemove = null }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                        },
+                    )
+                }
             }
             HorizontalDivider()
             Text(
