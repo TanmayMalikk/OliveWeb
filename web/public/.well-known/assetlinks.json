@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.olive.app",
-      "sha256_cert_fingerprints": [
+      "sha256_cert_fingerprints": ["2D:6E:E1:F1:95:ED:46:41:DE:E7:22:0B:3E:4B:5C:AB:84:8D:DC:C1:3B:BD:EA:91:E9:FE:A4:A7:69:11:2E:66",
         "38:58:AD:BF:47:04:37:6D:30:D1:A1:36:8B:C4:10:BB:38:58:57:D9:67:06:6D:D0:87:4B:CA:86:48:71:B8:DD"
       ]
     }
