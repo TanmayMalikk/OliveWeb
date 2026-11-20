@@ -1,0 +1,144 @@
+name: Deployment Status
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify-and-notify:
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      SITE_URL: ${{ vars.SITE_URL }}
+
+    steps:
+      - name: Notify Building
+        run: |
+          python3 -c '
+          import json, os, urllib.request
+          payload = {
+            "embeds": [{
+              "title": "⏳ Building & Deploying",
+              "description": f"New push to `{os.environ[\"REF\"]}` by **{os.environ[\"ACTOR\"]}**",
+              "color": 16761095,
+              "fields": [
+                {"name": "Commit", "value": f"`{os.environ[\"SHA\"][:7]}`", "inline": True},
+                {"name": "Logs", "value": f"[View Workflow]({os.environ[\"RUN_URL\"]})", "inline": True}
+              ]
+            }]
+          }
+          req = urllib.request.Request(
+            os.environ["WEBHOOK_URL"],
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "User-Agent": "Deploy-Notifier"}
+          )
+          urllib.request.urlopen(req)
+          '
+        env:
+          REF: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install & Build
+        id: build
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee build.log
+          npm run build --if-present 2>&1 | tee -a build.log
+
+      - name: Verify Live Site on Hostinger
+        id: live_check
+        if: env.SITE_URL != ''
+        run: |
+          # Wait briefly for Hostinger git auto-deploy to pull & restart
+          sleep 15
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL" || true)
+            echo "Check $i: HTTP $CODE"
+            if [ "$CODE" -ge 200 ] && [ "$CODE" -lt 400 ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Last HTTP status: $CODE" > health.log
+          exit 1
+
+      - name: Notify Success
+        if: success()
+        run: |
+          python3 -c '
+          import json, os, urllib.request
+          payload = {
+            "embeds": [{
+              "title": "✅ Deployment Successful",
+              "description": f"`{os.environ[\"REF\"]}` built cleanly and live site responded OK.",
+              "color": 3066993,
+              "fields": [
+                {"name": "Commit", "value": f"`{os.environ[\"SHA\"][:7]}`", "inline": True},
+                {"name": "Logs", "value": f"[View Workflow]({os.environ[\"RUN_URL\"]})", "inline": True}
+              ]
+            }]
+          }
+          req = urllib.request.Request(
+            os.environ["WEBHOOK_URL"],
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "User-Agent": "Deploy-Notifier"}
+          )
+          urllib.request.urlopen(req)
+          '
+        env:
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Notify Failure + Reason
+        if: failure()
+        run: |
+          python3 -c '
+          import json, os, urllib.request
+
+          build_outcome = os.environ.get("BUILD_OUTCOME", "")
+          live_outcome = os.environ.get("LIVE_OUTCOME", "")
+
+          if build_outcome == "failure":
+            lines = open("build.log").read().splitlines()[-12:] if os.path.exists("build.log") else []
+            snippet = "\n".join(lines)[-900:]
+            reason = f"**Build / `npm ci` failed:**\n```\n{snippet or \"Check workflow logs\"}\n```"
+          elif live_outcome == "failure":
+            status = open("health.log").read().strip() if os.path.exists("health.log") else "No 2xx/3xx response"
+            reason = f"**Hostinger live check failed** ({status}). Hostinger git deploy or server startup likely failed—check hPanel deploy logs."
+          else:
+            reason = "Workflow failed before build completed. Check workflow logs."
+
+          payload = {
+            "embeds": [{
+              "title": "❌ Deployment Failed",
+              "description": reason,
+              "color": 15158332,
+              "fields": [
+                {"name": "Commit", "value": f"`{os.environ[\"SHA\"][:7]}`", "inline": True},
+                {"name": "Logs", "value": f"[View Workflow]({os.environ[\"RUN_URL\"]})", "inline": True}
+              ]
+            }]
+          }
+          req = urllib.request.Request(
+            os.environ["WEBHOOK_URL"],
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "User-Agent": "Deploy-Notifier"}
+          )
+          urllib.request.urlopen(req)
+          '
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          LIVE_OUTCOME: ${{ steps.live_check.outcome }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
