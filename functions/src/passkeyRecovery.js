@@ -33,6 +33,12 @@ function credentialId(value) {
   return typeof value === "string" && /^[A-Za-z0-9_-]{16,1024}$/.test(value) ? value : "";
 }
 
+function rejectPrfResult(response) {
+  if (response?.clientExtensionResults?.prf?.results !== undefined) {
+    throw new HttpsError("invalid-argument", "Passkey secret material must remain on the client.");
+  }
+}
+
 function recoveryEnvelope(value, uid, id) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new HttpsError("invalid-argument", "Invalid encrypted recovery key.");
   const fields = ["version", "accountId", "credentialId", "salt", "iv", "ciphertext"];
@@ -145,10 +151,11 @@ exports.passkeyRecoveryBeginEnrollment = onCall(async (request) => {
   return {options, challengeId, prfInput, expiresAt: expiresAt.toISOString()};
 });
 
-exports.passkeyRecoveryCompleteEnrollment = onCall(async (request) => {
+exports.passkeyRecoveryContinueEnrollment = onCall(async (request) => {
   const uid = authenticatedUid(request);
   const reference = challengeReference(uid, request.data?.challengeId);
   const challengeData = validChallenge(await reference.get(), uid, "REGISTER");
+  rejectPrfResult(request.data?.response);
   const {rpId, origins} = webAuthnConfig();
   let verification;
   try {
@@ -167,16 +174,89 @@ exports.passkeyRecoveryCompleteEnrollment = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Passkey registration could not be verified.");
   }
   const credential = credentialRecord(verification.registrationInfo.credential, uid, verification.registrationInfo);
-  const envelope = recoveryEnvelope(request.data?.envelope, uid, credential.credentialId);
   const prfInput = base64Bytes(challengeData.prfInput, PRF_INPUT_BYTES);
   if (!prfInput) throw new HttpsError("failed-precondition", "Passkey challenge is invalid.");
+  const options = await generateAuthenticationOptions({
+    rpID: rpId,
+    timeout: CHALLENGE_LIFETIME_MS,
+    userVerification: "required",
+    allowCredentials: [{id: credential.credentialId, transports: credential.transports}],
+  });
+  const proofChallengeId = crypto.randomBytes(24).toString("base64url");
+  const proofReference = challengeReference(uid, proofChallengeId);
+  const expiresAt = new Date(Date.now() + CHALLENGE_LIFETIME_MS);
   await db.runTransaction(async (transaction) => {
     await consumeChallenge(transaction, reference, uid, "REGISTER");
     const credentialRef = root(uid).collection("credentials").doc(credential.credentialId);
     const prior = await transaction.get(credentialRef);
     if (prior.exists) throw new HttpsError("already-exists", "This passkey is already registered.");
+    transaction.create(proofReference, {
+      ownerUid: uid,
+      action: "ENROLL_PROOF",
+      challenge: options.challenge,
+      credential,
+      prfInput: prfInput.toString("base64"),
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt,
+    });
+  });
+  return {
+    options,
+    challengeId: proofChallengeId,
+    prfInputs: {[credential.credentialId]: prfInput.toString("base64")},
+    expiresAt: expiresAt.toISOString(),
+  };
+});
+
+exports.passkeyRecoveryCompleteEnrollment = onCall(async (request) => {
+  const uid = authenticatedUid(request);
+  rejectPrfResult(request.data?.response);
+  const responseId = credentialId(request.data?.response?.id);
+  if (!responseId) throw new HttpsError("invalid-argument", "Invalid passkey response.");
+  const reference = challengeReference(uid, request.data?.challengeId);
+  const challengeData = validChallenge(await reference.get(), uid, "ENROLL_PROOF");
+  const pending = challengeData.credential || {};
+  const credential = credentialRecord(pending, uid, {
+    credentialDeviceType: pending.deviceType,
+    credentialBackedUp: pending.backedUp,
+  });
+  if (credential.credentialId !== responseId) {
+    throw new HttpsError("permission-denied", "Passkey verification failed.");
+  }
+  const prfInput = base64Bytes(challengeData.prfInput, PRF_INPUT_BYTES);
+  if (!prfInput) throw new HttpsError("failed-precondition", "Passkey challenge is invalid.");
+  const {rpId, origins} = webAuthnConfig();
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response: request.data?.response,
+      expectedChallenge: challengeData.challenge,
+      expectedOrigin: origins,
+      expectedRPID: rpId,
+      credential: {
+        id: credential.credentialId,
+        publicKey: credential.publicKey,
+        counter: credential.counter,
+        transports: credential.transports,
+      },
+      requireUserVerification: true,
+    });
+  } catch (error) {
+    throw new HttpsError("invalid-argument", "Passkey verification failed.");
+  }
+  if (!verification.verified || verification.authenticationInfo.credentialID !== credential.credentialId) {
+    throw new HttpsError("permission-denied", "Passkey verification failed.");
+  }
+  const envelope = recoveryEnvelope(request.data?.envelope, uid, credential.credentialId);
+  await db.runTransaction(async (transaction) => {
+    await consumeChallenge(transaction, reference, uid, "ENROLL_PROOF");
+    const credentialRef = root(uid).collection("credentials").doc(credential.credentialId);
+    const prior = await transaction.get(credentialRef);
+    if (prior.exists) throw new HttpsError("already-exists", "This passkey is already registered.");
     transaction.create(credentialRef, {
       ...credential,
+      counter: verification.authenticationInfo.newCounter,
+      backedUp: verification.authenticationInfo.credentialBackedUp,
       envelope,
       prfInput: prfInput.toString("base64"),
       createdAt: FieldValue.serverTimestamp(),
@@ -217,6 +297,7 @@ exports.passkeyRecoveryBeginUnlock = onCall(async (request) => {
 
 exports.passkeyRecoveryCompleteUnlock = onCall(async (request) => {
   const uid = authenticatedUid(request);
+  rejectPrfResult(request.data?.response);
   const responseId = credentialId(request.data?.response?.id);
   if (!responseId) throw new HttpsError("invalid-argument", "Invalid passkey response.");
   const reference = challengeReference(uid, request.data?.challengeId);
@@ -255,4 +336,4 @@ exports.passkeyRecoveryCompleteUnlock = onCall(async (request) => {
   return result;
 });
 
-exports._test = {recoveryEnvelope, credentialRecord};
+exports._test = {recoveryEnvelope, credentialRecord, rejectPrfResult};

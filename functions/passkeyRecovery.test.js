@@ -71,3 +71,16 @@ test("passkey recovery rejects malformed credential data across repeated input c
     }, "uid-a", {}));
   }
 });
+
+test("passkey recovery rejects uploaded PRF outputs but permits non-secret support flags", () => {
+  assert.doesNotThrow(() => recovery.rejectPrfResult({
+    id: "credential_abcdefghijklmnop",
+    clientExtensionResults: {prf: {enabled: true}},
+  }));
+  for (const first of ["secret", [1, 2, 3], {byteLength: 32}]) {
+    assert.throws(() => recovery.rejectPrfResult({
+      id: "credential_abcdefghijklmnop",
+      clientExtensionResults: {prf: {results: {first}}},
+    }));
+  }
+});
