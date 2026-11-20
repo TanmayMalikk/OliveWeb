@@ -13,6 +13,7 @@ jobs:
 
     steps:
       - name: Notify Building
+        if: env.WEBHOOK_URL != ''
         run: |
           python3 - << 'EOF'
           import json, os, urllib.request
@@ -43,20 +44,21 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
-          package-manager-cache: false
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Install & Build
         id: build
         run: |
           set -o pipefail
-          npm ci 2>&1 | tee build.log
-          npm run build --if-present 2>&1 | tee -a build.log
+          npm --prefix web ci --ignore-scripts 2>&1 | tee build.log
+          DISCORD_WEBHOOK_URL="" npm --prefix web run build 2>&1 | tee -a build.log
 
       - name: Verify Live Site on Hostinger
         id: live_check
@@ -78,7 +80,7 @@ jobs:
           exit 1
 
       - name: Notify Success
-        if: success()
+        if: success() && env.WEBHOOK_URL != ''
         run: |
           python3 - << 'EOF'
           import json, os, urllib.request
@@ -108,7 +110,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Notify Failure + Reason
-        if: failure()
+        if: failure() && env.WEBHOOK_URL != ''
         run: |
           python3 - << 'EOF'
           import json, os, urllib.request

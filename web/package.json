@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node server/developmentServer.mjs",
     "security:check": "node scripts/check-public-secrets.mjs",
-    "build": "npm run security:check && npm run qr:generate && tsc -b && vite build",
+    "build": "node scripts/deploy-notify.mjs build",
     "qr:generate": "node scripts/generate-download-qr.mjs",
     "postinstall": "npm run build",
     "start": "node server/productionServer.mjs",
