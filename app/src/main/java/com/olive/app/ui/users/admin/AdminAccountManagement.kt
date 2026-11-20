@@ -42,7 +42,7 @@ internal fun AdminAccounts(
     onDelete: (AdminAccountSummary) -> Unit
 ) {
     val uiText = rememberResourceText()
-    LaunchedEffect(Unit) { session.refreshAdminAccounts() }
+    LaunchedEffect(session.coverAccountId) { session.ensureAdminAccounts() }
     var noteTarget by remember { mutableStateOf<DirectoryUser?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var status by rememberSaveable { mutableIntStateOf(0) }
@@ -98,11 +98,11 @@ internal fun AdminAccounts(
                     }
             }
         }
-        if (session.busy) {
+        if (session.showAdminAccountsSkeleton) {
             item("loading_accounts") { LoadingSkeleton(SkeletonLayout.Accounts, rows = 3) }
             return@LazyColumn
         }
-        if (session.adminAccounts.isEmpty() && session.message == null) item("no_accounts") {
+        if (session.adminAccounts.isEmpty() && session.adminAccountsError == null) item("no_accounts") {
             Text(uiText(R.string.ui_no_accounts_found), color = Muted)
         }
         AccountRole.entries.forEach { role ->
@@ -136,7 +136,10 @@ internal fun AdminAccounts(
                 )
             }
         }
-        item("account_status") { Status(session) }
+        item("account_status") {
+            session.adminAccountsError?.let { AccessibleMessage(stringResource(it)) }
+            Status(session)
+        }
     }
     noteTarget?.let { target ->
         PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })

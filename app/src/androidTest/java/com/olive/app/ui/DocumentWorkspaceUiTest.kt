@@ -6,7 +6,11 @@ import android.graphics.pdf.PdfDocument
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import com.olive.app.ui.session.EmergencyAlert
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.ui.users.user.documents.PendingUploadCard
 import com.olive.app.ui.users.admin.EmergencyResponseScreen
+import com.olive.app.ui.users.shared.messaging.SharedMediaMessage
 import com.olive.app.ui.users.shared.messaging.VoiceMessageBubble
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -30,6 +34,36 @@ import org.junit.Test
 import java.io.File
 
 class DocumentWorkspaceUiTest {
+    @Test
+    fun uploadCardAnnouncesProgressAndOnlyOffersRetryForFailureOrBackoff() {
+        val upload = mutableStateOf(MediaUploadPresentation(
+            "job", "owner", "Fixture attachment.pdf", "application/pdf",
+            MediaTransferStatus.QUEUED, 25, 100, "", null, 1,
+        ))
+        var retries = 0
+        compose.setContent { OliveTheme { PendingUploadCard(upload.value) { retries++ } } }
+        val retry = compose.onNodeWithText(text(R.string.retry))
+        fun verify(status: MediaTransferStatus, label: String, error: String? = null) {
+            compose.runOnIdle { upload.value = upload.value.copy(status = status, error = error) }
+            val announcement = listOfNotNull(upload.value.name, label, error).joinToString(". ")
+            compose.onNodeWithContentDescription(announcement).assertIsDisplayed()
+        }
+        verify(MediaTransferStatus.QUEUED, text(R.string.documents_upload_queued))
+        retry.assertDoesNotExist()
+        verify(MediaTransferStatus.CREATING_SESSION, text(R.string.documents_upload_starting))
+        verify(MediaTransferStatus.UPLOADING, context.getString(R.string.documents_upload_progress, 25))
+        retry.assertDoesNotExist()
+        verify(MediaTransferStatus.FINALIZING, text(R.string.documents_upload_finalizing))
+        verify(MediaTransferStatus.COMPLETE, text(R.string.documents_upload_complete))
+        verify(MediaTransferStatus.CANCELLED, text(R.string.documents_upload_cancelled))
+        retry.assertDoesNotExist()
+        verify(MediaTransferStatus.FAILED, text(R.string.documents_upload_failed), "Synthetic upload error")
+        retry.performClick()
+        verify(MediaTransferStatus.QUEUED, text(R.string.documents_upload_waiting_retry), "Synthetic network error")
+        retry.performClick()
+        compose.runOnIdle { assertEquals(2, retries) }
+    }
+
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
     private val context get()=instrumentation.targetContext
@@ -47,6 +81,7 @@ class DocumentWorkspaceUiTest {
             changed=onUpdate;onUpdate(DocumentListSnapshot(rows,DocumentListSource.SERVER,100));return ChatSubscription {changed=null}
         }
         override suspend fun getFor(uid:String,id:String)=rows.single {it.id==id}
+        override fun cachedFor(uid: String, id: String) = rows.firstOrNull { it.id == id && uid in it.allowedUsers }
         override suspend fun share(document:SafetyDocument,ownerUid:String,recipients:Map<String,String>){shared=true}
         override suspend fun delete(document:SafetyDocument,ownerUid:String){rows=rows.filterNot {it.id==document.id};changed?.invoke(DocumentListSnapshot(rows,DocumentListSource.SERVER,101))}
         override suspend fun setEvidence(document:SafetyDocument,ownerUid:String,evidence:Boolean){rows=rows.map {if(it.id==document.id) it.copy(evidence=evidence) else it}}
@@ -93,6 +128,40 @@ class DocumentWorkspaceUiTest {
         }
         return session
     }
+    @Test
+    fun sharedDocumentsOpenPrivatelyAndShowAnErrorWhenAnAttachmentIsUnavailable() {
+        val source = Documents().apply {
+            rows += SafetyDocument("encrypted", "owner", "", "Protected file", "application/pdf",
+                listOf("owner"), objectKey = "synthetic/encrypted")
+        }
+        val session = session(source)
+        var opened: Pair<String, File>? = null
+        compose.setContent { OliveTheme {
+            androidx.compose.foundation.layout.Column {
+                SharedMediaMessage("pdf", "Report", session, false, { document, file ->
+                    opened = document.id to file
+                }, sender = "Synthetic sender")
+                SharedMediaMessage("encrypted", "Protected file", session, false, { _, _ -> })
+                SharedMediaMessage("missing", "", session, true, { _, _ -> error("Missing file opened") })
+            }
+        } }
+        compose.onNodeWithText("Synthetic report.pdf").assertIsDisplayed()
+        compose.onNodeWithTag("shared_media_offline_encrypted").assertExists()
+        compose.onNodeWithTag("shared_media_pdf").performClick()
+        compose.waitUntil(10_000) { opened?.first == "pdf" }
+        try {
+            assertTrue(opened!!.second.isFile)
+        } finally {
+            opened?.second?.delete()
+        }
+        compose.onNodeWithTag("shared_media_missing").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("shared_media_error_missing").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.runOnIdle { session.runtime.state.accountRole = AccountRole.STAFF }
+        compose.onNodeWithTag("shared_media_offline_encrypted").assertDoesNotExist()
+    }
+
     @Test
     fun filtersShowOnlyTheirMediaTypeAndEvidenceAndSharingChangesUseTheOwner() {
         val source=Documents();val session=session(source)

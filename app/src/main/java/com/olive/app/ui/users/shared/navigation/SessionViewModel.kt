@@ -20,6 +20,7 @@ import com.olive.app.data.messaging.ChatMembershipEvent
 import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.FriendInviteRepository
 import com.olive.app.data.messaging.FriendRelationship
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.news.NewsArticle
@@ -96,7 +97,18 @@ internal class SessionViewModel @JvmOverloads constructor(
     val coverUsername get() = runtime.state.coverUsername
     val coverType get() = runtime.state.coverType
     val accountRole get() = runtime.state.accountRole
-    val adminAccounts get() = runtime.state.adminAccounts
+    val adminAccounts get() = runtime.adminPreloader.accounts
+    val adminStaffAccounts get() = runtime.adminPreloader.staff
+    val adminAccountsLoading get() = runtime.adminPreloader.loadingAccounts
+    val adminStaffLoading get() = runtime.adminPreloader.loadingStaff
+    val adminAccountsReady get() = runtime.adminPreloader.accountsReady
+    val adminStaffReady get() = runtime.adminPreloader.staffReady
+    val showAdminAccountsSkeleton get() = runtime.adminPreloader.showAccountsSkeleton
+    val showAdminStaffSkeleton get() = runtime.adminPreloader.showStaffSkeleton
+    val adminAccountsError get() = runtime.adminPreloader.accountsError
+    val adminStaffError get() = runtime.adminPreloader.staffError
+    fun ensureAdminAccounts() = runtime.adminPreloader.accounts()
+    fun ensureAdminStaff() = runtime.adminPreloader.staff()
     val savedNews get() = runtime.state.savedNews
     val privacyBlackout get() = runtime.state.privacyBlackout
     val coverReset get() = runtime.state.coverReset
@@ -191,11 +203,13 @@ internal class SessionViewModel @JvmOverloads constructor(
         documents.clear()
         locationMap.clear()
         adminLocationMap.close()
+        runtime.adminPreloader.clear()
         runtime.accountSession.signOut()
     }
 
     // Stops account listeners and background work when the session view model is removed.
     override fun onCleared() {
+        runtime.adminPreloader.clear()
         coverEmergencyConfirmation = null
         coverEmergencyInFlight = false
         documents.clear()
@@ -240,13 +254,53 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
             (it.type == "SUPPORT") == tickets && runtime.isActiveUnreadConversation(it)
         } + if (tickets) 0 else runtime.incomingFriendRequestCount
 
-    // Starts chat listeners when the current screen needs messaging.
+    /**
+     * Starts the friend and conversation listeners if messaging is not already running or starting.
+     *
+     * @param showFeedback Whether to show immediate setup or sign-in messages.
+     */
     fun ensureMessagingObservation(showFeedback: Boolean = false) =
         runtime.messaging.ensureMessagingObservation(showFeedback)
 
-    // Reconnects chat listeners after a network or account change.
+    /**
+     * Reauthenticates the linked account and restarts messaging observation.
+     *
+     * @param password The current account password.
+     * @param onConnected Runs after sign-in succeeds if the same messaging session is still active.
+     */
     fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) =
         runtime.messaging.reconnectMessaging(password, onConnected)
+
+    /**
+     * Gets a shareable invite for the signed-in account.
+     *
+     * @param uid The expected UID of the signed-in account.
+     * @param refresh Whether to replace an existing invite.
+     * @return The invite code, share link, and expiration time.
+     */
+    suspend fun createFriendInvite(uid: String, refresh: Boolean) =
+        FriendInviteRepository(uid).create(refresh)
+
+    /**
+     * Claims another account's friend invite with the current Firebase account.
+     *
+     * @param uid The expected account UID, if known.
+     * @param code The invitation code entered by the user.
+     * @return The username of the person who created the invite.
+     */
+    suspend fun claimFriendInvite(uid: String?, code: String) =
+        FriendInviteRepository(uid).claim(code)
+
+    /**
+     * Watches for Firebase to report that the displayed invite was claimed or replaced.
+     *
+     * @param uid The UID of the invite owner.
+     * @param code The invite code currently displayed.
+     * @param onUnavailable Runs when the invite has been claimed or its code no longer matches.
+     * @return The subscription to close when the invite dialog is dismissed.
+     */
+    fun observeFriendInviteUnavailable(uid: String, code: String, onUnavailable: () -> Unit) =
+        FriendInviteRepository(uid).observeUnavailable(code, onUnavailable)
 
     // Searches the account directory for an exact username.
     fun searchUsers(query: String) = runtime.friendActions.searchUsers(query)

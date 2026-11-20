@@ -25,6 +25,58 @@ class LocationSharingRepositorySdkTest {
     private fun register() { transport.records["messageDirectory/friend_fixture"] = mapOf("uid" to "friend", "publicKey" to java.util.Base64.getEncoder().encodeToString(KeyManager.getOrCreatePublicKey().encoded)) }
 
     @Test
+    fun adminFeedSortsValidUserLocationsAndUnsubscribes() {
+        val database = mock(FirebaseDatabase::class.java)
+        val root = mock(DatabaseReference::class.java)
+        val feed = mock(DatabaseReference::class.java)
+        val listener = org.mockito.ArgumentCaptor.forClass(ValueEventListener::class.java)
+        `when`(database.reference).thenReturn(root)
+        `when`(root.child("adminLiveLocations")).thenReturn(feed)
+        fun row(
+            uid: String?, name: String = "", latitude: Double? = 53.5,
+            longitude: Double? = -113.5, timestamp: Long? = 100L, active: Boolean = false,
+        ): DataSnapshot {
+            val row = mock(DataSnapshot::class.java)
+            `when`(row.key).thenReturn(uid)
+            fun <T> child(key: String, type: Class<T>, value: T?) {
+                val node = mock(DataSnapshot::class.java)
+                `when`(row.child(key)).thenReturn(node)
+                `when`(node.getValue(type)).thenReturn(value)
+            }
+            child("name", String::class.java, name)
+            child("latitude", Double::class.java, latitude)
+            child("longitude", Double::class.java, longitude)
+            child("updatedAt", Long::class.java, timestamp)
+            child("active", Boolean::class.java, active)
+            child("accuracy", Double::class.java, 4.5)
+            return row
+        }
+        val snapshot = mock(DataSnapshot::class.java)
+        val rows = listOf(
+            row("z", latitude = 53.6), row("b", "A location", active = true), row(null),
+            row("missing-latitude", latitude = null), row("missing-longitude", longitude = null),
+            row("invalid", longitude = -181.0), row("missing-time", timestamp = null),
+        )
+        `when`(snapshot.children).thenReturn(rows)
+        val updates = mutableListOf<List<MapLocationPoint>>()
+        val errors = mutableListOf<String>()
+        val subscription = AdminLocationRepository { database }.observe({ updates += it }, { errors += it })
+        val ignored = mock(ValueEventListener::class.java)
+        verify(feed).addValueEventListener(listener.capture() ?: ignored)
+        listener.value.onDataChange(snapshot)
+        assertEquals(listOf("b", "z"), updates.single().map { it.uid })
+        assertEquals("z", updates.single().last().name)
+        assertTrue(updates.single().first().live)
+        assertTrue(updates.single().last().lastKnown)
+        assertEquals(4.5f, updates.single().first().accuracy)
+        val cancelled = DatabaseError.fromCode(DatabaseError.PERMISSION_DENIED)
+        listener.value.onCancelled(cancelled)
+        assertEquals(listOf(cancelled.message), errors)
+        subscription.close()
+        verify(feed).removeEventListener(listener.value)
+    }
+
+    @Test
     fun liveRecipientsRotateKeysRemoveOldGrantsAndRejectUnverifiedIdentities() = runBlocking<Unit> {
         TestAndroidKeyStore.install().use {
             register()

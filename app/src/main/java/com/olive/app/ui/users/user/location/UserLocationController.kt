@@ -133,71 +133,74 @@ internal class LocationMapController(
             }
         }
         locationJob = scope.launch {
-            if (requestPermission()) {
-                // User location controller: Keeps open active while is active.
-                while (isActive) {
-                    DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+            try {
+                if (requestPermission()) {
+                    // User location controller: Keeps open active while is active.
+                    while (isActive) {
+                        DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+                            // Apply the map result only if it belongs to the newest open request.
+                            if (token == generation) {
+                                val previous = state.ownPoint
+                                val trail = previous?.trail.orEmpty()
+                                    .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
+                                    .toMutableList()
+                                val moved = previous == null || FloatArray(1).also { result ->
+                                    Location.distanceBetween(
+                                        previous.latitude,
+                                        previous.longitude,
+                                        fix.latitude,
+                                        fix.longitude,
+                                        result
+                                    )
+                                }[0] >= MIN_TRAIL_DISTANCE_METERS
+                                if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp)
+                                    trail += LocationTrailPoint(
+                                        fix.latitude,
+                                        fix.longitude,
+                                        fix.timestamp
+                                    )
+                                state = state.copy(
+                                    ownPoint = MapLocationPoint(
+                                        uid,
+                                        configuration.youLabel,
+                                        fix.latitude,
+                                        fix.longitude,
+                                        fix.timestamp,
+                                        true,
+                                        fix.accuracy,
+                                        trail = trail.takeLast(MAX_TRAIL_POINTS)
+                                    )
+                                )
+                            }
+                        }
+                        if (token == generation && state.locating) state = state.copy(locating = false)
+                        delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
+                    }
+                } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
+                    val coordinates = GeoapifyClient.coordinates(configuration.profile.address)
+                        ?: DeviceLocation.coordinatesForAddress(
+                            applicationContext,
+                            configuration.profile.address
+                        )
+                    coordinates?.let { (latitude, longitude) ->
                         // Apply the map result only if it belongs to the newest open request.
                         if (token == generation) {
-                            val previous = state.ownPoint
-                            val trail = previous?.trail.orEmpty()
-                                .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
-                                .toMutableList()
-                            val moved = previous == null || FloatArray(1).also { result ->
-                                Location.distanceBetween(
-                                    previous.latitude,
-                                    previous.longitude,
-                                    fix.latitude,
-                                    fix.longitude,
-                                    result
-                                )
-                            }[0] >= MIN_TRAIL_DISTANCE_METERS
-                            if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp)
-                                trail += LocationTrailPoint(
-                                    fix.latitude,
-                                    fix.longitude,
-                                    fix.timestamp
-                                )
                             state = state.copy(
                                 ownPoint = MapLocationPoint(
                                     uid,
-                                    configuration.youLabel,
-                                    fix.latitude,
-                                    fix.longitude,
-                                    fix.timestamp,
-                                    true,
-                                    fix.accuracy,
-                                    trail = trail.takeLast(MAX_TRAIL_POINTS)
+                                    configuration.savedLocationLabel,
+                                    latitude,
+                                    longitude,
+                                    System.currentTimeMillis(),
+                                    false
                                 )
                             )
                         }
                     }
-                    if (token == generation && state.locating) state = state.copy(locating = false)
-                    delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                 }
-            } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
-                val coordinates = GeoapifyClient.coordinates(configuration.profile.address)
-                    ?: DeviceLocation.coordinatesForAddress(
-                        applicationContext,
-                        configuration.profile.address
-                    )
-                coordinates?.let { (latitude, longitude) ->
-                    // Apply the map result only if it belongs to the newest open request.
-                    if (token == generation) {
-                        state = state.copy(
-                            ownPoint = MapLocationPoint(
-                                uid,
-                                configuration.savedLocationLabel,
-                                latitude,
-                                longitude,
-                                System.currentTimeMillis(),
-                                false
-                            )
-                        )
-                    }
-                }
+            } finally {
+                if (token == generation && state.locating) state = state.copy(locating = false)
             }
-            if (token == generation && state.locating) state = state.copy(locating = false)
         }
         if (
             configuration.profile.role == AccountRole.SAFE_CONTACT &&

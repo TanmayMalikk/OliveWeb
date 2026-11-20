@@ -12,6 +12,7 @@ import com.google.firebase.storage.StorageReference
 import com.olive.app.data.media.*
 import com.olive.app.data.safety.*
 import com.olive.app.security.EncryptionUtils
+import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -31,6 +32,30 @@ class SafetyDocumentRepositorySdkTest {
     private val media = mock(MediaTicketDataSource::class.java)
     private val repository = SafetyDocumentRepository(firestore, storage, media) { }
     private val key = EncryptionUtils.generateSymmetricKey()
+
+    @Test
+    fun serverDocumentListUsesAuthoritativeMembershipAndReturnsNewestFirst() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val files = mock(CollectionReference::class.java)
+            val query = mock(Query::class.java)
+            val result = mock(QuerySnapshot::class.java)
+            `when`(firestore.collection("files")).thenReturn(files)
+            `when`(files.whereArrayContains("allowed_users", "owner")).thenReturn(query)
+            val base = mapOf("owner_id" to "owner", "file_type" to "text/plain", "allowed_users" to listOf("owner"))
+            val older = row("earlier", base + ("file_name" to "Earlier fixture"))
+            val newer = row("latest", base + ("file_name" to "Latest fixture"))
+            val invalid = row("invalid", emptyMap())
+            `when`(older.getTimestamp("created_at")).thenReturn(com.google.firebase.Timestamp(java.util.Date(1L)))
+            `when`(newer.getTimestamp("created_at")).thenReturn(com.google.firebase.Timestamp(java.util.Date(2L)))
+            `when`(result.documents).thenReturn(listOf(older, invalid, newer))
+            `when`(query.get(Source.SERVER)).thenReturn(Tasks.forResult(result))
+            val snapshot = repository.listFor("owner")
+            assertEquals(DocumentListSource.SERVER, snapshot.source)
+            assertEquals(listOf("latest", "earlier"), snapshot.documents.map(SafetyDocument::id))
+            assertNotNull(snapshot.lastSyncedAt)
+            verify(query).get(Source.SERVER)
+        }
+    }
 
     @Test
     fun recoveredMetadataAndEvidenceAreReadFromAnAuthorizedServerDocument() = withDeviceKey {

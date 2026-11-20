@@ -31,7 +31,7 @@ class OnboardingBirthdayInputTest {
 
         compose.onNodeWithText("Birthday required").assertIsDisplayed()
         choose("open")
-        compose.onNodeWithContentDescription("Years 2 0 0 7 through 2 0 1 6").assertExists()
+        compose.onNodeWithContentDescription("Years 2007 through 2016").assertExists()
         compose.onNodeWithTag("dob_range_1926").assertDoesNotExist()
         val today = LocalDate.now()
         choose("range_${today.year}")

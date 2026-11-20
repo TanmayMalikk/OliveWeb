@@ -170,16 +170,36 @@ function Save-DeviceCoverage {
     $process.StartInfo.RedirectStandardError = $true
     $process.StartInfo.CreateNoWindow = $true
     $destination = Join-Path $directory "$Name.ec"
+    $partial = "$destination.partial"
+    $label = "$Module/$Name on $Serial"
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Value "Pull device coverage for $label"
     try {
         [void]$process.Start()
-        $stream = [System.IO.File]::Create($destination)
-        try { $process.StandardOutput.BaseStream.CopyTo($stream) } finally { $stream.Dispose() }
-        $failure = $process.StandardError.ReadToEnd()
-        $process.WaitForExit()
-        if ($process.ExitCode -ne 0 -or (Get-Item -LiteralPath $destination).Length -eq 0) {
-            throw "No device coverage produced for $Module/$Name on ${Serial}: $failure"
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $stream = [System.IO.File]::Create($partial)
+        try {
+            $copy = $process.StandardOutput.BaseStream.CopyToAsync($stream)
+            if (-not $process.WaitForExit(30000)) {
+                throw "ADB timed out while pulling device coverage for $label."
+            }
+            if (-not $copy.Wait(5000) -or -not $stderr.Wait(5000)) {
+                throw "ADB did not finish writing device coverage for $label."
+            }
+        } finally {
+            if (-not $process.HasExited) { $process.Kill() }
+            $stream.Dispose()
         }
-    } finally { $process.Dispose() }
+        if ($process.ExitCode -ne 0 -or (Get-Item -LiteralPath $partial).Length -eq 0) {
+            throw "No device coverage produced for ${label}: $($stderr.Result)"
+        }
+        Move-Item -LiteralPath $partial -Destination $destination -Force
+    } catch {
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "Pull device coverage for $label|1"
+        throw
+    } finally {
+        $process.Dispose()
+        if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force }
+    }
 }
 if ($WithCoverage -and $WithDeviceTests) {
     foreach ($module in @("app", "wear")) {

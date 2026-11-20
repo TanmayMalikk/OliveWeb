@@ -21,6 +21,7 @@ internal class SessionRuntimeFixture(
     role: AccountRole = AccountRole.USER,
     val documents: SafetyDocumentDataSource? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+    localMode: Boolean = false,
 ) : AutoCloseable {
     private val keys = TestAndroidKeyStore.install()
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -43,7 +44,7 @@ internal class SessionRuntimeFixture(
         `when`(accounts.authenticatedUsername()).thenReturn("fixture_owner")
         runtime = SessionRuntime(application, scope, SessionDataSources(
             accounts, admin, messaging, secureChat, secureDocuments, null, documents, null, null,
-        ), localMode = false)
+        ), localMode = localMode)
         runtime.enrollment = DeviceEnrollment("owner", "", role)
         runtime.state.accountRole = role
         runtime.state.coverUsername = "fixture_owner"

@@ -52,10 +52,59 @@ class FirebaseAccountRepositorySdkTest {
                 else -> RETURNS_DEFAULTS.answer(call)
             } })
         }
+
+        fun callable(name: String, data: Map<String, Any>): HttpsCallableReference {
+            val call = mock(HttpsCallableReference::class.java)
+            val result = HttpsCallableResult::class.java.getConstructor(Any::class.java).newInstance(data)
+            `when`(functions.getHttpsCallable(name)).thenReturn(call)
+            `when`(call.call(anyMap<String, Any>())).thenReturn(Tasks.forResult(result))
+            return call
+        }
+
+        fun signInResult(): AuthResult = mock(AuthResult::class.java).also { result ->
+            `when`(result.user).thenReturn(user)
+        }
+
         override fun close() { sync.close() }
     }
     private val identity=AccountIdentity("owner","fixture_owner")
     private val profile=UserProfile("fixture_owner","Synthetic owner","","","2000-01-01","English","","Edmonton","")
+
+    @Test
+    fun adminRequestsOnlyTheSelectedAccountViewAndReloadsAfterProfileSetup() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val list = f.callable("adminListAccounts", mapOf(
+                "counts" to mapOf("STAFF" to 1, "USER" to 2),
+                "tickets" to mapOf("open" to 3, "closed" to 4),
+                "accounts" to listOf(mapOf("uid" to "staff-id", "username" to "staff_member", "role" to "STAFF")),
+            ))
+            val create = f.callable("adminCreateAccount", emptyMap())
+            val delete = f.callable("adminDeleteAccount", emptyMap())
+            val fields = profile.toJson()
+            val profileMap = fields.keys().asSequence().associateWith(fields::get)
+            val complete = f.callable("completeOrganizationProfile", mapOf("profile" to profileMap))
+            `when`(f.user.reload()).thenReturn(Tasks.forResult(null))
+            mockStatic(FirebaseAuth::class.java).use { authSdk ->
+                authSdk.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(f.auth)
+                val admin = AdminRepository(f.functions)
+                assertEquals(AccountCounts(users = 2, staff = 1, openTickets = 3, closedTickets = 4), admin.summary())
+                assertEquals("staff-id", admin.accounts().single().uid)
+                assertEquals(AccountRole.STAFF, admin.staffAccounts().single().role)
+                verify(list).call(mapOf("view" to "SUMMARY"))
+                verify(list).call(mapOf("view" to "ACCOUNTS"))
+                verify(list).call(mapOf("view" to "STAFF"))
+
+                admin.create(AdminAccountDraft("staff_member", "Synthetic-123!", AccountRole.STAFF))
+                verify(create).call(argThat<Map<String, Any>> { it["username"] == "staff_member" && it["role"] == "STAFF" })
+                admin.delete("staff-id")
+                verify(delete).call(mapOf("uid" to "staff-id"))
+                assertEquals(profile, admin.completeOrganizationProfile(profile.fullName, profile.dob, "", ""))
+                verify(complete).call(mapOf("fullName" to profile.fullName, "dob" to profile.dob, "email" to "", "phone" to ""))
+                verify(f.user).reload()
+            }
+        }
+    }
+
     @Test
     fun profileReadAndWriteUseTheAuthenticatedAccountAndEraseTemporaryReadBytes()=runBlocking<Unit> {
         Fixture().use { f ->
@@ -103,6 +152,56 @@ class FirebaseAccountRepositorySdkTest {
             `when`(f.user.getIdToken(false)).thenReturn(Tasks.forResult(token))
             assertThrows(IllegalStateException::class.java){runBlocking { f.repository.authenticate("fixture_owner","Secret!1234",AccountRole.USER) }}
             verify(f.auth).signOut()
+        }
+    }
+
+    @Test
+    fun publicRegistrationRejectsAnUnexpectedSignedInAccountAndBlocksStaffSelfRegistration() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val create = f.callable("createPublicAccount", mapOf("uid" to "owner"))
+            val password = "Synthetic!1234"
+            val email = AccountPolicy.signInEmail(identity.username, AccountRole.SAFE_CONTACT)
+            val signedIn = f.signInResult()
+            `when`(f.auth.signInWithEmailAndPassword(email, password)).thenReturn(Tasks.forResult(signedIn))
+            assertEquals(identity, f.repository.create("Fixture_Owner", password, AccountRole.SAFE_CONTACT))
+            verify(create).call(mapOf("username" to identity.username, "password" to password, "role" to "SAFE_CONTACT"))
+
+            `when`(f.user.uid).thenReturn("another-account")
+            val mismatch = runCatching { f.repository.create(identity.username, password, AccountRole.SAFE_CONTACT) }.exceptionOrNull()
+            assertTrue(mismatch is IllegalStateException)
+            verify(f.auth).signOut()
+            val forbidden = runCatching { f.repository.create(identity.username, password, AccountRole.STAFF) }.exceptionOrNull()
+            assertTrue(forbidden is IllegalArgumentException)
+            verify(create, times(2)).call(anyMap<String, Any>())
+        }
+    }
+
+    @Test
+    fun organizationAndLegacyAliasesAreTriedOnlyForTheirAppropriateAccountRoles() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val password = "Synthetic!1234"
+            val primaryError = IllegalStateException("Synthetic primary login failure")
+            val primary = AccountPolicy.signInEmail(identity.username, AccountRole.STAFF)
+            val staffAlias = "staff.fixture@example.test"
+            `when`(f.auth.signInWithEmailAndPassword(primary, password)).thenReturn(Tasks.forException(primaryError))
+            val signedIn = f.signInResult()
+            `when`(f.auth.signInWithEmailAndPassword(staffAlias, password)).thenReturn(Tasks.forResult(signedIn))
+            val resolver = f.callable("resolveOrganizationLogin", mapOf("authEmail" to staffAlias))
+            val aliasRefresh = f.callable("restoreOrganizationLoginAlias", emptyMap())
+            `when`(aliasRefresh.call()).thenReturn(Tasks.forException(IllegalStateException("Synthetic refresh failure")))
+            val token = mock(GetTokenResult::class.java)
+            `when`(token.claims).thenReturn(mapOf("role" to "STAFF"), emptyMap())
+            `when`(f.user.getIdToken(false)).thenReturn(Tasks.forResult(token))
+            assertEquals(identity, f.repository.authenticate(identity.username, password, AccountRole.STAFF))
+            verify(resolver).call(mapOf("identifier" to identity.username, "role" to "STAFF"))
+            verify(aliasRefresh).call()
+
+            val safeContact = AccountPolicy.signInEmail(identity.username, AccountRole.SAFE_CONTACT)
+            val legacy = AccountPolicy.legacyUserEmail(identity.username)
+            `when`(f.auth.signInWithEmailAndPassword(safeContact, password)).thenReturn(Tasks.forException(primaryError))
+            `when`(f.auth.signInWithEmailAndPassword(legacy, password)).thenReturn(Tasks.forResult(signedIn))
+            assertEquals(identity, f.repository.authenticate(identity.username, password, AccountRole.SAFE_CONTACT))
+            verify(f.auth).signInWithEmailAndPassword(legacy, password)
         }
     }
 }

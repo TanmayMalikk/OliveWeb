@@ -1,0 +1,502 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for functions/src/fitnessAiBilling.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">functions/src</a> fitnessAiBilling.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">67.62% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>94/139</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">77.5% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>31/40</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">91.66% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>11/12</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">67.62% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>94/139</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line medium'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const Stripe = require("stripe");
+const {HttpsError} = require("firebase-functions/v2/https");
+const {defineSecret} = require("firebase-functions/params");
+const {db} = require("./firebaseAdminClient");
+&nbsp;
+const RETURN_URL = "https://yourolivebranch.ca/get";
+const OFFER = {currency: "cad", amount: 599, interval: "week"};
+const stripeKey = defineSecret("FITNESS_STRIPE_SECRET_KEY");
+&nbsp;
+function isWeeklyOffer(price) {
+  return price?.currency === OFFER.currency &amp;&amp; price.unit_amount === OFFER.amount &amp;&amp;
+    price.recurring?.interval === OFFER.interval &amp;&amp; price.recurring.interval_count === 1;
+}
+&nbsp;
+function fitnessBilling(secret, priceId) {
+  if (!secret || !/^price_[A-Za-z0-9]+$/.test(priceId)) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >    throw new HttpsError("failed-precondition", "Fitness Coach billing is not configured.");</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+  const stripe = new Stripe(secret, {timeout: 10_000, maxNetworkRetries: 1});
+  const ref = (uid) =&gt; db.collection("fitnessAiBilling").doc(uid);
+  const customerFor = async (uid) =&gt; (await ref(uid).get()).get("customerId");
+&nbsp;
+  async function subscriptions(customer) {
+    if (!customer) <span class="branch-0 cbranch-no" title="branch not covered" >return [];</span>
+    const matches = [];
+    for await (const subscription of stripe.subscriptions.list({customer, status: "all", price: priceId})) {
+      if (subscription.items.data.some((item) =&gt; item.price.id === priceId &amp;&amp; isWeeklyOffer(item.price))) {
+        matches.push(subscription);
+      }
+    }
+    return matches;
+  }
+  async function status(uid) {
+    const customer = await customerFor(uid);
+    const plans = await subscriptions(customer);
+    return {active: plans.some((plan) =&gt; plan.status === "active"), canManage: Boolean(customer)};
+  }
+  async function checkPrice() {
+    const price = await stripe.prices.retrieve(priceId);
+    if (!price.active || !isWeeklyOffer(price)) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >      throw new HttpsError("failed-precondition", "The weekly subscription price is not configured correctly.");</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+  }
+  async function ensureCustomer(uid) {
+    let customer = await customerFor(uid);
+    if (!customer) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >      const created = await stripe.customers.create({}, {idempotencyKey: "olive-fitness:" + uid});</span>
+<span class="cstat-no" title="statement not covered" >      customer = await db.runTransaction(async (tx) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >        const current = (await tx.get(ref(uid))).get("customerId");</span>
+<span class="cstat-no" title="statement not covered" >        if (current) return current;</span>
+<span class="cstat-no" title="statement not covered" >        tx.set(ref(uid), {customerId: created.id});</span>
+<span class="cstat-no" title="statement not covered" >        return created.id;</span>
+<span class="cstat-no" title="statement not covered" >      });</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+    return customer;
+  }
+<span class="fstat-no" title="function not covered" >  async function checkout(uid) {</span>
+<span class="cstat-no" title="statement not covered" >    await checkPrice();</span>
+<span class="cstat-no" title="statement not covered" >    const customer = await ensureCustomer(uid);</span>
+<span class="cstat-no" title="statement not covered" >    const plans = await subscriptions(customer);</span>
+<span class="cstat-no" title="statement not covered" >    if (plans.some((p) =&gt; ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"].includes(p.status))) {</span>
+<span class="cstat-no" title="statement not covered" >      throw new HttpsError("failed-precondition", "Manage the existing subscription in billing settings.");</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >    const sessions = await stripe.checkout.sessions.list({customer, limit: 1});</span>
+<span class="cstat-no" title="statement not covered" >    const latest = sessions.data[0];</span>
+<span class="cstat-no" title="statement not covered" >    if (latest?.status === "open" &amp;&amp; latest.metadata?.fitnessPrice === priceId &amp;&amp; latest.url) {</span>
+<span class="cstat-no" title="statement not covered" >      return latest.url;</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >    const session = await stripe.checkout.sessions.create({</span>
+<span class="cstat-no" title="statement not covered" >      customer, mode: "subscription",</span>
+<span class="cstat-no" title="statement not covered" >      line_items: [{price: priceId, quantity: 1}],</span>
+<span class="cstat-no" title="statement not covered" >      metadata: {fitnessPrice: priceId},</span>
+<span class="cstat-no" title="statement not covered" >      success_url: RETURN_URL, cancel_url: RETURN_URL,</span>
+<span class="cstat-no" title="statement not covered" >    }, {idempotencyKey: "olive-fitness-checkout:" + customer + ":" + priceId + ":" + (latest?.id ?? "first")});</span>
+<span class="cstat-no" title="statement not covered" >    return session.url;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+  async function paymentSheet(uid, publishableKey) {
+    const mode = /^(?:sk|rk)_(test|live)_/.exec(secret)?.[1];
+    if (!mode || !publishableKey.startsWith("pk_" + mode + "_")) {
+      throw new HttpsError("failed-precondition", "In-app payment is not configured for this Stripe mode.");
+    }
+    await checkPrice();
+    const customer = await ensureCustomer(uid);
+    // Remove open sessions issued by older Android builds before starting in-app payment.
+    for await (const session of stripe.checkout.sessions.list({customer, status: "open"})) {
+      if (session.metadata?.fitnessPrice !== priceId) <span class="branch-0 cbranch-no" title="branch not covered" >continue;</span>
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+      } <span class="branch-0 cbranch-no" title="branch not covered" >catch (failure) {</span>
+<span class="cstat-no" title="statement not covered" >        if (failure.code !== "checkout_session_not_open") throw failure;</span>
+<span class="cstat-no" title="statement not covered" >      }</span>
+    }
+    const plans = await subscriptions(customer);
+    if (plans.some((p) =&gt; ["active", "trialing", "past_due", "unpaid", "paused"].includes(p.status))) {
+      throw new HttpsError("failed-precondition", "Manage the existing subscription in billing settings.");
+    }
+    const pending = plans.find((p) =&gt; p.status === "incomplete");
+    const expand = ["latest_invoice.confirmation_secret"];
+    const subscription = pending
+      ? await stripe.subscriptions.retrieve(pending.id, {expand})
+      : await stripe.subscriptions.create({
+        customer,
+        items: [{price: priceId, quantity: 1}],
+        payment_behavior: "default_incomplete",
+        payment_settings: {payment_method_types: ["card"], save_default_payment_method: "on_subscription"},
+        expand,
+      }, {idempotencyKey: "olive-fitness-native:" + customer + ":" + priceId + ":" + (plans[0]<span class="branch-0 cbranch-no" title="branch not covered" >?.id </span>?? "first")});
+    const clientSecret = subscription.latest_invoice?.confirmation_secret?.client_secret;
+    if (subscription.status !== "incomplete" || typeof clientSecret !== "string") <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >      throw new HttpsError("failed-precondition", "Check your subscription before trying to pay again.");</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+    return {publishableKey, clientSecret};
+  }
+  async function portal(uid) {
+    const customer = await customerFor(uid);
+    if (!customer) throw new HttpsError("failed-precondition", "There is no billing account yet.");
+    return (await stripe.billingPortal.sessions.create({customer, return_url: RETURN_URL})).url;
+  }
+  return {status, checkout, paymentSheet, portal};
+}
+&nbsp;
+async function closeFitnessBilling(uid) {
+  const ref = db.collection("fitnessAiBilling").doc(uid);
+  const customer = (await ref.get()).get("customerId");
+  if (customer) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >    // This Stripe customer belongs only to Fitness Coach. Deleting it cancels recurring billing.</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      await new Stripe(stripeKey.value(), {timeout: 10_000}).customers.del(customer);</span>
+<span class="cstat-no" title="statement not covered" >    } catch (error) {</span>
+<span class="cstat-no" title="statement not covered" >      if (error.code !== "resource_missing") {</span>
+<span class="cstat-no" title="statement not covered" >        throw new HttpsError("unavailable", "Could not close Fitness Coach billing. Retry account deletion.");</span>
+<span class="cstat-no" title="statement not covered" >      }</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >    await ref.delete();</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+  await db.collection("fitnessAiLimits").doc("user-" + uid).delete();
+}
+&nbsp;
+module.exports = {fitnessBilling, isWeeklyOffer, stripeKey, closeFitnessBilling};
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-20T00:53:39.762Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

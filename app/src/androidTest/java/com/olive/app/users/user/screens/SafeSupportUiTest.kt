@@ -19,7 +19,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
@@ -119,6 +118,50 @@ class SafeSupportUiTest : OliveUiTestBase() {
             assertEquals(java.time.LocalDate.now(), java.time.LocalDate.parse(entry.incidentDate))
             assertTrue(entry.incidentTime.matches(Regex("[0-9]{2}:[0-9]{2}")))
         }
+    }
+
+    @Test
+    fun incidentCanClearOptionalDateAndTimeAndSaveTypedCoordinatesWithoutATitle() {
+        val session = setup()
+        click("safe_notes")
+        click("new_private_entry")
+        click("private_kind_incident")
+        fill("private_entry_body", "Synthetic coordinate fixture")
+        hideKeyboard()
+        click("incident_date")
+        click("incident_date_apply")
+        val dateClear = compose.onNodeWithContentDescription(compose.activity.getString(R.string.incident_clear_date))
+        dateClear.performScrollTo().performClick()
+        dateClear.assertDoesNotExist()
+        click("incident_time")
+        click("incident_time_apply")
+        val timeClear = compose.onNodeWithContentDescription(compose.activity.getString(R.string.incident_clear_time))
+        timeClear.performScrollTo().performClick()
+        timeClear.assertDoesNotExist()
+        fill("incident_location", "53.5, -113.5")
+        hideKeyboard()
+        click("save_private_entry")
+        compose.waitUntil(15_000) { !session.busy && session.privateEntries.any { it.body == "Synthetic coordinate fixture" } }
+        compose.runOnIdle {
+            val entry = session.privateEntries.single { it.body == "Synthetic coordinate fixture" }
+            assertTrue(entry.title.isBlank() && entry.incidentDate.isBlank() && entry.incidentTime.isBlank())
+            assertEquals(53.5, entry.incidentLatitude ?: Double.NaN, 0.0)
+            assertEquals(-113.5, entry.incidentLongitude ?: Double.NaN, 0.0)
+        }
+    }
+
+    @Test
+    fun staffHelpShowsTheOfflineErrorAndCanReturnToTheSafeDashboard() {
+        val session = setup()
+        click("support_menu_toggle")
+        click("support_staff_help")
+        waitFor("staff_help_back")
+        compose.onNodeWithText(compose.activity.getString(R.string.safety_account_required)).assertExists()
+        compose.onNodeWithTag("cancel_staff_help").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(SafePage.StaffHelp, session.page) }
+        click("staff_help_back")
+        waitFor("safe_home_content")
+        compose.runOnIdle { assertEquals(SafePage.Home, session.page) }
     }
 
     @Test
@@ -296,11 +339,12 @@ class SafeSupportUiTest : OliveUiTestBase() {
     @Test
     fun deviceLocationChangesResourcesWithoutChangingTheSavedAddress() {
         val session = setup()
+        var locationPermissionGranted = false
         // Supply a deterministic location result; the separate permission-flow test exercises the real Android dialog.
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             compose.activity.setContent {
                 CompositionLocalProvider(
-                    LocalLocationPermissionRequest provides { true },
+                    LocalLocationPermissionRequest provides { locationPermissionGranted },
                     LocalHotlineLocationLookup provides {
                         DeliveryAddress(
                             city = "Toronto",
@@ -314,6 +358,10 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
         compose.runOnIdle { session.navigation.openSafePage(SafePage.Hotlines) }
         waitFor("hotline_use_device_location")
+        compose.onNodeWithTag("hotline_use_device_location").performScrollTo().performClick()
+        waitFor("hotline_location_error")
+        compose.onNodeWithTag("hotline_location_permissions").assertExists()
+        compose.runOnIdle { locationPermissionGranted = true }
         compose.onNodeWithTag("hotline_use_device_location").performScrollTo().performClick()
         compose.waitUntil(10_000) {
             runCatching {
@@ -331,6 +379,12 @@ class SafeSupportUiTest : OliveUiTestBase() {
             assertEquals("", session.profile!!.address.province)
         }
         compose.onNodeWithTag("hotline_city").assertDoesNotExist()
+        val hotlineList = compose.onNodeWithTag("hotline_page")
+        val region = hasTestTag("hotline_region")
+        hotlineList.performScrollToNode(region)
+        compose.onNode(region).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.support_saved_location)).performClick()
+        compose.onNode(region).assertTextContains(compose.activity.getString(R.string.support_region_ab))
     }
 
     // Checks the back dismisses support before leaving the current safe page step with the test's sample data.
@@ -414,13 +468,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 R.string.a11y_returned_to_cover,
                 session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
             )
-            compose.onNodeWithContentDescription(returnedToCover)
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.LiveRegion,
-                        LiveRegionMode.Polite
-                    )
-                )
+            compose.waitUntil(10_000) { returnedToCover in talkBack.announcements }
+            compose.onNodeWithContentDescription(returnedToCover).assertDoesNotExist()
             assertTrue(
                 "Quick-exit status must not move TalkBack focus",
                 talkBack.focused.none { it.contains(returnedToCover) })

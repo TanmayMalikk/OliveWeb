@@ -8,6 +8,8 @@ import androidx.work.impl.WorkManagerImpl
 import com.olive.app.security.*
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.user.documents.MediaTransferController
+import com.olive.app.ui.users.user.location.LocationMapConfiguration
+import com.olive.app.ui.users.user.location.LocationMapController
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -164,6 +166,51 @@ class SessionSecureSharingTest {
                 }
                 verifyNoInteractions(documents, fixture.messaging)
                 assertTrue(mockingDetails(work).invocations.any { it.method.name == "enqueueUniqueWork" })
+            } finally {
+                WorkManagerImpl.setDelegate(null)
+            }
+        }
+    }
+
+    @Test
+    fun chatLocationIsQueuedOnlyAfterSharingStartsForAContactInThatChat() = runBlocking<Unit> {
+        SessionRuntimeFixture().use { fixture ->
+            val runtime = fixture.runtime
+            val controller = mock(LocationMapController::class.java)
+            val key = EncryptionUtils.generateSymmetricKey()
+            val friend = Friend("chat", "friend", "friend_fixture")
+            runtime.state.activeConversation = chat
+            runtime.activeRoomKey = key
+            runtime.state.profile = UserProfile("fixture_owner", "Synthetic owner", "", "", "2000-01-01", "English", "", "Edmonton", "")
+            runtime.state.friends = emptyList()
+            runtime.secureSharing.shareLiveLocation(60_000, controller) { false }
+            verifyNoInteractions(controller)
+
+            runtime.state.friends = listOf(friend, Friend("other-chat", "other", "other_fixture"))
+            val work = mock(WorkManagerImpl::class.java)
+            WorkManagerImpl.setDelegate(work)
+            try {
+                runtime.secureSharing.shareLiveLocation(60_000, controller) { true }
+                val arguments = mockingDetails(controller).invocations.single().arguments
+                val config = arguments[0] as LocationMapConfiguration
+                assertEquals("owner", config.identity.uid)
+                assertEquals(listOf(friend), arguments[1])
+                assertEquals(60_000L, arguments[2])
+                assertTrue(runtime.messageOutbox.all("owner").isEmpty())
+
+                @Suppress("UNCHECKED_CAST")
+                val failed = arguments[6] as (String) -> Unit
+                failed("Synthetic location error")
+                assertEquals("Synthetic location error", runtime.state.message)
+                assertTrue(runtime.messageOutbox.all("owner").isEmpty())
+
+                @Suppress("UNCHECKED_CAST")
+                val started = arguments[7] as (Long) -> Unit
+                started(1_800_000_000_000)
+                fixture.await { !runtime.state.messagingBusy }
+                val queued = runtime.messageOutbox.all("owner").single()
+                assertEquals(chat.id, queued.conversationId)
+                assertEquals("SHARED_LOCATION:1800000000000", EncryptionUtils.decryptText(queued.ciphertext, key))
             } finally {
                 WorkManagerImpl.setDelegate(null)
             }

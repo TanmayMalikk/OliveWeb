@@ -9,10 +9,15 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
 import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.media.MediaKind
+import com.olive.app.ocr.OcrResult
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.users.shared.camera.CameraReview
+import com.olive.app.ui.users.shared.camera.CapturedMedia
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -76,6 +81,70 @@ class DocumentViewerFormatsUiTest {
         } finally {
             photo.delete()
             unknown.delete()
+        }
+    }
+
+    @Test
+    fun brokenVideoReportsAPrivatePreviewErrorAndCanBeClosed() {
+        val video = File.createTempFile("viewer-broken-", ".mp4", context.cacheDir)
+        try {
+            video.writeText("Synthetic invalid video")
+            var closed = 0
+            compose.setContent { OliveTheme { SafetyDocumentViewer(document(video, "video/mp4"), video) { closed++ } } }
+            awaitText(context.getString(R.string.documents_preview_unavailable))
+            compose.onNodeWithTag("media_zoom_in").assertDoesNotExist()
+            compose.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+            compose.runOnIdle { assertEquals(1, closed) }
+        } finally {
+            video.delete()
+        }
+    }
+
+    @Test
+    fun cameraReviewWarnsAboutUncertainOcrAndKeepsTheCaptureAvailableAfterUploadFailure() {
+        val file = File.createTempFile("synthetic-scan-", ".png", context.cacheDir)
+        try {
+            val image = Bitmap.createBitmap(48, 65, Bitmap.Config.ARGB_8888)
+            try { file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+            finally { image.recycle() }
+            val captured = mutableStateOf(CapturedMedia(file, "image/png", "Synthetic scan", MediaKind.IMAGE,
+                ocrResult = OcrResult(true, "Synthetic OCR text", 0.31f)))
+            val busy = mutableStateOf(false)
+            val error = mutableStateOf<String?>(null)
+            var saved: CapturedMedia? = null
+            var retakes = 0
+            compose.setContent {
+                OliveTheme {
+                    CameraReview(captured.value, busy.value, error.value, { retakes++ }) { saved = it }
+                }
+            }
+            compose.onNodeWithTag("camera_ocr_text").assertTextContains("Synthetic OCR text")
+            compose.onNodeWithTag("camera_ocr_low_confidence").assertExists()
+            val save = compose.onNodeWithTag("camera_save")
+            val retake = compose.onNodeWithTag("camera_retake")
+            save.assertTextContains(context.getString(R.string.camera_save_anyway)).performClick()
+            compose.runOnIdle {
+                assertEquals(captured.value, saved)
+                busy.value = true
+            }
+            save.assertIsNotEnabled()
+            retake.assertIsNotEnabled()
+            compose.onNodeWithTag("camera_saving").assertIsDisplayed()
+            compose.runOnIdle {
+                busy.value = false
+                error.value = "Synthetic connection failure"
+            }
+            compose.onNodeWithTag("camera_upload_error").assertTextContains("Synthetic connection failure")
+            retake.assertIsEnabled().performClick()
+            compose.runOnIdle {
+                assertEquals(1, retakes)
+                captured.value = captured.value.copy(ocrResult = OcrResult(true, "Verified fixture text", 0.96f))
+                error.value = null
+            }
+            compose.onNodeWithTag("camera_ocr_low_confidence").assertDoesNotExist()
+            save.assertTextContains(context.getString(R.string.camera_save))
+        } finally {
+            file.delete()
         }
     }
 

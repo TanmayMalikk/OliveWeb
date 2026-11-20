@@ -31,6 +31,7 @@ import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import com.olive.app.ui.users.user.account.SettingsSection
 import com.olive.app.ui.users.user.account.SettingsCategory
+import com.olive.app.ui.users.user.account.SettingsHeading
 import com.olive.app.ui.users.user.account.accountSettingsTabs
 
 
@@ -54,11 +55,7 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
                 }
-                Text(
-                    stringResource(R.string.settings),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.semantics { heading() },
-                )
+                SettingsHeading(Modifier.weight(1f))
             }
             SecondaryScrollableTabRow(selectedTabIndex = accountSettingsTabs.indexOf(selectedTab), edgePadding = 8.dp) {
                 accountSettingsTabs.forEach { tab ->
@@ -133,6 +130,7 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                     }
                 }
                 Status(session)
+                AppVersionFooter()
             }
         }
     }
@@ -265,9 +263,6 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
             }
-        }
-if (state.loading) Surface(Modifier.fillMaxSize()) {
-            LoadingSkeleton(SkeletonLayout.Map, Modifier.fillMaxSize().padding(16.dp))
         }
         val status = state.error ?: if (!state.loading && state.points.isEmpty())
             stringResource(R.string.organization_location_feed_empty) else null

@@ -1,7 +1,9 @@
 package com.olive.app.ui.session
 
+import androidx.work.impl.WorkManagerImpl
 import com.olive.app.data.account.*
 import com.olive.app.data.messaging.*
+import com.olive.app.data.sync.AccountRevocationEvents
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.*
 import org.junit.Assert.*
@@ -88,6 +90,33 @@ class SessionNavigationPrivacyTest {
             assertEquals(CoverType.GAME, r.state.coverType)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
+        }
+    }
+
+    @Test
+    fun revocationOfThisAccountClosesItsPrivateWorkspaceAndIgnoresOtherAccounts() {
+        SessionRuntimeFixture(AccountRole.SAFE_CONTACT).use { fixture ->
+            val session = fixture.runtime
+            val privateEntry = PrivateEntry(title = "Synthetic private entry", body = "Private fixture")
+            session.state.profile = UserProfile("fixture_owner", "Synthetic", "", "", "2000-01-01", "English", "", "Edmonton", "")
+            session.state.viewedSharedEntry = privateEntry
+            session.state.privateEntries = listOf(privateEntry)
+            val work = mock(WorkManagerImpl::class.java)
+            `when`(fixture.accounts.authenticatedUid()).thenReturn(null)
+            WorkManagerImpl.setDelegate(work)
+            try {
+                AccountRevocationEvents.publish("other")
+                assertEquals("owner", session.enrollment?.uid)
+                assertEquals(privateEntry, session.state.viewedSharedEntry)
+                AccountRevocationEvents.publish("owner")
+                assertNull(session.enrollment)
+                assertNull(session.state.profile)
+                assertNull(session.state.viewedSharedEntry)
+                assertTrue(session.state.privateEntries.isEmpty())
+                assertEquals(SessionScreen.Cover, session.state.screen)
+            } finally {
+                WorkManagerImpl.setDelegate(null)
+            }
         }
     }
 }

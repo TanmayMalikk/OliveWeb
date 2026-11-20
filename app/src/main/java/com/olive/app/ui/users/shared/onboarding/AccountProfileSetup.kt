@@ -352,7 +352,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
             }
         }
         if (page == pages.lastIndex) {
-            com.olive.app.ui.users.shared.messaging.InviteCodeEntry(enabled = !session.localMode,
+            com.olive.app.ui.users.shared.messaging.InviteCodeEntry(messages = session.messages, enabled = !session.localMode,
                 accountUid = session.runtime.pendingIdentity?.uid)
         }
         Status(session)

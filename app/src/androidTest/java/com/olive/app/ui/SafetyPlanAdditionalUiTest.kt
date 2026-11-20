@@ -15,11 +15,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.account.*
+import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.*
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
+import com.olive.app.ui.users.shared.safetyplan.SharedSafetyPlanList
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -81,6 +83,55 @@ class SafetyPlanAdditionalUiTest {
         compose.onNodeWithTag("safety_plan_page").performScrollToNode(hasTestTag("safety_documents"))
         compose.onNodeWithTag("safety_documents").performClick()
         compose.runOnIdle { assertEquals(SafePage.Documents,s.page) }
+    }
+
+    @Test
+    fun sharedPlansListHidesDataWhileLoadingAndOpensTheSelectedOwner() {
+        val loading = mutableStateOf(true)
+        val plans = mutableStateOf(listOf(SharedSafetyPlan("owner", "Synthetic owner"), SharedSafetyPlan("anonymous", "")))
+        var opened: String? = null
+        var wentBack = false
+        compose.setContent {
+            OliveTheme {
+                SharedSafetyPlanList(plans.value, loading.value, false, null, { wentBack = true }) { opened = it.ownerUid }
+            }
+        }
+        val row = compose.onNodeWithTag("shared_plan_owner")
+        row.assertDoesNotExist()
+        compose.onNodeWithTag("loading_skeleton").assertExists()
+        compose.runOnIdle { loading.value = false }
+        row.assertTextContains("Synthetic owner").performClick()
+        compose.onNodeWithTag("shared_plan_anonymous")
+            .assertTextContains(context.getString(R.string.safe_contact_shared_user))
+        compose.onNodeWithTag("safe_contact_safety_back").performClick()
+        compose.runOnIdle {
+            assertEquals("owner", opened)
+            assertTrue(wentBack)
+            plans.value = emptyList()
+        }
+        compose.onNodeWithText(context.getString(R.string.safe_contact_no_shared_plans)).assertIsDisplayed()
+    }
+
+    @Test
+    fun sharingDraftUsesTheTrustedContactNameAndDoesNotChangeSavedAccessOffline() {
+        val owner = session(AccountRole.USER, plan("viewer").copy(safeContactUids = listOf("trusted")))
+        compose.runOnIdle {
+            owner.runtime.state.friends = listOf(Friend("pair", "trusted", "fixture_handle"))
+            owner.runtime.state.profile = owner.profile!!.copy(contacts = listOf(
+                SafeContact("fixture", "Fixture trusted name", "", linkedUid = "trusted"),
+            ))
+        }
+        compose.setContent { OliveTheme { SafetyPlanScreen(owner) } }
+        compose.waitUntil(15_000) { owner.safetyPlans.plan != null && !owner.safetyPlans.loadingPlan }
+        compose.onNodeWithTag("safety_jump_consultation").performClick()
+        val content = compose.onNodeWithTag("safety_plan_page")
+        content.performScrollToNode(hasText("Fixture trusted name"))
+        compose.onNodeWithText("@fixture_handle").assertExists()
+        compose.onNodeWithTag("safety_share_contact_trusted")
+            .assertIsOn().performClick().assertIsOff()
+        content.performScrollToNode(hasTestTag("share_safety_plan"))
+        compose.onNodeWithTag("share_safety_plan").assertIsNotEnabled()
+        compose.runOnIdle { assertEquals(listOf("trusted"), owner.safetyPlans.plan!!.safeContactUids) }
     }
     @Test
     fun userCanReviewAConflictChooseTheIncomingChangeAndKeepTheOtherRow() {

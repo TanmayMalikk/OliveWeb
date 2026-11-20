@@ -109,6 +109,7 @@ internal fun NewsFeed(
                                 Box(Modifier.padding(18.dp)) { CoverAccountPanel(session) }
                             }
                         }
+                        item { AppVersionFooter() }
                     }
 
                     else -> {

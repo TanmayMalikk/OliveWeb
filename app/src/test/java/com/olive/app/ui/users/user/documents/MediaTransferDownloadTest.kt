@@ -64,6 +64,30 @@ class MediaTransferDownloadTest {
     }
 
     @Test
+    fun disablingRecentCachingClearsTemporaryCopiesButRetainsPinnedFiles() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val pinned = f.document.copy(id = "pinned")
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.RECENT_AVAILABLE)
+            `when`(f.cache.availability("owner", pinned)).thenReturn(OfflineMediaAvailability.AVAILABLE)
+            f.controller.onDocumentSnapshot("owner", listOf(f.document, pinned), false)
+            withTimeout(5_000) { while (f.controller.offlineCopies.size != 2) delay(10) }
+            f.controller.setRecentCachingPreference("owner", false)
+            withTimeout(5_000) {
+                while (f.controller.offlineCopies[f.document.id] != OfflineMediaAvailability.NOT_CACHED) delay(10)
+            }
+            assertEquals(OfflineMediaAvailability.AVAILABLE, f.controller.offlineCopies[pinned.id])
+            verify(f.cache).setRecentCachingEnabled("owner", false)
+
+            doThrow(IllegalStateException("Fixture storage unavailable"))
+                .`when`(f.cache).setRecentCachingEnabled("owner", true)
+            `when`(f.cache.recentCachingEnabled("owner")).thenReturn(false)
+            f.controller.setRecentCachingPreference("owner", true)
+            withTimeout(5_000) { while (f.controller.recentCachingEnabled) delay(10) }
+            assertFalse(f.controller.recentCachingEnabled)
+        }
+    }
+
+    @Test
     fun remoteDownloadVerifiesCiphertextAndOnlyReturnsAuthenticatedPlaintext() = runBlocking<Unit> {
         Fixture().use { f ->
             f.ticket()

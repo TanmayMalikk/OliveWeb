@@ -415,7 +415,7 @@ private fun PreparingUploadCard() {
 
 // Shows upload progress, errors, and retry controls for one pending file.
 @Composable
-private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
+internal fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
     val waitingToRetry = upload.status == MediaTransferStatus.QUEUED && upload.error != null
     val retryable = failed || waitingToRetry

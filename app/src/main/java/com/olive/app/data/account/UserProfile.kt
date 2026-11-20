@@ -236,8 +236,8 @@ data class AdminAccountDraft(
 )
 
 // Admin actions go through callable Functions so account deletion and role checks never trust the phone.
-class AdminRepository {
-    private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+class AdminRepository(private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1")) {
+
 
     // Loads only dashboard totals so sign-in does not download every organization account.
     suspend fun summary(): AccountCounts {

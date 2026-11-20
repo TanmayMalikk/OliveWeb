@@ -8,6 +8,9 @@ import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,6 +19,33 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class SessionMessagingActionsTest {
+    @Test
+    fun arrivingConversationCannotReopenMessagesAfterTheUserLeaves() = runBlocking<Unit> {
+        SessionRuntimeFixture(dispatcher = Dispatchers.Default).use { fixture ->
+            val friend = Friend("connected", "friend", "Synthetic friend")
+            val actor = AccountIdentity("owner", "fixture_owner")
+            val conversation = ChatConversation("direct", "connected", listOf("owner", "friend"), emptyMap())
+            val requested = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            `when`(fixture.messaging.conversationWith(actor, friend)).thenAnswer {
+                requested.complete(Unit)
+                runBlocking { withTimeout(5_000) { release.await() } }
+                conversation
+            }
+            fixture.runtime.friendActions.startConversation(friend)
+            try {
+                withTimeout(5_000) { requested.await() }
+                fixture.runtime.state.page = SafePage.Home
+            } finally {
+                release.complete(Unit)
+            }
+            fixture.await { !fixture.runtime.state.messagingBusy }
+            assertNull(fixture.runtime.state.activeConversation)
+            assertEquals(SafePage.Home, fixture.runtime.state.page)
+            verify(fixture.messaging).conversationWith(actor, friend)
+        }
+    }
+
     @Test
     fun repositoryFailuresReleaseBusyStateAndAccountChangesSuppressOldSearchResults() = runBlocking<Unit> {
         SessionRuntimeFixture().use { fixture ->

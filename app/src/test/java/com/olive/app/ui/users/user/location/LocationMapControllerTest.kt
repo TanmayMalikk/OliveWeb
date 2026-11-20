@@ -74,6 +74,19 @@ class LocationMapControllerTest {
     }
 
     @Test
+    fun failedInitialLocationRequestDoesNotLeaveTheMapLoading() {
+        var failure: Throwable? = null
+        val failingScope = CoroutineScope(Job() + Dispatchers.Unconfined +
+            kotlinx.coroutines.CoroutineExceptionHandler { _, error -> failure = error })
+        val map = LocationMapController(context, failingScope, source)
+        try {
+            map.open(configuration()) { throw IllegalStateException("Synthetic permission failure") }
+            assertTrue(failure is IllegalStateException)
+            assertFalse(map.state.locating)
+        } finally { map.clear(); failingScope.cancel() }
+    }
+
+    @Test
     fun staticRecipientUpdatesStopAtTheAccountBoundary() {
         val profile = configuration()
         controller.open(profile) { false }

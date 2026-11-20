@@ -18,6 +18,7 @@ import com.olive.app.ui.shared.OliveTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -30,6 +31,7 @@ class LocationMapMotionUiTest {
     // Checks the marker and trail update without recreating map step with the test's sample data.
     @Test
     fun markerAndTrailUpdateWithoutRecreatingMap() {
+        assumeTrue("The published map requires a public Mapbox token", BuildConfig.MAPBOX_ACCESS_TOKEN.trim().startsWith("pk."))
         val started = System.currentTimeMillis()
         val first = LocationTrailPoint(53.5461, -113.4937, started)
         val points = mutableStateOf(

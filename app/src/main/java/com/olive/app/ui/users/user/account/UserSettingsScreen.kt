@@ -56,6 +56,7 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.UserProfile
 import com.olive.app.ui.shared.AddressFields
+import com.olive.app.ui.shared.AppVersionFooter
 import com.olive.app.ui.shared.CardTintEnabled
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
@@ -107,11 +108,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             SafeBack(session)
-            Text(
-                uiText(R.string.settings),
-                modifier = Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.headlineSmall
-            )
+            SettingsHeading(Modifier.weight(1f))
         }
         SecondaryScrollableTabRow(
             selectedTabIndex = tabs.indexOf(activeTab),
@@ -366,6 +363,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     SettingsCategory.Permissions -> SafePermissionsSettings()
                 }
                 Status(session)
+                AppVersionFooter()
             }
         }
     }
@@ -380,6 +378,15 @@ internal enum class SettingsCategory(val label: Int, val tag: String) {
 }
 
 internal val accountSettingsTabs = listOf(SettingsCategory.Profile, SettingsCategory.Password, SettingsCategory.Permissions)
+
+@Composable
+internal fun SettingsHeading(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(R.string.settings),
+        modifier = modifier.semantics { heading() },
+        style = MaterialTheme.typography.headlineSmall,
+    )
+}
 
 @Composable
 internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {

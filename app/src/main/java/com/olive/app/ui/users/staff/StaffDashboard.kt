@@ -150,7 +150,9 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     var assignedExpanded by rememberSaveable { mutableStateOf(true) }
     var waitingExpanded by rememberSaveable { mutableStateOf(true) }
     val controller = session.safetyPlans
-    DisposableEffect(Unit) { onDispose { controller.close() } }
+    DisposableEffect(session.coverAccountId) {
+        onDispose { controller.close(preserveAdminIndex = session.accountRole == AccountRole.ADMIN) }
+    }
     BackHandler { if (selected != null) selected = null else onBack() }
     val plan = selected
     if (plan != null) {
@@ -195,7 +197,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     // Load once on entry; account invalidations refresh the encrypted consultation index afterward.
     LaunchedEffect(Unit) {
         controller.observeAccess()
-        controller.refreshConsultations()
+        controller.refreshConsultations(force = false)
     }
     FormColumn {
         TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }

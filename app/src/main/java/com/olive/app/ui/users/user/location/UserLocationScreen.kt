@@ -98,9 +98,13 @@ private fun PrivateRouteControls(controller: LocationMapController, state: Locat
 // Shows the user and trusted-contact map, sharing controls, and route tools.
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
+    LocationMapScreen(session, session.locationMap)
+}
+
+@Composable
+internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMapController) {
     val profile = session.profile ?: return
     val uid = session.coverAccountId ?: return
-    val controller = session.locationMap
     val requestPermission = LocalLocationPermissionRequest.current
     val requestBackgroundPermission = LocalBackgroundLocationPermissionRequest.current
     val youLabel = stringResource(R.string.you)
@@ -131,7 +135,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         AccountIdentity(uid, profile.username), profile, session.messages.friends,
         session.localMode, youLabel, savedLocationLabel
     )
-    LaunchedEffect(uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
+    LaunchedEffect(controller, uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
         controller.open(configuration) { requestMapAccess() }
     }
     DisposableEffect(controller) { onDispose(controller::closeMap) }

@@ -28,11 +28,11 @@ import kotlinx.coroutines.withContext
 internal fun installUpdatesPermissionIntent(context: Context) =
     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri())
 
+internal enum class AppUpdateStage { Preparing, Permission, Installing, Failed }
+
 /** Prepares the signed APK off the UI thread, then hands it to Android for approval. */
 class AppUpdateInstallerActivity : ComponentActivity() {
-    private enum class Stage { Preparing, Permission, Installing, Failed }
-
-    private var stage by mutableStateOf(Stage.Preparing)
+    private var stage by mutableStateOf(AppUpdateStage.Preparing)
     private lateinit var release: AppReleaseManifest
     private var preparedFile: File? = null
     private val permission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -49,43 +49,20 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         }?.takeIf { it.versionCode > BuildConfig.VERSION_CODE } ?: run { finish(); return }
         setContent {
             OliveTheme {
-                Surface(Modifier.fillMaxSize()) {
-                    Column(
-                        Modifier.safeDrawingPadding().padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text(stringResource(R.string.app_update_version, release.versionName),
-                            style = MaterialTheme.typography.headlineSmall)
-                        Text(stringResource(when (stage) {
-                            Stage.Preparing -> R.string.app_update_preparing
-                            Stage.Permission -> R.string.app_update_permission
-                            Stage.Installing -> R.string.app_update_installing
-                            Stage.Failed -> R.string.app_update_failed
-                        }))
-                        when (stage) {
-                            Stage.Preparing -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                            Stage.Permission -> Button(onClick = ::openPermission) {
-                                Text(stringResource(R.string.app_permissions_install))
-                            }
-                            Stage.Failed -> Button(onClick = ::prepare) { Text(stringResource(R.string.retry)) }
-                            Stage.Installing -> Unit
-                        }
-                        TextButton(onClick = ::finish) { Text(stringResource(R.string.cancel)) }
-                    }
-                }
+                AppUpdateInstallerContent(release.versionName, stage, ::openPermission, ::prepare, ::finish)
             }
         }
         // Android reconnects any system activity result following a configuration change.
-        if (savedInstanceState?.getBoolean(INSTALLING) == true) stage = Stage.Installing else prepare()
+        if (savedInstanceState?.getBoolean(INSTALLING) == true) stage = AppUpdateStage.Installing else prepare()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putBoolean(INSTALLING, stage == Stage.Installing)
+        outState.putBoolean(INSTALLING, stage == AppUpdateStage.Installing)
         super.onSaveInstanceState(outState)
     }
 
     private fun prepare() {
-        stage = Stage.Preparing
+        stage = AppUpdateStage.Preparing
         lifecycleScope.launch {
             try {
                 preparedFile = withContext(Dispatchers.IO) { AppUpdateClient(applicationContext).prepare(release) }
@@ -93,7 +70,7 @@ class AppUpdateInstallerActivity : ComponentActivity() {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                stage = Stage.Failed
+                stage = AppUpdateStage.Failed
             }
         }
     }
@@ -102,30 +79,63 @@ class AppUpdateInstallerActivity : ComponentActivity() {
         try {
             permission.launch(installUpdatesPermissionIntent(this))
         } catch (_: android.content.ActivityNotFoundException) {
-            stage = Stage.Failed
+            stage = AppUpdateStage.Failed
         }
     }
 
     private fun continueInstall() {
         val file = preparedFile ?: return
         if (!packageManager.canRequestPackageInstalls()) {
-            stage = Stage.Permission
+            stage = AppUpdateStage.Permission
             return
         }
         val uri = FileProvider.getUriForFile(this, "$packageName.documents", file)
-        stage = Stage.Installing
+        stage = AppUpdateStage.Installing
         try {
             packageInstaller.launch(Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             })
         } catch (_: android.content.ActivityNotFoundException) {
-            stage = Stage.Failed
+            stage = AppUpdateStage.Failed
         }
     }
 
     companion object {
         const val EXTRA_RELEASE_JSON = "release-json"
         private const val INSTALLING = "installing"
+    }
+}
+
+@Composable
+internal fun AppUpdateInstallerContent(
+    version: String,
+    stage: AppUpdateStage,
+    onPermission: () -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Surface(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.safeDrawingPadding().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(R.string.app_update_version, version), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(when (stage) {
+                AppUpdateStage.Preparing -> R.string.app_update_preparing
+                AppUpdateStage.Permission -> R.string.app_update_permission
+                AppUpdateStage.Installing -> R.string.app_update_installing
+                AppUpdateStage.Failed -> R.string.app_update_failed
+            }))
+            when (stage) {
+                AppUpdateStage.Preparing -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                AppUpdateStage.Permission -> Button(onClick = onPermission) {
+                    Text(stringResource(R.string.app_permissions_install))
+                }
+                AppUpdateStage.Failed -> Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                AppUpdateStage.Installing -> Unit
+            }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+        }
     }
 }

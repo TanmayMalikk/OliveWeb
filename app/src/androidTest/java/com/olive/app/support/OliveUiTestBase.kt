@@ -175,6 +175,13 @@ abstract class OliveUiTestBase {
         waitFor("new_user")
     }
 
+    protected fun signOutAndOpenOnboarding() {
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        click("sign_out")
+        compose.waitUntil(30_000) { !session.busy && session.coverAccountId == null }
+        openOnboarding()
+    }
+
     // Presses the next button used by onboarding tests.
     protected fun nextOnboarding() {
         click("onboarding_next")

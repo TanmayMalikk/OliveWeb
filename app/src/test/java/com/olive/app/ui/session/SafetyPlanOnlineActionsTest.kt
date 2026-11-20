@@ -47,6 +47,33 @@ class SafetyPlanOnlineActionsTest {
         return SessionSafetyPlans(f.runtime){repo}.also { it.open("owner","Synthetic owner",emptyMap(),Any()) }
     }
     @Test
+    fun completionFlushesOnlyTheOpenConsultationAndDoesNotHideSyncFailure() = runBlocking<Unit> {
+        SessionRuntimeFixture().use { fixture ->
+            online(fixture)
+            val repository = mock(SafetyPlanRepository::class.java)
+            val controller = open(fixture, repository, original.copy(consultationConversationId = "ticket-42"))
+            try {
+                clearInvocations(repository)
+                controller.flushConsultation("unrelated-ticket")
+                verify(repository, never()).sync(any<SafetyPlan>() ?: original, isNull())
+                val outage = IllegalStateException("Fixture sync outage")
+                doAnswer { throw outage }.`when`(repository).sync(any<SafetyPlan>() ?: original, isNull())
+                val failure = runCatching { controller.flushConsultation("ticket-42") }.exceptionOrNull()
+                assertTrue(failure is IllegalStateException)
+                assertEquals(outage.message, failure?.message)
+                assertEquals("ticket-42", controller.plan?.consultationConversationId)
+                doReturn(original.copy(consultationConversationId = "ticket-42")).`when`(repository)
+                    .sync(any<SafetyPlan>() ?: original, isNull())
+                controller.flushConsultation("ticket-42")
+                verify(repository, times(2)).sync(any<SafetyPlan>() ?: original, isNull())
+            } finally {
+                controller.close()
+                WorkManagerImpl.setDelegate(null)
+            }
+        }
+    }
+
+    @Test
     fun discreteEditsFlushToTheServerAndConsultationRequestAndStopKeepTheirState()=runBlocking<Unit> {
         SessionRuntimeFixture().use { f ->
             online(f)
@@ -265,4 +292,28 @@ class SafetyPlanOnlineActionsTest {
         }
     }
 
+    @Test
+    fun adminConsultationIndexSurvivesPageChangesButFullCloseClearsIt() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.ADMIN).use { f ->
+            online(f)
+            val repository = mock(SafetyPlanRepository::class.java)
+            val assigned = SafetyConsultation("assigned", "Synthetic owner", "ticket", ticketNumber = 42)
+            `when`(repository.consultations()).thenReturn(true to listOf(assigned))
+            val controller = SessionSafetyPlans(f.runtime) { repository }
+            try {
+                controller.refreshConsultations(force = false)
+                assertEquals(listOf(assigned), controller.consultations)
+                assertFalse(controller.loadingAccess)
+                controller.close(preserveAdminIndex = true)
+                assertEquals(listOf(assigned), controller.consultations)
+                controller.refreshConsultations(force = false)
+                verify(repository, times(1)).consultations()
+                controller.close()
+                assertTrue(controller.consultations.isEmpty())
+                assertTrue(controller.loadingAccess)
+                controller.refreshConsultations(force = false)
+                verify(repository, times(2)).consultations()
+            } finally { controller.close(); WorkManagerImpl.setDelegate(null) }
+        }
+    }
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_readiness_title">Emergency readiness</string>
+    <string name="emergency_readiness_location">Allow location to include your coordinates in an emergency report so responders know where to look.</string>
+    <string name="emergency_readiness_device_location">Turn on device location so your emergency report can include where you are.</string>
+    <string name="emergency_readiness_background">Allow background location so admins can keep seeing your location if you leave the app.</string>
+    <string name="emergency_readiness_notifications">Enable notifications to see the notice while location sharing is active.</string>
+    <string name="emergency_readiness_allow_location">Allow location</string>
+    <string name="emergency_readiness_enable_location">Turn on device location</string>
+    <string name="emergency_readiness_allow_background">Allow background location</string>
+    <string name="emergency_readiness_notification_settings">Notification settings</string>
+    <string name="emergency_readiness_remind_later">Remind me later</string>
+    <string name="emergency_readiness_location_settings_path">Choose %1$s. If Android opens App info, go to Permissions, then Location.</string>
+</resources>

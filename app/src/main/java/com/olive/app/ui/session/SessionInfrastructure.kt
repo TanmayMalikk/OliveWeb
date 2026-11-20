@@ -380,7 +380,7 @@ internal class SessionRuntime(
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment
         set(value) {
-            if (activeEnrollment?.uid != value?.uid) messaging.stopMessaging()
+            if (activeEnrollment?.uid != value?.uid) { messaging.stopMessaging(); adminPreloader.clear() }
             activeEnrollment = value
         }
     var pendingIdentity: AccountIdentity? = null
@@ -414,6 +414,7 @@ internal class SessionRuntime(
     val entrySettings = SessionEntrySettings(this)
     val deviceAccess = SessionDeviceAccess(this)
     val navigation = SessionNavigation(this)
+    val adminPreloader = AdminDataPreloader(this)
     val organization = OrganizationAccounts(this)
     val messaging = SessionMessaging(this)
     val friendActions = FriendActions(this)

@@ -528,11 +528,35 @@
 .safe-resource-grid h3,
 .safe-resource-grid p { margin: 0; }
 .safe-resource-grid .button { justify-self: start; }
-.safe-map iframe {
+.current-location-map {
   width: 100%;
   height: clamp(18rem, 55vh, 36rem);
   border: 0;
   border-radius: 1rem;
+}
+
+.faded-map-shell {
+  position: relative;
+  overflow: hidden;
+  background: #f1ede4;
+}
+.faded-map-shell > .faded-map-canvas { position: absolute; inset: 0; }
+.faded-map-status {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #f1ede4;
+}
+.faded-map-current-dot {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #c7352b;
 }
 
 @media (max-width: 48rem) {

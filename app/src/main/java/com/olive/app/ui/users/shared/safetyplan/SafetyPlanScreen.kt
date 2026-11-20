@@ -491,17 +491,32 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
             controller.close()
             selected = null
             controller.refreshSharedPlans()
-        }) else FormColumn {
-        SafetyBackButton(onClick = session.navigation::back, tag = "safe_contact_safety_back")
+        }) else SharedSafetyPlanList(
+        controller.sharedPlans, controller.loadingAccess, session.localMode, controller.error,
+        onBack = session.navigation::back, onOpen = { selected = it },
+    )
+}
+
+@Composable
+internal fun SharedSafetyPlanList(
+    plans: List<SharedSafetyPlan>,
+    loading: Boolean,
+    localMode: Boolean,
+    error: Int?,
+    onBack: () -> Unit,
+    onOpen: (SharedSafetyPlan) -> Unit,
+) {
+    FormColumn {
+        SafetyBackButton(onClick = onBack, tag = "safe_contact_safety_back")
         Heading(
             stringResource(R.string.support_safety_plan),
             stringResource(R.string.safe_contact_shared_plans_intro)
         )
-        if (session.localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
-        if (controller.loadingAccess && !session.localMode) LoadingSkeleton(SkeletonLayout.SharedPlans)
-        controller.error?.let { AccessibleMessage(stringResource(it)) }
-        val visiblePlans = if (controller.loadingAccess) emptyList() else controller.sharedPlans
-        if (visiblePlans.isEmpty() && (!controller.loadingAccess || session.localMode) && controller.error == null) Surface(
+        if (localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
+        if (loading && !localMode) LoadingSkeleton(SkeletonLayout.SharedPlans)
+        error?.let { AccessibleMessage(stringResource(it)) }
+        val visiblePlans = if (loading) emptyList() else plans
+        if (visiblePlans.isEmpty() && (!loading || localMode) && error == null) Surface(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = LightSage
@@ -520,7 +535,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
         }
         visiblePlans.forEach { shared ->
             OutlinedCard(
-                onClick = { selected = shared },
+                onClick = { onOpen(shared) },
                 modifier = Modifier.fillMaxWidth().testTag("shared_plan_${shared.ownerUid}")
             ) {
                 Row(
@@ -543,7 +558,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
                 }
             }
         }
-        controller.error?.let { AccessibleMessage(stringResource(it)) }
+        error?.let { AccessibleMessage(stringResource(it)) }
     }
 }
 
@@ -576,7 +591,8 @@ private fun SafetyContactSharingControls(session: SessionViewModel, plan: Safety
                     { checked ->
                         selected = if (checked) selected + friend.uid else selected - friend.uid
                     },
-                    enabled = friend.uid in selected || selected.size < 10
+                    enabled = friend.uid in selected || selected.size < 10,
+                    modifier = Modifier.testTag("safety_share_contact_${friend.uid}"),
                 )
                 Column(Modifier.weight(1f)) {
                     Text(trusted?.name ?: friend.username)

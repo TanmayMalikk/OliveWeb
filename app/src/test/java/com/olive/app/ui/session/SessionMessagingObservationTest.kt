@@ -2,17 +2,21 @@ package com.olive.app.ui.session
 
 import com.google.firebase.auth.FirebaseAuth
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.messaging.*
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SessionMessages
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
 import org.robolectric.RobolectricTestRunner
+import kotlin.coroutines.ContinuationInterceptor
 
 @RunWith(RobolectricTestRunner::class)
 class SessionMessagingObservationTest {
@@ -69,9 +73,17 @@ class SessionMessagingObservationTest {
 
     @Test
     fun serverMembershipRemovalClosesTheChatAndPurgesArchivePreferences() = withBackgroundTransport {
-        SessionRuntimeFixture().use { f ->
+        runBlocking<Unit> {
+            verifyServerMembershipRemoval(coroutineContext[ContinuationInterceptor] as CoroutineDispatcher)
+        }
+    }
+
+    private suspend fun verifyServerMembershipRemoval(dispatcher: CoroutineDispatcher) {
+        // Keep cache completion and listener callbacks on one thread, as they are on Android.
+        SessionRuntimeFixture(dispatcher = dispatcher).use { f ->
             val listeners=Observers(f)
             f.runtime.messaging.startMessaging()
+            yield()
             val chat=ChatConversation("ticket","SUPPORT",listOf("owner","staff"),emptyMap())
             listeners.chats(listOf(chat))
             assertEquals(listOf(chat),f.runtime.state.conversations)
@@ -87,6 +99,34 @@ class SessionMessagingObservationTest {
             listeners.chats(emptyList())
             assertFalse(f.runtime.state.conversationLoadFailed)
             assertNull(f.runtime.state.message)
+        }
+    }
+
+    @Test
+    fun reconnectRejectsDifferentAccountAndOnlyRestartsObserversAfterValidAuthentication() = withBackgroundTransport {
+        runBlocking<Unit> {
+            SessionRuntimeFixture().use { fixture ->
+                val session = fixture.runtime
+                val listeners = Observers(fixture)
+                session.state.messagingNeedsReconnect = true
+                var connected = 0
+                session.messaging.reconnectMessaging(" ") { connected++ }
+                verifyNoInteractions(fixture.accounts)
+                val password = "Synthetic!123"
+                `when`(fixture.accounts.authenticate("fixture_owner", password, AccountRole.USER))
+                    .thenReturn(AccountIdentity("different", "fixture_owner"), AccountIdentity("owner", "fixture_owner"))
+                session.messaging.reconnectMessaging(password) { connected++ }
+                fixture.await { !session.state.messagingBusy }
+                assertEquals(0, connected)
+                assertTrue(session.state.messagingNeedsReconnect)
+                assertNotNull(session.state.message)
+                session.messaging.reconnectMessaging(password) { connected++ }
+                fixture.await { !session.state.messagingBusy && connected == 1 }
+                assertFalse(session.state.messagingNeedsReconnect)
+                assertNull(session.state.message)
+                listeners.social(SocialSnapshot(friends = listOf(Friend("pair", "friend", "fixture_friend"))))
+                assertEquals("friend", session.state.friends.single().uid)
+            }
         }
     }
 

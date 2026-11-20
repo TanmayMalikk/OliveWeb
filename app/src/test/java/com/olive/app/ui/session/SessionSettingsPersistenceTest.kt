@@ -86,4 +86,25 @@ class SessionSettingsPersistenceTest {
             assertTrue(f.runtime.store.verify("owner","987654") is PinResult.Accepted)
         }
     }
+
+    @Test
+    fun aTriggerChangeRequiresTheCurrentPinAndPersistsOnlyTheVerifiedPhraseHash() = runBlocking<Unit> {
+        fixture().use { fixture ->
+            val session = fixture.runtime
+            val replacement = "synthetic replacement phrase"
+            session.settings.changeTrigger("x", "123456")
+            assertTrue(session.state.message.orEmpty().contains("trigger"))
+            session.settings.changeTrigger(replacement, "654321")
+            fixture.await { !session.state.busy }
+            assertFalse(InputPolicy.matchesTrigger(replacement, session.store.profile("owner").triggerHash))
+            assertEquals(1, session.state.attempts.size)
+            session.settings.changeTrigger(replacement, "123456")
+            fixture.await { !session.state.busy }
+            val hash = session.store.profile("owner").triggerHash
+            assertTrue(InputPolicy.matchesTrigger(replacement, hash))
+            assertEquals(hash, session.enrollment?.triggerHash)
+            assertNotEquals(replacement, hash)
+            assertFalse(InputPolicy.matchesTrigger("moon garden", hash))
+        }
+    }
 }

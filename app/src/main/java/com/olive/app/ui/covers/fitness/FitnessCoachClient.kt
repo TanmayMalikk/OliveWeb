@@ -13,29 +13,46 @@ internal data class CoachReply(val text: String, val goals: Map<String, Int>)
 internal data class CoachMembership(val active: Boolean, val canManage: Boolean)
 internal data class CoachPayment(val publishableKey: String, val clientSecret: String)
 
+internal interface FitnessCoachService {
+    suspend fun membership(): CoachMembership
+    suspend fun billingPortal(): Uri
+    suspend fun paymentSheet(): CoachPayment
+    suspend fun send(
+        text: String,
+        turns: List<CoachTurn>,
+        profile: FitnessProfile,
+        history: List<FitnessHistoryDay>,
+    ): CoachReply
+}
+
 // No access to the Safe App session or to any account profile repository.
-internal class FitnessCoachClient(private val uid: String) {
+internal class FitnessCoachClient(
+    private val uid: String,
+    private val functions: () -> FirebaseFunctions,
+) : FitnessCoachService {
+    constructor(uid: String) : this(uid, { FirebaseFunctions.getInstance("northamerica-northeast1") })
+
     private suspend fun call(name: String, input: Map<String, Any>): Map<*, *> {
         check(FirebaseAuth.getInstance().currentUser?.uid == uid)
-        val result = FirebaseFunctions.getInstance("northamerica-northeast1")
+        val result = functions()
             .getHttpsCallable(name).call(input).await().data
         check(FirebaseAuth.getInstance().currentUser?.uid == uid)
         return result as? Map<*, *> ?: error("Invalid coach response")
     }
 
-    suspend fun membership(): CoachMembership {
+    override suspend fun membership(): CoachMembership {
         val data = call("fitnessAiBilling", mapOf("action" to "status"))
         return CoachMembership(data["active"] == true, data["canManage"] == true)
     }
 
-    suspend fun billingPortal(): Uri {
+    override suspend fun billingPortal(): Uri {
         val data = call("fitnessAiBilling", mapOf("action" to "portal"))
         val uri = Uri.parse(data["url"] as? String ?: error("Missing billing URL"))
         check(uri.scheme == "https" && uri.host == "billing.stripe.com" && uri.userInfo == null)
         return uri
     }
 
-    suspend fun paymentSheet(): CoachPayment {
+    override suspend fun paymentSheet(): CoachPayment {
         val data = call("fitnessAiBilling", mapOf("action" to "paymentSheet"))
         val key = data["publishableKey"] as? String ?: error("Missing publishable key")
         val secret = data["clientSecret"] as? String ?: error("Missing payment intent")
@@ -43,7 +60,7 @@ internal class FitnessCoachClient(private val uid: String) {
         return CoachPayment(key, secret)
     }
 
-    suspend fun send(
+    override suspend fun send(
         text: String,
         turns: List<CoachTurn>,
         profile: FitnessProfile,

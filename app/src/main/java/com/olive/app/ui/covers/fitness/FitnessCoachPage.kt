@@ -54,8 +54,22 @@ internal fun FitnessCoachPage(
     dataLoading: Boolean,
     onGoalsSaved: (FitnessSnapshot) -> Unit,
 ) {
+    val coachClient = remember(accountId) { FitnessCoachClient(accountId) }
+    FitnessCoachPage(accountId, cloudAvailable, store, history, dataLoading, coachClient, onGoalsSaved)
+}
+
+@Composable
+internal fun FitnessCoachPage(
+    accountId: String,
+    cloudAvailable: Boolean,
+    store: FitnessStore,
+    history: List<FitnessHistoryDay>,
+    dataLoading: Boolean,
+    client: FitnessCoachService,
+    onGoalsSaved: (FitnessSnapshot) -> Unit,
+) {
     val context = LocalContext.current
-    val client = remember(accountId) { FitnessCoachClient(accountId) }
+    val coachTitle = stringResource(R.string.fitness_coach_title)
     val chatHistory = remember(context, accountId) { FitnessCoachHistory(context, accountId) }
     val scope = rememberCoroutineScope()
     var membership by remember { mutableStateOf<CoachMembership?>(null) }
@@ -103,7 +117,7 @@ internal fun FitnessCoachPage(
                     paymentOpen = true
                     paymentSheet.presentWithPaymentIntent(
                         payment.clientSecret,
-                        PaymentSheet.Configuration.Builder(context.getString(R.string.fitness_coach_title)).build(),
+                        PaymentSheet.Configuration.Builder(coachTitle).build(),
                     )
                 } else if (action == "portal") {
                     context.startActivity(Intent(Intent.ACTION_VIEW, client.billingPortal()))

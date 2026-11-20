@@ -77,8 +77,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         waitFor("unlock_pin")
         enterPin("123456")
         waitFor("safe_settings")
-        click("sign_out")
-        openOnboarding()
+        signOutAndOpenOnboarding()
         waitFor("returning_user")
     }
 

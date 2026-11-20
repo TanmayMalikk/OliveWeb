@@ -441,6 +441,11 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
                             )
                         }
                         ModeNotice(session)
+                        if (profile.role == AccountRole.USER && session.screen == SessionScreen.Safe &&
+                            session.page == SafePage.Home
+                        ) {
+                            session.coverAccountId?.let { EmergencyReadinessCard(it, session.localMode) }
+                        }
                         SafeHomeShortcuts(session)
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(

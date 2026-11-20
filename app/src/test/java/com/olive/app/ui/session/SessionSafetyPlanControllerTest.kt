@@ -1,5 +1,9 @@
 package com.olive.app.ui.session
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.olive.app.R
@@ -22,6 +26,44 @@ class SessionSafetyPlanControllerTest {
             "primary_grab" to SafetyField("Emergency bag", 1),
         ),
     )
+
+    @Test
+    fun successfulConsultationRefreshPrunesRevokedPlansAndARecoveryFailureKeepsTheIndex() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.ADMIN).use { fixture ->
+            val connectivity = mock(ConnectivityManager::class.java)
+            val network = mock(Network::class.java)
+            val capabilities = mock(NetworkCapabilities::class.java)
+            doReturn(connectivity).`when`(fixture.application).getSystemService(Context.CONNECTIVITY_SERVICE)
+            `when`(connectivity.activeNetwork).thenReturn(network)
+            `when`(connectivity.getNetworkCapabilities(network)).thenReturn(capabilities)
+            `when`(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)).thenReturn(true)
+            `when`(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)).thenReturn(true)
+            val repository = mock(SafetyPlanRepository::class.java)
+            val next = SafetyConsultation("current", "Synthetic current owner", "ticket", "staff")
+            `when`(repository.consultations()).thenReturn(false to listOf(next))
+            val store = SafetyPlanStore(fixture.application, false)
+            store.write("owner", "current", plan("current"))
+            store.write("owner", "revoked", plan("revoked"))
+            val controller = SessionSafetyPlans(fixture.runtime) { repository }
+            controller.refreshConsultations()
+            assertFalse(controller.loadingAccess)
+            assertFalse(controller.available)
+            assertEquals(listOf(next), controller.consultations)
+            assertNotNull(store.read("owner", "current"))
+            assertNull(store.read("owner", "revoked"))
+
+            controller.refreshConsultations(force = false)
+            verify(repository).consultations()
+            `when`(repository.consultations()).thenThrow(IllegalStateException("Temporary fixture failure"))
+            controller.refreshConsultations()
+            assertEquals(listOf(next), controller.consultations)
+            assertEquals(R.string.safety_sync_error, controller.error)
+            controller.close(preserveAdminIndex = true)
+            assertEquals(listOf(next), controller.consultations)
+            controller.close()
+            assertTrue(controller.consultations.isEmpty())
+        }
+    }
 
     @Test
     fun pendingEditsRemainDurableWhenRemoteUpdatesAnotherSection() = runBlocking<Unit> {

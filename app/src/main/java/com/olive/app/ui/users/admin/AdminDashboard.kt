@@ -300,8 +300,8 @@ private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modi
 @Composable
 private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
-    LaunchedEffect(Unit) { session.refreshAdminStaff() }
-    val staff = session.adminAccounts.filter { it.role == AccountRole.STAFF }
+    LaunchedEffect(session.coverAccountId) { session.ensureAdminStaff() }
+    val staff = session.adminStaffAccounts.filter { it.role == AccountRole.STAFF }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -325,11 +325,12 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.refresh)) }
-        if (session.busy) LoadingSkeleton(SkeletonLayout.StaffWorkload)
-        else if (staff.isEmpty() && session.message == null) {
+        if (session.showAdminStaffSkeleton) LoadingSkeleton(SkeletonLayout.StaffWorkload)
+        else if (staff.isEmpty() && session.adminStaffError == null) {
             Text(stringResource(R.string.admin_no_staff_accounts), color = Muted)
         }
-        if (!session.busy) staff.forEach { account -> StaffWorkloadCard(account) }
+        else staff.forEach { account -> StaffWorkloadCard(account) }
+        session.adminStaffError?.let { AccessibleMessage(stringResource(it)) }
         Status(session)
     }
 }
@@ -491,17 +492,22 @@ internal fun EmergencyResponseScreen(
 
 @Composable
 internal fun EmergencyLocationPreview(session: SessionViewModel, ownerUid: String) {
-    var points by remember(ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }
-    var error by remember(ownerUid) { mutableStateOf<String?>(null) }
+    var points by remember(session.coverAccountId, ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }
+    var error by remember(session.coverAccountId, ownerUid) { mutableStateOf<String?>(null) }
+    var loading by remember(session.coverAccountId, ownerUid) { mutableStateOf(true) }
     DisposableEffect(session.coverAccountId, ownerUid) {
         val subscription = session.emergencyResponses.observeLocations(
-            onUpdate = { values -> points = values.filter { it.uid == ownerUid } },
-            onError = { error = it },
+            onUpdate = { values ->
+                points = values.filter { it.uid == ownerUid }
+                error = null
+                loading = false
+            },
+            onError = { error = it; loading = false },
         )
         onDispose { subscription.close() }
     }
     Column {
-        if (points.isEmpty()) Text(error ?: stringResource(R.string.emergency_response_no_location))
+        if (!loading && points.isEmpty()) Text(error ?: stringResource(R.string.emergency_response_no_location))
         else InteractiveLocationMap(
             points = points, ownPointUid = null, initialFollowUid = ownerUid,
             modifier = Modifier.fillMaxWidth().height(200.dp),

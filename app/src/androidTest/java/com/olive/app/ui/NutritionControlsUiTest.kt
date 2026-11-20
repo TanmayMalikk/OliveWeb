@@ -1,18 +1,33 @@
 package com.olive.app.ui
 
+import android.Manifest
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityOptionsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.*
 import com.olive.app.ui.shared.OliveTheme
 import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -47,6 +62,49 @@ class NutritionControlsUiTest {
         capture("manual_food_dialog", "nutrition-manual-test.png")
         compose.onNodeWithTag("manual_food_continue").performClick()
         compose.runOnIdle { assertEquals(150f, selected!!.calories, 0f) }
+    }
+
+    @Test fun nutritionCameraDeletesTemporaryPhotosAfterCaptureCancellationAndInvalidInput() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.CAMERA)
+        val payload = byteArrayOf(3, 1, 4, 1, 5)
+        val received = AtomicReference<ByteArray>()
+        val errors = AtomicInteger()
+        val launches = AtomicInteger()
+        val registry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(
+                requestCode: Int,
+                contract: ActivityResultContract<I, O>,
+                input: I,
+                options: ActivityOptionsCompat?,
+            ) {
+                check(contract is ActivityResultContracts.TakePicture)
+                val attempt = launches.incrementAndGet()
+                if (attempt == 1) {
+                    requireNotNull(context.contentResolver.openOutputStream(input as Uri)).use { it.write(payload) }
+                }
+                // Android delivers the result after the launch call finishes.
+                Handler(Looper.getMainLooper()).post { dispatchResult(requestCode, attempt != 2) }
+            }
+        }
+        val owner = object : ActivityResultRegistryOwner { override val activityResultRegistry = registry }
+        val cache = File(context.cacheDir, "fitness-scans")
+        compose.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner) {
+                val launch = rememberNutritionCamera({ received.set(it) }, { errors.incrementAndGet() })
+                Button(onClick = launch) { Text("Fixture camera") }
+            }
+        }
+        val button = compose.onNodeWithText("Fixture camera")
+        button.performClick()
+        compose.waitUntil(10_000) { received.get() != null && cache.listFiles().orEmpty().isEmpty() }
+        assertArrayEquals(payload, received.get())
+        button.performClick()
+        compose.waitUntil(10_000) { launches.get() == 2 && cache.listFiles().orEmpty().isEmpty() }
+        assertEquals(0, errors.get())
+        button.performClick()
+        compose.waitUntil(10_000) { errors.get() == 1 && cache.listFiles().orEmpty().isEmpty() }
+        assertEquals(3, launches.get())
     }
 
     @Test fun nutritionActionsAppearAboveSummaryWithWaterVisible() {

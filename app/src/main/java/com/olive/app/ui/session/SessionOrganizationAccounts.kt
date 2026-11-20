@@ -95,65 +95,21 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
-    // Refreshes only the small dashboard totals after an administrator signs in.
-    fun refreshAdminSummary() {
-        with(runtime) {
-            with(state) {
-                val repository = adminRepository ?: return
-                if (accountRole != AccountRole.ADMIN || busy) return
-                val ownerUid = enrollment?.uid ?: return
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
-                    val counts = repository.summary()
-                    if (epoch == token && screen == SessionScreen.Portal && enrollment?.uid == ownerUid) {
-                        setAdminSummary(ownerUid, counts)
-                    }
-                }
-            }
-        }
-    }
+    fun refreshAdminSummary() = runtime.adminPreloader.summary(force = true)
+    fun refreshAdminAccounts() = runtime.adminPreloader.accounts(force = true, showLoading = true)
+    fun refreshAdminStaff() = runtime.adminPreloader.staff(force = true, showLoading = true)
 
-    // Loads the complete directory only when the administrator opens Accounts.
-    fun refreshAdminAccounts() {
-        with(runtime) {
-            with(state) {
-                val repository = adminRepository ?: return
-                if (accountRole != AccountRole.ADMIN || busy) return
-                adminAccounts = emptyList()
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
-                    val rows = repository.accounts()
-                    if (epoch == token && screen == SessionScreen.Portal) {
-                        adminAccounts = rows
-                    }
-                }
-            }
-        }
-    }
-
-    // Loads staff rows and their workload totals only when Staff management is open.
-    fun refreshAdminStaff() {
-        with(runtime) {
-            with(state) {
-                val repository = adminRepository ?: return
-                if (accountRole != AccountRole.ADMIN || busy) return
-                adminAccounts = emptyList()
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
-                    val rows = repository.staffAccounts()
-                    if (epoch == token && screen == SessionScreen.Portal) {
-                        adminAccounts = rows
-                    }
-                }
-            }
-        }
-    }
-
-    // Stores the newest staff and admin list after an admin refresh.
+    // Start small independent reads after authentication; none of them lock the portal UI.
     fun queueAdminRefresh() {
-        with(runtime) {
-            with(state) {
-                scope.launch {
-                    while (busy) delay(50.milliseconds)
-                    if (screen == SessionScreen.Portal && accountRole == AccountRole.ADMIN) refreshAdminSummary()
-                }
+        val owner = runtime.coverAccountId ?: return
+        val token = runtime.epoch
+        runtime.scope.launch {
+            while (runtime.state.busy && runtime.coverAccountId == owner && runtime.epoch == token) delay(50.milliseconds)
+            if (runtime.coverAccountId == owner && runtime.epoch == token &&
+                runtime.state.screen == SessionScreen.Portal && runtime.state.accountRole == AccountRole.ADMIN) {
+                runtime.adminPreloader.preload()
+                runtime.safety.observeAccess()
+                runtime.safety.refreshConsultations(force = false)
             }
         }
     }
@@ -185,8 +141,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                     val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
-                        adminCounts = counts
-                        adminAccounts = rows
+                        adminPreloader.adopt(rows, counts)
                         message =
                             runtime.application.getString(
                                 R.string.ui_value_account_created,
@@ -210,8 +165,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                     val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
-                        adminCounts = counts
-                        adminAccounts = rows
+                        adminPreloader.adopt(rows, counts)
                         message =
                             runtime.application.getString(
                                 R.string.ui_value_was_deleted,

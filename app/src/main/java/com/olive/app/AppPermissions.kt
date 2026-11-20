@@ -58,11 +58,13 @@ internal class AppPermissions(
     private val locationSettings = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         finishLocationRequest(hasLocation())
     }
+    private val backgroundLocationSettings =
+        activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            finishLocationRequest(hasBackgroundLocation())
+        }
 
-    private fun openLocationSettings() {
-        locationSettings.launch(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            "package:${activity.packageName}".toUri()))
-    }
+    private fun appLocationSettings() =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${activity.packageName}".toUri())
 
     // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
@@ -109,7 +111,7 @@ internal class AppPermissions(
                 ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION),
                 ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION),
             )
-            if (deniedPermanently) openLocationSettings()
+            if (deniedPermanently) locationSettings.launch(appLocationSettings())
             else {
                 preferences.edit { putBoolean("location_asked", true) }
                 location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
@@ -121,10 +123,18 @@ internal class AppPermissions(
         if (!requestLocation()) return false
         return locationRequests.withLock {
             locationResult?.await()
-            hasBackgroundLocation() || launchLocationRequest {
-                // Let Android show its own permission UI. Newer versions route directly to
-                // location permission settings rather than the generic app-info page.
-                backgroundLocation.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || hasBackgroundLocation()) return@withLock true
+            launchLocationRequest {
+                val permission = Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                val canRequest = !preferences.getBoolean("background_location_asked", false) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+                if (canRequest) {
+                    // Android owns the link to the location permission page.
+                    backgroundLocation.launch(permission)
+                    preferences.edit { putBoolean("background_location_asked", true) }
+                } else {
+                    backgroundLocationSettings.launch(appLocationSettings())
+                }
             }
         }
     }
@@ -135,6 +145,8 @@ internal class AppPermissions(
             locationResult = pending
             try {
                 launch()
+            } catch (_: android.content.ActivityNotFoundException) {
+                finishLocationRequest(false)
             } catch (_: IllegalStateException) {
                 finishLocationRequest(false)
             }

@@ -72,6 +72,54 @@ class DeviceLocationApiTest {
         assertEquals(100L,coordinates.timestamp)
         assertNull(coordinates.accuracy)
     }
+
+    @Test
+    fun fallbackChoosesAFreshAccurateCachedSampleWhenPlayServicesAndGpsFail() = fixture { context, fused, manager ->
+        val now = System.currentTimeMillis()
+        fun fix(provider: String, latitude: Double, age: Long, accuracy: Float) = Location(provider).apply {
+            this.latitude = latitude
+            longitude = -113.5
+            time = now - age
+            this.accuracy = accuracy
+        }
+        val gps = LocationManager.GPS_PROVIDER
+        val network = LocationManager.NETWORK_PROVIDER
+        val recentGps = fix(gps, 53.0, 12_000, 9f)
+        val recentNetwork = fix(network, 53.2, 1_000, 120f)
+        val stale = fix("stale", 52.2, 360_000, 1f)
+        `when`(fused.getCurrentLocation(any<CurrentLocationRequest>() ?: CurrentLocationRequest.Builder().build(), any<CancellationToken>()))
+            .thenReturn(Tasks.forException(IllegalStateException("Synthetic service failure")))
+        `when`(manager.isProviderEnabled(gps)).thenReturn(true)
+        doThrow(SecurityException("Synthetic provider failure")).`when`(manager)
+            .getCurrentLocation(eq(gps), any(), any(java.util.concurrent.Executor::class.java), any())
+        `when`(manager.getProviders(true)).thenReturn(listOf(gps, network, "stale", "revoked"))
+        `when`(manager.getLastKnownLocation(gps)).thenReturn(recentGps)
+        `when`(manager.getLastKnownLocation(network)).thenReturn(recentNetwork)
+        `when`(manager.getLastKnownLocation("stale")).thenReturn(stale)
+        `when`(manager.getLastKnownLocation("revoked")).thenThrow(SecurityException("Synthetic cache revocation"))
+
+        assertEquals(DeviceCoordinates(53.0, -113.5, 9f, recentGps.time), runBlocking { DeviceLocation.currentCoordinates(context) })
+        `when`(manager.getProviders(true)).thenReturn(listOf("stale", "revoked"))
+        assertNull(runBlocking { DeviceLocation.currentCoordinates(context) })
+    }
+
+    @Test
+    fun coarseOnlySubscriptionsUseBalancedLocationWithoutInventingAccuracy() = fixture { context, fused, _ ->
+        shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val received = mutableListOf<DeviceCoordinates>()
+        var priority = -1
+        `when`(fused.requestLocationUpdates(any<LocationRequest>() ?: LocationRequest.Builder(1_000).build(),
+            any<LocationCallback>() ?: object : LocationCallback() {}, any<Looper>() ?: Looper.getMainLooper())).thenAnswer {
+            priority = it.getArgument<LocationRequest>(0).priority
+            it.getArgument<LocationCallback>(1).onLocationResult(LocationResult.create(listOf(Location("network").apply {
+                latitude = 53.2; longitude = -113.5; time = 123
+            })))
+            Tasks.forResult<Void>(null)
+        }
+        assertNotNull(DeviceLocation.startUpdates(context) { received += it })
+        assertEquals(Priority.PRIORITY_BALANCED_POWER_ACCURACY, priority)
+        assertEquals(listOf(DeviceCoordinates(53.2, -113.5, null, 123)), received)
+    }
     @Test
     fun addressLookupsSupportForwardAndReverseCallbacksAndGracefullyHandleAnEmptyResult()=fixture { context,fused,_ ->
         val point=Location("fixture").apply { latitude=53.0;longitude=-113.0;time=100 }

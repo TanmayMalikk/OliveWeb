@@ -71,10 +71,14 @@ internal class SessionSafetyPlans(
         private set
     var loadingPlan by mutableStateOf(true)
         private set
+    private val consultationRefreshMutex = kotlinx.coroutines.sync.Mutex()
+    private var consultationsSession: Pair<String, Long>? = null
+    private var consultationsRefreshedAt = 0L
+    private var accessRevision = 0
     var loadingAccess by mutableStateOf(true)
         private set
     var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
-        private set
+        internal set
     var sharedPlans by mutableStateOf<List<SharedSafetyPlan>>(emptyList())
         private set
     var available by mutableStateOf(true)
@@ -123,7 +127,7 @@ internal class SessionSafetyPlans(
         authorized() && runtime.coverAccountId == actor && activeOwner == owner && generation == token
 
     // Clears private plan data when its screen closes; a different screen cannot clear the active one.
-    fun close(screenLease: Any? = null) {
+    fun close(screenLease: Any? = null, preserveAdminIndex: Boolean = false) {
         if (screenLease != null && lease !== screenLease) return
         planListener?.remove()
         foregroundSync?.cancel()
@@ -142,7 +146,11 @@ internal class SessionSafetyPlans(
         error = null
         saving =
             0
-        if (screenLease == null) {
+        if (screenLease == null && !(preserveAdminIndex && runtime.state.accountRole == AccountRole.ADMIN &&
+                runtime.state.screen == SessionScreen.Portal)) {
+            accessRevision++
+            consultationsSession = null
+            consultationsRefreshedAt = 0L
             loadingAccess = true
             consultations = emptyList()
             sharedPlans = emptyList()
@@ -671,14 +679,18 @@ internal class SessionSafetyPlans(
     }
 
     // Loads assigned consultations and the staff member's availability from local and cloud storage.
-    suspend fun refreshConsultations() {
-        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
-        val actor = runtime.coverAccountId ?: return
-        // Turn an unexpected refresh consultations failure into a readable message.
-        loadingAccess = true
+    suspend fun refreshConsultations(force: Boolean = true) = consultationRefreshMutex.withLock {
+        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return@withLock
+        val actor = runtime.coverAccountId ?: return@withLock
+        val session = actor to runtime.epoch
+        val revision = accessRevision
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force && consultationsSession == session && now - consultationsRefreshedAt < 90_000) return@withLock
+        // Once loaded, reconcile the index without replacing it with a skeleton.
+        loadingAccess = consultationsSession != session
         try {
             if (consultations.isEmpty()) loadCachedAccessLists(actor)
-            if (!hasValidatedInternetConnection(runtime.application)) return
+            if (!hasValidatedInternetConnection(runtime.application)) return@withLock
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
                 val cached = store.all(actor)
@@ -686,7 +698,9 @@ internal class SessionSafetyPlans(
                     .forEach { store.remove(actor, it.ownerUid) }
                 accessIndex.replaceConsultations(actor, result.first, result.second)
             }
-            if (authorized() && actor == runtime.coverAccountId) {
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) {
+                consultationsSession = session
+                consultationsRefreshedAt = android.os.SystemClock.elapsedRealtime()
                 available = result.first
                 consultations = result.second
                 error = null
@@ -694,9 +708,9 @@ internal class SessionSafetyPlans(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
-            if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) error = R.string.safety_sync_error
         } finally {
-            if (authorized() && actor == runtime.coverAccountId) loadingAccess = false
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) loadingAccess = false
         }
     }
 

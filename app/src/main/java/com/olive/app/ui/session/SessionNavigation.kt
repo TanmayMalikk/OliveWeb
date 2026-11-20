@@ -45,6 +45,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     accessibilityExitVersion++
                 }
                 safety.close()
+                adminPreloader.clear()
                 epoch++
                 pinAuthorizedUid = null
                 pinAuthorizedEpoch = -1L

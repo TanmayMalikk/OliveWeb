@@ -1,6 +1,5 @@
 package com.olive.app.ui.shared
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -32,7 +29,7 @@ import com.olive.app.R
 internal enum class SkeletonLayout {
     Conversation, ChatList, TicketList, Contacts, Documents, Notes, Checklist, SharedPlans,
     History, Accounts, StaffWorkload, DashboardCounts, EmergencyAlerts, HotlineDirectory,
-    SupportAssignment, NearbySupport, Directions, Map, NewsFeed, NewsArticle, FitnessSummary,
+    SupportAssignment, NearbySupport, Directions, NewsFeed, NewsArticle, FitnessSummary,
     FitnessActivity, FitnessVitals, FitnessNutrition, FoodResults, Form, Action, Image, Video,
     DocumentPage, TextDocument,
 }
@@ -166,7 +163,6 @@ internal fun LoadingSkeleton(
                 SkeletonBlock(Modifier.size(28.dp), CircleShape, foreground)
                 SkeletonBlock(Modifier.fillMaxWidth(.62f).height(14.dp), color = foreground)
             }
-            SkeletonLayout.Map -> MapPlaceholder()
             SkeletonLayout.NewsFeed, SkeletonLayout.NewsArticle -> repeat(rows) {
                 SkeletonCard {
                     val article = layout == SkeletonLayout.NewsArticle
@@ -310,22 +306,6 @@ private fun FitnessChartPlaceholder() {
         ) {
             repeat(7) { SkeletonBlock(Modifier.weight(1f).fillMaxHeight(.54f)) }
         }
-    }
-}
-
-@Composable
-private fun MapPlaceholder() {
-    val map = MaterialTheme.colorScheme.surfaceContainer
-    val roads = MaterialTheme.colorScheme.outline.copy(alpha = .22f)
-    Canvas(Modifier.fillMaxSize().heightIn(min = 140.dp).background(map, MaterialTheme.shapes.large)) {
-        val width = size.width
-        val height = size.height
-        drawLine(roads, Offset(width * .08f, height * .73f), Offset(width * .91f, height * .28f),
-            8.dp.toPx(), StrokeCap.Round)
-        drawLine(roads, Offset(width * .12f, height * .32f), Offset(width * .89f, height * .80f),
-            5.dp.toPx(), StrokeCap.Round)
-        drawLine(roads, Offset(width * .59f, height * .12f), Offset(width * .43f, height * .88f),
-            6.dp.toPx(), StrokeCap.Round)
     }
 }
 

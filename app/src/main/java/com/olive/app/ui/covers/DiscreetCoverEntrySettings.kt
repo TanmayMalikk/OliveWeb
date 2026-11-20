@@ -145,6 +145,7 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             CoverAccountPanel(session)
+            AppVersionFooter()
         }
     }
 }

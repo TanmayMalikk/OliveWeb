@@ -6,11 +6,15 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
 import com.olive.app.data.account.*
 import com.olive.app.data.location.LocationSharingDataSource
+import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.RouteCoordinate
+import com.olive.app.data.location.RouteDirection
 import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.messaging.Friend
 import com.olive.app.security.DeviceEnrollment
@@ -21,9 +25,11 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import com.olive.app.ui.users.user.location.LocationMapScreen
+import com.olive.app.ui.users.user.location.LocationMapController
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.CompletableDeferred
 import javax.crypto.SecretKey
 
 class LocationWorkspaceUiTest {
@@ -124,6 +130,45 @@ class LocationWorkspaceUiTest {
         compose.onNodeWithTag("share_saved_location").assertIsOn()
         compose.runOnIdle { assertTrue(locations.savedEnabled) }
     }
+    @Test
+    fun guidanceUsesTheSelectedLiveSenderAndStopsWithoutLeavingTheMap() {
+        val locations = Locations()
+        val session = session(AccountRole.SAFE_CONTACT, locations)
+        val route = CompletableDeferred<LocationRoute>()
+        val endpoints = CompletableDeferred<Pair<MapLocationPoint, MapLocationPoint>>()
+        val controller = LocationMapController(compose.activity, session.viewModelScope, locations) { origin, target ->
+            endpoints.complete(origin to target)
+            route.await()
+        }
+        compose.setContent {
+            OliveTheme {
+                CompositionLocalProvider(LocalLocationPermissionRequest provides { false }) {
+                    LocationMapScreen(session, controller)
+                }
+            }
+        }
+        val navigate = compose.onNodeWithTag("location_navigate")
+        navigate.assertIsEnabled().performClick()
+        compose.waitUntil(10_000) { endpoints.isCompleted }
+        compose.runOnIdle { assertTrue(controller.state.routeWorking) }
+        route.complete(LocationRoute(
+            coordinates = listOf(RouteCoordinate(53.5, -113.5), RouteCoordinate(53.0, -113.0)),
+            distanceMeters = 1500.0,
+            durationSeconds = 90.0,
+            directions = listOf(RouteDirection("Turn right at the fixture landmark", 0, 1)),
+        ))
+        val nextTurn = compose.onNodeWithText("Turn right at the fixture landmark", substring = true)
+        nextTurn.assertIsDisplayed()
+        compose.runOnIdle { assertEquals("first", controller.state.navigationTargetUid) }
+        val fullScreen = compose.onNodeWithTag("location_full_screen_navigation")
+        fullScreen.performClick()
+        compose.onNodeWithTag("full_screen_navigation").assertIsDisplayed()
+        compose.onNodeWithTag("exit_full_screen_navigation").performClick()
+        navigate.performClick()
+        compose.onNodeWithTag("location_expand_map").assertExists()
+        nextTurn.assertDoesNotExist()
+    }
+
     @Test
     fun openingMapRequestsForegroundThenGuidesBackgroundOnlyAfterItIsGranted() {
         val session = session(AccountRole.USER, Locations())

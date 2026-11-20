@@ -4,6 +4,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.support.FirestoreTestDriver
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -156,6 +157,68 @@ class MessagingRepositorySdkTest {
 
     private fun collection(path: String): CollectionReference = mock(CollectionReference::class.java).also {
         `when`(db.collection(path)).thenReturn(it)
+    }
+
+    @Test
+    fun socialIndexWaitsForAllThreeServerSnapshotsAndSortsEachList() {
+        val driver = FirestoreTestDriver()
+        val source = MessagingRepository(driver.db)
+        val friends = "friendLists/${user.uid}/friends"
+        val requests = "friendRequests"
+        driver.records["$friends/z"] = mapOf("friendUid" to "z", "friendUsername" to "Zoe", "friendshipId" to "z")
+        driver.records["$friends/a"] = mapOf("friendUid" to "a", "friendUsername" to "Ali", "friendshipId" to "a")
+        driver.records["$friends/invalid"] = emptyMap()
+        driver.records["$requests/older"] = mapOf("senderUid" to "a", "recipientUid" to user.uid, "createdAt" to Timestamp(Date(50)))
+        driver.records["$requests/newer"] = mapOf("senderUid" to "b", "recipientUid" to user.uid, "createdAt" to Timestamp(Date(100)))
+        driver.records["$requests/outgoing"] = mapOf("senderUid" to user.uid, "recipientUid" to "c")
+        val published = mutableListOf<SocialSnapshot>()
+        val errors = mutableListOf<String>()
+        var ready = 0
+        val subscription = source.observeSocial(user.uid, published::add, errors::add) { ready++ }
+        driver.emit(friends, cached = true)
+        driver.emit(requests)
+        assertEquals(0, ready)
+        driver.emit(friends)
+        assertEquals(1, ready)
+        driver.emit(friends)
+        assertEquals(1, ready)
+        assertEquals(listOf("Ali", "Zoe"), published.last().friends.map { it.username })
+        assertEquals(listOf("newer", "older"), published.last().incoming.map { it.id })
+        assertEquals("outgoing", published.last().outgoing.single().id)
+        driver.fail(requests, FirebaseFirestoreException("Synthetic offline error", FirebaseFirestoreException.Code.UNAVAILABLE))
+        assertEquals(listOf("Synthetic offline error", "Synthetic offline error"), errors)
+        subscription.close()
+        assertEquals(3, driver.listeners.count { it.closed })
+    }
+
+    @Test
+    fun ticketMembershipHistorySkipsCachedAndInvalidRowsAndLimitsActorScopedReads() {
+        val driver = FirestoreTestDriver()
+        val source = MessagingRepository(driver.db)
+        val path = "conversations/ticket/membershipEvents"
+        fun event(actor: String, action: String, timestamp: Long) = mapOf(
+            "action" to action, "actorUid" to actor, "participantUid" to "guest", "createdAt" to Timestamp(Date(timestamp)),
+        )
+        driver.records["$path/removed"] = event(user.uid, "REMOVED", 100)
+        driver.records["$path/added"] = event("staff", "ADDED", 50)
+        driver.records["$path/invalid"] = event(user.uid, "UNKNOWN", 150)
+        driver.records["$path/undated"] = event(user.uid, "ADDED", 150) - "createdAt"
+        val room = mutableListOf<List<ChatMembershipEvent>>()
+        val mine = mutableListOf<List<ChatMembershipEvent>>()
+        val all = source.observeMembershipEvents("ticket", onUpdate = room::add)
+        val filtered = source.observeMembershipEvents("ticket", user.uid, mine::add)
+        driver.emit(path, cached = true)
+        assertTrue(room.isEmpty())
+        assertTrue(mine.isEmpty())
+        driver.emit(path)
+        assertEquals(listOf("added", "removed"), room.single().map { it.id })
+        assertEquals("removed", mine.single().single().id)
+        driver.fail(path, FirebaseFirestoreException("Synthetic revoked membership", FirebaseFirestoreException.Code.PERMISSION_DENIED))
+        assertTrue(room.last().isEmpty())
+        assertTrue(mine.last().isEmpty())
+        all.close()
+        filtered.close()
+        assertEquals(2, driver.listeners.count { it.closed })
     }
 
     private fun document(parent: CollectionReference, id: String): DocumentReference =

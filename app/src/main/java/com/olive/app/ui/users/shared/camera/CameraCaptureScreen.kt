@@ -46,7 +46,7 @@ import java.io.File
 import java.util.UUID
 
 internal enum class CameraMode { Photo, Video, Document }
-private data class CapturedMedia(
+internal data class CapturedMedia(
     val file: File,
     val mimeType: String,
     val name: String,
@@ -487,7 +487,7 @@ private fun CameraShutter(
 }
 // Previews the captured file before the user saves or retakes it.
 @Composable
-private fun CameraReview(
+internal fun CameraReview(
     media: CapturedMedia,
     controllerLoading: Boolean,
     uploadError: String?,
