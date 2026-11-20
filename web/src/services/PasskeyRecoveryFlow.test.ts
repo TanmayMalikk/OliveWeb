@@ -16,10 +16,17 @@ describe("passkey recovery flow", () => {
         if (name === "passkeyRecoveryBeginEnrollment") {
           return { options: { challenge: "created" }, challengeId: "challenge-a", prfInput: "input-a" };
         }
+        if (name === "passkeyRecoveryContinueEnrollment") {
+          return {
+            options: { challenge: "proof" },
+            challengeId: "challenge-proof",
+            prfInputs: { [credentialId]: "input-a" },
+          };
+        }
         return { registered: true, credentialId };
       },
-      register: async () => ({ response: { id: credentialId }, prfOutput }),
-      authenticate: async () => { throw new Error("not used"); },
+      register: async () => ({ response: { id: credentialId } }),
+      authenticate: async () => ({ response: { id: credentialId }, prfOutput }),
     });
 
     await expect(flow.enroll(accountId, recoveryKey)).resolves.toEqual({
@@ -28,9 +35,33 @@ describe("passkey recovery flow", () => {
     });
     expect(calls.map(({ name }) => name)).toEqual([
       "passkeyRecoveryBeginEnrollment",
+      "passkeyRecoveryContinueEnrollment",
       "passkeyRecoveryCompleteEnrollment",
     ]);
     expect(JSON.stringify(calls)).not.toContain(btoa(String.fromCharCode(...recoveryKey)));
+    expect(JSON.stringify(calls)).not.toContain("prfOutput");
+  });
+
+  it("rejects enrollment when the proof assertion selects another credential", async () => {
+    const flow = createPasskeyRecoveryFlow({
+      call: async (name) => {
+        if (name === "passkeyRecoveryBeginEnrollment") {
+          return { options: { challenge: "created" }, challengeId: "challenge-a", prfInput: "input-a" };
+        }
+        if (name === "passkeyRecoveryContinueEnrollment") {
+          return {
+            options: { challenge: "proof" },
+            challengeId: "challenge-proof",
+            prfInputs: { [credentialId]: "input-a" },
+          };
+        }
+        throw new Error("completion must not be called");
+      },
+      register: async () => ({ response: { id: credentialId } }),
+      authenticate: async () => ({ response: { id: "different-credential" }, prfOutput }),
+    });
+
+    await expect(flow.enroll(accountId, recoveryKey)).rejects.toThrow("does not match");
   });
 
   it("returns a recovery key only after an authenticated passkey result", async () => {

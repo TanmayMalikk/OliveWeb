@@ -10,7 +10,7 @@ interface NativePasskeyClient {
   register(
     options: unknown,
     prfInput: string,
-  ): Promise<{ response: { id: string }; prfOutput: Uint8Array }>;
+  ): Promise<{ response: { id: string } }>;
   authenticate(
     options: unknown,
     prfInputs: Record<string, string>,
@@ -29,6 +29,8 @@ interface UnlockStart {
   prfInputs: Record<string, string>;
 }
 
+type EnrollmentProof = UnlockStart;
+
 interface EnrollmentComplete {
   registered: true;
   credentialId: string;
@@ -45,9 +47,18 @@ export function createPasskeyRecoveryFlow(
   return {
     async enroll(accountId: string, recoveryKey: Uint8Array): Promise<EnrollmentComplete> {
       const start = enrollmentStart(await callable.call("passkeyRecoveryBeginEnrollment"));
-      const native = await callable.register(start.options, start.prfInput);
-      const credentialId = credentialIdOf(native.response);
-      const prfOutput = new Uint8Array(native.prfOutput);
+      const registration = await callable.register(start.options, start.prfInput);
+      const credentialId = credentialIdOf(registration.response);
+      const proof = enrollmentProof(await callable.call("passkeyRecoveryContinueEnrollment", {
+        challengeId: start.challengeId,
+        response: registration.response,
+      }));
+      const assertion = await callable.authenticate(proof.options, proof.prfInputs);
+      const assertionCredentialId = credentialIdOf(assertion.response);
+      if (assertionCredentialId !== credentialId || !proof.prfInputs[credentialId]) {
+        throw new Error("The passkey proof does not match the registered credential.");
+      }
+      const prfOutput = new Uint8Array(assertion.prfOutput);
       try {
         const envelope = await encryptRecoveryKeyWithPrf({
           accountId,
@@ -56,8 +67,8 @@ export function createPasskeyRecoveryFlow(
           recoveryKey,
         });
         const completed = enrollmentComplete(await callable.call("passkeyRecoveryCompleteEnrollment", {
-          challengeId: start.challengeId,
-          response: native.response,
+          challengeId: proof.challengeId,
+          response: assertion.response,
           envelope,
         }));
         if (completed.credentialId !== credentialId) {
@@ -93,6 +104,14 @@ export function createPasskeyRecoveryFlow(
       }
     },
   };
+}
+
+function enrollmentProof(value: unknown): EnrollmentProof {
+  try {
+    return unlockStart(value);
+  } catch {
+    throw new Error("Invalid passkey enrollment proof response.");
+  }
 }
 
 function enrollmentStart(value: unknown): EnrollmentStart {
