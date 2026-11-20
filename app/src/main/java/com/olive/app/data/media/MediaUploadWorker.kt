@@ -297,6 +297,7 @@ interface MediaTicketDataSource {
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
@@ -304,6 +305,7 @@ interface MediaTicketDataSource {
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
     suspend fun shareInChat(
         mediaId:String,
@@ -311,6 +313,7 @@ interface MediaTicketDataSource {
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) { error("Chat attachment sharing is unavailable") }
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
@@ -415,15 +418,18 @@ class MediaRepository(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String>,
         revokeIndependentRecipients:List<String>,
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
+        require(accountWrappedKeys.keys==wrappedKeys.keys)
         return call("mediaUpdateAccess",mapOf(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
             "grantIndependentRecipients" to grantIndependentRecipients,
             "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
@@ -433,10 +439,12 @@ class MediaRepository(
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = call("mediaUpdateAccess", mapOf(
         "mediaId" to mediaId,
         "wrappedKeys" to wrappedKeys,
         "deviceWrappedKeys" to deviceWrappedKeys,
+        "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         "forPlan" to true,
     )).record()
 
@@ -446,6 +454,7 @@ class MediaRepository(
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) {
         call("mediaShareInChat",mapOf(
             "mediaId" to mediaId,
@@ -456,6 +465,7 @@ class MediaRepository(
             "recipientUids" to recipientUids,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         ))
     }
 

@@ -629,8 +629,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     /** Ensures media encryption has a stable account public key without unlocking private material. */
     internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope {
         with(runtime) {
-            withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { return it }
-            accountKeysetRepository?.fetch(uid)?.let { return it }
+            withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
+                runCatching { accountKeysetRepository?.publish(local) }
+                return local
+            }
+            accountKeysetRepository?.fetch(uid)?.let { remote ->
+                runCatching { accountKeysetRepository?.publish(remote) }
+                return remote
+            }
             val token = epoch
             check(currentRecoverySession(uid, token)) { "Account session changed" }
             accountRecoveryKey(uid, token)

@@ -14,7 +14,7 @@ const {safetyPlanConsult} = require("./src/safetyConsultations");
 const {safetySupportAdmin, staffSupportClose, conversationAddParticipant, conversationRemoveParticipant} = require("./src/supportGroups");
 const {conversationPrepareKeys, supportTicketsPrepare, repairPlanTicket, repairConversation} = require("./src/supportTicketRepair");
 const {staffSupportRequest} = require("./src/supportTickets");
-const {mediaAccountAccessKey, mediaShareInChat, mediaUpdateAccess, reconcilePlanMediaGrants} = require("./src/mediaTickets");
+const {mediaShareInChat, mediaUpdateAccess, reconcilePlanMediaGrants} = require("./src/mediaTickets");
 const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
@@ -33,6 +33,10 @@ const users = new Map([
 ]);
 let env;
 const originalGetUser=auth.getUser, originalListUsers=auth.listUsers, originalFile=bucket.file;
+const accountWrappedKeys=(...uids)=>Object.fromEntries(uids.map((uid,index)=>[uid,{
+  keyId:"123e4567-e89b-42d3-a456-426614174000",epoch:1,algorithm:"RSA-OAEP-256",
+  wrappedKey:Buffer.alloc(384,index+1).toString("base64"),
+}]));
 before(async () => {
   env=await initializeTestEnvironment({projectId:"demo-olive-rules",firestore:{host:"127.0.0.1",port:8180,rules:await readFile(new URL("./firestore.rules",import.meta.url),"utf8")}});
   auth.getUser=async (uid) => { const user=users.get(uid);if(!user) throw Error("Unknown account");return user; };
@@ -102,15 +106,17 @@ test("open user, safe contact and staff listeners receive edits and a completed 
   await file.set({
     owner_id: owner, object_key: `users/${owner}/media/${fileId}`, encrypted_metadata: "metadata",
     allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, ciphertext_size: 1024,
+    account_wrapped_keys: accountWrappedKeys(owner),
     ciphertext_sha256: "0".repeat(64), encryption_version: 2, created_at: new Date(),
   });
   await assert.rejects(call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true,
-    wrappedKeys: {[owner]: "owner-key", "plan-other": "outsider-key"}}));
+    wrappedKeys: {[owner]: "owner-key", "plan-other": "outsider-key"},
+    accountWrappedKeys: accountWrappedKeys(owner,"plan-other")}));
   // Independent grants can arrive concurrently from the owner's Android and web clients.
   await Promise.all([contact, staff].map(uid => call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true,
     wrappedKeys: {[owner]: "owner-key", [uid]: "reader-key"}, deviceWrappedKeys: {
       [`${uid}--test-device-id-1234`]: "device-key",
-    }})));
+    }, accountWrappedKeys: accountWrappedKeys(owner,uid)})));
   for (const {client} of listeners) {
     assert.equal((await getDocFromServer(doc(client, "files", fileId))).exists(), true);
   }
@@ -121,9 +127,9 @@ test("open user, safe contact and staff listeners receive edits and a completed 
   const after = (await ticket.get()).data();
   assert.equal(after.ticketStatus, "COMPLETED");
   assert.deepEqual(fcmTargetsForConversationUpdate(before, after, ticket.id).recipients, [owner]);
-  await assert.rejects(call(mediaAccountAccessKey, staff, {mediaId: fileId}), {code: "permission-denied"});
   await reconcilePlanMediaGrants(owner);
   assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set([owner, contact]));
+  assert.deepEqual(new Set(Object.keys((await file.get()).get("account_wrapped_keys"))),new Set([owner,contact]));
   await waitFor(() => listeners[2].seen.has("permission-denied"));
   const completed = (await call(safetyPlanSync, owner, {ownerUid: owner})).plan;
   assert.equal(completed.staffUid, "");
@@ -143,14 +149,17 @@ test("a failed repeat group share preserves earlier grants and publishes no part
   await file.set({
     owner_id: owner, object_key: `users/${owner}/media/${mediaId}`, encrypted_metadata: "metadata",
     allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, device_wrapped_keys: {},
+    account_wrapped_keys: accountWrappedKeys(owner),
   });
   const first = {mediaId, conversationId, messageId: "first-share", ciphertext: "first-ciphertext", clientSentAt: 1,
     recipientUids: [alice], wrappedKeys: {[owner]: "owner-key", [alice]: "alice-key"},
-    deviceWrappedKeys: {[`${alice}--phone`]: "alice-device-key"}};
+    deviceWrappedKeys: {[`${alice}--phone`]: "alice-device-key"},
+    accountWrappedKeys: accountWrappedKeys(owner,alice)};
   await call(mediaShareInChat, owner, first);
   await chat.update({participantIds: people});
   const repeat = {...first, messageId: "repeat-share", ciphertext: "repeat-ciphertext", clientSentAt: 2,
-    recipientUids: [alice, bob, carol], wrappedKeys: {[owner]: "owner-key", [alice]: "new-alice-key", [bob]: "bob-key"}};
+    recipientUids: [alice, bob, carol], wrappedKeys: {[owner]: "owner-key", [alice]: "new-alice-key", [bob]: "bob-key"},
+    accountWrappedKeys: accountWrappedKeys(owner,alice,bob)};
   const beforeFile = (await file.get()).data();
   const beforeGrants = (await grants.get()).data();
 
@@ -161,7 +170,8 @@ test("a failed repeat group share preserves earlier grants and publishes no part
   assert.equal((await chat.collection("messages").doc(repeat.messageId).get()).exists, false);
   assert.equal((await chat.get()).get("lastMessageId"), first.messageId);
 
-  const complete = {...repeat, wrappedKeys: {...repeat.wrappedKeys, [carol]: "carol-key"}};
+  const complete = {...repeat, wrappedKeys: {...repeat.wrappedKeys, [carol]: "carol-key"},
+    accountWrappedKeys: accountWrappedKeys(owner,alice,bob,carol)};
   await Promise.all([call(mediaShareInChat, owner, complete), call(mediaShareInChat, owner, complete)]);
   assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set(people));
   assert.deepEqual(new Set((await grants.get()).get("independentReaders")), new Set([alice, bob, carol]));
@@ -181,24 +191,21 @@ test("removing a plan attachment preserves an overlapping independent chat share
   await file.set({
     owner_id: owner, object_key: `users/${owner}/media/${fileId}`, encrypted_metadata: "metadata",
     allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, device_wrapped_keys: {},
+    account_wrapped_keys: accountWrappedKeys(owner),
     ciphertext_size: 1024, ciphertext_sha256: "0".repeat(64), encryption_version: 2,
   });
-  const accountKey = Buffer.alloc(32, 9).toString("base64");
-  await db.collection("mediaAccessKeys").doc(fileId).set({owner_id: owner, key: accountKey});
-
   await call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true, wrappedKeys: {
     [owner]: "owner-key", [contact]: "contact-plan-key", [staff]: "staff-plan-key",
-  }});
+  },accountWrappedKeys:accountWrappedKeys(owner,contact,staff)});
   await call(mediaUpdateAccess, owner, {mediaId: fileId, grantIndependentRecipients: [contact], wrappedKeys: {
     [owner]: "owner-key", [contact]: "contact-chat-key", [staff]: "staff-plan-key",
-  }});
+  },accountWrappedKeys:accountWrappedKeys(owner,contact,staff)});
 
   await plan.update("fields.primary_documents.value", checklist([]));
   await reconcilePlanMediaGrants(owner);
 
   assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set([owner, contact]));
-  assert.equal((await call(mediaAccountAccessKey, contact, {mediaId: fileId})).accountAccessKey, accountKey);
-  await assert.rejects(call(mediaAccountAccessKey, staff, {mediaId: fileId}), {code: "permission-denied"});
+  assert.deepEqual(new Set(Object.keys((await file.get()).get("account_wrapped_keys"))),new Set([owner,contact]));
 });
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});
@@ -571,6 +578,7 @@ test("encrypted chat media sharing is atomic, authorized and idempotent", async 
     encrypted_metadata:"encrypted-metadata",
     wrapped_keys:{[owner]:"owner-wrapped-key"},
     device_wrapped_keys:{[`${owner}--phone`]:"owner-device-key"},
+    account_wrapped_keys:accountWrappedKeys(owner),
     allowed_users:[owner],
   });
   await db.collection("conversations").doc(conversationId).set({
@@ -582,6 +590,7 @@ test("encrypted chat media sharing is atomic, authorized and idempotent", async 
     recipientUids:[recipient],
     wrappedKeys:{[owner]:"owner-wrapped-key",[recipient]:"recipient-wrapped-key"},
     deviceWrappedKeys:{[`${recipient}--phone`]:"recipient-device-key"},
+    accountWrappedKeys:accountWrappedKeys(owner,recipient),
   };
 
   await call(mediaShareInChat,owner,request);
@@ -606,6 +615,7 @@ test("encrypted chat media sharing is atomic, authorized and idempotent", async 
   await assert.rejects(call(mediaShareInChat,owner,{
     ...request,messageId:incompleteMessageId,ciphertext:"incomplete-encrypted-message",
     wrappedKeys:{[owner]:"owner-wrapped-key"},deviceWrappedKeys:{},
+    accountWrappedKeys:accountWrappedKeys(owner),
   }));
   assert.equal((await db.collection("conversations").doc(conversationId)
       .collection("messages").doc(incompleteMessageId).get()).exists,false);

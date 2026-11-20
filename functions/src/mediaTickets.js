@@ -443,7 +443,7 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
       wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(added.map(id => [id, access.wrappedKeys[id]]))};
       accountWrappedKeys = {
         ...(value.account_wrapped_keys || {}),
-        ...Object.fromEntries(added.map(id => [id, access.accountWrappedKeys[id]])),
+        ...access.accountWrappedKeys,
       };
       deviceWrappedKeys = {...value.device_wrapped_keys, ...deviceWrappedKeys};
     } else if (grantIndependentRecipients.length || revokeIndependentRecipients.length || tracked.exists) {
@@ -543,7 +543,7 @@ exports.mediaShareInChat = onCall(options, async (request) => {
       )};
       const accountWrappedKeys = {
         ...(value.account_wrapped_keys || {}),
-        ...Object.fromEntries(recipients.map(id => [id, access.accountWrappedKeys[id]])),
+        ...access.accountWrappedKeys,
       };
       const deviceWrappedKeys = {
         ...(value.device_wrapped_keys || {}),
