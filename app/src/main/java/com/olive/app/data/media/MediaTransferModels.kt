@@ -4,6 +4,9 @@ package com.olive.app.data.media
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import javax.crypto.SecretKey
+import com.olive.app.security.KeyManager
+import com.olive.app.security.UnlockedAccountKeyset
 
 /** Approved upper bound for one encrypted R2 media object. */
 internal const val MAX_MEDIA_CIPHERTEXT_BYTES=250L*1024L*1024L
@@ -57,6 +60,11 @@ data class AccountKeysetWrappedKey(
     internal fun toMap():Map<String,Any> = mapOf(
         "keyId" to keyId,"epoch" to epoch,"algorithm" to algorithm,"wrappedKey" to wrappedKey,
     )
+
+    internal fun unwrap(keyset:UnlockedAccountKeyset):SecretKey {
+        require(keyset.keyId==keyId && keyset.epoch==epoch) { "Account wrapper uses another keyset" }
+        return KeyManager.unwrapKey(wrappedKey,keyset.privateKey,1)
+    }
 
     companion object {
         private const val ALGORITHM="RSA-OAEP-256"

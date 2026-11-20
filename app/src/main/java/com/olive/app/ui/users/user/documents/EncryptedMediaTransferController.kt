@@ -38,6 +38,7 @@ import com.olive.app.data.media.OnDeviceMediaPreprocessor
 import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.UnlockedAccountKeyset
 import com.olive.app.security.KeyManager
 import com.olive.app.security.MediaCipher
 import java.io.File
@@ -88,6 +89,7 @@ internal class MediaTransferController(
     private val client:OkHttpClient=OkHttpClient(),
     private val preprocessor:MediaPreprocessor=OnDeviceMediaPreprocessor(context.applicationContext),
     private val accountKeysetProvider:suspend (String)->AccountKeysetEnvelope?={ null },
+    private val accountKeysetUnlocker:suspend (String)->UnlockedAccountKeyset?={ null },
     private val preparationFailureResolver:(Context,Throwable,MediaKind)->String=::preparationFailureMessage,
 ):MediaTransferOperations {
     private val applicationContext=context.applicationContext
@@ -571,10 +573,13 @@ internal class MediaTransferController(
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
-            .getOrElse {
-                if (!document.accountRecoveryReady) throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it)
-                requireNetwork(MediaAccessError.NETWORK_REQUIRED)
-                repository.recoverDocumentKey(document.id)
+            .getOrElse { deviceFailure ->
+                val accountWrapper=document.accountWrappedKeys[viewerUid]
+                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrNull()
+                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                runCatching { accountWrapper.unwrap(keyset) }
+                    .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
             }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }

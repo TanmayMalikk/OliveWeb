@@ -44,6 +44,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         MediaTransferController(
             application,viewModelScope,it,offlineCache=runtime.offlineMediaCache,
             accountKeysetProvider=runtime.settings::ensureAccountKeysetForMedia,
+            accountKeysetUnlocker=runtime.settings::unlockAccountKeysetForMedia,
         )
     }
     internal val documents =

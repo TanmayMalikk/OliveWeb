@@ -1,5 +1,6 @@
 package com.olive.app.security
 
+import com.olive.app.data.media.AccountKeysetWrappedKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -81,6 +82,23 @@ class AccountKeysetEnvelopeTest {
         val unwrapped = KeyManager.unwrapKey(wrapped, accountKeyset.privateKey)
 
         assertEquals(fileKey.encoded.toList(), unwrapped.encoded.toList())
+    }
+
+    @Test
+    fun `media account wrapper requires its exact recovered keyset`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val envelope = AccountKeysetEnvelope.create("account-a", recoveryKey)
+        val unlocked = envelope.unlock("account-a", recoveryKey)
+        val fileKey = EncryptionUtils.generateSymmetricKey()
+        val wrapper = AccountKeysetWrappedKey(
+            envelope.keyId,envelope.epoch,"RSA-OAEP-256",
+            KeyManager.wrapForAccountKeyset(fileKey,unlocked.publicKey),
+        )
+
+        assertEquals(fileKey.encoded.toList(),wrapper.unwrap(unlocked).encoded.toList())
+        assertThrows(IllegalArgumentException::class.java) {
+            wrapper.copy(keyId="223e4567-e89b-42d3-a456-426614174000").unwrap(unlocked)
+        }
     }
 
     @Test

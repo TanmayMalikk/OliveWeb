@@ -639,6 +639,17 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Unlocks account private material only in client memory for one media-key operation. */
+    internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset {
+        with(runtime) {
+            val token = epoch
+            check(currentRecoverySession(uid, token)) { "Account session changed" }
+            val envelope = ensureAccountKeysetForMedia(uid)
+            val recoveryKey = accountRecoveryKey(uid, token)
+            return withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
+        }
+    }
+
 }
 
 // Signed-in users: records safe-app activity for the account.

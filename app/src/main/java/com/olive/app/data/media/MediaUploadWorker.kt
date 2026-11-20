@@ -3,7 +3,6 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
-import android.util.Base64
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -17,7 +16,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.safety.SafetyPlanSyncWorker
-import com.olive.app.security.KeyManager
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -40,8 +38,6 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
-import javax.crypto.SecretKey
-import javax.crypto.spec.SecretKeySpec
 
 
 /**
@@ -296,8 +292,6 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
-    suspend fun recoverDocumentKey(mediaId: String): SecretKey = error("Document recovery is unavailable")
-    suspend fun storeDocumentKey(mediaId: String, key: SecretKey) = Unit
     /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
     suspend fun updateAccess(
         mediaId:String,
@@ -379,30 +373,6 @@ class MediaRepository(
         val result=call("mediaCreateUpload",mediaCreateUploadRequest(job))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
-    }
-
-    override suspend fun recoverDocumentKey(mediaId: String): SecretKey {
-        val result = call("mediaAccountAccessKey", mapOf("mediaId" to mediaId))
-        val raw = Base64.decode(result.string("accountAccessKey"), Base64.DEFAULT)
-        return try {
-            require(raw.size == 32) { "Invalid document recovery key" }
-            SecretKeySpec(raw, "AES")
-        } finally {
-            raw.fill(0)
-        }
-    }
-
-    override suspend fun storeDocumentKey(mediaId: String, key: SecretKey) {
-        call("mediaStoreAccountAccessKey", mapOf("mediaId" to mediaId, "recoveryKeyToSeal" to encodeRecoveryKey(key)))
-    }
-
-    private fun encodeRecoveryKey(key: SecretKey): String {
-        val raw = key.encoded
-        return try {
-            Base64.encodeToString(raw, Base64.NO_WRAP)
-        } finally {
-            raw.fill(0)
-        }
     }
 
     // Requests a protected upload ticket for an encrypted media file.
@@ -555,6 +525,11 @@ private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error
 private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? Map<*,*>)?.entries?.associate { entry ->
     (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
 }.orEmpty()
+private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetWrappedKey> =
+    (get(name) as? Map<*,*>)?.entries?.associate { entry ->
+        (entry.key as? String ?: error("Invalid $name key")) to
+            AccountKeysetWrappedKey.fromMap(entry.value as? Map<*,*> ?: error("Invalid $name value"))
+    }.orEmpty()
 // Encrypted media: Reads the list of account IDs allowed to open a downloaded file.
 // Suppressing SameParameterValue, linter believes name is always 'allowedUsers'
 // That is the default value for stringlist function call.
@@ -564,7 +539,7 @@ private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsIn
 private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),
     string("encryptedMetadata"),stringMap("wrappedKeys"),stringList("allowedUsers"),long("ciphertextSize"),
     string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"),
-    stringMap("deviceWrappedKeys"))
+    stringMap("deviceWrappedKeys"),accountWrappedKeyMap("accountWrappedKeys"))
 
 /** Deletes expired, unpinned upload-reuse ciphertext even if no document screen is opened. */
 class OfflineMediaCleanupWorker(context: Context, parameters: WorkerParameters) :
