@@ -334,6 +334,10 @@ object KeyManager {
         return Base64.getEncoder().encodeToString(wrappedBytes)
     }
 
+    /** Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest. */
+    internal fun wrapForAccountKeyset(secretKey: SecretKey, publicKey: PublicKey): String =
+        wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA256)
+
     /**
      * Converts a Base64 string from Firestore back into an RSA PublicKey.
      */

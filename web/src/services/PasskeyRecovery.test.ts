@@ -4,6 +4,8 @@ import {
   decryptRecoveryKeyWithPrf,
   encryptRecoveryKeyWithPrf,
   getRequiredPrfOutput,
+  unlockAccountKeyset,
+  type AccountKeysetEnvelope,
 } from "./PasskeyRecovery";
 
 const accountId = "account-a";
@@ -102,4 +104,77 @@ describe("passkey PRF recovery", () => {
 
     expect(JSON.stringify(envelope)).not.toContain(btoa(String.fromCharCode(...recoveryKey)));
   });
+
+  it("opens an Android-format account keyset and WebCrypto OAEP wrapper", async () => {
+    const pair = await crypto.subtle.generateKey(
+      { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true,
+      ["encrypt", "decrypt"],
+    );
+    const envelope = await accountKeysetEnvelope(pair, recoveryKey);
+    const unlocked = await unlockAccountKeyset(accountId, recoveryKey, envelope);
+    const fileKey = new Uint8Array(32).fill(13);
+    const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pair.publicKey, fileKey);
+
+    await expect(crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      unlocked.privateKey,
+      wrapped,
+    )).resolves.toEqual(fileKey.buffer);
+    expect(unlocked.keyId).toBe(envelope.keyId);
+  });
+
+  it("rejects account-keyset identity, key, and ciphertext substitution", async () => {
+    const pair = await crypto.subtle.generateKey(
+      { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true,
+      ["encrypt", "decrypt"],
+    );
+    const envelope = await accountKeysetEnvelope(pair, recoveryKey);
+
+    await expect(unlockAccountKeyset("account-b", recoveryKey, envelope)).rejects.toThrow(
+      PasskeyRecoveryError,
+    );
+    await expect(unlockAccountKeyset(accountId, new Uint8Array(32).fill(12), envelope)).rejects.toThrow(
+      PasskeyRecoveryError,
+    );
+    await expect(unlockAccountKeyset(accountId, recoveryKey, {
+      ...envelope,
+      ciphertext: `${envelope.ciphertext.slice(0, -2)}aa`,
+    })).rejects.toThrow(PasskeyRecoveryError);
+  });
 });
+
+async function accountKeysetEnvelope(
+  pair: CryptoKeyPair,
+  ark: Uint8Array,
+): Promise<AccountKeysetEnvelope> {
+  const keyId = "123e4567-e89b-12d3-a456-426614174000";
+  const iv = new Uint8Array(12).fill(17);
+  const privateKey = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+  const aes = await crypto.subtle.importKey("raw", ark, "AES-GCM", false, ["encrypt"]);
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv,
+      additionalData: new TextEncoder().encode(`1|${accountId}|${keyId}|1|RSA-OAEP-256`),
+    },
+    aes,
+    privateKey,
+  );
+  privateKey.fill(0);
+  return {
+    version: 1,
+    accountId,
+    keyId,
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: bytesToBase64(new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey))),
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+  };
+}
+
+function bytesToBase64(value: Uint8Array): string {
+  return btoa(String.fromCharCode(...value));
+}

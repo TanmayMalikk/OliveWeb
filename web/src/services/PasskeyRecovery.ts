@@ -22,6 +22,25 @@ export interface PasskeyArkEnvelope {
   ciphertext: string;
 }
 
+export interface AccountKeysetEnvelope {
+  version: 1;
+  accountId: string;
+  keyId: string;
+  epoch: number;
+  algorithm: "RSA-OAEP-256";
+  publicKey: string;
+  iv: string;
+  ciphertext: string;
+}
+
+export interface UnlockedAccountKeyset {
+  accountId: string;
+  keyId: string;
+  epoch: number;
+  publicKey: CryptoKey;
+  privateKey: CryptoKey;
+}
+
 export interface PrfClientExtensionResults {
   prf?: {
     results?: {
@@ -129,6 +148,79 @@ export async function decryptRecoveryKeyWithPrf({
   }
 }
 
+export async function unlockAccountKeyset(
+  accountId: string,
+  recoveryKey: Uint8Array,
+  envelope: AccountKeysetEnvelope,
+): Promise<UnlockedAccountKeyset> {
+  validateLength(recoveryKey, RECOVERY_KEY_BYTES, "Invalid recovery key.");
+  if (
+    envelope.version !== 1 ||
+    envelope.accountId !== accountId ||
+    !validAccountId(accountId) ||
+    !validKeyId(envelope.keyId) ||
+    !Number.isSafeInteger(envelope.epoch) ||
+    envelope.epoch < 1 ||
+    envelope.algorithm !== "RSA-OAEP-256"
+  ) {
+    throw new PasskeyRecoveryError("The account keyset does not match this account.");
+  }
+  let plaintext: Uint8Array | undefined;
+  try {
+    const iv = fromBase64(envelope.iv);
+    const ciphertext = fromBase64(envelope.ciphertext);
+    const publicKeyBytes = fromBase64(envelope.publicKey);
+    validateLength(iv, IV_BYTES, "Invalid account keyset IV.");
+    if (ciphertext.byteLength <= 16 || publicKeyBytes.byteLength === 0) {
+      throw new PasskeyRecoveryError("Invalid encrypted account keyset.");
+    }
+    const aes = await crypto.subtle.importKey(
+      "raw",
+      recoveryKey as BufferSource,
+      "AES-GCM",
+      false,
+      ["decrypt"],
+    );
+    plaintext = new Uint8Array(await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv as BufferSource,
+        additionalData: accountKeysetAad(envelope),
+      },
+      aes,
+      ciphertext as BufferSource,
+    ));
+    const [publicKey, privateKey] = await Promise.all([
+      crypto.subtle.importKey(
+        "spki",
+        publicKeyBytes as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["encrypt"],
+      ),
+      crypto.subtle.importKey(
+        "pkcs8",
+        plaintext as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["decrypt"],
+      ),
+    ]);
+    return {
+      accountId,
+      keyId: envelope.keyId,
+      epoch: envelope.epoch,
+      publicKey,
+      privateKey,
+    };
+  } catch (error) {
+    if (error instanceof PasskeyRecoveryError) throw error;
+    throw new PasskeyRecoveryError("This recovery key cannot open the account keyset.", error);
+  } finally {
+    plaintext?.fill(0);
+  }
+}
+
 async function deriveKek(prfOutput: Uint8Array, salt: Uint8Array): Promise<CryptoKey> {
   try {
     const material = await crypto.subtle.importKey(
@@ -165,6 +257,24 @@ function aad(accountId: string, credentialId: string): ArrayBuffer {
     `olive.account.ark.passkey-prf.v${RECOVERY_VERSION}|${accountId}|${credentialId}`,
   );
   return value.buffer as ArrayBuffer;
+}
+
+function accountKeysetAad(envelope: AccountKeysetEnvelope): ArrayBuffer {
+  return encoder.encode([
+    envelope.version,
+    envelope.accountId,
+    envelope.keyId,
+    envelope.epoch,
+    envelope.algorithm,
+  ].join("|")).buffer as ArrayBuffer;
+}
+
+function validAccountId(value: string): boolean {
+  return /^[A-Za-z0-9_-]{1,128}$/u.test(value);
+}
+
+function validKeyId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value);
 }
 
 function toBase64(value: Uint8Array): string {

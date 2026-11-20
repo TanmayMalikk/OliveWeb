@@ -77,7 +77,7 @@ class AccountKeysetEnvelopeTest {
             .unlock("account-a", recoveryKey)
         val fileKey = EncryptionUtils.generateSymmetricKey()
 
-        val wrapped = KeyManager.wrapKey(fileKey, accountKeyset.publicKey)
+        val wrapped = KeyManager.wrapForAccountKeyset(fileKey, accountKeyset.publicKey)
         val unwrapped = KeyManager.unwrapKey(wrapped, accountKeyset.privateKey)
 
         assertEquals(fileKey.encoded.toList(), unwrapped.encoded.toList())
