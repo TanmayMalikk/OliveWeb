@@ -10,17 +10,15 @@ import java.util.Base64
 
 class PasskeyPrfProbeProtocolTest {
     @Test
-    fun creationRequestBindsTheApprovedRpAndPrfInput() {
+    fun creationRequestBindsTheApprovedRpWithoutRequiringPrfSupport() {
         val challenge = ByteArray(32) { 1 }
         val userId = ByteArray(16) { 2 }
-        val input = ByteArray(32) { 3 }
 
-        val request = JSONObject(PasskeyPrfProbeProtocol.creationRequest(challenge, userId, input))
+        val request = JSONObject(PasskeyPrfProbeProtocol.creationRequest(challenge, userId))
 
         assertEquals("yourolivebranch.ca", request.getJSONObject("rp").getString("id"))
         assertEquals("required", request.getJSONObject("authenticatorSelection").getString("userVerification"))
-        assertArrayEquals(input, decode(request.getJSONObject("extensions")
-            .getJSONObject("prf").getJSONObject("eval").getString("first")))
+        assertTrue(!request.has("extensions"))
     }
 
     @Test
@@ -55,10 +53,17 @@ class PasskeyPrfProbeProtocolTest {
     @Test
     fun invalidInputLengthsAreRejectedInsteadOfCreatingBrokenWebAuthnRequests() {
         assertTrue(runCatching {
-            PasskeyPrfProbeProtocol.creationRequest(ByteArray(31), ByteArray(16), ByteArray(32))
+            PasskeyPrfProbeProtocol.creationRequest(ByteArray(31), ByteArray(16))
         }.isFailure)
         assertTrue(runCatching {
             PasskeyPrfProbeProtocol.assertionRequest(ByteArray(32), "", ByteArray(32))
+        }.isFailure)
+        assertTrue(runCatching {
+            PasskeyPrfProbeProtocol.assertionRequest(
+                ByteArray(32),
+                "credential_abcdefghijklmnop",
+                ByteArray(31),
+            )
         }.isFailure)
     }
 

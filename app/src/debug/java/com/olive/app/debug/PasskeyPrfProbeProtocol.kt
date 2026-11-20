@@ -12,10 +12,9 @@ import java.util.Base64
 internal object PasskeyPrfProbeProtocol {
     const val RP_ID = "yourolivebranch.ca"
 
-    fun creationRequest(challenge: ByteArray, userId: ByteArray, prfInput: ByteArray): String {
+    fun creationRequest(challenge: ByteArray, userId: ByteArray): String {
         requireLength(challenge, 32, "Create challenge")
         requireLength(userId, 16, "Probe user ID")
-        requireLength(prfInput, 32, "PRF input")
         return JSONObject().apply {
             put("challenge", base64Url(challenge))
             put("rp", JSONObject().put("id", RP_ID).put("name", "Olive Branch PRF Probe"))
@@ -32,8 +31,6 @@ internal object PasskeyPrfProbeProtocol {
                 .put("residentKey", "required")
                 .put("userVerification", "required"))
             put("attestation", "none")
-            put("extensions", JSONObject().put("prf", JSONObject().put("eval", JSONObject()
-                .put("first", base64Url(prfInput)))))
         }.toString()
     }
 

@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.security.SecureRandom
 
 /**
@@ -41,6 +42,7 @@ class PasskeyPrfProbeActivity : Activity() {
     private val probeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var status: TextView
     private lateinit var start: Button
+    private var pendingAssertion: PendingAssertion? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +55,7 @@ class PasskeyPrfProbeActivity : Activity() {
         }
         start = Button(this).apply {
             text = getString(R.string.debug_prf_probe_start)
-            setOnClickListener { runProbe() }
+            setOnClickListener { runNextAction() }
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,79 +72,129 @@ class PasskeyPrfProbeActivity : Activity() {
         })
     }
 
-    private fun runProbe() {
+    private fun runNextAction() = when (PasskeyPrfProbeFlow.nextAction(pendingAssertion != null)) {
+        PasskeyPrfProbeAction.CREATE_PASSKEY -> createPasskey()
+        PasskeyPrfProbeAction.REQUEST_PRF_ASSERTION -> requestPrfAssertion()
+    }
+
+    private fun createPasskey() {
         start.isEnabled = false
-        status.text = getString(R.string.debug_prf_probe_working)
         probeScope.launch {
+            status.text = getString(R.string.debug_prf_probe_creating)
             val createChallenge = randomBytes(32)
-            val assertionChallenge = randomBytes(32)
             val userId = randomBytes(16)
             val prfInput = randomBytes(32)
+            var transferredPrfInput = false
             try {
                 val credentialManager = CredentialManager.create(this@PasskeyPrfProbeActivity)
                 val registration = credentialManager.createCredential(
                     this@PasskeyPrfProbeActivity,
                     CreatePublicKeyCredentialRequest(
-                        PasskeyPrfProbeProtocol.creationRequest(createChallenge, userId, prfInput),
+                        PasskeyPrfProbeProtocol.creationRequest(createChallenge, userId),
                     ),
                 ) as? CreatePublicKeyCredentialResponse ?: throw ProbeFailure
                 val credentialId = org.json.JSONObject(registration.registrationResponseJson)
                     .optString("rawId")
                     .takeIf { it.isNotBlank() } ?: throw ProbeFailure
-                val response = credentialManager.getCredential(
-                    this@PasskeyPrfProbeActivity,
-                    GetCredentialRequest(
-                        listOf(
-                            GetPublicKeyCredentialOption(
-                                PasskeyPrfProbeProtocol.assertionRequest(
-                                    assertionChallenge, credentialId, prfInput,
+                // The PRF input stays only in this Activity's memory until the user's second tap.
+                // Separating ceremonies avoids immediately reopening a pre-Android-14 provider.
+                pendingAssertion = PendingAssertion(credentialId, prfInput)
+                transferredPrfInput = true
+                status.text = getString(R.string.debug_prf_probe_ready_for_assertion)
+                start.text = getString(R.string.debug_prf_probe_assert)
+            } catch (error: Exception) {
+                showFailure(PasskeyPrfProbeStage.CREATING_PASSKEY, error)
+            } finally {
+                createChallenge.fill(0)
+                userId.fill(0)
+                if (!transferredPrfInput) prfInput.fill(0)
+                start.isEnabled = true
+            }
+        }
+    }
+
+    private fun requestPrfAssertion() {
+        val pending = pendingAssertion ?: return
+        start.isEnabled = false
+        probeScope.launch {
+            status.text = getString(R.string.debug_prf_probe_asserting)
+            val assertionChallenge = randomBytes(32)
+            try {
+                val credentialManager = CredentialManager.create(this@PasskeyPrfProbeActivity)
+                val providerResponse = withTimeoutOrNull(PRF_ASSERTION_TIMEOUT_MS) {
+                    credentialManager.getCredential(
+                        this@PasskeyPrfProbeActivity,
+                        GetCredentialRequest(
+                            listOf(
+                                GetPublicKeyCredentialOption(
+                                    PasskeyPrfProbeProtocol.assertionRequest(
+                                        assertionChallenge, pending.credentialId, pending.prfInput,
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
-                ).credential as? PublicKeyCredential ?: throw ProbeFailure
+                    )
+                } ?: throw PasskeyPrfProbeTimeout
+                val response = providerResponse.credential as? PublicKeyCredential ?: throw ProbeFailure
                 val prfResult = PasskeyPrfProbeProtocol.prfOutputOrNull(response.authenticationResponseJson)
                     ?: throw PrfUnavailable
                 try {
-                    status.text = if (prfResult.size == 32) {
-                        getString(R.string.debug_prf_probe_supported)
-                    } else {
-                        getString(R.string.debug_prf_probe_unavailable)
-                    }
+                    status.text = getString(R.string.debug_prf_probe_supported)
                 } finally {
                     prfResult.fill(0)
                 }
             } catch (_: PrfUnavailable) {
                 status.text = getString(R.string.debug_prf_probe_unavailable)
             } catch (error: Exception) {
-                status.text = if (isCancellation(error)) {
-                    getString(R.string.debug_prf_probe_cancelled)
-                } else {
-                    getString(R.string.debug_prf_probe_failed)
-                }
+                showFailure(PasskeyPrfProbeStage.REQUESTING_PRF_ASSERTION, error)
             } finally {
-                createChallenge.fill(0)
                 assertionChallenge.fill(0)
-                userId.fill(0)
-                prfInput.fill(0)
+                clearPendingAssertion()
+                start.text = getString(R.string.debug_prf_probe_start)
                 start.isEnabled = true
             }
         }
     }
 
+    private fun showFailure(stage: PasskeyPrfProbeStage, error: Exception) {
+        status.text = when (PasskeyPrfProbeFailureClassifier.classify(stage, error)) {
+            PasskeyPrfProbeFailure.CANCELLED -> getString(R.string.debug_prf_probe_cancelled)
+            PasskeyPrfProbeFailure.ASSERTION_TIMED_OUT -> getString(R.string.debug_prf_probe_assertion_timed_out)
+            PasskeyPrfProbeFailure.PROVIDER_CONFIGURATION -> getString(R.string.debug_prf_probe_provider_configuration)
+            PasskeyPrfProbeFailure.UNSUPPORTED -> getString(R.string.debug_prf_probe_unsupported)
+            PasskeyPrfProbeFailure.SECURITY_REJECTED -> getString(R.string.debug_prf_probe_security_rejected)
+            PasskeyPrfProbeFailure.NOT_ALLOWED -> getString(R.string.debug_prf_probe_not_allowed)
+            PasskeyPrfProbeFailure.CONSTRAINT_REJECTED -> getString(R.string.debug_prf_probe_constraint_rejected)
+            PasskeyPrfProbeFailure.INVALID_STATE -> getString(R.string.debug_prf_probe_invalid_state)
+            PasskeyPrfProbeFailure.REQUEST_REJECTED -> getString(R.string.debug_prf_probe_request_rejected)
+            PasskeyPrfProbeFailure.CREATION_FAILED -> getString(R.string.debug_prf_probe_creation_failed)
+            PasskeyPrfProbeFailure.ASSERTION_FAILED -> getString(R.string.debug_prf_probe_assertion_failed)
+        }
+    }
+
     override fun onDestroy() {
+        clearPendingAssertion()
         probeScope.cancel()
         super.onDestroy()
     }
 
     private fun randomBytes(size: Int) = ByteArray(size).also(random::nextBytes)
 
-    // Credential Manager exposes different cancellation exception classes across Android/provider versions.
-    // Avoid surfacing class names or WebAuthn payloads; cancellation is the only useful user-facing detail.
-    private fun isCancellation(error: Exception): Boolean =
-        error.javaClass.simpleName.contains("Cancellation", ignoreCase = true)
+    private fun clearPendingAssertion() {
+        pendingAssertion?.prfInput?.fill(0)
+        pendingAssertion = null
+    }
+
+    private companion object {
+        const val PRF_ASSERTION_TIMEOUT_MS = 30_000L
+    }
 
     private data object PrfUnavailable : Exception()
     private data object ProbeFailure : Exception()
+
+    private data class PendingAssertion(
+        val credentialId: String,
+        val prfInput: ByteArray,
+    )
 
 }
