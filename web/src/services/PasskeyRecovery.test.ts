@@ -152,7 +152,10 @@ async function accountKeysetEnvelope(
   const keyId = "123e4567-e89b-12d3-a456-426614174000";
   const iv = new Uint8Array(12).fill(17);
   const privateKey = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  const aes = await crypto.subtle.importKey("raw", ark, "AES-GCM", false, ["encrypt"]);
+  const arkBytes = new Uint8Array(ark.byteLength);
+  arkBytes.set(ark);
+  const aes = await crypto.subtle.importKey("raw", arkBytes, "AES-GCM", false, ["encrypt"]);
+  arkBytes.fill(0);
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
