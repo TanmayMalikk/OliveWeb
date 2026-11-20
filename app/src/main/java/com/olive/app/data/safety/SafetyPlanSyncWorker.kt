@@ -170,6 +170,7 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
          * @param documentId Unique identifier of the safety document.
          */
         fun enqueueAttachment(context: Context, owner: String, documentId: String) {
+            if (!BuildConfig.FIREBASE_CONFIGURED) return
             enqueueWork(
                 context = context,
                 uniqueWorkName = "olive_safety_attachment_${owner}_${documentId}",

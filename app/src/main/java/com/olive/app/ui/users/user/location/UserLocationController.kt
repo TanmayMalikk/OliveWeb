@@ -11,7 +11,8 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.location.DeviceLocation
-import com.olive.app.data.location.GeoapifyClient
+import com.olive.app.data.location.AddressCoordinateResolver
+import com.olive.app.data.location.AndroidAddressCoordinateResolver
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationTrailPoint
@@ -77,6 +78,7 @@ internal class LocationMapController(
     context: Context,
     private val scope: CoroutineScope,
     private val repository: LocationSharingDataSource?,
+    private val addressResolver: AddressCoordinateResolver = AndroidAddressCoordinateResolver(context.applicationContext),
     private val requestRoute: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? =
         if (MapboxDirectionsClient.configured) {
             { origin, target ->
@@ -197,11 +199,7 @@ internal class LocationMapController(
                         delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                     }
                 } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
-                    val coordinates = GeoapifyClient.coordinates(configuration.profile.address)
-                        ?: DeviceLocation.coordinatesForAddress(
-                            applicationContext,
-                            configuration.profile.address
-                        )
+                    val coordinates = addressResolver.coordinates(configuration.profile.address)
                     coordinates?.let { (latitude, longitude) ->
                         // Apply the map result only if it belongs to the newest open request.
                         if (token == generation) {

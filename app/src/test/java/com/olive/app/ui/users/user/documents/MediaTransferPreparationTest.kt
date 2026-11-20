@@ -209,19 +209,23 @@ class MediaTransferPreparationTest {
         val parsed = PendingVoiceMessage.fromJson(json)
         assertEquals(voice, parsed)
 
-        val entity = MediaUploadJobEntity(
+        val job = MediaUploadJob(
             id = "job-1",
-            filePath = "/path/to/voice.olive",
-            ciphertextSize = 100L,
-            ciphertextSha256 = "abc",
-            encryptedMetadata = "enc-meta",
-            wrappedKeys = mapOf("alice" to "wrapped"),
-            allowedUsers = listOf("alice"),
-            targetObjectKey = "key-1",
+            ownerUid = "alice",
+            source = PreparedEncryptedMedia(
+                filePath = "/path/to/voice.olive",
+                ciphertextSize = 100L,
+                ciphertextSha256 = "abc",
+                encryptedMetadata = "enc-meta",
+                wrappedKeys = mapOf("alice" to "wrapped"),
+                allowedUsers = listOf("alice"),
+                kind = MediaKind.AUDIO,
+                ocrReview = OcrReview.NOT_RUN,
+            ),
+            objectKey = "key-1",
             createdAt = 1000L,
             voiceDraft = voice,
         )
-        val model = entity.toModel()
-        assertEquals(voice, model.voiceDraft)
+        assertEquals(job, MediaUploadJob.fromJson(job.toJson()))
     }
 }

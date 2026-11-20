@@ -10,6 +10,7 @@ import androidx.work.impl.WorkManagerImpl
 import androidx.work.impl.utils.taskexecutor.TaskExecutor
 import androidx.work.workDataOf
 import com.google.android.gms.tasks.Tasks
+import com.olive.app.BuildConfig
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -197,7 +198,8 @@ class SafetyPlanRepositoryTest {
             try {
                 SafetyPlanSyncWorker.enqueue(baseApp, "owner", "owner")
                 SafetyPlanSyncWorker.enqueueAttachment(baseApp, "owner", "doc-1")
-                assertEquals(2, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
+                val expectedWork = if (BuildConfig.FIREBASE_CONFIGURED) 2 else 0
+                assertEquals(expectedWork, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
             } finally {
                 WorkManagerImpl.setDelegate(null)
             }
@@ -235,6 +237,10 @@ class SafetyPlanRepositoryTest {
                 `when`(inputData).thenAnswer { currentInput }
             }
             val worker = SafetyPlanSyncWorker(app, params)
+            if (!BuildConfig.FIREBASE_CONFIGURED) {
+                assertEquals(WorkResult.success(), worker.doWork())
+                return@runBlocking
+            }
 
             val createdFirebaseApp = if (FirebaseApp.getApps(baseApp).isEmpty()) {
                 FirebaseApp.initializeApp(

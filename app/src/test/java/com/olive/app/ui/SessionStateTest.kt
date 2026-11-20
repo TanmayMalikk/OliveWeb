@@ -122,6 +122,7 @@ class SessionStateTest {
 
         val controller = AdminLocationMapController(repo)
         controller.open(AccountRole.USER)
+        verifyNoInteractions(repo)
         assertFalse(controller.state.loading)
 
         controller.open(AccountRole.ADMIN)

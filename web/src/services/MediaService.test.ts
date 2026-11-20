@@ -169,10 +169,24 @@ it("publishes an owner recording with keys for the current participants and reje
   mocks.directory.mockReturnValue({ get: (field: string) => field === "uid" ? "friend" : publicKey });
   mocks.rows.mockReturnValue([{ data: () => ({ uid: "friend", publicKey, deviceId: "friend-phone" }) }]);
   mocks.unwrap.mockResolvedValue(crypto.getRandomValues(new Uint8Array(32)));
-  const chat = { id: "room", participantIds: [owner.uid, "friend"], participantUsernames: { friend: "friend" } };
+  const chat: Parameters<typeof prepareVoiceMessage>[1] = {
+    id: "room",
+    friendshipId: "friendship",
+    participantIds: [owner.uid, "friend"],
+    participantUsernames: { friend: "friend" },
+    lastMessage: "",
+    updatedAt: 0,
+    type: "DIRECT",
+    ownerUid: owner.uid,
+    staffUid: "",
+    adminUid: "",
+    supportOrigin: "",
+    supportTag: "",
+    closedAt: 0,
+  };
   const file = { owner_id: owner.uid, wrapped_keys: { [owner.uid]: "owner-envelope" } };
   mocks.serverRow.mockImplementation((id) => ({ data: () => id === "room" ? chat : file }));
-  const pending = await prepareVoiceMessage("recording", chat as Parameters<typeof prepareVoiceMessage>[1], await importKey(crypto.getRandomValues(new Uint8Array(32))));
+  const pending = await prepareVoiceMessage("recording", chat, await importKey(crypto.getRandomValues(new Uint8Array(32))));
   expect(pending).toMatchObject({ mediaId: "recording", conversationId: "room", ciphertext: "encrypted:SHARED_VOICE:recording" });
   await publishVoiceMessage(pending, owner);
   expect(mocks.callable).toHaveBeenLastCalledWith("mediaShareInChat", {

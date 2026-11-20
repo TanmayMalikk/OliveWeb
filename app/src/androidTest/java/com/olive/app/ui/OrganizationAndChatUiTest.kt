@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
@@ -708,7 +709,7 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { com.olive.app.ui.users.shared.organization.OrganizationProfileSetup(session) } }
         compose.onNodeWithTag("organization_full_name").performTextReplacement("Updated synthetic staff")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnIdle { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithTag("onboarding_next").performScrollTo().performClick()
         val email = compose.onNodeWithTag("organization_email")
         email.performTextInput("invalid")
@@ -716,7 +717,7 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithText(text(R.string.ui_invalid_email)).assertExists()
         email.performTextReplacement("staff@example.test")
         compose.onNodeWithTag("organization_phone").performTextInput("555-0100")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnIdle { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithTag("onboarding_back").performScrollTo().performClick()
         compose.onNodeWithTag("organization_full_name").assertTextContains("Updated synthetic staff")
         compose.onNodeWithTag("onboarding_next").performScrollTo().performClick()

@@ -2,6 +2,7 @@
 package com.olive.app
 
 import androidx.compose.ui.test.*
+import androidx.activity.ComponentActivity
 import android.content.Intent
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule
 import androidx.test.ext.junit.rules.ActivityScenarioRule
@@ -32,6 +33,13 @@ internal fun createOliveComposeRule() = Intent(Intent.ACTION_MAIN).setClass(
         rule.scenario.onActivity { activity = it }
         activity
     }
+}
+
+internal fun ComponentActivity.dismissTestKeyboard() {
+    val keyboard = getSystemService(InputMethodManager::class.java)
+    val token = currentFocus?.windowToken ?: window.decorView.windowToken
+    keyboard.hideSoftInputFromWindow(token, 0)
+    currentFocus?.clearFocus()
 }
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
@@ -153,12 +161,7 @@ abstract class OliveUiTestBase {
 
     // Hides the emulator keyboard before a UI test presses controls located below a text field.
     protected fun hideKeyboard() {
-        compose.activityRule.scenario.onActivity { activity ->
-            val keyboard = activity.getSystemService(InputMethodManager::class.java)
-            val token = activity.currentFocus?.windowToken ?: activity.window.decorView.windowToken
-            keyboard.hideSoftInputFromWindow(token, 0)
-            activity.currentFocus?.clearFocus()
-        }
+        compose.activityRule.scenario.onActivity { it.dismissTestKeyboard() }
         compose.waitForIdle()
     }
 
@@ -286,10 +289,9 @@ abstract class OliveUiTestBase {
         }
     }
 
-    // Wait for one onboarding page to settle before moving to the next one. A second click handles
-    // a button event that Android can drop while the keyboard or dropdown is closing under load.
+    // Wait for the keyboard and form layout to settle before advancing the onboarding page.
     protected fun advanceOnboarding(currentTag: String, nextTag: String) {
-        compose.waitForIdle()
+        hideKeyboard()
         click("onboarding_next")
         val moved = runCatching {
             compose.waitUntil(5_000) {
@@ -298,7 +300,7 @@ abstract class OliveUiTestBase {
         }.isSuccess
         if (!moved) {
             waitFor(currentTag)
-            compose.waitForIdle()
+            hideKeyboard()
             click("onboarding_next")
         }
         waitFor(nextTag)

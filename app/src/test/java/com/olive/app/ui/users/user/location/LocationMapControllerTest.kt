@@ -17,6 +17,8 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.location.LocationSharingDataSource
+import com.olive.app.data.location.AddressCoordinateResolver
+import com.olive.app.data.location.DeviceLocation
 import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.RouteCoordinate
@@ -281,7 +283,8 @@ class LocationMapControllerTest {
         }
         val contactSource = LocationFixture().apply { staticEnabled = true }
         val main = CoroutineScope(Job() + Dispatchers.Main.immediate)
-        val map = LocationMapController(context, main, contactSource) { _, _ ->
+        val addressResolver = AddressCoordinateResolver { DeviceLocation.coordinatesForAddress(context, it) }
+        val map = LocationMapController(context, main, contactSource, addressResolver) { _, _ ->
             throw IllegalStateException("Routing unavailable")
         }
         try {

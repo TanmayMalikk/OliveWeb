@@ -103,7 +103,7 @@ internal fun interface AddressCoordinateResolver {
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>?
 }
 
-private class AndroidAddressCoordinateResolver(private val context: Context) :
+internal class AndroidAddressCoordinateResolver(private val context: Context) :
     AddressCoordinateResolver {
     /**
      * Reads valid latitude and longitude values from a route point.

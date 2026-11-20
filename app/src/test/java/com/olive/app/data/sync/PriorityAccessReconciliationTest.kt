@@ -6,6 +6,7 @@ import androidx.work.impl.WorkManagerImpl
 import androidx.work.impl.utils.taskexecutor.TaskExecutor
 import androidx.work.workDataOf
 import com.google.android.gms.tasks.Tasks
+import com.olive.app.BuildConfig
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseOptions
@@ -116,7 +117,8 @@ class PriorityAccessReconciliationTest {
                 PriorityReconciliationWorker.enqueue(app, "viewer", revision = 5L, expedited = true)
                 PriorityReconciliationWorker.enqueue(app, "viewer", revision = 3L)
                 PriorityReconciliationWorker.cancel(app, "viewer")
-                assertEquals(2, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
+                val expectedWork = if (BuildConfig.FIREBASE_CONFIGURED) 2 else 0
+                assertEquals(expectedWork, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
                 verify(work).cancelUniqueWork("olive-priority-reconciliation-viewer")
             } finally {
                 WorkManagerImpl.setDelegate(null)
@@ -129,6 +131,10 @@ class PriorityAccessReconciliationTest {
             var currentInput = workDataOf()
             `when`(params.inputData).thenAnswer { currentInput }
             val worker = PriorityReconciliationWorker(app, params)
+            if (!BuildConfig.FIREBASE_CONFIGURED) {
+                assertEquals(WorkResult.success(), worker.doWork())
+                return@runBlocking
+            }
             val createdFirebaseApp = if (FirebaseApp.getApps(app).isEmpty()) {
                 FirebaseApp.initializeApp(
                     app,

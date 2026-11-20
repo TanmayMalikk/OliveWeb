@@ -5,6 +5,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.support.FirestoreTestDriver
+import org.json.JSONObject
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -287,17 +288,18 @@ class MessagingRepositorySdkTest {
 
     @Test
     fun outboxDrainableIgnoresPermanentFailuresAndMigratesV0Messages() {
-        val vault = FakeJsonVault()
+        val queued = OutgoingMessage("m-1", "alice", "conv-1", "alice", "encrypted-1", 1000L)
+        val failed = queued.copy(id = "m-2", conversationId = "conv-2", status = MessageDeliveryStatus.FAILED_PERMANENT)
+        val messages = JSONObject()
+            .put(queued.id, queued.toJson().apply { remove("clientSequence") })
+            .put(failed.id, failed.toJson())
+        val root = JSONObject().put("accounts", JSONObject().put("alice", JSONObject().put("messages", messages)))
+        val vault = object : MessageOutboxVault {
+            override fun read() = JSONObject(root.toString())
+            override fun update(change: (JSONObject) -> Unit) = change(root)
+        }
         val store = MessageOutboxStore(vault)
-        val msgV0 = OutgoingMessage("conv-1", "m-1", "hello", "alice", 1000L, 0L, MessageDeliveryStatus.PENDING)
-        val msgFailed = OutgoingMessage("conv-2", "m-2", "fail", "alice", 1000L, 1L, MessageDeliveryStatus.FAILED_PERMANENT)
-        store.put("alice", msgV0)
-        store.put("alice", msgFailed)
-
-        val drainable = store.drainableConversationIds("alice")
-        assertFalse(drainable.contains("conv-2"))
-
-        val all = store.all("alice")
-        assertTrue(all.any { it.id == "m-1" })
+        assertEquals(setOf("conv-1"), store.drainableConversationIds("alice"))
+        assertTrue(checkNotNull(store.get(queued.id)).clientSequence > 0)
     }
 }
