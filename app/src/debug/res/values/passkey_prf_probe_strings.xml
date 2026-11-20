@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_prf_probe_title">Passkey PRF compatibility probe</string>
+    <string name="debug_prf_probe_description">Debug-only check. It creates a disposable passkey for yourolivebranch.ca and verifies that this device returns a 32-byte PRF result. No key material is displayed, logged, uploaded, or saved.</string>
+    <string name="debug_prf_probe_start">Test passkey PRF compatibility</string>
+    <string name="debug_prf_probe_idle">Ready to test.</string>
+    <string name="debug_prf_probe_working">Waiting for passkey confirmation…</string>
+    <string name="debug_prf_probe_supported">PRF supported — 32-byte result received.</string>
+    <string name="debug_prf_probe_unavailable">PRF unavailable — cross-platform recovery cannot be enabled on this credential provider.</string>
+    <string name="debug_prf_probe_cancelled">Passkey request was cancelled.</string>
+    <string name="debug_prf_probe_failed">Passkey request failed. Retry with a supported credential provider.</string>
+</resources>
