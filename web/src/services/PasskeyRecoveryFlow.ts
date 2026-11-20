@@ -7,10 +7,7 @@ import {
 type Callable = (name: string, data?: unknown) => Promise<unknown>;
 
 interface NativePasskeyClient {
-  register(
-    options: unknown,
-    prfInput: string,
-  ): Promise<{ response: { id: string } }>;
+  register(options: unknown): Promise<{ response: { id: string } }>;
   authenticate(
     options: unknown,
     prfInputs: Record<string, string>,
@@ -47,7 +44,7 @@ export function createPasskeyRecoveryFlow(
   return {
     async enroll(accountId: string, recoveryKey: Uint8Array): Promise<EnrollmentComplete> {
       const start = enrollmentStart(await callable.call("passkeyRecoveryBeginEnrollment"));
-      const registration = await callable.register(start.options, start.prfInput);
+      const registration = await callable.register(start.options);
       const credentialId = credentialIdOf(registration.response);
       const proof = enrollmentProof(await callable.call("passkeyRecoveryContinueEnrollment", {
         challengeId: start.challengeId,

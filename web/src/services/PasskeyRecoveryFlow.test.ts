@@ -25,7 +25,10 @@ describe("passkey recovery flow", () => {
         }
         return { registered: true, credentialId };
       },
-      register: async () => ({ response: { id: credentialId } }),
+      register: async (options) => {
+        expect(options).toEqual({ challenge: "created" });
+        return { response: { id: credentialId } };
+      },
       authenticate: async () => ({ response: { id: credentialId }, prfOutput }),
     });
 

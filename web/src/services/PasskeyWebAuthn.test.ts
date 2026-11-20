@@ -1,56 +1,75 @@
-import { describe, expect, it } from "vitest";
-import {
-  buildAssertionRequest,
-  buildRegistrationRequest,
-  toBase64Url,
-} from "./PasskeyWebAuthn";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const options = {
-  challenge: "Y2hhbGxlbmdl",
-  rp: { id: "yourolivebranch.ca", name: "Olive Branch" },
-  user: { id: "dXNlci1h", name: "user-a", displayName: "" },
-  pubKeyCredParams: [{ type: "public-key" as const, alg: -7 }],
-};
+const ceremonies = vi.hoisted(() => ({
+  register: vi.fn(),
+  authenticate: vi.fn(),
+}));
 
-const bytes = (value: BufferSource) => value instanceof ArrayBuffer
-  ? new Uint8Array(value)
-  : new Uint8Array(value.buffer as ArrayBuffer, value.byteOffset, value.byteLength);
+vi.mock("@simplewebauthn/browser", () => ({
+  startRegistration: ceremonies.register,
+  startAuthentication: ceremonies.authenticate,
+}));
 
-describe("passkey WebAuthn conversion", () => {
-  it("adds a binary PRF input to registration without changing the relying-party options", () => {
-    const request = buildRegistrationRequest(options, new Uint8Array(32).fill(2));
+import { browserPasskeys } from "./PasskeyWebAuthn";
 
-    expect(request.rp.id).toBe("yourolivebranch.ca");
-    expect(bytes(request.challenge)).toEqual(new TextEncoder().encode("challenge"));
-    expect(bytes(request.user.id)).toEqual(new TextEncoder().encode("user-a"));
-    expect(bytes(request.extensions?.prf?.eval?.first as BufferSource)).toEqual(new Uint8Array(32).fill(2));
-  });
+const credentialId = "credential-a";
+const serverResponse = (first?: Uint8Array) => ({
+  id: credentialId,
+  rawId: "Y3JlZGVudGlhbC1h",
+  response: {
+    authenticatorData: "YXV0aA",
+    clientDataJSON: "Y2xpZW50",
+    signature: "c2ln",
+  },
+  type: "public-key" as const,
+  clientExtensionResults: first
+    ? { prf: { enabled: true, results: { first } } }
+    : { prf: { enabled: true } },
+});
 
-  it("binds each assertion candidate to its own binary PRF input", () => {
-    const request = buildAssertionRequest({
-      challenge: "Y2hhbGxlbmdl",
-      rpId: "yourolivebranch.ca",
-      allowCredentials: [
-        { id: "Y3JlZGVudGlhbC1h", type: "public-key" as const, transports: ["internal"] },
-      ],
-    }, {
-      "credential-a": toBase64Url(new Uint8Array(32).fill(4)),
+describe("passkey WebAuthn adapter", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("registers using only the server options", async () => {
+    const options = { challenge: "Y2hhbGxlbmdl" };
+    ceremonies.register.mockResolvedValue(serverResponse());
+
+    await expect(browserPasskeys.register(options)).resolves.toEqual({
+      response: serverResponse(),
     });
+    expect(ceremonies.register).toHaveBeenCalledWith({ optionsJSON: options });
+  });
 
-    expect(bytes(request.challenge)).toEqual(new TextEncoder().encode("challenge"));
-    expect(bytes(request.allowCredentials?.[0].id ?? new ArrayBuffer(0))).toEqual(
-      new TextEncoder().encode("credential-a"),
+  it("keeps the PRF result local and strips it from the server response", async () => {
+    const prfOutput = new Uint8Array(32).fill(4);
+    ceremonies.authenticate.mockResolvedValue(serverResponse(prfOutput));
+
+    const result = await browserPasskeys.authenticate(
+      { challenge: "Y2hhbGxlbmdl", rpId: "yourolivebranch.ca" },
+      { [credentialId]: "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=" },
     );
-    expect(bytes(request.extensions?.prf?.evalByCredential?.["credential-a"]?.first as BufferSource)).toEqual(
-      new Uint8Array(32).fill(4),
+
+    expect(result.prfOutput).toEqual(prfOutput);
+    expect(result.prfOutput).not.toBe(prfOutput);
+    expect(result.response.clientExtensionResults).toEqual({ prf: { enabled: true } });
+    expect(JSON.stringify(result.response)).not.toContain("results");
+    const options = ceremonies.authenticate.mock.calls[0][0].optionsJSON;
+    expect(options.extensions.prf.evalByCredential[credentialId].first).toEqual(
+      new Uint8Array(32).fill(5),
     );
   });
 
-  it("rejects malformed or empty binary inputs", () => {
-    expect(() => buildRegistrationRequest(options, new Uint8Array(31))).toThrow();
-    expect(() => buildAssertionRequest({ challenge: "!", rpId: "yourolivebranch.ca" }, {})).toThrow();
-    expect(() => buildAssertionRequest({ challenge: "YQ", rpId: "yourolivebranch.ca" }, {
-      "credential-a": "!",
-    })).toThrow();
+  it("fails securely when the provider omits or changes the PRF result size", async () => {
+    ceremonies.authenticate.mockResolvedValueOnce(serverResponse());
+    await expect(browserPasskeys.authenticate(
+      { challenge: "Y2hhbGxlbmdl", rpId: "yourolivebranch.ca" },
+      { [credentialId]: "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=" },
+    )).rejects.toThrow("32-byte PRF result");
+
+    ceremonies.authenticate.mockResolvedValueOnce(serverResponse(new Uint8Array(31)));
+    await expect(browserPasskeys.authenticate(
+      { challenge: "Y2hhbGxlbmdl", rpId: "yourolivebranch.ca" },
+      { [credentialId]: "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=" },
+    )).rejects.toThrow("32-byte PRF result");
   });
 });
