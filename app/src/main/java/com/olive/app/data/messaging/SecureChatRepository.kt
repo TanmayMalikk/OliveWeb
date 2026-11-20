@@ -1,6 +1,8 @@
 // All chat roles: stores encrypted chats between allowed participants.
 package com.olive.app.data.messaging
 
+import com.olive.app.data.sync.cloudStringMap
+
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
@@ -35,6 +37,37 @@ import java.util.Base64
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+    internal fun observeKeyChanges(
+        conversation: ChatConversation,
+        uid: String,
+        onKey: (path: String, fingerprint: String) -> Unit,
+        onDevices: (path: String, fingerprint: String) -> Unit,
+    ): ChatSubscription {
+        val members = conversation.participantUsernames.values.distinct().map {
+            firestore.collection("messageDirectory").document(it.trim().lowercase())
+        }
+        val localKey = firestore.collection("conversations").document(conversation.id)
+            .collection("deviceKeys").document("$uid--${KeyManager.deviceId()}")
+        val keyListeners = (listOf(localKey) + members).map { document ->
+            document.addSnapshotListener { snapshot, failure ->
+                if (failure != null || snapshot == null) return@addSnapshotListener
+                val key = snapshot.getString("wrappedKey") ?: snapshot.getString("publicKey") ?: return@addSnapshotListener
+                onKey(document.path, key)
+            }
+        }
+        val deviceListeners = members.map { member ->
+            val devices = member.collection("devices")
+            devices.addSnapshotListener { snapshot, failure ->
+                if (failure != null || snapshot == null) return@addSnapshotListener
+                val fingerprint = snapshot.documents.joinToString("|") {
+                    "${it.id}:${it.getString("publicKey")}:${it.getString("mgf1Digest")}"
+                }
+                onDevices(devices.path, fingerprint)
+            }
+        }
+        return ChatSubscription { (keyListeners + deviceListeners).forEach { it.remove() } }
+    }
+
     // Reads established keys directly after confirming current membership on the server.
     internal suspend fun readyRoomKey(conversation: ChatConversation, uid: String): KeyManager.UnwrappedKeyEnvelope? {
         val snapshot = firestore.collection("conversations").document(conversation.id).get(Source.SERVER).await()
@@ -389,9 +422,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     }
 
     // Loads and unwraps the room key used to decrypt this conversation.
-    @Suppress("UNCHECKED_CAST")
     private fun DocumentSnapshot.roomKeys() =
-        get("roomKeys") as? Map<String, String>
+        get("roomKeys").cloudStringMap()
 
     private fun DocumentSnapshot.accountRoomKeys(): Map<String, AccountKeysetWrappedKey> =
         (get("accountRoomKeys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
@@ -401,9 +433,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         }?.toMap().orEmpty()
 
     // Loads each participant's public key before sharing a room key.
-    @Suppress("UNCHECKED_CAST")
     private fun DocumentSnapshot.participantPublicKeys() =
-        get("participantPublicKeys") as? Map<String, String>
+        get("participantPublicKeys").cloudStringMap()
 }
 
 internal fun existingMessageMatches(

@@ -2,6 +2,9 @@
 package com.olive.app.ui.users.shared.navigation
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -30,10 +33,15 @@ import com.olive.app.ui.users.user.location.LocationMapController
 
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
-internal class SessionViewModel(application: Application) : AndroidViewModel(application),
+internal class SessionViewModel @JvmOverloads constructor(
+    application: Application,
+    dataSourcesOverride: com.olive.app.ui.session.SessionDataSources? = null,
+    localMode: Boolean = !com.olive.app.BuildConfig.FIREBASE_CONFIGURED,
+) : AndroidViewModel(application),
     SessionCoverNotesActivityActions,
     SessionAccountManagementActions {
-    override val runtime = SessionRuntime(application, viewModelScope)
+    override val runtime = SessionRuntime(application, viewModelScope, dataSourcesOverride, localMode)
+    val emergencyResponses = com.olive.app.ui.session.EmergencyResponseController(application)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)
     val calls = SessionCalls(application, viewModelScope)
@@ -53,12 +61,17 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)
     internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
 
+    val preparingVoiceConversationId get() = runtime.secureSharing.preparingVoiceConversationId
+    fun sendVoiceMessage(file: java.io.File, metadata: String): Boolean =
+        media?.let { runtime.secureSharing.sendVoice(file, metadata, it) } ?: false
+
     // Root navigation, account entry, and device lock state.
+    val navigationState get() = runtime.state.navigationState
+    val dashboardState get() = runtime.state.dashboardState
     val screen get() = runtime.state.screen
     // These versions tell Compose to redraw after an entry or cover event.
     val pinChallengeVersion get() = runtime.state.pinChallengeVersion
     val unlockAnimationVersion get() = runtime.state.unlockAnimationVersion
-    val accessibilityExitVersion get() = runtime.state.accessibilityExitVersion
     val page get() = runtime.state.page
     val activityCategory get() = runtime.state.activityCategory
     val busy get() = runtime.state.busy
@@ -74,6 +87,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val privacyHistory get() = runtime.state.privacyHistory
     val triggerHistory get() = runtime.state.triggerHistory
     val privateEntries get() = runtime.state.privateEntries
+    val loadingHistory get() = coverAccountId?.let { it == runtime.history.loadingUid } == true
+    val historyLoadFailed get() = coverAccountId?.let { it == runtime.history.failedUid } == true
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
     internal val safetyPlans get() = runtime.safety
     internal val staffSupport get() = runtime.staffSupport
@@ -87,10 +102,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val coverUsername get() = runtime.state.coverUsername
     val coverType get() = runtime.state.coverType
     val accountRole get() = runtime.state.accountRole
-    val adminCounts get() = runtime.state.adminCounts
     val adminAccounts get() = runtime.state.adminAccounts
     val savedNews get() = runtime.state.savedNews
-    val idleCountdownSeconds get() = runtime.state.idleCountdownSeconds
     val privacyBlackout get() = runtime.state.privacyBlackout
     val coverReset get() = runtime.state.coverReset
     val localMode get() = runtime.localMode
@@ -106,9 +119,34 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     var externalFilePickerOpen = false
         private set
 
-    @Volatile
-    var callPermissionRequestOpen = false
+    var callPermissionRequestOpen by mutableStateOf(false)
         private set
+    var safeSystemActivityOpen = false
+        private set
+    private var safeSystemLaunchId = 0
+
+    internal fun beginSafeSystemActivity(): Int? {
+        if (safeSystemActivityOpen) return null
+        safeSystemActivityOpen = true
+        return ++safeSystemLaunchId
+    }
+
+    internal fun finishSafeSystemActivity(launchId: Int = safeSystemLaunchId) {
+        if (launchId == safeSystemLaunchId) safeSystemActivityOpen = false
+    }
+
+    internal fun safeSystemActivityResult(view: android.view.View) {
+        val launchId = safeSystemLaunchId
+        // Some settings activities return a result before their window has even taken focus.
+        // Release the exemption only once Olive has its window back.
+        view.postDelayed(object : Runnable {
+            override fun run() {
+                if (launchId != safeSystemLaunchId || !safeSystemActivityOpen || !view.isAttachedToWindow) return
+                if (view.hasWindowFocus()) finishSafeSystemActivity(launchId)
+                else view.postDelayed(this, 250L)
+            }
+        }, 250L)
+    }
 
     /** Carries checklist-specific tags across navigation into the full-screen camera. */
     internal var pendingCameraUploadTags: Set<String> = emptySet()
@@ -174,10 +212,13 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 // Users, safe contacts, staff, and admins: keeps message screen state and chat actions together.
 
 internal class SessionMessages(private val runtime: SessionRuntime) {
+    val state get() = runtime.state.messagingState
     val userSearchResults get() = runtime.state.userSearchResults
     val friends get() = runtime.state.friends
     val incomingFriendRequests get() = runtime.state.incomingFriendRequests
+        .filter { it.recipientUid == runtime.enrollment?.uid }
     val outgoingFriendRequests get() = runtime.state.outgoingFriendRequests
+        .filter { it.senderUid == runtime.enrollment?.uid }
     val conversations get() = runtime.state.conversations
     val archivedConversationIds get() = runtime.state.archivedConversationIds
     val restoredClosedConversationIds get() = runtime.state.restoredClosedConversationIds
@@ -185,16 +226,21 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val activeConversation get() = runtime.state.activeConversation
     val chatQuickExitHintVisible get() = runtime.state.chatQuickExitHintVisible
     val chatMessages get() = runtime.state.chatMessages
+    val loadingIndex get() = runtime.messaging.loadingIndex
+    val loadingConversation get() = runtime.conversationActions.loadingConversation
     val busy get() = runtime.state.messagingBusy
     val needsReconnect get() = runtime.state.messagingNeedsReconnect
     val pendingActionCount get() = runtime.pendingMessageActionCount
     fun isUnread(conversation: ChatConversation) = runtime.isConversationUnread(conversation)
     fun unreadCountForSupportTag(tag: String) = runtime.state.conversations.count { conversation ->
         conversation.type == "SUPPORT" && conversation.supportTag == tag &&
-                conversation.closedAt == 0L &&
-                conversation.id !in runtime.state.archivedConversationIds &&
-                runtime.isConversationUnread(conversation)
+            runtime.isActiveUnreadConversation(conversation)
     }
+
+    fun unreadCountForChatTab(tickets: Boolean): Int =
+        runtime.state.conversations.count {
+            (it.type == "SUPPORT") == tickets && runtime.isActiveUnreadConversation(it)
+        } + if (tickets) 0 else runtime.incomingFriendRequestCount
 
     // Starts chat listeners when the current screen needs messaging.
     fun ensureMessagingObservation(showFeedback: Boolean = false) =
@@ -355,6 +401,8 @@ internal interface SessionCoverNotesActivityActions {
 
     // Passes the private-note button action to the session privacy controller.
     fun noteInteraction() = runtime.privacy.noteInteraction()
+    fun idleTimeoutSeconds(): Int = runtime.privacy.idleTimeoutSeconds()
+    fun setIdleTimeoutSeconds(seconds: Int) = runtime.privacy.setIdleTimeoutSeconds(seconds)
     // Records that Android detected a screenshot or screen recording.
     fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
     // Records when Android reports that screen recording has stopped.

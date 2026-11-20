@@ -21,15 +21,57 @@ let mapboxAttributionAdded=false;
 let points=[];
 let followEnabled=false;
 let followUid=null;
+let followFocusPending=false;
 let selectionMarker=null;
 let selectionEnabled=false;
 let detailsOnlyForSelectedPoint=false;
 let selectedPointUid=null;
+const supportMarkers=Object.create(null);
+window.oliveReportMapCenter=function(){
+  if(!window.OliveMapViewport) return;
+  const center=map.getCenter().wrap();
+  OliveMapViewport.selected(center.lat,center.lng);
+};
+let viewportReportTimer;
+map.on('moveend',function(){
+  if(!window.OliveMapViewport) return;
+  clearTimeout(viewportReportTimer);
+  viewportReportTimer=setTimeout(window.oliveReportMapCenter,150);
+});
+function showMapboxAttribution(){
+  if(mapboxAttributionAdded) return;
+  map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');
+  mapboxAttributionAdded=true;
+}
+window.oliveSetServices=function(services,fit){
+  const active=Object.create(null);
+  if(services?.length) showMapboxAttribution();
+  (services||[]).forEach(service=>{
+    active[service.id]=true;
+    if(!supportMarkers[service.id]){
+      const icon=L.divIcon({
+        className:'olive-service-marker',html:'<div class="olive-service-dot"></div>',
+        iconSize:[30,30],iconAnchor:[15,15]
+      });
+      const marker=L.marker([service.latitude,service.longitude],{icon:icon}).addTo(map);
+      const label=document.createElement('span');label.textContent=service.name;
+      marker.bindTooltip(label,{direction:'top'});
+      marker.on('click',function(){if(window.OliveSupportSelection)OliveSupportSelection.selected(service.id);});
+      supportMarkers[service.id]=marker;
+    }
+  });
+  Object.keys(supportMarkers).forEach(id=>{if(!active[id]){map.removeLayer(supportMarkers[id]);delete supportMarkers[id];}});
+  if(fit&&services.length){
+    const locations=services.map(service=>[service.latitude,service.longitude]);
+    points.filter(point=>point.own).forEach(point=>locations.push([point.latitude,point.longitude]));
+    map.fitBounds(L.latLngBounds(locations),{padding:[36,36],maxZoom:14});
+  }
+};
 // Keeps distant markers small enough to separate while leaving them visible in an Alberta-wide view.
 function markerSize(point){
-  const closeSize=(point.live||point.lastKnown)?24:22;
+  const closeSize=(point.live||point.lastKnown)?28:26;
   const zoomProgress=Math.max(0,Math.min(1,(map.getZoom()-4)/10));
-  return Math.round(12+(closeSize-12)*zoomProgress);
+  return Math.round(16+(closeSize-16)*zoomProgress);
 }
 // Map: Builds a marker at the size needed for the current zoom level.
 function markerIcon(point){
@@ -128,15 +170,14 @@ window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
     if(points.length===1) map.setView([points[0].latitude,points[0].longitude],14);
     else map.fitBounds(L.latLngBounds(points.map(point=>[point.latitude,point.longitude])),{padding:[36,36],maxZoom:14});
   }
+  // A navigation request can arrive before its live marker. Apply its close zoom once data arrives.
+  if(followEnabled) window.oliveSetFollow(true,followUid,false);
 };
 window.oliveSetRoute=function(coordinates,fitRoute){
   const line=coordinates||[];
   // line checks whether line length>1 before continuing.
   if(line.length>1){
-    if(!mapboxAttributionAdded){
-      map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');
-      mapboxAttributionAdded=true;
-    }
+    showMapboxAttribution();
     if(routeLine) routeLine.setLatLngs(line);
     else routeLine=L.polyline(line,{color:'#1769aa',weight:6,opacity:.86,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
     routeLine.bringToBack();
@@ -155,8 +196,10 @@ window.oliveRecenter=function(){
   if(points.length) map.setView([points[0].latitude,points[0].longitude],14);
 };
 window.oliveSetFollow=function(enabled,uid,focusClose){
+  if(!enabled || followUid!==(uid||null)) followFocusPending=false;
   followEnabled=!!enabled;
   followUid=uid||null;
+  if(followEnabled&&focusClose) followFocusPending=true;
   if(followEnabled){
     const target=points.find(point=>(point.uid||point.name)===followUid);
     if(target){
@@ -165,7 +208,8 @@ window.oliveSetFollow=function(enabled,uid,focusClose){
         window.oliveSetPoints(points,false,true);
       }
       // Search selection starts three zoom-out steps below the closest map view.
-      if(focusClose){
+      if(followFocusPending){
+        followFocusPending=false;
         const closeFollowZoom=Math.max(map.getMinZoom(),map.getMaxZoom()-3);
         map.setView([target.latitude,target.longitude],closeFollowZoom,{animate:true,duration:.5});
       }else map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});

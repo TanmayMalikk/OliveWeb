@@ -58,6 +58,11 @@ const starterItems: Record<string, string[]> = {
     "Plan essentials for the first few days: shelter, food and medication.",
     "Identify support services you may want to contact.",
   ],
+  finances: [
+    "List money and payment methods you can access independently.",
+    "Plan how to pay for transport, a temporary place to stay, and essentials.",
+    "Note who you can ask about financial support or joint accounts.",
+  ],
   documents: [
     "Driver’s licence / government-issued photo ID",
     "Birth certificates",
@@ -83,11 +88,15 @@ const starterItems: Record<string, string[]> = {
 const safetyWriterId = crypto.randomUUID();
 let safetyClientSequence = 0;
 
-function initialDefaults() {
+function initialDefaults(hasAffectedPeople: boolean) {
   return Object.fromEntries(
     ["primary", "backup"].flatMap((kind) =>
       [...safetySections, ...olderSafetySections].map((section) => {
-        const items = (starterItems[section] ?? []).map((text) => ({
+        const prompts = starterItems[section] ?? [];
+        const tailored = section === "documents" && hasAffectedPeople
+          ? [...prompts, "Gather identification and any applicable school or care records for people leaving with you."]
+          : prompts;
+        const items = tailored.map((text) => ({
           id: crypto.randomUUID(),
           text,
           checked: false,
@@ -105,11 +114,11 @@ async function call<T>(name: string, data: unknown = {}): Promise<T> {
   return (await httpsCallable(functions, name)(data)).data as T;
 }
 // Loads one user's safety plan through the protected cloud function.
-export async function loadPlan(ownerUid: string) {
+export async function loadPlan(ownerUid: string, hasAffectedPeople = false) {
   return (
     await call<{ plan: SafetyPlan }>("safetyPlanSync", {
       ownerUid,
-      defaults: initialDefaults(),
+      defaults: initialDefaults(hasAffectedPeople),
       changes: [],
     })
   ).plan;

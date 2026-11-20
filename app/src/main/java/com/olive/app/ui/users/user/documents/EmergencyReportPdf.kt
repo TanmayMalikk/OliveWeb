@@ -18,6 +18,7 @@ import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.parseIncidentDate
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Instant
@@ -38,6 +39,12 @@ internal data class EmergencyReportMedia(
     val document: SafetyDocument,
     val file: File?,
 )
+
+internal fun emergencyIncidentDate(value: String): String = when {
+    value.isBlank() -> "Not provided"
+    else -> parseIncidentDate(value)?.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.CANADA))
+        ?: "Invalid saved date: $value (requires correction)"
+}
 
 // Trashed records are left out because the user has already chosen to remove them from active notes.
 internal fun emergencyIncidents(entries: List<PrivateEntry>) = entries.filter {
@@ -131,6 +138,11 @@ internal object EmergencyReportPdf {
             writer.field("Home address", emergencyHomeAddress(profile))
             writer.field("Emergency button coordinates", pressedLocationText(pressedLocation))
             writer.field("Situation", profile.situation.ifBlank { "Not provided" })
+            writer.section("Emergency contacts")
+            if (profile.contacts.isEmpty()) writer.paragraph("No emergency contacts saved.")
+            profile.contacts.forEach { contact ->
+                writer.field(contact.name.ifBlank { "Contact" }, contact.details.ifBlank { "No contact details provided" })
+            }
 
             val orderedIncidents = emergencyIncidents(incidents)
             if (orderedIncidents.isEmpty()) {
@@ -140,7 +152,7 @@ internal object EmergencyReportPdf {
             orderedIncidents.forEachIndexed { index, incident ->
                 writer.startPage("Incident report ${index + 1} of ${orderedIncidents.size}")
                 writer.field("Title", incident.title.ifBlank { "Untitled incident" })
-                writer.field("Date of incident", incident.incidentDate.ifBlank { "Not provided" })
+                writer.field("Date of incident", emergencyIncidentDate(incident.incidentDate))
                 writer.field("Approximate time", incident.incidentTime.ifBlank { "Not provided" })
                 writer.field("Location of incident", emergencyIncidentLocation(incident))
                 writer.section("Description")

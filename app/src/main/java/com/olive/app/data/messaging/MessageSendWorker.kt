@@ -14,25 +14,28 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentRepository
 import com.olive.app.data.work.DurableWorkPolicy
-import java.security.MessageDigest
-import java.security.GeneralSecurityException
-import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
+import java.security.GeneralSecurityException
+import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
-import org.json.JSONObject
-import org.json.JSONArray
 import kotlinx.coroutines.CancellationException
-import com.google.firebase.functions.FirebaseFunctions
-import com.olive.app.data.account.AccountIdentity
 import kotlinx.coroutines.tasks.await
-
+import kotlinx.serialization.Required
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** WorkManager boundary for idempotent encrypted-message delivery. */
 class MessageSendWorker(context: Context, parameters: WorkerParameters) :
@@ -216,6 +219,7 @@ internal fun canDiscardFailedMessage(status: MessageDeliveryStatus) =
  * [ciphertext] is produced before persistence. Plaintext and the room key never enter this model,
  * WorkManager input data, or the encrypted outbox file.
  */
+@Serializable
 data class OutgoingMessage(
     val id: String,
     val ownerUid: String,
@@ -224,7 +228,7 @@ data class OutgoingMessage(
     val ciphertext: String,
     val clientSentAt: Long,
     val clientSequence: Long = 0,
-    val status: MessageDeliveryStatus = MessageDeliveryStatus.QUEUED,
+    @Required val status: MessageDeliveryStatus = MessageDeliveryStatus.QUEUED,
     val attemptCount: Int = 0,
     val failureCode: String? = null,
     val attachment: OutgoingAttachment? = null,
@@ -235,34 +239,19 @@ data class OutgoingMessage(
         require(clientSentAt >= 0 && clientSequence >= 0 && attemptCount >= 0)
     }
 
-    fun toJson() = JSONObject().apply {
-        put("id", id)
-        put("ownerUid", ownerUid)
-        put("conversationId", conversationId)
-        put("senderUsername", senderUsername)
-        put("ciphertext", ciphertext)
-        put("clientSentAt", clientSentAt)
-        put("clientSequence", clientSequence)
-        put("status", status.name)
-        put("attemptCount", attemptCount)
-        failureCode?.let { put("failureCode", it) }
-        attachment?.let { put("attachment", it.toJson()) }
-    }
+    fun toJson() = JSONObject(outboxJson.encodeToString(this))
 
     companion object {
-        fun fromJson(value: JSONObject) = OutgoingMessage(
-            id = value.getString("id"),
-            ownerUid = value.getString("ownerUid"),
-            conversationId = value.getString("conversationId"),
-            senderUsername = value.getString("senderUsername"),
-            ciphertext = value.getString("ciphertext"),
-            clientSentAt = value.getLong("clientSentAt"),
-            clientSequence = value.optLong("clientSequence", 0),
-            status = MessageDeliveryStatus.valueOf(value.getString("status")),
-            attemptCount = value.optInt("attemptCount", 0),
-            failureCode = value.optString("failureCode").takeIf(String::isNotBlank),
-            attachment = value.optJSONObject("attachment")?.let(OutgoingAttachment::fromJson),
-        )
+        private val outboxJson = Json {
+            encodeDefaults = true
+            explicitNulls = false
+            ignoreUnknownKeys = true
+        }
+
+        fun fromJson(value: JSONObject): OutgoingMessage {
+            val message = outboxJson.decodeFromString<OutgoingMessage>(value.toString())
+            return message.copy(failureCode = message.failureCode?.takeIf(String::isNotBlank))
+        }
     }
 }
 
@@ -522,3 +511,56 @@ internal data class StaffSupportTicket(
     val staffUid: String,
     val conversationId: String,
 )
+
+/** References ciphertext already published to the media service. */
+@Serializable
+data class OutgoingAttachment(
+    val mediaId: String,
+) {
+    init {
+        require(validId(mediaId)) { "Attachment media ID is invalid" }
+    }
+
+    companion object {
+        private fun validId(value: String) =
+            value.length <= 160 && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+    }
+}
+
+/** Only immutable ciphertext already published to the media service can enter the chat outbox. */
+internal fun isDurableChatAttachment(document: SafetyDocument, ownerUid: String?) =
+    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank()
+
+/** Uses the locally opened conversation key without touching Firebase while the device is offline. */
+internal suspend fun outgoingRoomKey(
+    activeRoomKey: SecretKey?,
+    loadRoomKey: suspend () -> SecretKey,
+): SecretKey = activeRoomKey ?: loadRoomKey()
+
+internal open class MessageDeliveryRejected(
+    val failureCode: String,
+    cause: Throwable? = null,
+) : IllegalStateException(failureCode, cause)
+
+internal class AttachmentDeliveryRejected(
+    failureCode: String,
+    cause: Throwable? = null,
+) : MessageDeliveryRejected(failureCode, cause)
+
+internal fun attachmentKeyUnavailable(cause: GeneralSecurityException) =
+    AttachmentDeliveryRejected("ATTACHMENT_KEY_UNAVAILABLE", cause)
+
+/** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
+internal class OutgoingDeliveryDispatcher(
+    private val deliverText: suspend (OutgoingMessage) -> Unit,
+    private val deliverAttachment: suspend (OutgoingMessage, String) -> Unit,
+) {
+    suspend fun deliver(message: OutgoingMessage) {
+        val attachment = message.attachment
+        if (attachment == null) {
+            deliverText(message)
+            return
+        }
+        deliverAttachment(message, attachment.mediaId)
+    }
+}

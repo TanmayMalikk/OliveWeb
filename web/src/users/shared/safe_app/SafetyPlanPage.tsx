@@ -177,7 +177,7 @@ export default function SafetyPlan() {
     baseRevisions.current = {};
     baseValues.current = {};
     if (!ownerUid) return;
-    void loadPlan(ownerUid)
+    void loadPlan(ownerUid, editable && Boolean(session.profile?.affectedNames.trim()))
       .then(async (value) => {
         if (!live) return;
         setPlan(value);
@@ -229,7 +229,7 @@ export default function SafetyPlan() {
       live = false;
       stop?.();
     };
-  }, [identity?.uid, sharedOwnerUid, editable]);
+  }, [identity?.uid, sharedOwnerUid, editable, session.profile?.affectedNames]);
   const updateSection = async (
     key: string,
     items: SafetyChecklistItem[],
@@ -301,6 +301,14 @@ export default function SafetyPlan() {
   const kind = activeKind;
   return (
     <div className="safety-plan-web">
+      {feedback && (
+        <div className="status-banner status-success" role="status">
+          <span>{feedback}</span>
+          <Button variant="quiet" onClick={() => setFeedback("")}>
+            Dismiss
+          </Button>
+        </div>
+      )}
       {!editable && (
         <section className="panel shared-plan-heading">
           <div>
@@ -636,22 +644,24 @@ export default function SafetyPlan() {
               })()}
             </label>
           ))}
-          <Button disabled={session.busy} onClick={() => void session.perform(async () => {
-            if (!localConflict) {
-              setPlan(await resolvePlanConflict(plan, conflictKey, !keepMine));
-              return;
-            }
-            const current = plan.fields[conflictKey]?.value ?? "";
-            if (keepMine) {
-              const result = await saveField(plan, conflictKey, localConflict.mine);
-              setPlan(result.plan);
-              if (result.conflicts.includes(conflictKey)) return;
-              setDrafts((draft) => ({ ...draft, [conflictKey]: localConflict.mine }));
-            } else {
-              setDrafts((draft) => ({ ...draft, [conflictKey]: current }));
-            }
-            setLocalConflict(null);
-          })}>{keepMine ? "Keep my change" : "Use incoming change"}</Button>
+          <div className="modal-actions">
+            <Button disabled={session.busy} onClick={() => void session.perform(async () => {
+              if (!localConflict) {
+                setPlan(await resolvePlanConflict(plan, conflictKey, !keepMine));
+                return;
+              }
+              const current = plan.fields[conflictKey]?.value ?? "";
+              if (keepMine) {
+                const result = await saveField(plan, conflictKey, localConflict.mine);
+                setPlan(result.plan);
+                if (result.conflicts.includes(conflictKey)) return;
+                setDrafts((draft) => ({ ...draft, [conflictKey]: localConflict.mine }));
+              } else {
+                setDrafts((draft) => ({ ...draft, [conflictKey]: current }));
+              }
+              setLocalConflict(null);
+            })}>{keepMine ? "Keep my change" : "Use incoming change"}</Button>
+          </div>
         </Modal>
       )}
     </div>

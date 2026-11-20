@@ -1,5 +1,6 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
+import { BirthdayField } from "../../components/BirthdayField";
 import { LayoutDashboard, MessageCircle, Plus, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import {
   Button,
@@ -36,6 +37,7 @@ export default function AdminPortal() {
   const session = useSession();
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
   const [search, setSearch] = useState("");
+  const [profileStatus, setProfileStatus] = useState<"all" | "complete" | "required">("all");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ManagedAccount | null>(null);
   const [plans, setPlans] = useState<
@@ -58,6 +60,7 @@ export default function AdminPortal() {
   }, []);
 
   const matchingAccounts = accounts.filter((account) =>
+    (profileStatus === "all" || Boolean(account.profileComplete) === (profileStatus === "complete")) &&
     [account.username, account.fullName, account.role, roleLabels[account.role]]
       .join(" ").toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -93,6 +96,11 @@ export default function AdminPortal() {
             )}
           </div>
         </section>
+        <section className="panel">
+          <h2>Emergency response</h2>
+          <p>Review escalated tickets for updates and information the user has shared. This dashboard does not dispatch emergency services.</p>
+          <Button variant="outline" onClick={() => navigate("messages")}>Open escalation chats</Button>
+        </section>
         <WorkspaceShortcuts pages={pages.slice(1)} onNavigate={navigate} />
       </>}
       {view === "accounts" && <>
@@ -105,6 +113,17 @@ export default function AdminPortal() {
               setSearch(event.target.value)
             }
           />
+          <label>
+            Profile status
+            <select value={profileStatus} onChange={(event) => {
+              const value = event.currentTarget.value;
+              setProfileStatus(value === "complete" || value === "required" ? value : "all");
+            }}>
+              <option value="all">All statuses</option>
+              <option value="complete">Setup complete</option>
+              <option value="required">Setup required</option>
+            </select>
+          </label>
           <div className="toolbar-actions">
             <Button
               variant="outline"
@@ -133,7 +152,10 @@ export default function AdminPortal() {
             <tbody>
               {matchingAccounts.map((account) => (
                 <tr key={account.uid}>
-                    <th scope="row">@{account.username}</th>
+                    <th scope="row">
+                      @{account.username}{" "}
+                      {account.protected && <span className="tag">Protected</span>}
+                    </th>
                     <td><span className="tag">{roleLabels[account.role]}</span></td>
                     <td>{account.fullName || "—"}</td>
                     <td>
@@ -209,7 +231,7 @@ export default function AdminPortal() {
               </select>
             </label>
             <Field label="Full name" name="fullName" maxLength={120} />
-            <Field label="Date of birth" name="dob" type="date" />
+            <BirthdayField />
             <Field
               label="Login email (optional for staff and administrators)"
               name="email"
@@ -221,9 +243,17 @@ export default function AdminPortal() {
               login email cannot be changed after this account is created.
             </p>
             <Field label="City" name="region" maxLength={160} />
-            <Button type="submit" disabled={session.busy}>
-              Create account
-            </Button>
+            {session.message && (
+              <p role="alert" className="form-error">{session.message}</p>
+            )}
+            <div className="modal-actions">
+              <Button type="submit" disabled={session.busy}>
+                Create account
+              </Button>
+              <Button variant="quiet" onClick={() => setCreating(false)}>
+                Cancel
+              </Button>
+            </div>
           </Form>
         </Modal>
       )}
@@ -233,21 +263,26 @@ export default function AdminPortal() {
             This permanently deletes @{removing.username} and their cloud
             records. This cannot be undone.
           </p>
-          <Button
-            disabled={session.busy}
-            onClick={() =>
-              void session.perform(async () => {
-                await deleteAccount(removing.uid);
-                setRemoving(null);
-                await refresh();
-              })
-            }
-          >
-            Delete @{removing.username}
-          </Button>
-          <Button variant="quiet" onClick={() => setRemoving(null)}>
-            Cancel
-          </Button>
+          {session.message && (
+            <p role="alert" className="form-error">{session.message}</p>
+          )}
+          <div className="modal-actions">
+            <Button
+              disabled={session.busy}
+              onClick={() =>
+                void session.perform(async () => {
+                  await deleteAccount(removing.uid);
+                  setRemoving(null);
+                  await refresh();
+                })
+              }
+            >
+              Delete @{removing.username}
+            </Button>
+            <Button variant="quiet" onClick={() => setRemoving(null)}>
+              Cancel
+            </Button>
+          </div>
         </Modal>
       )}
     </OrganizationWorkspace>

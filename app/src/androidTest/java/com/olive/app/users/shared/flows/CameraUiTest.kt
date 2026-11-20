@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CameraUiTest : OliveUiTestBase() {
@@ -30,7 +31,9 @@ class CameraUiTest : OliveUiTestBase() {
             )
         }
         waitFor("camera_screen")
-        compose.onNodeWithTag("quick_exit").assertIsDisplayed()
+        val camera = compose.onNodeWithTag("camera_screen").getUnclippedBoundsInRoot()
+        val exit = compose.onNodeWithTag("quick_exit").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(exit.bottom <= camera.bottom && exit.right - exit.left < camera.right - camera.left)
         waitFor("camera_ready")
         compose.onNodeWithTag("camera_flip").assertIsDisplayed().performClick()
         waitFor("camera_ready")

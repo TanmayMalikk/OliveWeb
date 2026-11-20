@@ -1,5 +1,5 @@
 // Tests lane movement and obstacles in the olive crossing cover game.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverageFixture";
 import AxeBuilder from "@axe-core/playwright";
 
 // Inputs: the values in this case. Expected: Olive Crossing supports keyboard play, pausing and restarting.
@@ -47,7 +47,7 @@ test("Olive Crossing supports keyboard play, pausing and restarting", async ({
     .analyze();
   expect(accessibility.violations).toEqual([]);
 
-  await page.getByRole("button", { name: "New crossing" }).click();
+  await page.locator(".game-bottom").getByRole("button", { name: "New crossing", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("0 lanes cleared");
 });
 

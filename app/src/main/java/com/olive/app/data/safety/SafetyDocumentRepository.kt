@@ -1,6 +1,8 @@
 // Safe-app users and support staff: loads and saves a user’s safety documents.
 package com.olive.app.data.safety
 
+import com.olive.app.data.sync.cloudStringMap
+
 import android.content.Context
 import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
@@ -526,10 +528,8 @@ class SafetyDocumentRepository(
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
         val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
-        @Suppress("UNCHECKED_CAST")
-        val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
-        @Suppress("UNCHECKED_CAST")
-        val deviceWrapped = (row.get("device_wrapped_keys") as? Map<String, String>).orEmpty()
+        val wrapped = row.get("wrapped_keys").cloudStringMap().orEmpty()
+        val deviceWrapped = row.get("device_wrapped_keys").cloudStringMap().orEmpty()
         val accountWrapped = (row.get("account_wrapped_keys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
             val id = uid as? String ?: return@mapNotNull null
             val fields = value as? Map<*, *> ?: return@mapNotNull null
@@ -552,7 +552,8 @@ class SafetyDocumentRepository(
                 ?: row.getString("file_name").orEmpty().ifBlank { "Encrypted document" },
             mimeType = metadata?.optString("mimeType")?.takeIf(String::isNotBlank)
                 ?: row.getString("file_type").orEmpty().ifBlank { "application/octet-stream" },
-            allowedUsers = (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            allowedUsers = ((row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty() +
+                if (!row.getString("emergency_id").isNullOrBlank()) listOf(viewerUid) else emptyList()).distinct(),
             createdAt = row.getTimestamp("created_at")?.toDate()?.time ?: 0,
             ocrText = ocr?.text,
             ocrConfidence = ocr?.confidence,
@@ -588,6 +589,17 @@ class IndexedSafetyDocumentRepository(
     private val index: DocumentIndexDataSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SafetyDocumentDataSource {
+    override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
+        remote.setEvidence(document, ownerUid, evidence)
+        // The acknowledged write must also survive an offline fallback before the listener catches up.
+        val cached = index.read(ownerUid)
+        if (cached.documents.any { it.id == document.id }) index.replace(
+            ownerUid,
+            cached.documents.map { if (it.id == document.id) it.copy(evidence = evidence) else it },
+            cached.lastSyncedAt ?: clock(),
+        )
+    }
+
     override suspend fun listFor(uid: String): DocumentListSnapshot = try {
         persist(uid, remote.listFor(uid))
     } catch (failure: Exception) {

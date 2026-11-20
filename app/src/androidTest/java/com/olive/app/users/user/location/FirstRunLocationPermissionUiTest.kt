@@ -1,11 +1,13 @@
-// Tests first-run permission order after a user denies a prompt.
+// Tests that account setup leaves sensitive permissions for their features.
 package com.olive.app
 
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.Manifest
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.pm.PackageManager
-import android.view.accessibility.AccessibilityNodeInfo
+import android.os.Build
+import android.os.ParcelFileDescriptor
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.DeliveryAddress
@@ -16,31 +18,9 @@ import org.junit.Test
 
 // This class sorts before tests that deliberately grant permissions for unrelated feature flows.
 class FirstRunLocationPermissionUiTest : OliveUiTestBase() {
-    private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
-    // Checks the find step with the test's sample data.
-    private fun find(node: AccessibilityNodeInfo?, suffix: String): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.viewIdResourceName?.endsWith(suffix) == true) return node
-        for (index in 0 until node.childCount) find(node.getChild(index), suffix)?.let { return it }
-        return null
-    }
-
-    // Checks the permission button step with the test's sample data.
-    private fun permissionButton(suffix: String) {
-        compose.waitUntil(20_000) {
-            find(automation.rootInActiveWindow, suffix)
-                ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-        }
-    }
-
     @Test
-    // Checks that first-run permissions appear in order and denial does not cancel account setup.
-    fun onboardingRequestsFeaturePermissionsAndCompletesAfterDenials() {
+    fun onboardingCompletesWithoutRequestingSensitiveFeaturePermissions() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        automation.serviceInfo = automation.serviceInfo.apply {
-            flags =
-                flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
-        }
         assertNotEquals(
             PackageManager.PERMISSION_GRANTED,
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION),
@@ -81,16 +61,59 @@ class FirstRunLocationPermissionUiTest : OliveUiTestBase() {
             "123456"
         )
         click("pin_setup_submit")
-        // Local test mode intentionally skips notifications; location follows the completed onboarding step directly.
-        permissionButton("/permission_deny_button")
-        // Camera and microphone follow immediately; denying either must still finish onboarding normally.
-        permissionButton("/permission_deny_button")
-        permissionButton("/permission_deny_button")
+        compose.waitUntil(10_000) { session.screen == SessionScreen.Cover }
         assertTrue(session.account.configured)
         assertEquals(SessionScreen.Cover, session.screen)
         assertNotEquals(
             PackageManager.PERMISSION_GRANTED,
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION),
         )
+        unlock()
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Location) }
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        }
+        fun isPermissionScreen(): Boolean {
+            val systemPackage = automation.rootInActiveWindow?.packageName?.toString().orEmpty()
+            return systemPackage.endsWith("permissioncontroller") || systemPackage == "com.android.settings"
+        }
+        compose.waitUntil(10_000) {
+            val window = automation.rootInActiveWindow ?: return@waitUntil false
+            val allow = window.findAccessibilityNodeInfosByViewId(
+                "${window.packageName}:id/permission_allow_foreground_only_button"
+            ).firstOrNull() ?: window.findAccessibilityNodeInfosByText("While using the app").firstOrNull()
+                ?: return@waitUntil false
+            val button = generateSequence(allow) { it.parent }.firstOrNull { it.isClickable }
+            button?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) == true
+        }
+        compose.waitUntil(10_000) { !isPermissionScreen() }
+        waitFor("location_back")
+        assertEquals(SessionScreen.Safe, session.screen)
+        assertEquals(SafePage.Location, session.page)
+        assertTrue(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+        assertNotEquals(PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            click("background_location")
+            click("background_location_continue")
+            compose.waitUntil(10_000) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val option = context.packageManager.backgroundPermissionOptionLabel.toString()
+                    automation.rootInActiveWindow?.findAccessibilityNodeInfosByText(option)?.isNotEmpty() == true
+                } else {
+                    isPermissionScreen()
+                }
+            }
+            assertEquals(SessionScreen.Safe, session.screen)
+            ParcelFileDescriptor.AutoCloseInputStream(
+                automation.executeShellCommand("input keyevent KEYCODE_BACK")
+            ).use { it.readBytes() }
+            compose.waitUntil(10_000) { !isPermissionScreen() }
+            waitFor("location_back")
+            assertEquals(SessionScreen.Safe, session.screen)
+            assertEquals(SafePage.Location, session.page)
+        }
     }
 }

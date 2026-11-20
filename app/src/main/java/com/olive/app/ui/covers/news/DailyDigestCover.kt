@@ -37,6 +37,7 @@ import com.olive.app.data.news.NewsFeedCacheStore
 import com.olive.app.data.news.NewsScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
@@ -50,12 +51,18 @@ internal fun NewsCover(
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
-    var tab by remember { mutableStateOf("Today") }
-    var scope by remember { mutableStateOf(NewsScope.LOCAL) }
+    var tab by rememberSaveable(session.coverAccountId) { mutableStateOf("Today") }
+    var scope by rememberSaveable(session.coverAccountId) { mutableStateOf(NewsScope.LOCAL) }
     var query by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<NewsArticle?>(null) }
+    val articleSaver = remember {
+        androidx.compose.runtime.saveable.Saver<NewsArticle?, String>(
+            save = { it?.toJson()?.toString() },
+            restore = { runCatching { NewsArticle.fromJson(org.json.JSONObject(it)) }.getOrNull() },
+        )
+    }
+    var selected by rememberSaveable(session.coverAccountId, stateSaver = articleSaver) { mutableStateOf<NewsArticle?>(null) }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var completedRequest by remember { mutableStateOf<List<Any>?>(null) }
     var newsError by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
     val tabHistory = remember { mutableListOf<String>() }
@@ -96,22 +103,18 @@ internal fun NewsCover(
             }
         }
     }
-    LaunchedEffect(
+    val request = listOf(
         session.language,
         scope,
         refresh,
         session.coverReset,
         fallbackPlace,
         locationPermissionVersion,
-        customPlace
-    ) {
-        val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
-        if (cached != null) {
-            articles = cached.articles
-            if (scope == NewsScope.LOCAL && customPlace.isBlank() && cached.place.isNotBlank()) currentPlace =
-                cached.place
-        }
-        loading = articles.isEmpty()
+        customPlace,
+        locationPreferenceKey,
+    )
+    val loading = request != completedRequest
+    LaunchedEffect(request) {
         newsError = false
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
@@ -131,19 +134,43 @@ internal fun NewsCover(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) { // Keep cached articles visible; show the error state only when no news is available.
-            newsError = articles.isEmpty()
+        } catch (_: Exception) {
+            val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
+            articles = cached?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
+            newsError = true
         }
-        loading = false
+        completedRequest = request
     }
+    LaunchedEffect(query) {
+        if (session.account.interceptSearchAsync(query)) query = ""
+    }
+    LaunchedEffect(locationEditorOpen, locationDraft) {
+        if (locationEditorOpen && session.account.interceptSearchAsync(locationDraft)) locationDraft = ""
+    }
+    val locationSaveScope = rememberCoroutineScope()
+    var savingLocation by remember { mutableStateOf(false) }
     if (locationEditorOpen) NewsLocationDialog(locationDraft, { value ->
-        locationDraft = if (!session.account.interceptSearch(value)) value.take(120) else ""
+        locationDraft = value.take(120)
     }, onDismiss = { locationEditorOpen = false }, onSave = {
-        customPlace = locationDraft.trim()
-        currentPlace = customPlace
-        locationPreferences.edit { putString(locationPreferenceKey, customPlace) }
-        locationEditorOpen = false
-        refresh++
+        if (!savingLocation) {
+            val candidate = locationDraft
+            savingLocation = true
+            locationSaveScope.launch {
+                try {
+                    if (!session.account.interceptSearchAsync(candidate) &&
+                        locationEditorOpen && locationDraft == candidate
+                    ) {
+                        customPlace = candidate.trim()
+                        currentPlace = customPlace
+                        locationPreferences.edit { putString(locationPreferenceKey, customPlace) }
+                        locationEditorOpen = false
+                        refresh++
+                    }
+                } finally {
+                    savingLocation = false
+                }
+            }
+        }
     }, onUseDeviceLocation = {
         customPlace = ""
         currentPlace = fallbackPlace
@@ -243,7 +270,7 @@ internal fun NewsCover(
                 NewsFeedState(tab, scope, query, articles, saved, loading, newsError, currentPlace),
                 NewsFeedActions(
                     search = { value ->
-                        query = if (!session.account.interceptSearch(value)) value else ""
+                        query = value
                     },
                     changeScope = { scope = it },
                     editLocation = {

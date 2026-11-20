@@ -384,10 +384,11 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
   const snapshot = await mediaRef(mediaId).get();
   if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
   const value = snapshot.data();
-  if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
+  const emergencyAccess = await require("./emergencyReports").canReadEmergencyMedia(value, uid, mediaId);
+  if ((!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) && !emergencyAccess) {
     throw new HttpsError("permission-denied", "Media access was denied");
   }
-  await requireActivePlanGrant(value.owner_id, mediaId, uid);
+  if (!emergencyAccess) await requireActivePlanGrant(value.owner_id, mediaId, uid);
   const url = await getSignedUrl(
     client(),
     new GetObjectCommand({ Bucket: bucketName.value(), Key: value.object_key }),

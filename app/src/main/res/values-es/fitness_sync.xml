@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_connect_health">Conectar Health Connect</string>
+    <string name="fitness_health_permissions">Permisos de salud</string>
+    <string name="fitness_health_privacy">Olive Fitness lee pasos y frecuencia cardiaca para actualizar tu historial. El acceso en segundo plano permite sincronizar con la aplicación cerrada. Los datos se guardan en privado en tu perfil de Firebase. Puedes revocar los permisos en Health Connect.</string>
+    <string name="fitness_sync_pending">Sincronización no disponible. Los cambios se guardan en este dispositivo y se reintentará.</string>
+</resources>

@@ -1,5 +1,5 @@
 // Tests the olive memory cover game's board and controls.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverageFixture";
 
 // Inputs: the values in this case. Expected: every board stays inside its play area and controls remain reachable without horizontal page scrolling.
 test("all board sizes stay usable without horizontal scrolling", async ({

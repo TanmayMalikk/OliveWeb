@@ -12,11 +12,16 @@ import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Clock
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.FrameDropEffect
+import androidx.media3.datasource.DataSourceBitmapLoader
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.transformer.AudioEncoderSettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.DefaultEncoderFactory
+import androidx.media3.transformer.DefaultDecoderFactory
+import androidx.media3.transformer.DefaultAssetLoaderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
@@ -62,7 +67,15 @@ internal class VideoMediaCompressor(private val context:Context) {
             File.createTempFile(OUTPUT_PREFIX, ".mp4", outputFolder)
         }
         try {
-            export(source,output,target,bitrate,input.frameRate)
+            try {
+                export(source,output,target,bitrate,input.frameRate)
+            } catch (failure:ExportException) {
+                // Some vendor decoders initialize successfully but fail on the first sample.
+                // Retry once with a software decoder before retaining the original video.
+                if (failure.errorCode != ExportException.ERROR_CODE_DECODING_FAILED) throw failure
+                output.delete()
+                export(source,output,target,bitrate,input.frameRate,softwareDecoder = true)
+            }
             require(output.isFile && output.length()>0) { "Video compression produced an empty result" }
             val exported=inspect(output)
             require(maxOf(exported.width,exported.height)<=MAX_LONG_SIDE &&
@@ -73,7 +86,10 @@ internal class VideoMediaCompressor(private val context:Context) {
                 output.delete()
                 original(source,declaredMimeType)
             }
-        } catch(_:ExportException) {
+        } catch(failure:ExportException) {
+            if (com.olive.app.BuildConfig.DEBUG) android.util.Log.d(
+                "OliveVideoCompression", "Codec fallback errorCode=${failure.errorCode}",
+            )
             output.delete()
             return original(source,declaredMimeType)
         } catch(_:OutOfMemoryError) {
@@ -139,6 +155,7 @@ internal class VideoMediaCompressor(private val context:Context) {
         target:Pair<Int,Int>,
         bitrate:Int,
         sourceFrameRate:Float,
+        softwareDecoder:Boolean = false,
     ):Unit =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -180,7 +197,17 @@ internal class VideoMediaCompressor(private val context:Context) {
                     .setRequestedAudioEncoderSettings(
                         AudioEncoderSettings.Builder().setBitrate(AUDIO_BITRATE).build())
                     .build()
+                val decoder=DefaultDecoderFactory.Builder(context)
+                        .setEnableDecoderFallback(true)
+                        .apply {
+                            if (softwareDecoder) setMediaCodecSelector { mime, secure, tunneled ->
+                                MediaCodecSelector.DEFAULT.getDecoderInfos(mime,secure,tunneled)
+                                    .filter { it.softwareOnly }
+                            }
+                        }.build()
                 transformer=Transformer.Builder(context)
+                    .setAssetLoaderFactory(DefaultAssetLoaderFactory(
+                        context,decoder,Clock.DEFAULT,null,DataSourceBitmapLoader(context)))
                     .setEncoderFactory(encoder)
                     .setVideoMimeType(MimeTypes.VIDEO_H264)
                     .setAudioMimeType(MimeTypes.AUDIO_AAC)

@@ -2,6 +2,7 @@
 package com.olive.app.ui.users.user.location
 
 
+import com.olive.app.ui.shared.SkeletonLayout
 import android.annotation.SuppressLint
 import android.webkit.JavascriptInterface
 import android.graphics.Color
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -32,7 +35,6 @@ import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +51,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -57,8 +61,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.NearbySupportService
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -78,8 +88,12 @@ internal fun InteractiveLocationMap(
     navigationActive: Boolean = false,
     detailsOnlyForSelectedPoint: Boolean = false,
     userSearchEnabled: Boolean = false,
+    initialFollowUid: String? = null,
     selectedLocation: Pair<Double, Double>? = null,
     onSelectedLocationChange: ((Double, Double) -> Unit)? = null,
+    supportServices: List<NearbySupportService> = emptyList(),
+    onSupportSelected: ((NearbySupportService) -> Unit)? = null,
+    onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
@@ -91,11 +105,21 @@ internal fun InteractiveLocationMap(
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var routeWasShown by remember { mutableStateOf(false) }
+    var supportWereFitted by remember { mutableStateOf(false) }
+    val currentSupportServices by rememberUpdatedState(supportServices)
+    val currentSupportSelection by rememberUpdatedState(onSupportSelected)
+    val currentViewportCallback by rememberUpdatedState(onViewportCenterChanged)
     val followTargetUid = selectedFollowUid ?: if (navigationActive) ownPointUid
     else points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
     val matchingUsers = remember(points, searchQuery) {
         points.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
             .sortedBy { it.name.lowercase() }
+    }
+    LaunchedEffect(initialFollowUid) {
+        if (initialFollowUid != null) {
+            selectedFollowUid = initialFollowUid
+            following = true
+        }
     }
 
     LaunchedEffect(attempt) {
@@ -148,6 +172,18 @@ internal fun InteractiveLocationMap(
         )
     }
 
+    fun updateSupportServices(view: WebView) {
+        val encoded = JSONArray().apply {
+            supportServices.forEach { service -> put(JSONObject().apply {
+                put("id", service.id); put("name", service.name)
+                put("latitude", service.latitude); put("longitude", service.longitude)
+            }) }
+        }
+        val fit = !supportWereFitted && supportServices.isNotEmpty() && !navigationActive
+        view.evaluateJavascript("window.oliveSetServices($encoded,$fit);", null)
+        if (fit) supportWereFitted = true
+    }
+
     // Draws the current navigation route and can fit the camera around it.
     fun updateRoute(view: WebView, fitRoute: Boolean) {
         val encoded = JSONArray().apply {
@@ -181,19 +217,19 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Ready) webView[0]?.evaluateJavascript(
             "window.oliveSetFollow(" +
                 "$following,${JSONObject.quote(followTargetUid.orEmpty())}," +
-                "${userSearchEnabled && selectedFollowUid != null});",
+                "${selectedFollowUid != null && (userSearchEnabled || initialFollowUid != null)});",
             null
         )
     }
 
     LaunchedEffect(navigationActive) {
-        following = navigationActive
+        if (initialFollowUid == null || navigationActive) following = navigationActive
         if (!navigationActive) routeWasShown = false
     }
 
     // Stops following when the selected user is no longer available in the organization feed.
     LaunchedEffect(points, selectedFollowUid) {
-        if (selectedFollowUid != null && points.none { it.uid == selectedFollowUid }) {
+        if (selectedFollowUid != null && selectedFollowUid != initialFollowUid && points.none { it.uid == selectedFollowUid }) {
             selectedFollowUid = null
             following = false
         }
@@ -260,6 +296,16 @@ internal fun InteractiveLocationMap(
                         settings.allowContentAccess = false
                         settings.allowFileAccess = true
                         settings.setSupportZoom(false)
+                        if (onViewportCenterChanged != null) addJavascriptInterface(
+                            LocationSelectionBridge { latitude, longitude ->
+                                currentViewportCallback?.invoke(latitude, longitude)
+                            }, "OliveMapViewport",
+                        )
+                        if (onSupportSelected != null) addJavascriptInterface(
+                            SupportSelectionBridge { id ->
+                                currentSupportServices.firstOrNull { it.id == id }?.let { currentSupportSelection?.invoke(it) }
+                            }, "OliveSupportSelection",
+                        )
                         if (onSelectedLocationChange != null) {
                             addJavascriptInterface(
                                 LocationSelectionBridge(onSelectedLocationChange),
@@ -270,6 +316,9 @@ internal fun InteractiveLocationMap(
                             // The bundled map uses its page title to report that JavaScript is ready.
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 if (title == MAP_READY_TITLE) loadState = MapLoadState.Ready
+                                if (title == MAP_READY_TITLE && onViewportCenterChanged != null) {
+                                    view.evaluateJavascript("window.oliveReportMapCenter();", null)
+                                }
                             }
                         }
                         webViewClient = object : WebViewClient() {
@@ -303,9 +352,10 @@ internal fun InteractiveLocationMap(
                     resizeMap(view)
                     if (loadState == MapLoadState.Ready) {
                         updatePoints(view, false)
-                        if (userSearchEnabled && selectedFollowUid != null) {
+                        updateSupportServices(view)
+                        if ((userSearchEnabled || initialFollowUid != null) && selectedFollowUid != null) {
                             view.evaluateJavascript(
-                                "window.oliveSetFollow(true,${JSONObject.quote(selectedFollowUid)},false);",
+                                "window.oliveSetFollow($following,${JSONObject.quote(selectedFollowUid)},false);",
                                 null,
                             )
                         }
@@ -323,9 +373,9 @@ internal fun InteractiveLocationMap(
         }
         // Shows map loading, retry, or nothing once the map is ready.
         when (loadState) {
-            MapLoadState.Loading -> CircularProgressIndicator(
-                Modifier.align(Alignment.Center).testTag("map_loading")
-            )
+MapLoadState.Loading -> Surface(Modifier.fillMaxSize().testTag("map_loading")) {
+                com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Map, Modifier.fillMaxSize().padding(12.dp))
+            }
 
             MapLoadState.Error -> Column(
                 Modifier.align(Alignment.Center).padding(24.dp),
@@ -390,6 +440,48 @@ internal fun InteractiveLocationMap(
             }
         }
 
+        if (userSearchEnabled && following) {
+            points.firstOrNull { it.uid == selectedFollowUid }?.let { point ->
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth()
+                        .testTag("followed_user_coordinates"),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    shadowElevation = 6.dp,
+                ) {
+                    Column(
+                        Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(point.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (point.live && !point.lastKnown) R.string.organization_map_live else R.string.location_last_known),
+                            color = if (point.live && !point.lastKnown) OliveGreen else Muted,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Text(
+                            stringResource(R.string.incident_latitude) + ": " + point.latitude.toString(),
+                            modifier = Modifier.testTag("followed_user_latitude"),
+                        )
+                        Text(
+                            stringResource(R.string.incident_longitude) + ": " + point.longitude.toString(),
+                            modifier = Modifier.testTag("followed_user_longitude"),
+                        )
+                        point.accuracy?.takeIf { it.isFinite() && it >= 0 }?.let {
+                            Text(stringResource(R.string.organization_map_accuracy, it.toDouble()), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (point.updatedAt > 0) Text(
+                            stringResource(
+                                R.string.organization_map_updated,
+                                DateTimeFormatter.ofPattern("MMM d, HH:mm:ss").withZone(ZoneId.systemDefault())
+                                    .format(Instant.ofEpochMilli(point.updatedAt)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Muted,
+                        )
+                    }
+                }
+            }
+        }
         if (searchOpen && userSearchEnabled) {
             AlertDialog(
                 onDismissRequest = { searchOpen = false },
@@ -460,6 +552,14 @@ private class LocationSelectionBridge(
         if (latitude in -90.0..90.0 && longitude in -180.0..180.0) {
             mainHandler.post { onChange(latitude, longitude) }
         }
+    }
+
+}
+
+private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
+    private val handler = Handler(Looper.getMainLooper())
+    @JavascriptInterface fun selected(id: String) {
+        if (id.length in 1..512) handler.post { onSelected(id) }
     }
 }
 

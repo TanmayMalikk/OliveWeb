@@ -14,7 +14,12 @@ import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -50,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.safety.SafetyDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,6 +64,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
+import kotlin.math.abs
 
 
 // Opens an in-app image, video, PDF, or text viewer for a safety document.
@@ -93,8 +101,9 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         HorizontalDivider()
         // Opens the correct in-app viewer for an image, video, PDF, or text document.
         when {
+            pickerMediaKind(document.mimeType) == MediaKind.AUDIO -> UnsupportedViewer()
             document.mimeType.startsWith("image/") -> ImageViewer(file, document.name)
-            document.mimeType.startsWith("video/") -> VideoViewer(file)
+            document.mimeType.startsWith("video/") -> key(file) { VideoViewer(file) }
             document.mimeType == "application/pdf" || file.extension.equals(
                 "pdf",
                 true
@@ -119,8 +128,10 @@ private fun ImageViewer(file: File, name: String) {
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
-    val image by produceState<Bitmap?>(null, file) {
-        value = withContext(Dispatchers.IO) { decodeImageWithExif(file) }
+    val image by key(file) {
+        produceState<Result<Bitmap>?>(null) {
+            value = withContext(Dispatchers.IO) { runCatching { requireNotNull(decodeImageWithExif(file)) } }
+        }
     }
     val zoomPercent = (scale * 100).toInt()
     val zoomIn = stringResource(R.string.a11y_zoom_in)
@@ -157,8 +168,9 @@ private fun ImageViewer(file: File, name: String) {
         }
     }
     Box(imageModifier, contentAlignment = Alignment.Center) {
-        val bitmap = image
-        if (bitmap == null) CircularProgressIndicator()
+        val bitmap = image?.getOrNull()
+        if (image == null) LoadingSkeleton(SkeletonLayout.Image, Modifier.fillMaxWidth().padding(16.dp))
+        else if (bitmap == null) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
         else Image(
             bitmap.asImageBitmap(), contentDescription = name, contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize().graphicsLayer(
@@ -188,6 +200,8 @@ private fun ImageViewer(file: File, name: String) {
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
+    var ready by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
     var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
     // Prepare and release video playback with the viewer lifecycle.
@@ -205,19 +219,29 @@ private fun VideoViewer(file: File) {
                 setMediaController(
                     controls
                 )
-                setVideoPath(file.absolutePath)
                 setOnPreparedListener {
                     it.isLooping = false
                     seekTo(1)
+                    ready = true
                 }
+                setOnErrorListener { _, _, _ ->
+                    failed = true
+                    true
+                }
+                setVideoPath(file.absolutePath)
                 player = this
             }
+        }, update = { view ->
+            view.alpha = if (ready && !failed) 1f else 0f
+            view.isEnabled = ready && !failed
         }, modifier = Modifier.fillMaxSize().graphicsLayer(
             scaleX = scale,
             scaleY = scale,
             rotationZ = rotation.toFloat(),
         ))
-        ZoomControls(
+        if (failed) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
+        else if (!ready) LoadingSkeleton(SkeletonLayout.Video, Modifier.fillMaxWidth().padding(16.dp))
+        else ZoomControls(
             scale = scale,
             onZoomOut = { scale = (scale / 1.25f).coerceAtLeast(1f) },
             onReset = { scale = 1f },
@@ -228,7 +252,7 @@ private fun VideoViewer(file: File) {
     }
 }
 
-private data class PdfPage(val bitmap: Bitmap, val count: Int)
+private data class PdfPage(val bitmap: Bitmap, val count: Int, val index: Int)
 
 // Renders a saved PDF one page at a time inside the app.
 @Composable
@@ -238,8 +262,11 @@ private fun PdfViewer(file: File) {
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
-    val rendered by produceState<PdfPage?>(null, file, page) {
-        value = withContext(Dispatchers.IO) { renderPdfPage(file, page) }
+    var rendered by remember(file) { mutableStateOf<PdfPage?>(null) }
+    var failedPage by remember(file, page) { mutableStateOf(false) }
+    LaunchedEffect(file, page) {
+        val result = withContext(Dispatchers.IO) { runCatching { renderPdfPage(file, page) } }
+        result.onSuccess { rendered = it }.onFailure { failedPage = true }
     }
     LaunchedEffect(page) {
         scale = 1f
@@ -247,68 +274,95 @@ private fun PdfViewer(file: File) {
         offsetY = 0f
     }
     val result = rendered
-    if (result == null) Box(
-        Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) { CircularProgressIndicator() }
-    else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier.weight(1f).fillMaxWidth().clipToBounds().pointerInput(page) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    offsetX += pan.x
-                    offsetY += pan.y
-                    if (scale == 1f) { offsetX = 0f; offsetY = 0f }
-                }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                result.bitmap.asImageBitmap(),
-                contentDescription = stringResource(
-                    R.string.documents_pdf_page,
-                    page + 1,
-                    result.count
-                ),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(8.dp).graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                    rotationZ = rotation.toFloat(),
-                )
-            )
-            ZoomControls(
-                scale = scale,
-                onZoomOut = {
-                    scale = (scale / 1.25f).coerceAtLeast(1f)
-                    if (scale == 1f) { offsetX = 0f; offsetY = 0f }
-                },
-                onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
-                onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
-                onRotate = { rotation = (rotation + 90) % 360 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(
-                onClick = { page-- },
-                enabled = page > 0
+    when {
+        result == null && failedPage -> AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
+        result == null -> Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) { LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp)) }
+        else -> Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Keep page controls above the preview, clear of floating safety actions.
+            Row(
+                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.NavigateBefore,
-                    stringResource(R.string.ui_previous_safe_page)
+                IconButton(onClick = { page-- }, enabled = page > 0,
+                    modifier = Modifier.testTag("pdf_previous_page")) {
+                    Icon(Icons.AutoMirrored.Outlined.NavigateBefore, stringResource(R.string.ui_previous_safe_page))
+                }
+                Text(stringResource(R.string.documents_pdf_page, page + 1, result.count),
+                    modifier = Modifier.testTag("pdf_page_number"))
+                IconButton(onClick = { page++ }, enabled = page + 1 < result.count,
+                    modifier = Modifier.testTag("pdf_next_page")) {
+                    Icon(Icons.AutoMirrored.Outlined.NavigateNext, stringResource(R.string.next))
+                }
+            }
+            Box(
+                Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("pdf_page_content").pointerInput(file, page, result.count) {
+                    val swipeThreshold = 72.dp.toPx()
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        var swipeEligible = scale <= 1.01f
+                        var dragX = 0f
+                        var dragY = 0f
+                        var cancelled = false
+                        do {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.isConsumed }) cancelled = true
+                            if (event.changes.count { it.pressed || it.previousPressed } > 1) swipeEligible = false
+                            val pan = event.calculatePan()
+                            val zoom = event.calculateZoom()
+                            if (!cancelled) {
+                                dragX += pan.x
+                                dragY += pan.y
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1.01f) swipeEligible = false
+                                offsetX = if (scale > 1f) offsetX + pan.x else 0f
+                                offsetY = if (scale > 1f) offsetY + pan.y else 0f
+                                if (pan.x != 0f || pan.y != 0f || zoom != 1f) {
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        // One page per completed horizontal swipe; zoomed gestures remain pans.
+                        if (!cancelled && swipeEligible && abs(dragX) >= swipeThreshold && abs(dragX) > abs(dragY) * 1.5f) {
+                            page = (page + if (dragX < 0f) 1 else -1).coerceIn(0, result.count - 1)
+                        }
+                    }
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (failedPage) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
+                else if (result.index != page) LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp))
+                else Image(
+                    result.bitmap.asImageBitmap(),
+                    contentDescription = stringResource(
+                        R.string.documents_pdf_page,
+                        page + 1,
+                        result.count
+                    ),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(8.dp).graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY,
+                        rotationZ = rotation.toFloat(),
+                    )
+                )
+                ZoomControls(
+                    scale = scale,
+                    onZoomOut = {
+                        scale = (scale / 1.25f).coerceAtLeast(1f)
+                        if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                    },
+                    onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
+                    onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+                    onRotate = { rotation = (rotation + 90) % 360 },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
                 )
             }
-            Text(stringResource(R.string.documents_pdf_page, page + 1, result.count))
-            IconButton(
-                onClick = { page++ },
-                enabled = page + 1 < result.count
-            ) { Icon(Icons.AutoMirrored.Outlined.NavigateNext, stringResource(R.string.next)) }
         }
     }
 }
@@ -324,7 +378,7 @@ private fun renderPdfPage(file: File, index: Int): PdfPage {
                     createBitmap((page.width * ratio).toInt(), (page.height * ratio).toInt())
                 bitmap.eraseColor(android.graphics.Color.WHITE)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                return PdfPage(bitmap, renderer.pageCount)
+return PdfPage(bitmap, renderer.pageCount, safeIndex)
             }
         }
     }
@@ -334,17 +388,20 @@ private fun renderPdfPage(file: File, index: Int): PdfPage {
 @Composable
 private fun TextViewer(file: File, docx: Boolean) {
     var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
-    val content by produceState<String?>(null, file) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                if (docx) readDocx(file) else file.readText().take(500_000)
-            }.getOrNull()
+    val content by key(file, docx) {
+        produceState<Result<String>?>(null) {
+            value = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (docx) readDocx(file) else file.readText().take(500_000)
+                }
+            }
         }
     }
     if (content == null) Box(
         Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
-    ) { CircularProgressIndicator() }
+    ) { LoadingSkeleton(SkeletonLayout.TextDocument, Modifier.fillMaxWidth().padding(16.dp), rows = 3) }
+    else if (content?.isFailure == true) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
     else Column(Modifier.fillMaxSize()) {
         ZoomControls(
             scale = scale,
@@ -355,7 +412,7 @@ private fun TextViewer(file: File, docx: Boolean) {
         )
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp)) {
             item {
-                Text(content!!, fontSize = (16f * scale).sp)
+                Text(content?.getOrNull().orEmpty(), fontSize = (16f * scale).sp)
             }
         }
     }
@@ -374,8 +431,15 @@ private fun ZoomControls(
     modifier: Modifier = Modifier,
 ) {
     val resetDescription = stringResource(R.string.a11y_reset_zoom)
-    Surface(modifier, shape = MaterialTheme.shapes.extraLarge, tonalElevation = 4.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Surface(
+        modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = Paper,
+        contentColor = Ink,
+        border = BorderStroke(1.dp, OliveOutline),
+        shadowElevation = 4.dp,
+    ) {
+        FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
             if (onRotate != null) IconButton(
                 onClick = onRotate,
                 modifier = Modifier.testTag("media_rotate"),
@@ -442,8 +506,8 @@ private fun readDocx(file: File): String {
         val text = StringBuilder()
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && text.length < 500_000) {
-            if (event == XmlPullParser.START_TAG && parser.name.endsWith("t")) text.append(parser.nextText())
-            else if (event == XmlPullParser.END_TAG && parser.name.endsWith("p")) text.append('\n')
+            if (event == XmlPullParser.START_TAG && parser.name.substringAfterLast(':') == "t") text.append(parser.nextText())
+            else if (event == XmlPullParser.END_TAG && parser.name.substringAfterLast(':') == "p") text.append('\n')
             event = parser.next()
         }
         return text.toString().trim()

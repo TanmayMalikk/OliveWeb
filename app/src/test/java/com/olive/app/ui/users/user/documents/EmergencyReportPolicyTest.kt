@@ -11,6 +11,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmergencyReportPolicyTest {
+    @Test
+    fun reportFormatsValidDatesAndFlagsLegacyInvalidDatesWithoutChangingTheirValue() {
+        assertEquals("Feb 29, 2024", emergencyIncidentDate("2024-02-29"))
+        assertEquals("Not provided", emergencyIncidentDate(""))
+        assertTrue(emergencyIncidentDate("222222-02-22").contains("Invalid saved date: 222222-02-22"))
+    }
     // Input: one full address and one city-only profile. Expected: the most useful available address is shown.
     @Test
     fun addressUsesStreetWhenPresentAndFallsBackToCityRegion() {

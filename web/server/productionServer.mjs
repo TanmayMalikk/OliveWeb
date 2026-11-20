@@ -2,11 +2,15 @@
 import "./serverEnvironment.mjs";
 import { resolve } from "node:path";
 import express from "express";
+import { readFile } from "node:fs/promises";
+import { renderPageHtml } from "./pageSecurity.mjs";
 import { createServerApp } from "./httpApp.mjs";
 const app = createServerApp();
 const dist = resolve(import.meta.dirname, "../dist");
+const template = await readFile(resolve(dist, "index.html"), "utf8");
 app.use(
   express.static(dist, {
+    index: false,
     maxAge: "1h",
     setHeaders(res, path) {
       if (/[/\\]assets[/\\]/i.test(path)) {
@@ -27,7 +31,7 @@ app.use((req, res, next) => {
     return next();
   }
   res.setHeader("Cache-Control", "no-store");
-  return res.sendFile(resolve(dist, "index.html"));
+  return res.type("html").send(renderPageHtml(template, res.locals.publicAdNonce));
 });
 app.listen(
   Number(process.env.PORT ?? 4173),

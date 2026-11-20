@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_connect_health">Connecter Health Connect</string>
+    <string name="fitness_health_permissions">Autorisations santé</string>
+    <string name="fitness_health_privacy">Olive Fitness lit les pas et la fréquence cardiaque pour mettre à jour votre historique. L’accès en arrière-plan permet une synchronisation lorsque l’application est fermée. Les données sont privées dans votre profil Firebase. Vous pouvez retirer les autorisations dans Health Connect.</string>
+    <string name="fitness_sync_pending">Synchronisation indisponible. Les modifications sont conservées sur cet appareil et seront réessayées.</string>
+</resources>

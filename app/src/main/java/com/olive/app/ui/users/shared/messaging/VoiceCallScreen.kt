@@ -52,8 +52,7 @@ internal fun IncomingCallDialog(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     onQuickExit: (() -> Unit)?,
-) = FullScreenCallDialog(onBack = onDecline) {
-    onQuickExit?.let { QuickExitCallButton(it, Modifier.align(Alignment.End)) }
+) = FullScreenCallDialog(onBack = onDecline, onQuickExit = onQuickExit) {
     Spacer(Modifier.height(20.dp))
     CallIdentity(
         name = invitation.name.ifBlank { stringResource(R.string.ui_voice_call) },
@@ -91,9 +90,9 @@ internal fun ActiveCallDialog(
     onFinish: () -> Unit,
     onMinimize: () -> Unit,
     onQuickExit: (() -> Unit)?,
-) = FullScreenCallDialog(onBack = onMinimize) {
+) = FullScreenCallDialog(onBack = onMinimize, onQuickExit = onQuickExit) {
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().padding(end = if (onQuickExit == null) 0.dp else 64.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -114,8 +113,6 @@ internal fun ActiveCallDialog(
                 stringResource(R.string.ui_minimize_call),
             )
         }
-        Spacer(Modifier.width(10.dp))
-        onQuickExit?.let { QuickExitCallButton(it) }
     }
     Spacer(Modifier.height(20.dp))
     val active = state as? VoipSessionState.Active
@@ -288,21 +285,9 @@ private fun Offset.coerceInside(parent: IntSize, child: IntSize): Offset = Offse
 )
 
 @Composable
-private fun QuickExitCallButton(onQuickExit: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onQuickExit,
-        colors = ButtonDefaults.buttonColors(containerColor = CallRed),
-        modifier = modifier.testTag("call_quick_exit"),
-    ) {
-        Icon(Icons.Outlined.Close, null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.quick_exit))
-    }
-}
-
-@Composable
 private fun FullScreenCallDialog(
     onBack: () -> Unit,
+    onQuickExit: (() -> Unit)?,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -322,14 +307,25 @@ private fun FullScreenCallDialog(
             onDispose { view.keepScreenOn = previous }
         }
         Surface(Modifier.fillMaxSize(), color = CallBackground) {
-            Column(
-                Modifier.fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 28.dp, vertical = 36.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = content,
-            )
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 28.dp, vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    content = content,
+                )
+                if (onQuickExit != null) FloatingActionButton(
+                    onClick = onQuickExit,
+                    containerColor = CallRed,
+                    contentColor = Color.White,
+                    modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
+                        .padding(top = 28.dp, end = 28.dp).testTag("call_quick_exit"),
+                ) {
+                    Icon(Icons.Outlined.Close, stringResource(R.string.a11y_quick_exit))
+                }
+            }
         }
     }
 }
@@ -365,7 +361,7 @@ private fun CallIdentity(
     Spacer(Modifier.height(10.dp))
     Text(
         status,
-        color = if (isError) MaterialTheme.colorScheme.error else Color.White.copy(alpha = .75f),
+        color = if (isError) OliveErrorContainer else Paper,
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
     )

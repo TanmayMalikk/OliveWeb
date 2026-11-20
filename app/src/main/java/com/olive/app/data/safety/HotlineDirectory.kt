@@ -6,6 +6,8 @@
 
 package com.olive.app.data.safety
 
+import android.content.Context
+
 import com.olive.app.data.account.DeliveryAddress
 import java.net.URI
 import java.text.Normalizer
@@ -26,6 +28,7 @@ data class HotlineResource(
     val website: String,
     val source: String,
     val phoneUri: String,
+    val hours: String = "",
 )
 
 /** Searchable view of Lars's province-specific hotline and shelter datasets. */
@@ -110,6 +113,13 @@ class HotlineDirectory private constructor(
                 .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
         // Reads province files from saved text.
+        fun readBundled(context: Context): HotlineDirectory = parseProvinceFiles(
+            context.assets.list("hotlines/provinces").orEmpty().associate { name ->
+                name.removePrefix("Resources").removeSuffix(".json") to
+                    context.assets.open("hotlines/provinces/$name").bufferedReader().use { it.readText() }
+            }
+        )
+
         fun parseProvinceFiles(files: Map<String, String>): HotlineDirectory {
             val expected = CanadianRegion.entries.map { it.code }.toSet()
             require(files.keys == expected) { "A hotline dataset is required for every Canadian province and territory" }
@@ -147,6 +157,7 @@ class HotlineDirectory private constructor(
                                 website = website,
                                 source = website,
                                 phoneUri = "tel:" + phone.filter { it.isDigit() || it == '+' },
+                                hours = row.optString("hours").trim(),
                             )
                         }
                     }

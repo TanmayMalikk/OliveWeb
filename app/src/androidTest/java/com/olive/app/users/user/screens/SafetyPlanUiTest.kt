@@ -1,6 +1,9 @@
 // Tests plan edits, quick exit, and trusted-contact sharing for users.
 package com.olive.app
 
+import com.olive.app.ui.shared.ResourceText
+import com.olive.app.ui.shared.localizedTitle
+
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
@@ -12,6 +15,7 @@ import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test
@@ -213,7 +217,11 @@ class SafetyPlanUiTest : OliveUiTestBase() {
             compose.onNodeWithTag("quick_exit")
                 .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
             waitCover()
-            compose.onNodeWithContentDescription("Returned to Olive")
+            val returnedToCover = compose.activity.getString(
+                R.string.a11y_returned_to_cover,
+                session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
+            )
+            compose.onNodeWithContentDescription(returnedToCover)
                 .assert(
                     SemanticsMatcher.expectValue(
                         SemanticsProperties.LiveRegion,
@@ -222,19 +230,48 @@ class SafetyPlanUiTest : OliveUiTestBase() {
                 )
             assertTrue(
                 "Quick-exit status must not move TalkBack focus",
-                talkBack.focused.none { it.contains("Returned to Olive") })
+                talkBack.focused.none { it.contains(returnedToCover) })
             assertNull(session.safetyPlans.plan)
             compose.onNodeWithTag("safety_plan_page").assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun checklistProgressUpdatesWhenAnItemIsChecked() {
+        val session = setup()
+        val progress = compose.onNodeWithTag("safety_checklist_progress")
+        val progressRange = SemanticsProperties.ProgressBarRangeInfo
+        val initialProgress = progress.fetchSemanticsNode().config[progressRange].current
+        compose.onNodeWithTag("safety_check_primary_documents_0").performScrollTo().performClick()
+        progress.assertIsDisplayed()
+        assertTrue(progress.fetchSemanticsNode().config[progressRange].current > initialProgress)
+
+        val documentsTab = compose.onNodeWithTag("safety_jump_documents")
+        val complete = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Complete")
+        documentsTab.assert(!complete)
+        compose.runOnIdle {
+            val documents = readSafetyChecklist(session.safetyPlans.plan!!.fields.getValue("primary_documents").value)
+            session.safetyPlans.edit("primary_documents", writeSafetyChecklist(documents.map { it.copy(checked = true) }))
+        }
+        documentsTab.assert(complete)
+        click("safety_backup")
+        documentsTab.assert(!complete)
+        progress.assertIsDisplayed()
+        click("safety_primary")
+        documentsTab.assert(complete)
     }
 
     // Checks the checklist ticks persist and document items are visible step with the test's sample data.
     @Test
     fun checklistTicksPersistAndDocumentItemsAreVisible() {
         val session = setup()
-        compose.onNodeWithTag("safety_save_status").assertTextEquals("Saved.")
+        compose.onNodeWithTag("safety_save_status").assertTextEquals(compose.activity.getString(R.string.safety_saved))
+        // This action now opens the attachment-source sheet before any system picker.
         compose.onNodeWithTag("safety_upload_primary_documents_0").performScrollTo()
-            .assertIsNotEnabled()
+            .assertIsEnabled().performClick()
+        waitFor("documents_choose_document")
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithTag("documents_choose_document").assertDoesNotExist()
         val originalCount =
             readSafetyChecklist(session.safetyPlans.plan!!.fields.getValue("primary_documents").value).size
         compose.onNodeWithTag("safety_check_primary_documents_0").performScrollTo().performClick()
@@ -272,11 +309,14 @@ class SafetyPlanUiTest : OliveUiTestBase() {
     // Checks the consultation explains local mode and document upload does not open apicker step with the test's sample data.
     @Test
     fun consultationExplainsLocalModeAndDocumentUploadDoesNotOpenAPicker() {
-        setup()
+        val session = setup()
         compose.onNodeWithTag("safety_plan_page")
             .performScrollToNode(hasTestTag("safety_request_consultation"))
-        click("safety_request_consultation")
-        compose.onNodeWithTag("safety_plan_page").performScrollToNode(hasTestTag("safety_error"))
+        compose.onNodeWithTag("safety_request_consultation").assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { session.safetyPlans.error == R.string.safety_account_required }
+        // The status lives in the first lazy item, outside the consultation viewport.
+        compose.onNodeWithTag("safety_plan_page").performScrollToIndex(0)
+        waitFor("safety_error")
         compose.onNodeWithText("Staff consultation requires a signed-in account. Your plans still work offline.")
             .assertIsDisplayed()
         click("safety_back")
