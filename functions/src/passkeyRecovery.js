@@ -33,6 +33,20 @@ function credentialId(value) {
   return typeof value === "string" && /^[A-Za-z0-9_-]{16,1024}$/.test(value) ? value : "";
 }
 
+function requiredCredentialId(value) {
+  const id = credentialId(value);
+  if (!id) throw new HttpsError("invalid-argument", "Invalid passkey credential.");
+  return id;
+}
+
+function credentialSummary(value) {
+  return {
+    credentialId: requiredCredentialId(value?.credentialId),
+    deviceType: value?.deviceType === "multiDevice" ? "multiDevice" : "singleDevice",
+    backedUp: value?.backedUp === true,
+  };
+}
+
 function rejectPrfResult(response) {
   if (response?.clientExtensionResults?.prf?.results !== undefined) {
     throw new HttpsError("invalid-argument", "Passkey secret material must remain on the client.");
@@ -133,6 +147,24 @@ async function existingCredentials(uid) {
   const snapshot = await root(uid).collection("credentials").get();
   return snapshot.docs.map((document) => storedCredential(document, uid));
 }
+
+exports.passkeyRecoveryListCredentials = onCall(async (request) => {
+  const uid = authenticatedUid(request);
+  return {
+    credentials: (await existingCredentials(uid)).map(credentialSummary),
+  };
+});
+
+exports.passkeyRecoveryRemoveCredential = onCall(async (request) => {
+  const uid = authenticatedUid(request);
+  const id = requiredCredentialId(request.data?.credentialId);
+  const reference = root(uid).collection("credentials").doc(id);
+  await db.runTransaction(async (transaction) => {
+    storedCredential(await transaction.get(reference), uid);
+    transaction.delete(reference);
+  });
+  return {removed: true, credentialId: id};
+});
 
 exports.passkeyRecoveryBeginEnrollment = onCall(async (request) => {
   const uid = authenticatedUid(request);
@@ -336,4 +368,10 @@ exports.passkeyRecoveryCompleteUnlock = onCall(async (request) => {
   return result;
 });
 
-exports._test = {recoveryEnvelope, credentialRecord, rejectPrfResult};
+exports._test = {
+  recoveryEnvelope,
+  credentialRecord,
+  rejectPrfResult,
+  requiredCredentialId,
+  credentialSummary,
+};

@@ -84,3 +84,30 @@ test("passkey recovery rejects uploaded PRF outputs but permits non-secret suppo
     }));
   }
 });
+
+test("passkey recovery exposes only bounded public factor metadata", () => {
+  assert.deepEqual(recovery.credentialSummary({
+    credentialId: "credential_abcdefghijklmnop",
+    deviceType: "multiDevice",
+    backedUp: true,
+    publicKey: Buffer.alloc(77, 4),
+    envelope: {ciphertext: "secret"},
+    prfInput: b64(32),
+  }), {
+    credentialId: "credential_abcdefghijklmnop",
+    deviceType: "multiDevice",
+    backedUp: true,
+  });
+});
+
+test("passkey recovery rejects malformed factor IDs across input classes", () => {
+  for (const value of [undefined, null, 7, {}, [], "", "short", "bad/id", "x".repeat(1025)]) {
+    assert.throws(() => recovery.requiredCredentialId(value));
+  }
+  for (let iteration = 0; iteration < 200; iteration += 1) {
+    assert.equal(
+      recovery.requiredCredentialId(`credential_${iteration.toString().padStart(16, "0")}`),
+      `credential_${iteration.toString().padStart(16, "0")}`,
+    );
+  }
+});
