@@ -132,13 +132,13 @@ internal class AccountRecoveryKeyDeviceChallenge internal constructor(
     private val saved: AccountRecoveryKeyDeviceRecord?,
     private val protectionId: String,
     private val alias: String,
-) {
+) : DeviceAuthenticationChallenge {
     private var committed = false
-    internal val enrolling get() = saved == null
-    internal val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
+    override val enrolling get() = saved == null
+    override val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
     private var legacyCipher: Cipher? = null
 
-    internal fun legacyCipher(): Cipher = newCipher().also { legacyCipher = it }
+    override fun legacyCipher(): Cipher = newCipher().also { legacyCipher = it }
 
     internal fun enroll(cipher: Cipher, recoveryKey: AccountRecoveryKey): AccountRecoveryKeyDeviceRecord {
         check(enrolling && cipher === (promptCipher ?: legacyCipher))
