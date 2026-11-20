@@ -456,17 +456,29 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
     acceptedRequestId:requestId,createdAt:serverTimestamp()}));
 
-  const accept=writeBatch(bob);
-  accept.set(doc(bob,'friendships/'+friendshipId),{participantIds:['social-a','social-b'],
+  const friendship={participantIds:['social-a','social-b'],
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
-    acceptedRequestId:requestId,createdAt:serverTimestamp()});
-  accept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),{friendshipId,friendUid:'social-b',
-    friendUsername:'social_bob',createdAt:serverTimestamp()});
-  accept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),{friendshipId,friendUid:'social-a',
-    friendUsername:'social_alice',createdAt:serverTimestamp()});
+    acceptedRequestId:requestId,createdAt:serverTimestamp()};
+  const aliceFriend={friendshipId,friendUid:'social-b',friendUsername:'social_bob',createdAt:serverTimestamp()};
+  const bobFriend={friendshipId,friendUid:'social-a',friendUsername:'social_alice',createdAt:serverTimestamp()};
   const conversation={friendshipId,participantIds:['social-a','social-b'],
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
+  const invalidAccept=writeBatch(bob);
+  invalidAccept.set(doc(bob,'friendships/'+friendshipId),friendship);
+  invalidAccept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),aliceFriend);
+  invalidAccept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),bobFriend);
+  invalidAccept.set(doc(bob,'conversations/'+friendshipId),{
+    ...conversation,
+    accountRoomKeys:{'social-a':{keyId:'unvalidated',epoch:0,algorithm:'raw',wrappedKey:'plaintext'}},
+  });
+  invalidAccept.delete(doc(bob,'friendRequests/'+requestId));
+  await assertFails(invalidAccept.commit());
+
+  const accept=writeBatch(bob);
+  accept.set(doc(bob,'friendships/'+friendshipId),friendship);
+  accept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),aliceFriend);
+  accept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),bobFriend);
   accept.set(doc(bob,'conversations/'+friendshipId),conversation);
   accept.delete(doc(bob,'friendRequests/'+requestId));
   await assertSucceeds(accept.commit());

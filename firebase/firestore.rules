@@ -706,7 +706,7 @@ service cloud.firestore {
       allow list: if signedIn()
         && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data)
-        && !request.resource.data.keys().hasAny(['type'])
+        && !request.resource.data.keys().hasAny(['type','accountRoomKeys'])
         && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
