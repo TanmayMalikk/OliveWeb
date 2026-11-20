@@ -626,6 +626,19 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
             state.accountRole == AccountRole.USER
     }
 
+    /** Ensures media encryption has a stable account public key without unlocking private material. */
+    internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope {
+        with(runtime) {
+            withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { return it }
+            accountKeysetRepository?.fetch(uid)?.let { return it }
+            val token = epoch
+            check(currentRecoverySession(uid, token)) { "Account session changed" }
+            accountRecoveryKey(uid, token)
+            return withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
+                ?: error("Account recovery keyset was not stored")
+        }
+    }
+
 }
 
 // Signed-in users: records safe-app activity for the account.
