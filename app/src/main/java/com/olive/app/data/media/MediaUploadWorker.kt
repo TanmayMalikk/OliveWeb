@@ -342,6 +342,21 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
     return false
 }
 
+/** Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key. */
+internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
+    require(source.allowedUsers.toSet()==source.accountWrappedKeys.keys) {
+        "Every authorized account requires an account-keyset wrapper"
+    }
+    mapOf(
+        "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
+        "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
+        "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
+        "deviceWrappedKeys" to source.deviceWrappedKeys,
+        "accountWrappedKeys" to source.accountWrappedKeys.mapValues { it.value.toMap() },
+        "encryptionVersion" to source.encryptionVersion,
+    )
+}
+
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
  *
@@ -349,7 +364,7 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
  * - called by [MediaUploadWorker] for upload session/ticket/finalization operations;
  * - called by `MediaTransferController` for download tickets;
  * - delegates authorization and R2 signing to `functions/src/mediaTickets.js`;
- * - never accepts plaintext file content; only transfer facts and the account recovery key cross it.
+ * - never accepts plaintext file content or raw AES keys; only ciphertext facts and opaque wrappers cross it.
  *
  * Every returned URL is locally constrained to HTTPS on Cloudflare's R2 hostname before OkHttp sees
  * it. This limits the impact of a malformed or compromised callable response.
@@ -361,17 +376,7 @@ class MediaRepository(
 ):MediaTicketDataSource {
     // Requests short-lived upload URLs for one encrypted file.
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
-        val source=job.source
-        val wrapped = source.wrappedKeys.getValue(job.ownerUid)
-        val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
-        val result=call("mediaCreateUpload",mapOf(
-            "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
-            "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
-            "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
-            "deviceWrappedKeys" to source.deviceWrappedKeys,
-            "encryptionVersion" to source.encryptionVersion,
-            "recoveryKeyToSeal" to encodeRecoveryKey(key),
-        ))
+        val result=call("mediaCreateUpload",mediaCreateUploadRequest(job))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
     }

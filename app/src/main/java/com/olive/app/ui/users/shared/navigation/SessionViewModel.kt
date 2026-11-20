@@ -5,6 +5,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.olive.app.data.account.AdminAccountDraft
 import com.olive.app.data.account.AdminAccountSummary
 import com.olive.app.data.account.CoverType
@@ -41,7 +43,13 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 
     // Document and map screens keep their own feature controllers.
     internal val media = runtime.mediaRepository?.let {
-        MediaTransferController(application, viewModelScope, it, offlineCache = runtime.offlineMediaCache)
+        MediaTransferController(
+            application,viewModelScope,it,offlineCache=runtime.offlineMediaCache,
+            accountKeysetProvider={ uid ->
+                withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid)?.envelope }
+                    ?: runtime.accountKeysetRepository?.fetch(uid)
+            },
+        )
     }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)

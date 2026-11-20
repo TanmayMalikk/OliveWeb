@@ -54,6 +54,19 @@ class MediaTransferModelsEdgeCaseTest {
         assertEquals(original, MediaUploadJob.fromJson(original.toJson()))
     }
 
+    @Test
+    fun uploadRequestContainsOnlyOpaqueAccountWrappers() {
+        val request = mediaCreateUploadRequest(MediaUploadJob("job", "owner", source()))
+
+        assertFalse(request.containsKey("accountAccessKey"))
+        assertFalse(request.containsKey("recoveryKeyToSeal"))
+        val wrappers = request["accountWrappedKeys"] as Map<*, *>
+        val owner = wrappers["owner"] as Map<*, *>
+        assertEquals("123e4567-e89b-42d3-a456-426614174000", owner["keyId"])
+        assertEquals("RSA-OAEP-256", owner["algorithm"])
+        assertEquals("opaque owner wrapper", owner["wrappedKey"])
+    }
+
     // Inputs: the values shown below. Expected: older upload jobs receive safe encryption and ocr defaults.
     @Test
     fun olderUploadJobsReceiveSafeEncryptionAndOcrDefaults() {
