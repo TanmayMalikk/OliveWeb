@@ -618,7 +618,7 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','requestSource','sourceConversationId','supportConversationId'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','accountRoomKeys','requestSource','sourceConversationId','supportConversationId'])
         && data.friendshipId == conversationId
         && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT', 'SUPPORT_BUTTON'])
         && (!data.keys().hasAny(['sourceConversationId']) || data.sourceConversationId is string)
@@ -674,6 +674,27 @@ service cloud.firestore {
         && validAdditionalConversationKeys(data);
     }
 
+    function validAccountRoomKey(data, uid) {
+      return !(uid in data.accountRoomKeys) || (
+        data.accountRoomKeys[uid] is map
+        && data.accountRoomKeys[uid].keys().hasOnly(['keyId','epoch','algorithm','wrappedKey'])
+        && data.accountRoomKeys[uid].keyId == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.keyId
+        && data.accountRoomKeys[uid].epoch == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.epoch
+        && data.accountRoomKeys[uid].algorithm == 'RSA-OAEP-256'
+        && data.accountRoomKeys[uid].wrappedKey is string
+        && data.accountRoomKeys[uid].wrappedKey.size() > 0
+        && data.accountRoomKeys[uid].wrappedKey.size() <= 768
+      );
+    }
+
+    function validAccountRoomKeys(data) {
+      return data.accountRoomKeys is map
+        && data.accountRoomKeys.keys().hasOnly(data.participantIds)
+        && data.accountRoomKeys.size() <= 25
+        && (data.participantIds.size() < 1 || validAccountRoomKey(data, data.participantIds[0]))
+        && (data.participantIds.size() < 2 || validAccountRoomKey(data, data.participantIds[1]));
+    }
+
     match /conversations/{conversationId} {
       // Collection listeners must constrain participantIds to the authenticated UID.
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
@@ -703,6 +724,8 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAny(['lastMessageId']) || request.resource.data.lastMessageId == '')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
             && validConversationKeys(request.resource.data))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountRoomKeys','updatedAt'])
+            && validAccountRoomKeys(request.resource.data))
         );
       allow delete: if false;
 

@@ -514,6 +514,23 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
     {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
+  const accountKeyId='123e4567-e89b-42d3-a456-426614174000';
+  await env.withSecurityRulesDisabled(async context => {
+    for (const uid of ['social-a','social-b']) await setDoc(
+      doc(context.firestore(),'accountKeyDirectories',uid),
+      {ownerUid:uid,keyId:accountKeyId,epoch:1,algorithm:'RSA-OAEP-256',publicKey:'A'.repeat(400),updatedAt:new Date()},
+    );
+  });
+  const accountRoomKeys=Object.fromEntries(['social-a','social-b'].map(uid=>[uid,{
+    keyId:accountKeyId,epoch:1,algorithm:'RSA-OAEP-256',wrappedKey:'A'.repeat(512),
+  }]));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
+    {accountRoomKeys,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    accountRoomKeys:{...accountRoomKeys,'social-c':accountRoomKeys['social-a']},updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    accountRoomKeys:{...accountRoomKeys,'social-a':{...accountRoomKeys['social-a'],keyId:'223e4567-e89b-42d3-a456-426614174000'}},
+    updatedAt:serverTimestamp()}));
   // An empty conversation may repair stale wrapped keys because no message history can be lost.
   await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),
     {roomKeys:{'social-a':'replacement','social-b':'replacement'},

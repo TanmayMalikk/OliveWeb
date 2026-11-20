@@ -265,6 +265,7 @@ for (const type of ["GROUP", "SUPPORT"]) {
     await chat.update({
       roomKeys: {[owner]: "owner-envelope", [removed]: "removed-envelope"},
       participantPublicKeys: {[owner]: "owner-public", [removed]: "removed-public"},
+      accountRoomKeys: {[owner]: {wrappedKey:"owner-recovery"}, [removed]: {wrappedKey:"removed-recovery"}},
     });
     await chat.collection("messages").doc("history").set({ciphertext: "existing-ciphertext"});
     const deviceId = `${removed}--phone`;
@@ -287,6 +288,7 @@ for (const type of ["GROUP", "SUPPORT"]) {
     const remaining = await chat.get();
     assert.deepEqual(remaining.get("roomKeys"), {[owner]: "owner-envelope"});
     assert.deepEqual(remaining.get("participantPublicKeys"), {[owner]: "owner-public"});
+    assert.deepEqual(remaining.get("accountRoomKeys"), {[owner]: {wrappedKey:"owner-recovery"}});
     assert.equal((await chat.collection("deviceKeys").doc(deviceId).get()).exists, false);
     assert.equal((await chat.collection("deviceKeys").doc(`${owner}--phone`).get()).exists, true);
 
@@ -323,7 +325,8 @@ test("ticket owners can remove friends they added, while staff, admins, and orig
   const clientEvents = client => collection(client, "conversations", id, "membershipEvents");
   assert.equal((await getDocsFromServer(clientEvents(friendClient))).size, 1);
   await ticket.update({roomKeys: {[owner]: "owner-envelope", [friend]: "friend-envelope"},
-    participantPublicKeys: {[owner]: "owner-key", [friend]: "friend-key"}});
+    participantPublicKeys: {[owner]: "owner-key", [friend]: "friend-key"},
+    accountRoomKeys: {[owner]: {wrappedKey:"owner-recovery"}, [friend]: {wrappedKey:"friend-recovery"}}});
   await Promise.all([
     call(conversationRemoveParticipant, owner, args(friend)),
     call(safetySupportAdmin, staff, {conversationId: id}),
@@ -332,6 +335,7 @@ test("ticket owners can remove friends they added, while staff, admins, and orig
   assert.deepEqual(remaining.get("participantIds"), originalMembers);
   assert.deepEqual(remaining.get("roomKeys"), {[owner]: "owner-envelope"});
   assert.deepEqual(remaining.get("participantPublicKeys"), {[owner]: "owner-key"});
+  assert.deepEqual(remaining.get("accountRoomKeys"), {[owner]: {wrappedKey:"owner-recovery"}});
   await assertFails(getDocFromServer(doc(friendClient, "conversations", id)));
   await assertFails(getDocsFromServer(clientEvents(friendClient)));
   assert.deepEqual((await getDocsFromServer(clientEvents(ownerClient))).docs.map(event => event.get("action")).sort(),

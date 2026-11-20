@@ -98,6 +98,7 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
   if (participantRemoved) {
     value.roomKeys = FieldValue.delete();
     value.participantPublicKeys = FieldValue.delete();
+    value.accountRoomKeys = FieldValue.delete();
   }
   if (writeContext) writeContext.transaction.set(reference, value, {merge: true});
   else await reference.set(value, {merge: true});
@@ -335,7 +336,7 @@ exports.conversationRemoveParticipant = onCall({invoker: "public"}, async (reque
       updatedAt: FieldValue.serverTimestamp(),
     };
     const deviceKeys = await transaction.get(reference.collection("deviceKeys").where("uid", "==", participantUid));
-    for (const field of ["roomKeys", "participantPublicKeys"]) {
+    for (const field of ["roomKeys", "participantPublicKeys", "accountRoomKeys"]) {
       if (Object.hasOwn(conversation[field] || {}, participantUid)) {
         const retainedKeys = {...conversation[field]};
         delete retainedKeys[participantUid];
