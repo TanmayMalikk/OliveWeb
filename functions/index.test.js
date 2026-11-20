@@ -1,7 +1,7 @@
 // Tests that cloud endpoints for accounts, support, media, and nutrition keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createCipheriv, randomBytes } = require("node:crypto");
+const { randomBytes } = require("node:crypto");
 const { PutObjectCommand, UploadPartCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 process.env.FIREBASE_CONFIG = JSON.stringify({
@@ -13,26 +13,50 @@ const { _test } = require("./index");
 const mediaTest = require("./src/mediaTickets")._test;
 const supportGroups = require("./src/supportGroups");
 
-test("document recovery encrypts the key and binds it to one file and owner", () => {
-  const key = randomBytes(32).toString("base64");
-  const masterKey = randomBytes(32).toString("base64");
-  const sealed = mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey);
-  assert.notEqual(sealed, key);
-  assert.notEqual(sealed, mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey));
-  assert.equal(mediaTest.openRecoveryKey(sealed, "file-a", "owner-a", masterKey), key);
-  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-b", "owner-a", masterKey));
-  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-a", "owner-b", masterKey));
+test("document recovery accepts only opaque account-keyset wrappers", () => {
+  const wrapped = randomBytes(384).toString("base64");
+  assert.deepEqual(mediaTest.accountKeysetWrapper({
+    keyId: "123e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    wrappedKey: wrapped,
+  }), {
+    keyId: "123e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    wrappedKey: wrapped,
+  });
+  assert.throws(() => mediaTest.accountKeysetWrapper({wrappedKey: randomBytes(32).toString("base64")}));
+  assert.throws(() => mediaTest.accountKeysetWrapper({
+    keyId: "123e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "AES-256-GCM",
+    wrappedKey: wrapped,
+  }));
 });
 
-test("document recovery rejects a key that cannot open the existing Android/web metadata", () => {
-  const key = randomBytes(32);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update('{"name":"test.pdf"}'), cipher.final()]);
-  const metadata = Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString("base64");
-  assert.doesNotThrow(() => mediaTest.verifyRecoveryKey(key.toString("base64"), metadata));
-  assert.throws(() => mediaTest.verifyRecoveryKey(randomBytes(32).toString("base64"), metadata),
-    { code: "invalid-argument" });
+test("media upload rejects legacy raw recovery keys", () => {
+  const request = {
+    jobId: "123e4567-e89b-42d3-a456-426614174000",
+    ciphertextSize: 64,
+    ciphertextSha256: "ab".repeat(32),
+    encryptedMetadata: "encrypted-metadata",
+    allowedUsers: ["owner"],
+    wrappedKeys: {owner: "legacy-device-wrapper"},
+    deviceWrappedKeys: {"owner--phone": "device-wrapper"},
+    accountWrappedKeys: {owner: {
+      keyId: "123e4567-e89b-42d3-a456-426614174000",
+      epoch: 1,
+      algorithm: "RSA-OAEP-256",
+      wrappedKey: randomBytes(384).toString("base64"),
+    }},
+    encryptionVersion: 3,
+    accountAccessKey: randomBytes(32).toString("base64"),
+  };
+  assert.throws(() => mediaTest.uploadRequest(request, "owner"), {code: "invalid-argument"});
+  delete request.accountAccessKey;
+  assert.equal(mediaTest.uploadRequest(request, "owner").accountWrappedKeys.owner.keyId,
+    "123e4567-e89b-42d3-a456-426614174000");
 });
 
 test("R2 upload tickets do not sign the checksum of an empty body", async () => {
@@ -65,7 +89,7 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
+    "mediaDownloadTicket",
     "mediaUpdateAccess", "mediaShareInChat", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
     "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
@@ -142,26 +166,29 @@ test("encrypted media device keys stay scoped to the signed-in account", () => {
   assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
 });
 
-// Inputs: a valid 32-byte Base64 key plus malformed and wrong-length values. Expected: only AES-256 material passes.
-test("account document recovery accepts only a 256-bit key", () => {
-  const valid = Buffer.alloc(32, 7).toString("base64");
-  assert.equal(mediaTest.accountAccessKey(valid, true), valid);
-  assert.equal(mediaTest.accountAccessKey(undefined), "");
-  assert.throws(() => mediaTest.accountAccessKey("not base64", true));
-  assert.throws(() => mediaTest.accountAccessKey(Buffer.alloc(16).toString("base64"), true));
-});
-
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.
 test("encrypted media access keeps the owner and exact wrapped-key recipients", () => {
+  const accountWrappedKeys = {
+    owner: {
+      keyId:"123e4567-e89b-42d3-a456-426614174000", epoch:1,
+      algorithm:"RSA-OAEP-256", wrappedKey:randomBytes(384).toString("base64"),
+    },
+    staff: {
+      keyId:"223e4567-e89b-42d3-a456-426614174000", epoch:2,
+      algorithm:"RSA-OAEP-256", wrappedKey:randomBytes(384).toString("base64"),
+    },
+  };
   assert.deepEqual(
     mediaTest.accessRequest({
       wrappedKeys:{owner:"owner-key",staff:"staff-key"},
       deviceWrappedKeys:{"owner--phone":"owner-device","staff--phone":"staff-device"},
+      accountWrappedKeys,
     }, "owner"),
     {
       wrappedKeys:{owner:"owner-key",staff:"staff-key"},
       allowedUsers:["owner","staff"],
       deviceWrappedKeys:{"owner--phone":"owner-device","staff--phone":"staff-device"},
+      accountWrappedKeys,
     },
   );
   assert.throws(() => mediaTest.accessRequest({wrappedKeys:{staff:"staff-key"}}, "owner"));
