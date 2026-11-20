@@ -15,6 +15,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
+import androidx.credentials.exceptions.NoCredentialException
 import com.olive.app.R
 import com.olive.app.security.PasskeyPrfProtocol
 import kotlinx.coroutines.CoroutineScope
@@ -146,6 +147,8 @@ class PasskeyPrfProbeActivity : Activity() {
                 }
             } catch (_: PrfUnavailable) {
                 status.text = getString(R.string.debug_prf_probe_unavailable)
+            } catch (error: NoCredentialException) {
+                showFailure(PasskeyPrfProbeStage.REQUESTING_PRF_ASSERTION, error)
             } catch (error: Exception) {
                 showFailure(PasskeyPrfProbeStage.REQUESTING_PRF_ASSERTION, error)
             } finally {
