@@ -3,6 +3,7 @@ package com.olive.app.ui.covers.fitness
 
 import android.content.Context
 import androidx.core.content.edit
+import com.olive.app.data.network.nonNegativeFloat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -14,7 +15,11 @@ import kotlin.math.roundToInt
 internal class FitnessStore(private val context: Context, private val accountId: String) {
     internal val preferences = fitnessPreferences(context, accountId)
 
-    // Loads fitness goals and body details saved on this phone.
+    /**
+     * Loads fitness goals and body details saved on this phone.
+     *
+     * @return The resulting profile.
+     */
     fun profile() = FitnessProfile(
         weightKg = preferences.getFloat("weight_kg", 70f),
         heightCm = preferences.getFloat("height_cm", 170f),
@@ -26,8 +31,13 @@ internal class FitnessStore(private val context: Context, private val accountId:
         waterGoalMl = preferences.getInt("water_goal_ml", 2000),
     )
 
-    // Saves calorie, macro, activity, and body goals for the fitness cover.
-    fun saveProfile(value: FitnessProfile) = preferences.edit {
+    /**
+     * Saves calorie, macro, activity, and body goals for the fitness cover.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param coachUpdateDate Optional coach update date supplied to [saveProfile].
+     */
+    fun saveProfile(value: FitnessProfile, coachUpdateDate: LocalDate? = null) = preferences.edit {
         putFloat("weight_kg", value.weightKg.coerceIn(30f, 300f))
         putFloat("height_cm", value.heightCm.coerceIn(100f, 230f))
         putInt("step_goal", value.stepGoal.coerceIn(500, 100_000))
@@ -36,9 +46,16 @@ internal class FitnessStore(private val context: Context, private val accountId:
         putInt("carbohydrate_goal", value.carbohydrateGoal.coerceIn(10, 2_000))
         putInt("fat_goal", value.fatGoal.coerceIn(10, 1_000))
         putInt("water_goal_ml", value.waterGoalMl.coerceIn(250, 10000))
+        coachUpdateDate?.let { putString("coach_goal_update", it.toString()) }
     }
 
-    // Loads the snapshot needed by the fitness cover.
+    /**
+     * Loads the snapshot needed by the fitness cover.
+     *
+     * @param today Today supplied to [snapshot].
+     * @param nowMillis Duration or timestamp for now, in milliseconds.
+     * @return The resulting [FitnessSnapshot] instance.
+     */
     fun snapshot(
         today: LocalDate = LocalDate.now(),
         nowMillis: Long = System.currentTimeMillis(),
@@ -72,7 +89,13 @@ internal class FitnessStore(private val context: Context, private val accountId:
         )
     }
 
-    // Fitness cover users: loads up to 31 saved days for activity and nutrition graphs.
+    /**
+     * Fitness cover users: loads up to 31 saved days for activity and nutrition graphs.
+     *
+     * @param days Days supplied to [history].
+     * @param endDate End date supplied to [history].
+     * @return List of resulting history items.
+     */
     fun history(
         days: Int = 14,
         endDate: LocalDate = LocalDate.now(),
@@ -103,7 +126,14 @@ internal class FitnessStore(private val context: Context, private val accountId:
         }
     }
 
-    // Phone fitness users: counts phone steps only while a worn watch is not actively reporting.
+    /**
+     * Phone fitness users: counts phone steps only while a worn watch is not actively reporting.
+     *
+     * @param totalSinceBoot Total since boot supplied to [recordSensorValue].
+     * @param today Today supplied to [recordSensorValue].
+     * @param nowMillis Duration or timestamp for now, in milliseconds.
+     * @return The resulting [FitnessSnapshot] for record sensor value.
+     */
     fun recordSensorValue(
         totalSinceBoot: Int,
         today: LocalDate = LocalDate.now(),
@@ -145,7 +175,17 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return snapshot(today)
     }
 
-    // Watch fitness users: makes a worn watch primary and removes phone fallback overlap.
+    /**
+     * Watch fitness users: makes a worn watch primary and removes phone fallback overlap.
+     *
+     * @param watchSteps Watch steps supplied to [recordWatchActivity].
+     * @param heartRate Heart rate supplied to [recordWatchActivity].
+     * @param watchUpdatedAt Watch updated at supplied to [recordWatchActivity].
+     * @param today Today supplied to [recordWatchActivity].
+     * @param nowMillis Duration or timestamp for now, in milliseconds.
+     * @param heartRateUpdatedAt Heart rate updated at supplied to [recordWatchActivity].
+     * @return The resulting [FitnessSnapshot] for record watch activity.
+     */
     fun recordWatchActivity(
         watchSteps: Int,
         heartRate: Int,
@@ -223,7 +263,13 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return snapshot(today, nowMillis)
     }
 
-    // Health Connect aggregates overlapping step sources; merge by maximum rather than adding them.
+    /**
+     * Health Connect aggregates overlapping step sources; merge by maximum rather than adding them.
+     *
+     * @param steps Steps supplied to [recordHealthConnect].
+     * @param samples Collection of samples values to process.
+     * @param today Today supplied to [recordHealthConnect].
+     */
     fun recordHealthConnect(steps: Int, samples: List<HeartRateSample>, today: LocalDate = LocalDate.now()) {
         var stats = heartRateStats(today)
         var graph = heartRateSamples(today)
@@ -248,6 +294,14 @@ internal class FitnessStore(private val context: Context, private val accountId:
         }
     }
 
+    /**
+     * Adds water.
+     *
+     * @param milliliters Milliliters supplied to [addWater].
+     * @param goalMl Goal ml supplied to [addWater].
+     * @param today Today supplied to [addWater].
+     * @return The resulting [FitnessSnapshot] for add water.
+     */
     fun addWater(milliliters: Int, goalMl: Int, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         require(milliliters in -10000..10000 && milliliters != 0 && goalMl in 250..10000)
         val adjustment = if (milliliters < 0) maxOf(milliliters, -waterTotal(today)) else milliliters
@@ -262,13 +316,27 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return snapshot(today)
     }
 
+    /**
+     * Computes water total.
+     *
+     * @param today Today supplied to [waterTotal].
+     * @return The computed water total numeric value.
+     */
     private fun waterTotal(today: LocalDate): Int = runCatching {
         val entries = JSONArray(preferences.getString("water_$today", "[]"))
         (0 until entries.length()).sumOf { entries.getJSONObject(it).optInt("milliliters").coerceIn(-10000, 10000).toLong() }
             .coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
     }.getOrDefault(0)
 
-    // Adds a selected food and its nutrients to today's diary.
+    /**
+     * Adds a selected food and its nutrients to today's diary.
+     *
+     * @param food Food supplied to [addFood].
+     * @param servings Servings supplied to [addFood].
+     * @param meal Meal supplied to [addFood].
+     * @param today Today supplied to [addFood].
+     * @return The resulting [FitnessSnapshot] for add food.
+     */
     fun addFood(
         food: NutritionFood,
         servings: Float,
@@ -287,6 +355,13 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return snapshot(today)
     }
 
+    /**
+     * Updates food.
+     *
+     * @param entry Entry supplied to [updateFood].
+     * @param today Today supplied to [updateFood].
+     * @return The resulting [FitnessSnapshot] for update food.
+     */
     fun updateFood(entry: FoodLogEntry, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         require(entry.servings.isFinite() && entry.servings in 0.0001f..10000f)
         val existing = foods(today)
@@ -296,35 +371,67 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return snapshot(today)
     }
 
-    // Removes one food entry from today's diary.
+    /**
+     * Removes one food entry from today's diary.
+     *
+     * @param logId Log ID supplied to [removeFood].
+     * @param today Today supplied to [removeFood].
+     * @return The resulting [FitnessSnapshot] for remove food.
+     */
     fun removeFood(logId: String, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         saveFoods(today, foods(today).filterNot { it.logId == logId })
         FitnessAccountSync.meal(context, accountId, today.toString(), logId, null)
         return snapshot(today)
     }
 
+    /**
+     * Computes recent foods.
+     *
+     * @param today Today supplied to [recentFoods].
+     * @return List of resulting recent foods items.
+     */
     fun recentFoods(today: LocalDate = LocalDate.now()): List<FoodLogEntry> =
         FitnessHistory.datesEndingOn(today, 30).asReversed().asSequence()
             .flatMap { foods(it).asReversed().sortedByDescending(FoodLogEntry::loggedAt).asSequence() }
             .distinctBy { it.food.id }.take(10).toList()
 
-    // Reads today's steps from Health Connect for the fitness dashboard.
+    /**
+     * Reads today's steps from Health Connect for the fitness dashboard.
+     *
+     * @param date Date supplied to [activitySteps].
+     * @return The computed activity steps numeric value.
+     */
     private fun activitySteps(date: LocalDate): Int = preferences.getInt(
         activityStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
-    // Combines phone step readings without counting sensor resets twice.
+    /**
+     * Combines phone step readings without counting sensor resets twice.
+     *
+     * @param date Date supplied to [phoneSteps].
+     * @return The computed phone steps numeric value.
+     */
     private fun phoneSteps(date: LocalDate): Int = preferences.getInt(
         phoneStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
-    // Gives the fitness cover the phone fallback since watch it needs.
+    /**
+     * Gives the fitness cover the phone fallback since watch it needs.
+     *
+     * @param date Date supplied to [phoneFallbackSinceWatch].
+     * @return The resulting phone fallback since watch.
+     */
     private fun phoneFallbackSinceWatch(date: LocalDate) =
         preferences.getInt(phoneFallbackKey(date), 0)
 
-    // Returns the heart rate stats used by the fitness cover.
+    /**
+     * Returns the heart rate stats used by the fitness cover.
+     *
+     * @param date Date supplied to [heartRateStats].
+     * @return The resulting heart rate stats.
+     */
     private fun heartRateStats(date: LocalDate) = HeartRateDayStats(
         peakBpm = preferences.getInt(heartRatePeakKey(date), 0),
         lowestBpm = preferences.getInt(heartRateLowestKey(date), 0),
@@ -334,7 +441,12 @@ internal class FitnessStore(private val context: Context, private val accountId:
         restingSampleCount = preferences.getInt(heartRateRestingSampleCountKey(date), 0),
     )
 
-    // Reads recent heart-rate samples for the fitness vitals graph.
+    /**
+     * Reads recent heart-rate samples for the fitness vitals graph.
+     *
+     * @param date Date supplied to [heartRateSamples].
+     * @return List of resulting heart rate samples items.
+     */
     private fun heartRateSamples(date: LocalDate): List<HeartRateSample> {
         val encoded = preferences.getString(heartRateGraphSamplesKey(date), null) ?: return emptyList()
         return runCatching {
@@ -352,7 +464,13 @@ internal class FitnessStore(private val context: Context, private val accountId:
         }.getOrDefault(emptyList())
     }
 
-    // Fitness vitals graphs: keeps at most one point per minute and one day of points.
+    /**
+     * Fitness vitals graphs: keeps at most one point per minute and one day of points.
+     *
+     * @param existing Collection of existing values to process.
+     * @param sample Sample supplied to [appendHeartRateGraphSample].
+     * @return List of resulting append heart rate graph sample items.
+     */
     private fun appendHeartRateGraphSample(
         existing: List<HeartRateSample>,
         sample: HeartRateSample,
@@ -364,7 +482,12 @@ internal class FitnessStore(private val context: Context, private val accountId:
         return (existing + sample).takeLast(1_440)
     }
 
-    // Fitness cover: Converts heart rate samples.
+    /**
+     * Fitness cover: Converts heart rate samples.
+     *
+     * @param samples Collection of samples values to process.
+     * @return The resulting encode heart rate samples.
+     */
     private fun encodeHeartRateSamples(samples: List<HeartRateSample>) = JSONArray().apply {
         samples.forEach { sample ->
             put(JSONObject().apply {
@@ -374,39 +497,119 @@ internal class FitnessStore(private val context: Context, private val accountId:
         }
     }.toString()
 
-    // Keeps the saved activity steps key name in one place for the fitness cover.
+    /**
+     * Keeps the saved activity steps key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [activityStepsKey].
+     * @return The resulting activity steps key.
+     */
     private fun activityStepsKey(date: LocalDate) = "activity_steps_$date"
-    // Keeps the saved phone steps key name in one place for the fitness cover.
+    /**
+     * Keeps the saved phone steps key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [phoneStepsKey].
+     * @return The resulting phone steps key.
+     */
     private fun phoneStepsKey(date: LocalDate) = "phone_steps_$date"
-    // Watches steps key for fitness cover.
+    /**
+     * Watches steps key for fitness cover.
+     *
+     * @param date Date supplied to [watchStepsKey].
+     * @return The resulting watch steps key.
+     */
     private fun watchStepsKey(date: LocalDate) = "watch_steps_$date"
-    // Keeps the saved phone fallback key name in one place for the fitness cover.
+    /**
+     * Keeps the saved phone fallback key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [phoneFallbackKey].
+     * @return The resulting phone fallback key.
+     */
     private fun phoneFallbackKey(date: LocalDate) = "phone_fallback_since_watch_$date"
-    // Watches active at key for fitness cover.
+    /**
+     * Watches active at key for fitness cover.
+     *
+     * @param date Date supplied to [watchActiveAtKey].
+     * @return The resulting watch active at key.
+     */
     private fun watchActiveAtKey(date: LocalDate) = "watch_active_at_$date"
-    // Fitness cover: Watches report at key.
+    /**
+     * Fitness cover: Watches report at key.
+     *
+     * @param date Date supplied to [watchReportAtKey].
+     * @return The resulting watch report at key.
+     */
     private fun watchReportAtKey(date: LocalDate) = "watch_report_at_$date"
-    // Keeps the saved heart rate peak key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate peak key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRatePeakKey].
+     * @return The resulting heart rate peak key.
+     */
     private fun heartRatePeakKey(date: LocalDate) = "heart_rate_peak_$date"
-    // Keeps the saved heart rate lowest key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate lowest key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateLowestKey].
+     * @return The resulting heart rate lowest key.
+     */
     private fun heartRateLowestKey(date: LocalDate) = "heart_rate_lowest_$date"
-    // Keeps the saved heart rate total key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate total key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateTotalKey].
+     * @return The resulting heart rate total key.
+     */
     private fun heartRateTotalKey(date: LocalDate) = "heart_rate_total_$date"
-    // Keeps the saved heart rate sample count key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate sample count key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateSampleCountKey].
+     * @return The resulting heart rate sample count key.
+     */
     private fun heartRateSampleCountKey(date: LocalDate) = "heart_rate_sample_count_$date"
-    // Keeps the saved heart rate resting total key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate resting total key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateRestingTotalKey].
+     * @return The resulting heart rate resting total key.
+     */
     private fun heartRateRestingTotalKey(date: LocalDate) = "heart_rate_resting_total_$date"
-    // Keeps the saved heart rate resting sample count key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate resting sample count key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateRestingSampleCountKey].
+     * @return The resulting heart rate resting sample count key.
+     */
     private fun heartRateRestingSampleCountKey(date: LocalDate) =
         "heart_rate_resting_sample_count_$date"
-    // Keeps the saved heart rate last sample at key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate last sample at key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateLastSampleAtKey].
+     * @return The resulting heart rate last sample at key.
+     */
     private fun heartRateLastSampleAtKey(date: LocalDate) = "heart_rate_last_sample_at_$date"
-    // Keeps the saved heart rate graph samples key name in one place for the fitness cover.
+    /**
+     * Keeps the saved heart rate graph samples key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [heartRateGraphSamplesKey].
+     * @return The resulting heart rate graph samples key.
+     */
     private fun heartRateGraphSamplesKey(date: LocalDate) = "heart_rate_graph_samples_$date"
-    // Keeps the saved legacy steps key name in one place for the fitness cover.
+    /**
+     * Keeps the saved legacy steps key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [legacyStepsKey].
+     * @return The resulting legacy steps key.
+     */
     private fun legacyStepsKey(date: LocalDate) = "steps_$date"
 
-    // Loads food-diary entries for the selected day.
+    /**
+     * Loads food-diary entries for the selected day.
+     *
+     * @param date Date supplied to [foods].
+     * @return List of resulting foods items.
+     */
     private fun foods(date: LocalDate): List<FoodLogEntry> {
         val encoded = preferences.getString(foodKey(date), null) ?: return emptyList()
         return runCatching {
@@ -419,7 +622,12 @@ internal class FitnessStore(private val context: Context, private val accountId:
         }.getOrDefault(emptyList())
     }
 
-    // Saves today's food diary on the phone.
+    /**
+     * Saves today's food diary on the phone.
+     *
+     * @param date Date supplied to [saveFoods].
+     * @param foods Collection of foods values to process.
+     */
     private fun saveFoods(date: LocalDate, foods: List<FoodLogEntry>) {
         val encoded = JSONArray().apply {
             foods.takeLast(250).forEach { put(it.toJson()) }
@@ -427,7 +635,12 @@ internal class FitnessStore(private val context: Context, private val accountId:
         preferences.edit { putString(foodKey(date), encoded) }
     }
 
-    // Keeps the saved food key name in one place for the fitness cover.
+    /**
+     * Keeps the saved food key name in one place for the fitness cover.
+     *
+     * @param date Date supplied to [foodKey].
+     * @return The resulting food key.
+     */
     private fun foodKey(date: LocalDate) = "foods_$date"
 
     private companion object {
@@ -435,7 +648,11 @@ internal class FitnessStore(private val context: Context, private val accountId:
     }
 }
 
-// Fitness cover: Converts this record into JSON.
+/**
+ * Fitness cover: Converts this record into JSON.
+ *
+ * @return JSON representation of this object.
+ */
 private fun FoodLogEntry.toJson() = JSONObject().apply {
     put("logId", logId)
     put("servings", servings.toDouble())
@@ -444,6 +661,12 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
     put("food", food.toJson())
 }
 
+/**
+ * Serializes this instance into a JSON object.
+ *
+ * @param includeServingOptions Whether to include serving options.
+ * @return JSON object representing to JSON.
+ */
 internal fun NutritionFood.toJson(includeServingOptions: Boolean = false): JSONObject = JSONObject().apply {
     put("id", id)
     put("name", name)
@@ -469,7 +692,12 @@ internal fun NutritionFood.toJson(includeServingOptions: Boolean = false): JSONO
     }
 }
 
-// Converts a saved food entry into the model used by the nutrition screen.
+/**
+ * Converts a saved food entry into the model used by the nutrition screen.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting [FoodLogEntry], or `null` if unavailable.
+ */
 private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     FoodLogEntry(
         logId = value.getString("logId"),
@@ -480,40 +708,53 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     )
 }.getOrNull()
 
+/**
+ * Converts JSON object into nutrition food.
+ *
+ * @param includeServingOptions Whether to include serving options.
+ * @return The resulting [NutritionFood], or `null` if unavailable.
+ */
 internal fun JSONObject.toNutritionFood(includeServingOptions: Boolean = false): NutritionFood? = runCatching {
     NutritionFood(
         id = getString("id"),
         name = getString("name"),
         brand = optString("brand"),
         servingDescription = optString("servingDescription", "1 serving"),
-        calories = safeNutrient("calories"),
-        proteinGrams = safeNutrient("proteinGrams"),
-        carbohydrateGrams = safeNutrient("carbohydrateGrams"),
-        fatGrams = safeNutrient("fatGrams"),
+        calories = nonNegativeFloat("calories"),
+        proteinGrams = nonNegativeFloat("proteinGrams"),
+        carbohydrateGrams = nonNegativeFloat("carbohydrateGrams"),
+        fatGrams = nonNegativeFloat("fatGrams"),
         source = FoodDataSource.valueOf(getString("source")),
         barcode = optString("barcode"),
-        saturatedFatGrams = safeNutrient("saturatedFatGrams"),
-        transFatGrams = safeNutrient("transFatGrams"),
-        fiberGrams = safeNutrient("fiberGrams"),
-        sugarGrams = safeNutrient("sugarGrams"),
-        sodiumMilligrams = safeNutrient("sodiumMilligrams"),
-        cholesterolMilligrams = safeNutrient("cholesterolMilligrams"),
-        potassiumMilligrams = safeNutrient("potassiumMilligrams"),
+        saturatedFatGrams = nonNegativeFloat("saturatedFatGrams"),
+        transFatGrams = nonNegativeFloat("transFatGrams"),
+        fiberGrams = nonNegativeFloat("fiberGrams"),
+        sugarGrams = nonNegativeFloat("sugarGrams"),
+        sodiumMilligrams = nonNegativeFloat("sodiumMilligrams"),
+        cholesterolMilligrams = nonNegativeFloat("cholesterolMilligrams"),
+        potassiumMilligrams = nonNegativeFloat("potassiumMilligrams"),
         servingOptions = if (includeServingOptions) readNutritionFoods(optJSONArray("servingOptions"), false)
             else emptyList(),
     )
 }.getOrNull()
 
+/**
+ * Reads nutrition foods.
+ *
+ * @param array Optional array supplied to [readNutritionFoods].
+ * @param includeServingOptions Whether to include serving options.
+ * @return List of resulting read nutrition foods items.
+ */
 internal fun readNutritionFoods(array: JSONArray?, includeServingOptions: Boolean = true): List<NutritionFood> =
     if (array == null) emptyList() else (0 until array.length()).mapNotNull {
         array.optJSONObject(it)?.toNutritionFood(includeServingOptions)
     }
 
-// Reads a nutrient value and replaces invalid numbers with zero.
-private fun JSONObject.safeNutrient(name: String) =
-    optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
-
-// Formats the food serving amount shown in the diary.
+/**
+ * Formats the food serving amount shown in the diary.
+ *
+ * @return The resulting display amount string.
+ */
 internal fun Float.displayAmount(): String = when {
     this > 0f && this < 1f ->
         java.math.BigDecimal(toString()).setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
@@ -605,7 +846,13 @@ internal data class HeartRateDayStats(
     val restingTotalBpm: Long = 0L,
     val restingSampleCount: Int = 0,
 ) {
-    // Fitness watch users: adds one medically plausible watch reading to today's summary.
+    /**
+     * Fitness watch users: adds one medically plausible watch reading to today's summary.
+     *
+     * @param heartRate Heart rate supplied to [record].
+     * @param resting Whether to apply resting.
+     * @return The resulting [HeartRateDayStats] instance.
+     */
     fun record(heartRate: Int, resting: Boolean): HeartRateDayStats {
         if (heartRate !in 30..240) return this
         return copy(
@@ -618,7 +865,15 @@ internal data class HeartRateDayStats(
         )
     }
 
-    // Fitness history: converts saved totals into values the daily vitals screen can display.
+    /**
+     * Fitness history: converts saved totals into values the daily vitals screen can display.
+     *
+     * @param date Date supplied to [toVitals].
+     * @param watchConnected Whether to apply watch connected.
+     * @param lastUpdatedAt Last updated at supplied to [toVitals].
+     * @param samples Collection of samples values to process.
+     * @return The resulting [HeartRateVitals], or `null` if unavailable.
+     */
     fun toVitals(
         date: LocalDate,
         watchConnected: Boolean,
@@ -682,18 +937,41 @@ internal data class FitnessHistoryDay(
 )
 
 internal object FitnessHistory {
-    // Creates the ordered date list used by the 14-day fitness graphs.
+    /**
+     * Creates the ordered date list used by the 14-day fitness graphs.
+     *
+     * @param endDate End date supplied to [datesEndingOn].
+     * @param days Days supplied to [datesEndingOn].
+     * @return List of resulting dates ending on items.
+     */
     fun datesEndingOn(endDate: LocalDate, days: Int): List<LocalDate> =
         (days.coerceIn(1, 31) - 1 downTo 0).map { endDate.minusDays(it.toLong()) }
 }
 
 internal object FitnessMath {
-    // Gives the fitness cover the stride meters it needs.
+    /**
+     * Gives the fitness cover the stride meters it needs.
+     *
+     * @param heightCm Height cm supplied to [strideMeters].
+     * @return The resulting stride meters.
+     */
     fun strideMeters(heightCm: Float) = (heightCm.coerceIn(100f, 230f) * 0.413f) / 100f
-    // Estimates walking distance from the saved step count.
+    /**
+     * Estimates walking distance from the saved step count.
+     *
+     * @param steps Steps supplied to [distanceKm].
+     * @param heightCm Height cm supplied to [distanceKm].
+     * @return The resulting distance km.
+     */
     fun distanceKm(steps: Int, heightCm: Float) =
         steps.coerceAtLeast(0) * strideMeters(heightCm) / 1_000f
-    // Returns the walking calories used by the fitness cover.
+    /**
+     * Returns the walking calories used by the fitness cover.
+     *
+     * @param steps Steps supplied to [walkingCalories].
+     * @param profile Account profile details.
+     * @return The resulting walking calories.
+     */
     fun walkingCalories(steps: Int, profile: FitnessProfile) =
         distanceKm(steps, profile.heightCm) * profile.weightKg.coerceIn(30f, 300f) * 0.75f
 }
@@ -701,16 +979,35 @@ internal object FitnessMath {
 internal object StepSourcePolicy {
     const val WATCH_ACTIVE_WINDOW_MS = 120_000L
 
-    // Watches is active for fitness cover.
+    /**
+     * Watches is active for fitness cover.
+     *
+     * @param lastWatchActivityAt Last watch activity at supplied to [watchIsActive].
+     * @param nowMillis Duration or timestamp for now, in milliseconds.
+     * @return `true` if watch is active, or `false` otherwise.
+     */
     fun watchIsActive(lastWatchActivityAt: Long, nowMillis: Long): Boolean =
         lastWatchActivityAt in 1..nowMillis &&
             nowMillis - lastWatchActivityAt <= WATCH_ACTIVE_WINDOW_MS
 
-    // Adds only new phone steps so watch and phone totals are not counted twice.
+    /**
+     * Adds only new phone steps so watch and phone totals are not counted twice.
+     *
+     * @param phoneDelta Phone delta supplied to [phoneDeltaToAdd].
+     * @param lastWatchActivityAt Last watch activity at supplied to [phoneDeltaToAdd].
+     * @param nowMillis Duration or timestamp for now, in milliseconds.
+     * @return The computed phone delta to add numeric value.
+     */
     fun phoneDeltaToAdd(phoneDelta: Int, lastWatchActivityAt: Long, nowMillis: Long): Int =
         if (watchIsActive(lastWatchActivityAt, nowMillis)) 0 else phoneDelta.coerceAtLeast(0)
 
-    // Fitness cover: Watches delta to add.
+    /**
+     * Fitness cover: Watches delta to add.
+     *
+     * @param watchDelta Watch delta supplied to [watchDeltaToAdd].
+     * @param phoneFallbackSinceWatch Phone fallback since watch supplied to [watchDeltaToAdd].
+     * @return The computed watch delta to add numeric value.
+     */
     fun watchDeltaToAdd(watchDelta: Int, phoneFallbackSinceWatch: Int): Int =
         (watchDelta.coerceAtLeast(0) - phoneFallbackSinceWatch.coerceAtLeast(0)).coerceAtLeast(0)
 }

@@ -61,12 +61,23 @@ import com.olive.app.security.allowsAppPin
 import com.olive.app.ui.session.SessionRuntime
 
 
-// Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
+/**
+ * Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
+ *
+ * @param usesCover Whether to apply uses cover.
+ * @return `true` if should compose cover, or `false` otherwise.
+ */
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
 internal val LocalQuickExit = staticCompositionLocalOf<(() -> Unit)?> { null }
 
-// Chooses the account, cover, onboarding, or Safe App root screen.
+/**
+ * Chooses the account, cover, onboarding, or Safe App root screen.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param locationPermissionVersion Location permission version supplied to [OliveRoot].
+ * @param closeApp Action or callback executed for close app.
+ */
 @Composable
 internal fun OliveRoot(
     session: SessionViewModel,
@@ -496,14 +507,27 @@ internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Setting
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Privacy }
 internal enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 
-// Creates the messaging identity used after account sign-in.
+/**
+ * Creates the messaging identity used after account sign-in.
+ *
+ * @param identity Authenticated account identity containing UID and username.
+ * @param publicKey Raw public key byte array.
+ * @return The resulting messaging identity marker string.
+ */
 internal fun messagingIdentityMarker(identity: AccountIdentity, publicKey: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(publicKey)
     val keyId = Base64.getUrlEncoder().withoutPadding().encodeToString(digest).take(16)
     return "secure-v2:${identity.uid}:${identity.username.lowercase()}:$keyId"
 }
 
-// Registers an encryption identity before opening secure messaging.
+/**
+ * Registers an encryption identity before opening secure messaging.
+ *
+ * @param savedMarker Optional saved marker supplied to [shouldRegisterMessagingIdentity].
+ * @param identity Authenticated account identity containing UID and username.
+ * @param publicKey Raw public key byte array.
+ * @return `true` if should register messaging identity, or `false` otherwise.
+ */
 internal fun shouldRegisterMessagingIdentity(
     savedMarker: String?,
     identity: AccountIdentity,
@@ -528,60 +552,143 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     val usesDeviceLock get() = preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK && phoneHasLock
     val canUseAppPin get() = runtime.enrollment?.allowsAppPin() == true
 
-    // Restores the account and private-entry state saved on this device.
+    /**
+     * Restores the account and private-entry state saved on this device.
+     *
+     * @return The resulting load.
+     */
     fun load() = runtime.accountSession.load()
-    // Selects whether the person is a user, trusted contact, staff member, or admin.
+    /**
+     * Selects whether the person is a user, trusted contact, staff member, or admin.
+     *
+     * @param role Account role determining workspace permissions.
+     */
     fun selectRole(role: AccountRole) = runtime.accountSession.selectRole(role)
-    // Opens the new-account path on the account entry screen.
+    /**
+     * Opens the new-account path on the account entry screen.
+     */
     fun chooseNew() = runtime.accountSession.chooseNew()
-    // Opens the returning-account sign-in path.
+    /**
+     * Opens the returning-account sign-in path.
+     */
     fun chooseReturning() = runtime.accountSession.chooseReturning()
-    // Starts profile setup after a new account signs in successfully.
+    /**
+     * Starts profile setup after a new account signs in successfully.
+     */
     fun openAccountSetup() = runtime.accountSession.openAccountSetup()
-    // Clears the username or password error when the user edits the form.
+    /**
+     * Clears the username or password error when the user edits the form.
+     */
     fun clearCredentialError() = runtime.accountSession.clearCredentialError()
-    // Signs in with Firebase, or creates the Firebase account when requested.
+    /**
+     * Signs in with Firebase, or creates the Firebase account when requested.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     * @return The resulting authenticate.
+     */
     fun authenticate(username: String, password: String, create: Boolean) =
         runtime.accountSignIn.authenticate(username, password, create)
 
-    // Saves the profile collected during account setup.
+    /**
+     * Saves the profile collected during account setup.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun saveSetupProfile(value: UserProfile) = runtime.accountSession.saveSetupProfile(value)
-    // Checks both PIN fields before saving the first private-entry PIN.
+    /**
+     * Checks both PIN fields before saving the first private-entry PIN.
+     *
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [createDevicePin].
+     * @return The resulting create device PIN.
+     */
     fun createDevicePin(pin: String, confirmation: String) =
         runtime.accountSession.createDevicePin(pin, confirmation)
 
-    // Saves the hidden phrase chosen during first-time setup.
+    /**
+     * Saves the hidden phrase chosen during first-time setup.
+     *
+     * @param trigger Trigger supplied to [saveProvisionedTrigger].
+     */
     fun saveProvisionedTrigger(trigger: String) = runtime.accountSession.saveProvisionedTrigger(trigger)
 
-    // Shows a specific account-entry error on the current screen.
+    /**
+     * Shows a specific account-entry error on the current screen.
+     *
+     * @param text Text string to display, parse, or send.
+     */
     fun showError(text: String) {
         runtime.state.message = text
     }
 
-    // Checks again whether Android currently has a secure device lock.
+    /**
+     * Checks again whether Android currently has a secure device lock.
+     */
     fun refreshDeviceSecurity() {
         runtime.deviceSecure = runtime.phoneSecure()
     }
 
-    // Changes whether this user prefers Android lock or the app PIN.
+    /**
+     * Changes whether this user prefers Android lock or the app PIN.
+     *
+     * @param method Method supplied to [setSafeEntryMethod].
+     * @param currentPin Current PIN supplied to [setSafeEntryMethod].
+     */
     fun setSafeEntryMethod(method: SafeEntryMethod, currentPin: String) =
         runtime.entrySettings.select(method, currentPin)
 
-    // Saves or replaces the user's backup app PIN.
+    /**
+     * Saves or replaces the user's backup app PIN.
+     *
+     * @param currentPin Current PIN supplied to [saveSafeEntryPin].
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [saveSafeEntryPin].
+     * @param usePin Whether to use PIN.
+     */
     fun saveSafeEntryPin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) =
         runtime.entrySettings.savePin(currentPin, pin, confirmation, usePin)
 
-    // Opens Android device authentication for entry or first-time enrolment.
+    /**
+     * Opens Android device authentication for entry or first-time enrolment.
+     *
+     * @param enroll Whether to apply enroll.
+     * @return The resulting authenticate device lock.
+     */
     fun authenticateDeviceLock(enroll: Boolean = false) = runtime.deviceAccess.authenticate(enroll)
-    // Confirms device authentication before changing the hidden trigger phrase.
+    /**
+     * Confirms device authentication before changing the hidden trigger phrase.
+     *
+     * @param trigger Trigger supplied to [changeDeviceLockTrigger].
+     * @return The resulting change device lock trigger.
+     */
     fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false, trigger)
 
-    // Checks whether cover-app search text matches the saved hidden phrase.
+    /**
+     * Checks whether cover-app search text matches the saved hidden phrase.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search, or `false` otherwise.
+     */
     fun interceptSearch(value: String): Boolean = runtime.access.interceptSearch(value)
+    /**
+     * Computes intercept search async.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search async, or `false` otherwise.
+     */
     suspend fun interceptSearchAsync(value: String): Boolean = runtime.access.interceptSearchAsync(value)
-    // Opens private authentication after the hidden olive is double-tapped.
+    /**
+     * Opens private authentication after the hidden olive is double-tapped.
+     */
     fun beginDiscreetEntry() = runtime.access.beginDiscreetEntry()
-    // Checks the entered app PIN against the current private-entry challenge.
+    /**
+     * Checks the entered app PIN against the current private-entry challenge.
+     *
+     * @param pin User-entered PIN string.
+     * @param challenge Challenge supplied to [submitPin].
+     */
     fun submitPin(pin: String, challenge: Int = runtime.state.pinChallengeVersion) =
         runtime.access.submitPin(pin, challenge)
 

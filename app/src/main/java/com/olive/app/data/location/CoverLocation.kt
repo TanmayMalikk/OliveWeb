@@ -23,7 +23,13 @@ import kotlin.time.Duration.Companion.seconds
 
 // Grab a one-off coarse location for cover content; nothing from here is saved to the account.
 object CoverLocation {
-    // Joins available address parts into the city label shown by the cover.
+    /**
+     * Joins available address parts into the city label shown by the cover.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param fallback Fallback supplied to [city].
+     * @return The resulting city string.
+     */
     suspend fun city(context: Context, fallback: String): String {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -41,14 +47,25 @@ object CoverLocation {
         return reverseGeocode(context, location) ?: fallback
     }
 
-    // Keeps the newest cached GPS point returned by Android.
+    /**
+     * Keeps the newest cached GPS point returned by Android.
+     *
+     * @param manager Manager supplied to [newestCachedLocation].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun newestCachedLocation(manager: LocationManager): Location? =
         manager.getProviders(true)
             .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
             .maxByOrNull(Location::getTime)
 
-    // Requests the best available current device location.
+    /**
+     * Requests the best available current device location.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param manager Manager supplied to [current].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun current(context: Context, manager: LocationManager): Location? =
         suspendCancellableCoroutine { continuation ->
@@ -68,7 +85,13 @@ object CoverLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         }
 
-    // Gives location sharing the reverse geocode it needs.
+    /**
+     * Gives location sharing the reverse geocode it needs.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param location Location supplied to [reverseGeocode].
+     * @return The resulting reverse geocode string, or `null` when unavailable.
+     */
     private suspend fun reverseGeocode(context: Context, location: Location): String? {
         if (Build.VERSION.SDK_INT < 33 || !Geocoder.isPresent()) return null
         val address = withTimeoutOrNull(6.seconds) {
@@ -77,12 +100,20 @@ object CoverLocation {
                     location.latitude, location.longitude, 1,
                     // Converts the cover's coordinates into the first local address returned by Android.
                     object : Geocoder.GeocodeListener {
-                        // Runs the geocode callback when location sharing finishes that step.
+                        /**
+                         * Runs the geocode callback when location sharing finishes that step.
+                         *
+                         * @param addresses Collection of addresses values to process.
+                         */
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
-                        // Returns a readable location error when the device request fails.
+                        /**
+                         * Returns a readable location error when the device request fails.
+                         *
+                         * @param errorMessage Optional error message supplied to [onError].
+                         */
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }

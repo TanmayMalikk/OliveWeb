@@ -52,11 +52,23 @@ class OCREngine(
         recognitionEngine = RecognitionEngine(ortManager, configured.characterList)
     }
 
+    /**
+     * Executes the OCR engine.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [OCREngineResult] instance.
+     */
     fun run(bitmap: Bitmap): OCREngineResult {
         val srcMat = BitmapUtils.bitmapToBGRMat(bitmap)
         return runWithOwnedMat(srcMat)
     }
 
+    /**
+     * Executes the OCR engine.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [OCREngineResult] instance.
+     */
     fun run(imageBytes: ByteArray): OCREngineResult {
         val srcMat = BitmapUtils.imdecodeBGR(imageBytes)
         if (srcMat.empty()) {
@@ -66,6 +78,12 @@ class OCREngine(
         return runWithOwnedMat(srcMat)
     }
 
+    /**
+     * Executes with owned mat.
+     *
+     * @param srcMat Src mat supplied to [runWithOwnedMat].
+     * @return The resulting [OCREngineResult] for run with owned mat.
+     */
     private fun runWithOwnedMat(srcMat: org.opencv.core.Mat): OCREngineResult {
         return try {
             run(srcMat)
@@ -74,6 +92,12 @@ class OCREngine(
         }
     }
 
+    /**
+     * Executes the OCR engine.
+     *
+     * @param srcMat Src mat supplied to [run].
+     * @return The resulting [OCREngineResult] instance.
+     */
     private fun run(srcMat: org.opencv.core.Mat): OCREngineResult {
         val totalStart = System.currentTimeMillis()
         val detResult = detectionEngine.detect(srcMat)
@@ -179,6 +203,9 @@ class OCREngine(
         )
     }
 
+    /**
+     * Computes release.
+     */
     fun release() {
         ortManager.release()
     }

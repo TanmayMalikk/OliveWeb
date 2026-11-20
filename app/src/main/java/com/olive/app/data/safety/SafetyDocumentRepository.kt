@@ -1,7 +1,7 @@
 // Safe-app users and support staff: loads and saves a user’s safety documents.
 package com.olive.app.data.safety
 
-import com.olive.app.data.sync.cloudStringMap
+import com.olive.app.data.network.cloudStringMap
 
 import android.content.Context
 import com.google.firebase.firestore.*
@@ -52,7 +52,13 @@ data class DocumentListSnapshot(
     val lastSyncedAt: Long? = null,
 )
 
-/** Retains device-encrypted key copies only for the exact authorized account set. */
+/**
+ * Retains device-encrypted key copies only for the exact authorized account set.
+ *
+ * @param keys Key-value mapping of keys entries.
+ * @param allowedUsers Collection of allowed users values to process.
+ * @return Map containing the resulting retain authorized device keys entries.
+ */
 internal fun retainAuthorizedDeviceKeys(
     keys: Map<String, String>,
     allowedUsers: Set<String>,
@@ -60,7 +66,14 @@ internal fun retainAuthorizedDeviceKeys(
     allowedUsers.any { uid -> key.startsWith("$uid--") }
 }
 
-/** Selects only this account and device's document-key copies, preferring the device envelope. */
+/**
+ * Selects only this account and device's document-key copies, preferring the device envelope.
+ *
+ * @param document Safety document metadata record.
+ * @param uid Firebase UID of the target user account.
+ * @param deviceId Stable identifier for this device installation.
+ * @return List of resulting document key candidates items.
+ */
 internal fun documentKeyCandidates(
     document: SafetyDocument,
     uid: String,
@@ -72,7 +85,12 @@ internal fun documentKeyCandidates(
 
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
 
-/** Accepts OCR only after the containing metadata has been decrypted on the client. */
+/**
+ * Accepts OCR only after the containing metadata has been decrypted on the client.
+ *
+ * @param metadata Optional metadata supplied to [documentOcrMetadataFrom].
+ * @return The resulting [DocumentOcrMetadata], or `null` if unavailable.
+ */
 internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata? {
     metadata ?: return null
     val text = metadata.opt("ocrText") as? String ?: return null
@@ -82,7 +100,12 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
     return DocumentOcrMetadata(text, confidence, successful)
 }
 
-/** Reads small private organization tags only after the encrypted metadata is opened on-device. */
+/**
+ * Reads small private organization tags only after the encrypted metadata is opened on-device.
+ *
+ * @param metadata Optional metadata supplied to [documentTagsFrom].
+ * @return List of resulting document tags from items.
+ */
 internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
     val values = metadata?.optJSONArray("tags") ?: return emptyList()
     return buildList {
@@ -93,25 +116,76 @@ internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
 }
 
 interface SafetyDocumentDataSource {
-    // Lists every safety document this account is allowed to open.
+    /**
+     * Lists every safety document this account is allowed to open.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [DocumentListSnapshot] for list for.
+     */
     suspend fun listFor(uid: String): DocumentListSnapshot
-    // Streams every document the account may open and reports storage-listener failures separately.
+    /**
+     * Streams every document the account may open and reports storage-listener failures separately.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeFor(
         uid: String,
         onUpdate: (DocumentListSnapshot) -> Unit,
         onError: (String) -> Unit
     ): ChatSubscription
 
-    // Loads one allowed safety document by its ID.
+    /**
+     * Loads one allowed safety document by its ID.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [getFor].
+     * @return The resulting [SafetyDocument] for get for.
+     */
     suspend fun getFor(uid: String, id: String): SafetyDocument
-    /** Returns encrypted-at-rest index metadata without contacting Firebase. */
+    /**
+     * Returns encrypted-at-rest index metadata without contacting Firebase.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [cachedFor].
+     * @return The resulting [SafetyDocument], or `null` if unavailable.
+     */
     fun cachedFor(uid: String, id: String): SafetyDocument? = null
+    /**
+     * Computes upgrade owned recovery keys.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun upgradeOwnedRecoveryKeys(uid: String) = Unit
-    // Wraps the document key for new recipients before sharing it.
+    /**
+     * Wraps the document key for new recipients before sharing it.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     */
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
+    /**
+     * Shares in chat.
+     *
+     * @param document Safety document metadata record.
+     * @param outgoing Outgoing supplied to [shareInChat].
+     * @param recipients Key-value mapping of recipients entries.
+     */
     suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) {
         error("Chat attachment sharing is unavailable")
     }
+    /**
+     * Grants access.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     * @param recipientUsername Recipient username supplied to [grantAccess].
+     * @param forPlan Whether to apply for plan.
+     */
     suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -119,16 +193,46 @@ interface SafetyDocumentDataSource {
         recipientUsername: String,
         forPlan: Boolean = false,
     ) { error("Encrypted media sharing is unavailable") }
+    /**
+     * Revokes access.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     */
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         error("Encrypted media revocation is unavailable")
     }
-    // Deletes a safety document owned by the current user.
+    /**
+     * Deletes a safety document owned by the current user.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     suspend fun delete(document: SafetyDocument, ownerUid: String)
-    // Marks an owned file as evidence or returns it to a normal document.
+    /**
+     * Marks an owned file as evidence or returns it to a normal document.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param evidence Whether to apply evidence.
+     */
     suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) = Unit
-    // Downloads and decrypts a safety document for in-app viewing.
+    /**
+     * Downloads and decrypts a safety document for in-app viewing.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param document Safety document metadata record.
+     * @return The resulting [File] instance.
+     */
     suspend fun download(context: Context, document: SafetyDocument): File
-    /** Gives this account's registered phones and browsers encrypted copies of the document key. */
+    /**
+     * Gives this account's registered phones and browsers encrypted copies of the document key.
+     *
+     * @param document Safety document metadata record.
+     * @param currentUid Current user ID supplied to [approveCurrentAccountDevices].
+     * @param username Account username.
+     */
     suspend fun approveCurrentAccountDevices(document: SafetyDocument, currentUid: String, username: String)
 }
 
@@ -138,7 +242,12 @@ class SafetyDocumentRepository(
     private val media: MediaTicketDataSource,
     private val authorizePeer: suspend (String) -> Unit = { com.olive.app.data.messaging.authorizeMessagingPeer(it) },
 ) : SafetyDocumentDataSource {
-    // Reads every Firebase document this account is allowed to open.
+    /**
+     * Reads every Firebase document this account is allowed to open.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [DocumentListSnapshot] for list for.
+     */
     override suspend fun listFor(uid: String): DocumentListSnapshot {
         val snapshot = firestore.collection("files").whereArrayContains("allowed_users", uid)
             .get(Source.SERVER).await()
@@ -149,7 +258,14 @@ class SafetyDocumentRepository(
         )
     }
 
-    // Converts live Firestore file updates into the user's readable document list.
+    /**
+     * Converts live Firestore file updates into the user's readable document list.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     override fun observeFor(
         uid: String,
         onUpdate: (DocumentListSnapshot) -> Unit,
@@ -179,7 +295,13 @@ class SafetyDocumentRepository(
         return ChatSubscription { listener.remove(); scope.cancel() }
     }
 
-    // Loads the encrypted document records that this account may open.
+    /**
+     * Loads the encrypted document records that this account may open.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [getFor].
+     * @return The resulting [SafetyDocument] for get for.
+     */
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
         try {
             val row = firestore.collection("files").document(id).get(Source.SERVER).await()
@@ -200,6 +322,11 @@ class SafetyDocumentRepository(
         }
     }
 
+    /**
+     * Computes upgrade owned recovery keys.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun upgradeOwnedRecoveryKeys(uid: String) {
         val rows = firestore.collection("files").whereArrayContains("allowed_users", uid)
             .get(Source.SERVER).await().documents
@@ -218,7 +345,13 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Adds encrypted document access for each selected recipient.
+    /**
+     * Adds encrypted document access for each selected recipient.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     */
     override suspend fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -252,6 +385,13 @@ class SafetyDocumentRepository(
         }
     }
 
+    /**
+     * Shares in chat.
+     *
+     * @param document Safety document metadata record.
+     * @param outgoing Outgoing supplied to [shareInChat].
+     * @param recipients Key-value mapping of recipients entries.
+     */
     override suspend fun shareInChat(
         document: SafetyDocument,
         outgoing: OutgoingMessage,
@@ -267,7 +407,15 @@ class SafetyDocumentRepository(
         media.shareInChat(current.id, outgoing, recipients.keys.toList(), access.accountKeys, access.deviceKeys)
     }
 
-    // Wraps the document key for another approved account without exposing the raw key.
+    /**
+     * Wraps the document key for another approved account without exposing the raw key.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     * @param recipientUsername Recipient username supplied to [grantAccess].
+     * @param forPlan Whether to apply for plan.
+     */
     override suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -310,7 +458,13 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Removes access from the safety plan.
+    /**
+     * Removes access from the safety plan.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     */
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         val document = getFor(ownerUid, documentId)
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
@@ -336,7 +490,12 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Removes an owned document from cloud storage and Firebase.
+    /**
+     * Removes an owned document from cloud storage and Firebase.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     override suspend fun delete(document: SafetyDocument, ownerUid: String) {
         require(document.ownerUid == ownerUid)
         if (document.objectKey.isNotBlank()) {
@@ -347,7 +506,13 @@ class SafetyDocumentRepository(
         firestore.collection("files").document(document.id).delete().await()
     }
 
-    // Stores evidence as document metadata, so the same setting appears on every signed-in device.
+    /**
+     * Stores evidence as document metadata, so the same setting appears on every signed-in device.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param evidence Whether to apply evidence.
+     */
     override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
         require(document.ownerUid == ownerUid)
         if (document.objectKey.isNotBlank()) {
@@ -357,7 +522,13 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Safety: Downloads the selected file.
+    /**
+     * Safety: Downloads the selected file.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param document Safety document metadata record.
+     * @return The resulting [File] instance.
+     */
     override suspend fun download(context: Context, document: SafetyDocument): File {
         require(document.objectKey.isBlank()) { "Encrypted media downloads use MediaTransferController" }
         val folder = File(context.cacheDir, "opened-documents").apply { mkdirs() }
@@ -371,7 +542,13 @@ class SafetyDocumentRepository(
         return target
     }
 
-    // Gives every registered device on this account its own wrapped document key.
+    /**
+     * Gives every registered device on this account its own wrapped document key.
+     *
+     * @param document Safety document metadata record.
+     * @param currentUid Current user ID supplied to [approveCurrentAccountDevices].
+     * @param username Account username.
+     */
     override suspend fun approveCurrentAccountDevices(
         document: SafetyDocument,
         currentUid: String,
@@ -411,7 +588,13 @@ class SafetyDocumentRepository(
         if (additions.isNotEmpty()) media.updateDeviceKeys(document.id, additions)
     }
 
-    // Grants or removes encrypted-file access for the selected document recipients.
+    /**
+     * Grants or removes encrypted-file access for the selected document recipients.
+     *
+     * @param document Safety document metadata record.
+     * @param before Collection of before values to process.
+     * @param after Collection of after values to process.
+     */
     private suspend fun updateStorageAccess(
         document: SafetyDocument,
         before: Set<String>,
@@ -435,7 +618,14 @@ class SafetyDocumentRepository(
         val deviceKeys: Map<String, String>,
     )
 
-    /** Re-wraps the document key for the exact final recipient set using registered device keys. */
+    /**
+     * Re-wraps the document key for the exact final recipient set using registered device keys.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     * @return The resulting [EncryptedAccess] for encrypted access.
+     */
     private suspend fun encryptedAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -460,7 +650,14 @@ class SafetyDocumentRepository(
         return EncryptedAccess(accountKeys, deviceKeys)
     }
 
-    /** Wraps the document key for both the directory identity and every registered recipient device. */
+    /**
+     * Wraps the document key for both the directory identity and every registered recipient device.
+     *
+     * @param documentKey Document key supplied to [recipientAccess].
+     * @param uid Firebase UID of the target user account.
+     * @param username Account username.
+     * @return The resulting [RecipientAccess] for recipient access.
+     */
     private suspend fun recipientAccess(
         documentKey: SecretKey,
         uid: String,
@@ -497,7 +694,13 @@ class SafetyDocumentRepository(
         )
     }
 
-    /** Uses this installation's key copy before the account envelope shared across installations. */
+    /**
+     * Uses this installation's key copy before the account envelope shared across installations.
+     *
+     * @param document Safety document metadata record.
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SecretKey] for unwrap document key.
+     */
     private suspend fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
         val candidates = documentKeyCandidates(document, uid, KeyManager.deviceId())
         val key = runCatching { KeyManager.unwrapFirst(candidates, document.encryptionVersion) }.getOrNull()
@@ -507,12 +710,26 @@ class SafetyDocumentRepository(
 
     private val recoveryRequests = Semaphore(6)
 
+    /**
+     * Resolves documents.
+     *
+     * @param rows Collection of rows values to process.
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting resolve documents items.
+     */
     private suspend fun resolveDocuments(rows: List<DocumentSnapshot>, uid: String): List<SafetyDocument> =
         coroutineScope {
             rows.map { row -> async(Dispatchers.IO) { resolveDocument(row, uid) } }
                 .awaitAll().filterNotNull().sortedByDescending { it.createdAt }
         }
 
+    /**
+     * Resolves document.
+     *
+     * @param row Row supplied to [resolveDocument].
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SafetyDocument], or `null` if unavailable.
+     */
     private suspend fun resolveDocument(row: DocumentSnapshot, uid: String): SafetyDocument? {
         val local = documentFrom(row, uid) ?: return null
         if (!local.accountRecoveryReady || local.name != "Encrypted document" || uid !in local.allowedUsers) return local
@@ -526,7 +743,14 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Converts a stored document record into the model shown by the Safe App.
+    /**
+     * Converts a stored document record into the model shown by the Safe App.
+     *
+     * @param row Row supplied to [documentFrom].
+     * @param viewerUid Firebase UID of the viewing account.
+     * @param recovered Optional recovered supplied to [documentFrom].
+     * @return The resulting [SafetyDocument], or `null` if unavailable.
+     */
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String, recovered: SecretKey? = null): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
@@ -572,7 +796,12 @@ class SafetyDocumentRepository(
 
     private companion object {
         const val CACHE_LIFETIME = 60L * 60L * 1000L
-        // Uses one protected-storage key for this account's document access data.
+        /**
+         * Uses one protected-storage key for this account's document access data.
+         *
+         * @param uid Firebase UID of the target user account.
+         * @return The resulting access key.
+         */
         fun accessKey(uid: String) = "access_$uid"
     }
 }
@@ -586,6 +815,13 @@ class IndexedSafetyDocumentRepository(
     private val index: DocumentIndexDataSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SafetyDocumentDataSource {
+    /**
+     * Sets evidence.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param evidence Whether to apply evidence.
+     */
     override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
         remote.setEvidence(document, ownerUid, evidence)
         // The acknowledged write must also survive an offline fallback before the listener catches up.
@@ -597,8 +833,19 @@ class IndexedSafetyDocumentRepository(
         )
     }
 
+    /**
+     * Computes upgrade owned recovery keys.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override suspend fun upgradeOwnedRecoveryKeys(uid: String) = remote.upgradeOwnedRecoveryKeys(uid)
 
+    /**
+     * Computes list for.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [DocumentListSnapshot] for list for.
+     */
     override suspend fun listFor(uid: String): DocumentListSnapshot = try {
         persist(uid, remote.listFor(uid))
     } catch (failure: Exception) {
@@ -607,6 +854,14 @@ class IndexedSafetyDocumentRepository(
         local.snapshot()
     }
 
+    /**
+     * Starts observing for.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     override fun observeFor(
         uid: String,
         onUpdate: (DocumentListSnapshot) -> Unit,
@@ -630,18 +885,54 @@ class IndexedSafetyDocumentRepository(
         })
     }
 
-    /** Server reads never silently fall back after an authorization failure. */
+    /**
+     * Server reads never silently fall back after an authorization failure.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [getFor].
+     * @return The resulting [SafetyDocument] for get for.
+     */
     override suspend fun getFor(uid: String, id: String): SafetyDocument = remote.getFor(uid, id)
 
+    /**
+     * Computes cached for.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [cachedFor].
+     * @return The resulting [SafetyDocument], or `null` if unavailable.
+     */
     override fun cachedFor(uid: String, id: String): SafetyDocument? =
         index.read(uid).documents.firstOrNull { it.id == id && uid in it.allowedUsers }
 
+    /**
+     * Shares the indexed safety document repository.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     */
     override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) =
         remote.share(document, ownerUid, recipients)
 
+    /**
+     * Shares in chat.
+     *
+     * @param document Safety document metadata record.
+     * @param outgoing Outgoing supplied to [shareInChat].
+     * @param recipients Key-value mapping of recipients entries.
+     */
     override suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) =
         remote.shareInChat(document, outgoing, recipients)
 
+    /**
+     * Grants access.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     * @param recipientUsername Recipient username supplied to [grantAccess].
+     * @param forPlan Whether to apply for plan.
+     */
     override suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -650,19 +941,53 @@ class IndexedSafetyDocumentRepository(
         forPlan: Boolean,
     ) = remote.grantAccess(document, ownerUid, recipientUid, recipientUsername, forPlan)
 
+    /**
+     * Revokes access.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipientUid Firebase UID of the recipient account.
+     */
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) =
         remote.revokeAccess(documentId, ownerUid, recipientUid)
 
+    /**
+     * Deletes the indexed safety document repository.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     override suspend fun delete(document: SafetyDocument, ownerUid: String) {
         remote.delete(document, ownerUid)
         index.remove(ownerUid, document.id)
     }
 
+    /**
+     * Downloads the indexed safety document repository.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param document Safety document metadata record.
+     * @return The resulting [File] instance.
+     */
     override suspend fun download(context: Context, document: SafetyDocument): File = remote.download(context, document)
 
+    /**
+     * Approves current account devices.
+     *
+     * @param document Safety document metadata record.
+     * @param currentUid Current user ID supplied to [approveCurrentAccountDevices].
+     * @param username Account username.
+     */
     override suspend fun approveCurrentAccountDevices(document: SafetyDocument, currentUid: String, username: String) =
         remote.approveCurrentAccountDevices(document, currentUid, username)
 
+    /**
+     * Persists the indexed safety document repository.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @return The resulting [DocumentListSnapshot] instance.
+     */
     private fun persist(uid: String, snapshot: DocumentListSnapshot): DocumentListSnapshot {
         if (snapshot.source != DocumentListSource.SERVER) return snapshot
         val saved = index.replace(uid, snapshot.documents, snapshot.lastSyncedAt ?: clock())
@@ -670,5 +995,10 @@ class IndexedSafetyDocumentRepository(
     }
 }
 
+/**
+ * Computes snapshot for this indexed documents.
+ *
+ * @return The resulting snapshot.
+ */
 private fun IndexedDocuments.snapshot() =
     DocumentListSnapshot(documents, DocumentListSource.LOCAL_INDEX, lastSyncedAt)

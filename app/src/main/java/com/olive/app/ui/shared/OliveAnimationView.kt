@@ -79,7 +79,14 @@ internal class OliveAnimationView @JvmOverloads constructor(
         Shader.TileMode.CLAMP,
     )
 
-    // Rebuilds the branch path when the animation view changes size.
+    /**
+     * Rebuilds the branch path when the animation view changes size.
+     *
+     * @param w W supplied to [onSizeChanged].
+     * @param h H supplied to [onSizeChanged].
+     * @param oldw Oldw supplied to [onSizeChanged].
+     * @param oldh Oldh supplied to [onSizeChanged].
+     */
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         branchPath.reset()
@@ -92,7 +99,11 @@ internal class OliveAnimationView @JvmOverloads constructor(
         pathMeasure.setPath(branchPath, false)
     }
 
-    // Draws the growing branch, leaves, falling olive, and ripple for this frame.
+    /**
+     * Draws the growing branch, leaves, falling olive, and ripple for this frame.
+     *
+     * @param canvas Canvas supplied to [onDraw].
+     */
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (progress <= 0f || progress >= 1f) return
@@ -197,7 +208,14 @@ internal class OliveAnimationView @JvmOverloads constructor(
         }
     }
 
-    // Draws one growing leaf on the animated olive branch.
+    /**
+     * Draws one growing leaf on the animated olive branch.
+     *
+     * @param canvas Canvas supplied to [drawLeaf].
+     * @param x X supplied to [drawLeaf].
+     * @param y Y supplied to [drawLeaf].
+     * @param scale Scale supplied to [drawLeaf].
+     */
     private fun drawLeaf(canvas: Canvas, x: Float, y: Float, scale: Float) {
         leafPath.reset()
         val len = 65f * scale

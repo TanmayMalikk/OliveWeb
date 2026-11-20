@@ -21,6 +21,11 @@ import kotlinx.coroutines.tasks.await
 
 // Topic membership belongs to the installation and applies to every signed-in role.
 class AppUpdateRegistrationWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result = try {
         val messaging = FirebaseMessaging.getInstance()
         messaging.register().await()
@@ -36,7 +41,11 @@ class AppUpdateRegistrationWorker(context: Context, parameters: WorkerParameters
 // Checks for a release update in the background and prepares it without interrupting the current screen.
 internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
-    // A failed network check is retried later; a malformed or untrusted release is never installed.
+    /**
+     * A failed network check is retried later; a malformed or untrusted release is never installed.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result = runCatching {
         val client = AppUpdateClient(applicationContext)
         val release = AppUpdateStore(applicationContext).refresh(client)
@@ -50,7 +59,11 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
         if (runAttemptCount < 3 && error is java.io.IOException) Result.retry() else Result.failure()
     }
 
-    // The notification opens a small installer screen; Android owns the final confirmation.
+    /**
+     * The notification opens a small installer screen; Android owns the final confirmation.
+     *
+     * @param release Release supplied to [notifyReady].
+     */
     private fun notifyReady(release: AppReleaseManifest) {
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
         OliveNotificationManager.createNotificationChannels(applicationContext)
@@ -84,7 +97,11 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
 internal object AppUpdateScheduler {
     const val TOPIC_APP_UPDATES = "app_updates"
 
-    // Checks once after startup and then once per day on an unmetered connection because the APK is large.
+    /**
+     * Checks once after startup and then once per day on an unmetered connection because the APK is large.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun schedule(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
         val manager = WorkManager.getInstance(context)
@@ -103,6 +120,11 @@ internal object AppUpdateScheduler {
         }
     }
 
+    /**
+     * Registers for updates.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun registerForUpdates(context: Context) {
         WorkManager.getInstance(context).enqueueUniqueWork(
             "olive-update-registration", ExistingWorkPolicy.KEEP,
@@ -112,6 +134,12 @@ internal object AppUpdateScheduler {
         )
     }
 
+    /**
+     * Computes announce release.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param versionName Version name supplied to [announceRelease].
+     */
     fun announceRelease(context: Context, versionName: String) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS,
@@ -130,7 +158,11 @@ internal object AppUpdateScheduler {
         context.getSystemService(NotificationManager::class.java).notify(7401, notification)
     }
 
-    // Immediately enqueues an update check and download when an FCM release alert is received.
+    /**
+     * Immediately enqueues an update check and download when an FCM release alert is received.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun triggerNow(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
         val manager = WorkManager.getInstance(context)

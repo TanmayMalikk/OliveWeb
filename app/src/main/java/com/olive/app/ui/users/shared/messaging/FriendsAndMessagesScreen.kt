@@ -38,7 +38,14 @@ import com.olive.app.data.messaging.SUPPORT_TAG_SUPPORT
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
-// Completed tickets stay archived unless this account manually restores them to the regular list.
+/**
+ * Completed tickets stay archived unless this account manually restores them to the regular list.
+ *
+ * @param conversation Conversation metadata including participants and ticket status.
+ * @param archivedIds Collection of archived IDs values to process.
+ * @param restoredClosedIds Collection of restored closed IDs values to process.
+ * @return `true` if is conversation archived, or `false` otherwise.
+ */
 internal fun isConversationArchived(
     conversation: ChatConversation,
     archivedIds: Set<String>,
@@ -46,7 +53,12 @@ internal fun isConversationArchived(
 ): Boolean = conversation.id in archivedIds ||
     (conversation.closedAt > 0L && conversation.id !in restoredClosedIds)
 
-// Staff sort every assigned ticket type, while admins work only with escalated tickets.
+/**
+ * Staff sort every assigned ticket type, while admins work only with escalated tickets.
+ *
+ * @param role Account role determining workspace permissions.
+ * @return List of resulting visible support tags items.
+ */
 internal fun visibleSupportTags(role: AccountRole): List<String> = when (role) {
     AccountRole.ADMIN -> listOf(SUPPORT_TAG_NEEDS_ADMIN)
     AccountRole.STAFF -> listOf(
@@ -57,8 +69,13 @@ internal fun visibleSupportTags(role: AccountRole): List<String> = when (role) {
     else -> emptyList()
 }
 
-// Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
-// UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and the list scrolls past the floating controls.
+/**
+ * Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices. UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and the list scrolls past the floating controls.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ * @param initialSupportFilter Optional initial support filter supplied to [MessagesScreen].
+ */
 @Composable
 internal fun MessagesScreen(
     session: SessionViewModel,
@@ -128,6 +145,12 @@ internal fun MessagesScreen(
     }
 }
 
+/**
+ * Composes the chat tab label UI element.
+ *
+ * @param label Accessible label or display caption.
+ * @param count Count supplied to [ChatTabLabel].
+ */
 @Composable
 private fun ChatTabLabel(label: String, count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -136,11 +159,30 @@ private fun ChatTabLabel(label: String, count: Int) {
     }
 }
 
-// Chooses whether Back returns to the dashboard or closes the organization portal.
+/**
+ * Chooses whether Back returns to the dashboard or closes the organization portal.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ * @return The resulting portal exit.
+ */
 private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
 
-// UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
+/**
+ * UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param currentUid Current user ID supplied to [MessagingSidebar].
+ * @param exit Action or callback executed for exit.
+ * @param showingArchived Whether to apply showing archived.
+ * @param onShowingArchivedChange Callback invoked when showing archived change changes or occurs.
+ * @param supportFilter Support filter supplied to [MessagingSidebar].
+ * @param ticketChats Whether to apply ticket chats.
+ * @param onChatTabChange Callback invoked when chat tab change changes or occurs.
+ * @param onSupportFilterChange Callback invoked when support filter change changes or occurs.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 private fun MessagingSidebar(
     session: SessionViewModel,
@@ -410,7 +452,17 @@ private fun MessagingSidebar(
     }
 }
 
-// shared safe app friends and messages screen shows this conversation row view so the user can view its details and use its actions.
+/**
+ * Shared safe app friends and messages screen shows this conversation row view so the user can view its details and use its actions.
+ *
+ * @param conversation Conversation metadata including participants and ticket status.
+ * @param currentUid Current user ID supplied to [ConversationRow].
+ * @param viewerRole Viewer role supplied to [ConversationRow].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param unread Whether to apply unread.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param onActions Callback invoked when actions changes or occurs.
+ */
 @Composable
 private fun ConversationRow(
     conversation: ChatConversation,
@@ -472,7 +524,11 @@ private fun ConversationRow(
     }
 }
 
-// Formats the support tag label shown by secure messaging.
+/**
+ * Formats the support tag label shown by secure messaging.
+ *
+ * @param tag Tag supplied to [supportTagLabel].
+ */
 @Composable
 private fun supportTagLabel(tag: String) = stringResource(
     when (tag) {
@@ -484,7 +540,14 @@ private fun supportTagLabel(tag: String) = stringResource(
 
 // All safe-app roles: shows private notes linked to friends or assigned users.
 
-// Lists the friends or supported users who may have a private contact note.
+/**
+ * Lists the friends or supported users who may have a private contact note.
+ *
+ * @param currentUid Current user ID supplied to [privateNoteTargets].
+ * @param role Account role determining workspace permissions.
+ * @param friendUids Collection of friend uids values to process.
+ * @return List of resulting private note targets items.
+ */
 internal fun ChatConversation.privateNoteTargets(
     currentUid: String,
     role: AccountRole,
@@ -502,7 +565,19 @@ internal fun ChatConversation.privateNoteTargets(
         DirectoryUser(uid, participantUsernames[uid].orEmpty().ifBlank { uid })
     }
 }
-// Shows archive and private-note actions for the selected conversation.
+/**
+ * Shows archive and private-note actions for the selected conversation.
+ *
+ * @param conversation Conversation metadata including participants and ticket status.
+ * @param archived Whether to apply archived.
+ * @param closed Whether to apply closed.
+ * @param currentUid Current user ID supplied to [ConversationActionsDialog].
+ * @param role Account role determining workspace permissions.
+ * @param friendUids Collection of friend uids values to process.
+ * @param onArchive Callback invoked when archive changes or occurs.
+ * @param onNotes Callback invoked when notes changes or occurs.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 @Composable
 internal fun ConversationActionsDialog(
     conversation: ChatConversation,
@@ -551,7 +626,13 @@ internal fun ConversationActionsDialog(
     )
 }
 
-// Shows the private note dialog for a selected contact.
+/**
+ * Shows the private note dialog for a selected contact.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param targets Collection of targets values to process.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 @Composable
 internal fun PrivateContactNoteDialog(
     session: SessionViewModel,

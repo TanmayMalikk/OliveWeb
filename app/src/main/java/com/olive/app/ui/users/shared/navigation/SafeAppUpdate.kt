@@ -51,6 +51,14 @@ internal data class SafeAppUpdateUi(
     val onDismissNotice: () -> Unit,
 )
 
+/**
+ * Composes the remember safe app update UI element.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param cameraInHeader Whether to apply camera in header.
+ * @param launch Function used to transform or provide launch.
+ * @return The resulting [SafeAppUpdateUi] for remember safe app update.
+ */
 @Composable
 internal fun rememberSafeAppUpdate(
     enabled: Boolean,
@@ -100,6 +108,12 @@ internal fun rememberSafeAppUpdate(
     )
 }
 
+/**
+ * Displays the safe app update banner overlay.
+ *
+ * @param state Current state instance to read or render.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun SafeAppUpdateBanner(state: SafeAppUpdateUi, modifier: Modifier = Modifier) {
     val dismissNotice by rememberUpdatedState(state.onDismissNotice)
@@ -124,6 +138,11 @@ internal fun SafeAppUpdateBanner(state: SafeAppUpdateUi, modifier: Modifier = Mo
     }
 }
 
+/**
+ * Renders the update offer card composable.
+ *
+ * @param state Current state instance to read or render.
+ */
 @Composable
 private fun UpdateOfferCard(state: SafeAppUpdateUi) {
     var recentOffer by remember { mutableStateOf(state.offer) }
@@ -168,6 +187,12 @@ private fun UpdateOfferCard(state: SafeAppUpdateUi) {
     }
 }
 
+/**
+ * Composes the swipe away UI element.
+ *
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed, or null when not provided.
+ * @return The resulting [Modifier] for swipe away.
+ */
 @Composable
 private fun Modifier.swipeAway(onDismiss: (() -> Unit)?): Modifier {
     if (onDismiss == null) return this
@@ -193,8 +218,16 @@ private fun Modifier.swipeAway(onDismiss: (() -> Unit)?): Modifier {
         }
 }
 
+/**
+ * Checks whether horizontal swipe for offset.
+ *
+ * @return `true` if is horizontal swipe, or `false` otherwise.
+ */
 private fun Offset.isHorizontalSwipe() = abs(x) > abs(y)
 
+/**
+ * Composes the safe app update reminder UI element.
+ */
 @Composable
 internal fun SafeAppUpdateReminder() {
     val download = LocalSafeUpdateReminder.current

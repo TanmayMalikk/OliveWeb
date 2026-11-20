@@ -40,13 +40,24 @@ internal data class EmergencyReportMedia(
     val file: File?,
 )
 
+/**
+ * Computes emergency incident date.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting emergency incident date string.
+ */
 internal fun emergencyIncidentDate(value: String): String = when {
     value.isBlank() -> "Not provided"
     else -> parseIncidentDate(value)?.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.CANADA))
         ?: "Invalid saved date: $value (requires correction)"
 }
 
-// Trashed records are left out because the user has already chosen to remove them from active notes.
+/**
+ * Trashed records are left out because the user has already chosen to remove them from active notes.
+ *
+ * @param entries Collection of entries values to process.
+ * @return The resulting emergency incidents.
+ */
 internal fun emergencyIncidents(entries: List<PrivateEntry>) = entries.filter {
     it.kind == PrivateEntryKind.Incident && it.deletedAt == null && it.purgedAt == null
 }.sortedWith(
@@ -55,7 +66,12 @@ internal fun emergencyIncidents(entries: List<PrivateEntry>) = entries.filter {
         .thenBy { it.timestamp },
 )
 
-// A complete street address is preferred, with city and region used when the street was not saved.
+/**
+ * A complete street address is preferred, with city and region used when the street was not saved.
+ *
+ * @param profile Account profile details.
+ * @return The resulting emergency home address string.
+ */
 internal fun emergencyHomeAddress(profile: UserProfile): String {
     val address = profile.address
     val parts = if (address.line1.isNotBlank()) {
@@ -73,7 +89,12 @@ internal fun emergencyHomeAddress(profile: UserProfile): String {
     return parts.filter(String::isNotBlank).distinct().joinToString(", ").ifBlank { "Not provided" }
 }
 
-// Typed addresses stay readable; map-only incidents use the exact stored pin coordinates.
+/**
+ * Typed addresses stay readable; map-only incidents use the exact stored pin coordinates.
+ *
+ * @param incident Incident supplied to [emergencyIncidentLocation].
+ * @return The resulting emergency incident location string.
+ */
 internal fun emergencyIncidentLocation(incident: PrivateEntry): String {
     val coordinates = if (incident.incidentLatitude != null && incident.incidentLongitude != null) {
         emergencyCoordinates(incident.incidentLatitude, incident.incidentLongitude)
@@ -86,7 +107,13 @@ internal fun emergencyIncidentLocation(incident: PrivateEntry): String {
     }
 }
 
-// Evidence already linked to any incident is not repeated in the final standalone-evidence section.
+/**
+ * Evidence already linked to any incident is not repeated in the final standalone-evidence section.
+ *
+ * @param incidents Collection of incidents values to process.
+ * @param media Collection of media values to process.
+ * @return List of resulting unattached emergency evidence items.
+ */
 internal fun unattachedEmergencyEvidence(
     incidents: List<PrivateEntry>,
     media: Collection<EmergencyReportMedia>,
@@ -95,6 +122,13 @@ internal fun unattachedEmergencyEvidence(
     return media.filter { it.document.evidence && it.document.id !in attachedIds }
 }
 
+/**
+ * Computes emergency coordinates.
+ *
+ * @param latitude Latitude supplied to [emergencyCoordinates].
+ * @param longitude Longitude supplied to [emergencyCoordinates].
+ * @return The resulting emergency coordinates.
+ */
 private fun emergencyCoordinates(latitude: Double, longitude: Double) =
     "${"%.6f".format(Locale.CANADA, latitude)}, ${"%.6f".format(Locale.CANADA, longitude)}"
 
@@ -105,7 +139,16 @@ internal object EmergencyReportPdf {
     private const val MARGIN = 48f
     private const val CONTENT_BOTTOM = 790f
 
-    // The report follows a fixed order so a reader can find profile facts before incident evidence.
+    /**
+     * The report follows a fixed order so a reader can find profile facts before incident evidence.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param profile Account profile details.
+     * @param incidents Collection of incidents values to process.
+     * @param pressedLocation Optional pressed location supplied to [create].
+     * @param media Key-value mapping of media entries.
+     * @return The resulting [File] instance.
+     */
     fun create(
         context: Context,
         profile: UserProfile,
@@ -187,13 +230,24 @@ internal object EmergencyReportPdf {
         }
     }
 
-    // The button location includes accuracy and capture time so coordinates are not presented without context.
+    /**
+     * The button location includes accuracy and capture time so coordinates are not presented without context.
+     *
+     * @param location Optional location supplied to [pressedLocationText].
+     * @return The resulting pressed location text string.
+     */
     private fun pressedLocationText(location: EmergencyReportLocation?): String {
         location ?: return "Unavailable - location permission or a GPS fix was not available."
         val accuracy = location.accuracyMeters?.let { " (accuracy about ${it.toInt()} m)" }.orEmpty()
         return "${emergencyCoordinates(location.latitude, location.longitude)}$accuracy\nCaptured ${formatTimestamp(location.capturedAt)}"
     }
 
+    /**
+     * Formats timestamp.
+     *
+     * @param timestamp Epoch timestamp in milliseconds.
+     * @return The resulting format timestamp string.
+     */
     private fun formatTimestamp(timestamp: Long): String = DateTimeFormatter
         .ofPattern("MMM d, yyyy 'at' h:mm a z")
         .withZone(ZoneId.systemDefault())
@@ -215,7 +269,11 @@ internal object EmergencyReportPdf {
         private var pageNumber = 0
         private var y = MARGIN
 
-        // Every major report section starts on a clean page with the same heading and footer layout.
+        /**
+         * Every major report section starts on a clean page with the same heading and footer layout.
+         *
+         * @param title Primary display title text.
+         */
         fun startPage(title: String) {
             closeOpenPage()
             pageNumber++
@@ -228,6 +286,9 @@ internal object EmergencyReportPdf {
             line()
         }
 
+        /**
+         * Closes open page.
+         */
         fun closeOpenPage() {
             val open = page ?: return
             canvas?.drawText("Olive Branch emergency report - page $pageNumber", MARGIN, 822f, muted)
@@ -236,16 +297,28 @@ internal object EmergencyReportPdf {
             canvas = null
         }
 
+        /**
+         * Finishes the report writer.
+         */
         fun finish() = closeOpenPage()
 
-        // A section heading separates profile, description, attachment, and evidence content.
+        /**
+         * A section heading separates profile, description, attachment, and evidence content.
+         *
+         * @param value Input value to store, parse, or format.
+         */
         fun section(value: String) {
             ensure(35f)
             y += 10f
             drawWrapped(value, section, 22f)
         }
 
-        // Labels are bold while their values can wrap across as many pages as needed.
+        /**
+         * Labels are bold while their values can wrap across as many pages as needed.
+         *
+         * @param label Accessible label or display caption.
+         * @param value Input value to store, parse, or format.
+         */
         fun field(label: String, value: String) {
             ensure(42f)
             drawWrapped(label, bold, 16f)
@@ -253,12 +326,23 @@ internal object EmergencyReportPdf {
             y += 6f
         }
 
+        /**
+         * Computes paragraph.
+         *
+         * @param value Input value to store, parse, or format.
+         * @param muted Whether to apply muted.
+         */
         fun paragraph(value: String, muted: Boolean = false) {
             drawWrapped(value, if (muted) this.muted else body, 16f)
             y += 6f
         }
 
-        // Media gets a labelled preview page; unsupported files remain listed by name and type.
+        /**
+         * Media gets a labelled preview page; unsupported files remain listed by name and type.
+         *
+         * @param value Input value to store, parse, or format, or null when not provided.
+         * @param group Group supplied to [media].
+         */
         fun media(value: EmergencyReportMedia?, group: String) {
             if (value == null) {
                 paragraph("An attached file could not be found in this account.")
@@ -282,7 +366,12 @@ internal object EmergencyReportPdf {
             }
         }
 
-        // Large images are sampled before drawing so an emergency export cannot exhaust device memory.
+        /**
+         * Large images are sampled before drawing so an emergency export cannot exhaust device memory.
+         *
+         * @param file Local file to read, hash, process, or write.
+         * @return The resulting [Bitmap], or `null` if unavailable.
+         */
         private fun decodeBounded(file: File): Bitmap? {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(file.absolutePath, bounds)
@@ -291,6 +380,11 @@ internal object EmergencyReportPdf {
             return BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
         }
 
+        /**
+         * Draws video preview.
+         *
+         * @param file Local file to read, hash, process, or write.
+         */
         private fun drawVideoPreview(file: File) {
             val retriever = MediaMetadataRetriever()
             val frame = runCatching {
@@ -302,7 +396,11 @@ internal object EmergencyReportPdf {
             drawBitmap(frame)
         }
 
-        // Existing PDF attachments are rendered page-by-page into the emergency report.
+        /**
+         * Existing PDF attachments are rendered page-by-page into the emergency report.
+         *
+         * @param file Local file to read, hash, process, or write.
+         */
         private fun drawPdf(file: File) {
             runCatching {
                 ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
@@ -324,6 +422,11 @@ internal object EmergencyReportPdf {
             }.onFailure { paragraph("The attached PDF preview could not be rendered.") }
         }
 
+        /**
+         * Draws text preview.
+         *
+         * @param file Local file to read, hash, process, or write.
+         */
         private fun drawTextPreview(file: File) {
             val text = runCatching { file.bufferedReader().use { it.readText().take(50_000) } }.getOrNull()
             if (text == null) paragraph("The attached text file could not be read.")
@@ -333,6 +436,11 @@ internal object EmergencyReportPdf {
             }
         }
 
+        /**
+         * Draws bitmap.
+         *
+         * @param bitmap Bitmap image to process or render, or null when not provided.
+         */
         private fun drawBitmap(bitmap: Bitmap?) {
             if (bitmap == null) {
                 paragraph("A preview could not be created for this file.")
@@ -353,13 +461,22 @@ internal object EmergencyReportPdf {
             if (!bitmap.isRecycled) bitmap.recycle()
         }
 
+        /**
+         * Computes line.
+         */
         private fun line() {
             ensure(16f)
             canvas!!.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, muted)
             y += 16f
         }
 
-        // Long text is broken on word boundaries and continues on a new page when required.
+        /**
+         * Long text is broken on word boundaries and continues on a new page when required.
+         *
+         * @param value Input value to store, parse, or format.
+         * @param paint Paint supplied to [drawWrapped].
+         * @param lineHeight Line height supplied to [drawWrapped].
+         */
         private fun drawWrapped(value: String, paint: Paint, lineHeight: Float) {
             val maximum = PAGE_WIDTH - MARGIN * 2
             value.replace("\r", "").split("\n").forEach { paragraph ->
@@ -384,6 +501,11 @@ internal object EmergencyReportPdf {
             }
         }
 
+        /**
+         * Ensures the report writer.
+         *
+         * @param height Target or source height in pixels or layout units.
+         */
         private fun ensure(height: Float) {
             if (page == null) startPage("Emergency information report")
             if (y + height > CONTENT_BOTTOM) startPage("Emergency information report - continued")

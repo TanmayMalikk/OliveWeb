@@ -17,10 +17,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.KeyboardType
-import com.google.firebase.firestore.FirebaseFirestore
 import com.olive.app.R
+import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.messaging.FriendInvite
-import com.olive.app.data.messaging.FriendInviteRepository
+import com.olive.app.ui.users.shared.navigation.SessionMessages
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.LocalSafeSystemLauncher
 import kotlinx.coroutines.CancellationException
@@ -30,19 +30,44 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Shows the controls for sharing an invite and connecting with an existing code.
+ *
+ * @param session The signed-in session that creates and claims invites.
+ */
 @Composable
 internal fun FriendInviteControls(session: SessionViewModel) {
     var opened by remember(session.coverAccountId) { mutableStateOf(false) }
     Button(onClick = { opened = true }, enabled = !session.localMode,
         modifier = Modifier.testTag("friend_invite")) { Text(stringResource(R.string.friend_invite)) }
-    InviteCodeEntry(enabled = !session.localMode, accountUid = session.coverAccountId,
+    InviteCodeEntry(messages = session.messages, enabled = !session.localMode, accountUid = session.coverAccountId,
         onConnected = { session.messages.ensureMessagingObservation() })
-    if (opened) FriendInviteDialog(session.coverAccountId.orEmpty()) { opened = false }
+    if (opened) {
+        val uid = session.coverAccountId.orEmpty()
+        FriendInviteDialog(
+            uid,
+            createInvite = { refresh -> session.messages.createFriendInvite(uid, refresh) },
+            observeUnavailable = { code, onUnavailable -> session.messages.observeFriendInviteUnavailable(uid, code, onUnavailable) },
+            onDismiss = { opened = false },
+        )
+    }
 }
 
+/**
+ * Lets someone claim an invite code and displays the result in place.
+ *
+ * @param messages The messaging controller that claims the code.
+ * @param enabled Whether the user can enter and submit a code.
+ * @param accountUid The account claiming the invite, if already known to the caller.
+ * @param onConnected Runs after the code is claimed successfully.
+ */
 @Composable
-internal fun InviteCodeEntry(enabled: Boolean = true, accountUid: String? = null, onConnected: () -> Unit = {}) {
-    val repository = remember(accountUid) { FriendInviteRepository(accountUid) }
+internal fun InviteCodeEntry(
+    messages: SessionMessages,
+    enabled: Boolean = true,
+    accountUid: String? = null,
+    onConnected: () -> Unit = {},
+) {
     val scope = rememberCoroutineScope()
     var code by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -58,7 +83,7 @@ internal fun InviteCodeEntry(enabled: Boolean = true, accountUid: String? = null
         Button(onClick = {
             busy = true; error = null; connected = null
             scope.launch {
-                try { connected = repository.claim(code); code = ""; onConnected() }
+                try { connected = messages.claimFriendInvite(accountUid, code); code = ""; onConnected() }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: Exception) { error = failure.localizedMessage }
                 finally { busy = false }
@@ -71,23 +96,40 @@ internal fun InviteCodeEntry(enabled: Boolean = true, accountUid: String? = null
     }
 }
 
+/**
+ * Lets the user copy, share, or refresh their invite and indicates when it becomes unavailable.
+ *
+ * @param uid The account that owns the invite.
+ * @param createInvite Loads or creates an invite. A refresh requests a replacement code.
+ * @param observeUnavailable Subscribes to changes that invalidate the displayed code.
+ * @param onDismiss Closes the dialog.
+ */
 @Composable
-private fun FriendInviteDialog(uid: String, onDismiss: () -> Unit) {
+internal fun FriendInviteDialog(
+    uid: String,
+    createInvite: suspend (refresh: Boolean) -> FriendInvite,
+    observeUnavailable: (String, () -> Unit) -> ChatSubscription,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     val openSystem = LocalSafeSystemLauncher.current
     val inviteLabel = stringResource(R.string.friend_invite)
-    val repository = remember(uid) { FriendInviteRepository(uid) }
     val scope = rememberCoroutineScope()
     var invite by remember { mutableStateOf<FriendInvite?>(null) }
     var busy by remember { mutableStateOf(true) }
     var unavailable by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    /**
+     * Loads an invite and updates the dialog with the invite or an error.
+     *
+     * @param refresh Whether to replace the current invite.
+     */
     suspend fun generate(refresh: Boolean) {
         busy = true
         error = null
         invite = null
         unavailable = false
-        try { invite = repository.create(refresh); unavailable = false }
+        try { invite = createInvite(refresh); unavailable = false }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { error = failure.localizedMessage }
         finally { busy = false }
@@ -97,13 +139,18 @@ private fun FriendInviteDialog(uid: String, onDismiss: () -> Unit) {
         invite?.let { delay((it.expiresAt - System.currentTimeMillis()).coerceAtLeast(0)); unavailable = true }
     }
     DisposableEffect(uid, invite?.code) {
-        val listener = FirebaseFirestore.getInstance().collection("friendInviteOwners").document(uid)
-            .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null && invite != null &&
-                    (snapshot.getString("code") != invite?.code || snapshot.getString("claimedBy").orEmpty().isNotBlank())) unavailable = true
+        val subscription = invite?.let { current ->
+            observeUnavailable(current.code) {
+                if (invite?.code == current.code) unavailable = true
             }
-        onDispose { listener.remove() }
+        }
+        onDispose { subscription?.close() }
     }
+    /**
+     * Copies invite information to the system clipboard.
+     *
+     * @param value The invite code or link to copy.
+     */
     fun copy(value: String) {
         (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
             .setPrimaryClip(ClipData.newPlainText(inviteLabel, value))

@@ -18,6 +18,14 @@ package com.paddle.ocr.postprocess
 object CTCDecoder {
     private const val BLANK_IDX = 0
 
+    /**
+     * Decodes the CTC decoder.
+     *
+     * @param output Output stream or target receiving processed data.
+     * @param shape Numeric array of shape values.
+     * @param characterList Collection of character list values to process.
+     * @return List of resulting decode items.
+     */
     fun decode(output: FloatArray, shape: LongArray, characterList: List<String>): List<Pair<String, Float>> {
         val batchSize = shape[0].toInt()
         val timeSteps = shape[1].toInt()

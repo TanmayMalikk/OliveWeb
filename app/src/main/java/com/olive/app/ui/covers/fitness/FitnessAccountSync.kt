@@ -8,17 +8,35 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
+import com.olive.app.data.network.sha256Hex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 
+/**
+ * Returns the fitness authenticated user ID.
+ *
+ * @return The resulting fitness authenticated user ID string, or `null` when unavailable.
+ */
 internal fun fitnessAuthenticatedUid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
 
-internal fun fitnessAccountKey(uid: String): String = MessageDigest.getInstance("SHA-256")
-    .digest(uid.toByteArray()).joinToString("") { "%02x".format(it) }
+/**
+ * Computes fitness account key.
+ *
+ * @param uid Firebase UID of the target user account.
+ * @return The resulting fitness account key string.
+ */
+internal fun fitnessAccountKey(uid: String): String = sha256Hex(uid)
 
+/**
+ * Computes fitness preferences.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param uid Firebase UID of the target user account.
+ * @param workout Whether to apply workout.
+ * @return The resulting [SharedPreferences] for fitness preferences.
+ */
 internal fun fitnessPreferences(context: Context, uid: String, workout: Boolean = false): SharedPreferences {
     val prefix = if (workout) "fitness_workout_" else "fitness_cover_"
     val preferences = context.getSharedPreferences(prefix + fitnessAccountKey(uid), Context.MODE_PRIVATE)
@@ -37,6 +55,12 @@ internal fun fitnessPreferences(context: Context, uid: String, workout: Boolean 
     return preferences
 }
 
+/**
+ * Stores fitness value on shared preferences editor.
+ *
+ * @param key Lookup key or cryptographic key.
+ * @param value Input value to store, parse, or format, or null when not provided.
+ */
 private fun SharedPreferences.Editor.putFitnessValue(key: String, value: Any?) {
     when (value) {
         is String -> putString(key, value)
@@ -48,6 +72,12 @@ private fun SharedPreferences.Editor.putFitnessValue(key: String, value: Any?) {
     }
 }
 
+/**
+ * Computes cloud fitness key.
+ *
+ * @param key Lookup key or cryptographic key.
+ * @return The resulting cloud fitness key.
+ */
 internal fun cloudFitnessKey(key: String) = key in setOf("weight_kg", "height_cm", "step_goal",
     "calorie_goal", "protein_goal", "carbohydrate_goal", "fat_goal", "water_goal_ml", "workout_history") ||
     savedFoodKeyPattern.matches(key) ||
@@ -64,6 +94,12 @@ internal object FitnessAccountSync {
     private var workouts: SharedPreferences? = null
     private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
+    /**
+     * Binds the fitness account sync.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param accountId Optional account ID supplied to [bind].
+     */
     fun bind(context: Context, accountId: String?) {
         if (uid == accountId && registration != null) return
         val previous = uid
@@ -142,16 +178,41 @@ internal object FitnessAccountSync {
         FitnessHealthConnect.schedule(context, owner)
     }
 
+    /**
+     * Computes meal.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [meal].
+     * @param date Date supplied to [meal].
+     * @param entryId Unique identifier of the private entry or note.
+     * @param entry Optional entry supplied to [meal].
+     */
     fun meal(context: Context, owner: String, date: String, entryId: String, entry: String?) {
         if (owner == "guest") return
         queue(context, owner, "meal_${date}_$entryId", entry)
     }
 
+    /**
+     * Computes water.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [water].
+     * @param date Date supplied to [water].
+     * @param entryId Unique identifier of the private entry or note.
+     * @param entry Entry supplied to [water].
+     */
     fun water(context: Context, owner: String, date: String, entryId: String, entry: String) {
         if (owner == "guest") return
         queue(context, owner, "drink_${date}_$entryId", entry)
     }
 
+    /**
+     * Applies meal.
+     *
+     * @param local Local supplied to [applyMeal].
+     * @param id ID supplied to [applyMeal].
+     * @param entry Optional entry supplied to [applyMeal].
+     */
     private fun applyMeal(local: SharedPreferences, id: String, entry: String?) {
         val drink = id.startsWith("drink_")
         val prefix = if (drink) "drink_" else "meal_"
@@ -168,8 +229,23 @@ internal object FitnessAccountSync {
         local.edit(commit = true) { putString(key, next.toString()) }
     }
 
+    /**
+     * Computes outbox.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [outbox].
+     * @return The resulting outbox.
+     */
     internal fun outbox(context: Context, owner: String) = context.getSharedPreferences("fitness_outbox_${fitnessAccountKey(owner)}", Context.MODE_PRIVATE)
 
+    /**
+     * Computes queue.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [queue].
+     * @param key Lookup key or cryptographic key.
+     * @param value Input value to store, parse, or format, or null when not provided.
+     */
     private fun queue(context: Context, owner: String, key: String, value: Any?) {
         val payload = JSONObject().put("type", when (value) {
             is Int -> "int"; is Long -> "long"; is Float -> "float"; is Boolean -> "bool"; is String -> "string"; else -> "null"
@@ -179,6 +255,12 @@ internal object FitnessAccountSync {
         schedule(context, owner)
     }
 
+    /**
+     * Decodes the fitness account sync.
+     *
+     * @param payload Payload supplied to [decode].
+     * @return The resulting [Any], or `null` if unavailable.
+     */
     internal fun decode(payload: String): Any? = runCatching {
         val value = JSONObject(payload)
         when (value.getString("type")) {
@@ -188,11 +270,23 @@ internal object FitnessAccountSync {
         }
     }.getOrNull()
 
+    /**
+     * Publishes the fitness account sync.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [publish].
+     */
     internal fun publish(context: Context, owner: String) {
         if (uid != owner || !ready.value || fitnessAuthenticatedUid() != owner) return
         FitnessWatchSync.publish(context, owner, FitnessStore(context, owner).snapshot())
     }
 
+    /**
+     * Schedules the fitness account sync.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [schedule].
+     */
     private fun schedule(context: Context, owner: String) {
         if (fitnessAuthenticatedUid() != owner) return
         val data = workDataOf("uid" to owner)
@@ -203,6 +297,11 @@ internal object FitnessAccountSync {
 }
 
 internal class FitnessUploadWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result {
         val owner = inputData.getString("uid") ?: return Result.failure()
         if (fitnessAuthenticatedUid() != owner) return Result.success()
@@ -237,6 +336,12 @@ internal data class SavedFood(val id: String, val food: NutritionFood?, val save
 internal data class RecentFoodSearch(val query: String, val barcode: Boolean)
 
 internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
+    /**
+     * Starts observing saved foods.
+     *
+     * @param onChange Callback invoked when the value or observed state changes.
+     * @return The resulting [AutoCloseable] for observe saved foods.
+     */
     fun observeSavedFoods(onChange: (List<SavedFood>) -> Unit): AutoCloseable {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || savedFoodKeyPattern.matches(key)) onChange(savedFoods())
@@ -246,6 +351,11 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
         return AutoCloseable { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
+    /**
+     * Returns the saved foods.
+     *
+     * @return List of resulting saved foods items.
+     */
     fun savedFoods(): List<SavedFood> = preferences.all.asSequence()
         .filter { (key, _) -> savedFoodKeyPattern.matches(key) }
         .mapNotNull { (_, raw) ->
@@ -258,6 +368,12 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
         }
         .sortedByDescending(SavedFood::savedAt).toList()
 
+    /**
+     * Sets saved.
+     *
+     * @param food Food supplied to [setSaved].
+     * @param saved Whether to apply saved.
+     */
     fun setSaved(food: NutritionFood, saved: Boolean) {
         if (!saved) {
             remove(food.id)
@@ -270,8 +386,18 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
         preferences.edit { putString(key(food.id), entry.toString()) }
     }
 
+    /**
+     * Removes the fitness food library.
+     *
+     * @param id ID supplied to [remove].
+     */
     fun remove(id: String) = preferences.edit { remove(key(id)) }
 
+    /**
+     * Returns the searches.
+     *
+     * @return List of resulting searches items.
+     */
     fun searches(): List<RecentFoodSearch> = runCatching {
         val stored = JSONArray(preferences.getString(RECENT_SEARCHES, "[]"))
         (0 until stored.length()).mapNotNull { index ->
@@ -281,6 +407,11 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
         }
     }.getOrDefault(emptyList())
 
+    /**
+     * Records search.
+     *
+     * @param search Search supplied to [recordSearch].
+     */
     fun recordSearch(search: RecentFoodSearch) {
         val normalized = search.copy(query = search.query.trim())
         if (normalized.query.isBlank()) return
@@ -291,5 +422,11 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
         preferences.edit { putString(RECENT_SEARCHES, encoded.toString()) }
     }
 
+    /**
+     * Computes key.
+     *
+     * @param id ID supplied to [key].
+     * @return The resulting key.
+     */
     private fun key(id: String) = SAVED_FOOD_PREFIX + fitnessAccountKey(id)
 }

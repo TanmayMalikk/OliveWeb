@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -24,13 +25,44 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaUploadPresentation
 import com.olive.app.ui.users.shared.messaging.VoiceMessageComposer
+import com.olive.app.ui.users.shared.messaging.VoiceMessageUploadStatus
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class VoiceMessageGestureTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun failedVoiceUploadCanRetryWithoutShowingAnErrorWhileSending() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val upload = mutableStateOf(MediaUploadPresentation(
+            jobId = "voice-fixture", ownerUid = "owner", name = "Voice message", mimeType = "audio/mp4",
+            status = MediaTransferStatus.FAILED, bytesTransferred = 0, totalBytes = 128,
+            mediaId = "", error = "Offline", createdAt = 1L,
+        ))
+        var retries = 0
+        compose.setContent {
+            MaterialTheme {
+                VoiceMessageUploadStatus(upload.value) {
+                    retries++
+                    upload.value = upload.value.copy(status = MediaTransferStatus.QUEUED)
+                }
+            }
+        }
+        val retry = compose.onNodeWithText(context.getString(R.string.retry))
+        val failed = compose.onNodeWithText(context.getString(R.string.voice_send_failed))
+        failed.assertExists()
+        retry.performClick()
+        compose.onNodeWithText(context.getString(R.string.voice_sending)).assertExists()
+        retry.assertDoesNotExist()
+        failed.assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, retries) }
+    }
 
     @Test
     fun tappingMicStartsAndStopsRecordingWithPreview() {

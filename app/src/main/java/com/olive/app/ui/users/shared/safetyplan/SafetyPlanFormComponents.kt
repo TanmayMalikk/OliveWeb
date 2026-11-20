@@ -37,6 +37,13 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
 
+/**
+ * Composes the safety checklist progress UI element.
+ *
+ * @param prepared Prepared supplied to [SafetyChecklistProgress].
+ * @param total Total supplied to [SafetyChecklistProgress].
+ * @param summary Whether to apply summary.
+ */
 @Composable
 internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
     val fraction = if (total > 0) prepared.toFloat() / total else 0f
@@ -80,7 +87,22 @@ internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean
     }
 }
 
-// Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
+/**
+ * Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
+ *
+ * @param plan Safety plan data model.
+ * @param fieldKey Field key supplied to [SafetyChecklistSection].
+ * @param onEdit Callback invoked when edit changes or occurs.
+ * @param onSyncNow Callback invoked when sync now changes or occurs.
+ * @param contacts Collection of contact records.
+ * @param contactsEditable Whether to apply contacts editable.
+ * @param onContactsChange Callback invoked when contacts change changes or occurs.
+ * @param editable Whether to apply editable.
+ * @param attachmentsEditable Whether to apply attachments editable.
+ * @param onUploadDocument Callback invoked when upload document changes or occurs.
+ * @param documents Collection of documents values to process.
+ * @param onOpenDocument Callback invoked when open document changes or occurs.
+ */
 @Composable
 internal fun SafetyChecklistSection(
     plan: SafetyPlan, fieldKey: String, onEdit: (String, String) -> Unit,
@@ -192,7 +214,24 @@ internal fun SafetyChecklistSection(
     }
 }
 
-// shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
+/**
+ * Shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
+ *
+ * @param item Item supplied to [ChecklistRow].
+ * @param heading Heading supplied to [ChecklistRow].
+ * @param sectionKey Section key supplied to [ChecklistRow].
+ * @param index Zero-based item index.
+ * @param editable Whether to apply editable.
+ * @param onChecked Callback invoked when checked changes or occurs.
+ * @param onText Callback invoked when text changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ * @param onSyncNow Callback invoked when sync now changes or occurs.
+ * @param attachments Collection of attachments values to process.
+ * @param onRemoveAttachment Callback invoked when remove attachment changes or occurs.
+ * @param attachmentsEditable Whether to apply attachments editable.
+ * @param onOpenAttachment Callback invoked when open attachment changes or occurs.
+ * @param onUploadDocument Callback invoked when upload document changes or occurs.
+ */
 @Composable
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
@@ -294,7 +333,15 @@ private fun ChecklistRow(
     }
 }
 
-// Lets the user choose which trusted contacts may view this safety plan.
+/**
+ * Lets the user choose which trusted contacts may view this safety plan.
+ *
+ * @param items Collection of items values to process.
+ * @param contacts Collection of contact records.
+ * @param editable Whether to apply editable.
+ * @param onItemsChange Callback invoked when items change changes or occurs.
+ * @param onContactsChange Callback invoked when contacts change changes or occurs.
+ */
 @Composable
 private fun SafetyPlanContactPicker(
     items: List<SafetyChecklistItem>,
@@ -451,8 +498,13 @@ private fun SafetyPlanContactPicker(
 // All safe-app roles: shows who can view a shared safety plan.
 
 
-// Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable.
-// https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
+/**
+ * Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable. https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param hasAffectedPeople Whether has affected people.
+ * @return Map containing the resulting safety defaults entries.
+ */
 internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false): Map<String, String> = buildMap {
     listOf("primary", "backup").forEach { plan ->
         SAFETY_SECTIONS.forEach { section ->
@@ -493,11 +545,21 @@ internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false
     }
 }
 
-// Loads the safety document suggestions needed by the safety plan.
+/**
+ * Loads the safety document suggestions needed by the safety plan.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @return The resulting safety document suggestions.
+ */
 private fun safetyDocumentSuggestions(context: Context) =
     context.resources.getStringArray(R.array.safety_document_checklist).toList()
 
-// Formats the safety section label shown by the safety plan.
+/**
+ * Formats the safety section label shown by the safety plan.
+ *
+ * @param section Section supplied to [safetySectionLabel].
+ * @return The resulting safety section label.
+ */
 internal fun safetySectionLabel(section: String) = when (section) {
     "destination" -> R.string.safety_destination
     "travel" -> R.string.safety_travel
@@ -510,7 +572,12 @@ internal fun safetySectionLabel(section: String) = when (section) {
     else -> R.string.safety_aftercare
 }
 
-// Returns the safety section hint used by the safety plan.
+/**
+ * Returns the safety section hint used by the safety plan.
+ *
+ * @param section Section supplied to [safetySectionHint].
+ * @return The resulting safety section hint.
+ */
 internal fun safetySectionHint(section: String) = when (section) {
     "destination" -> R.string.safety_destination_hint
     "travel" -> R.string.safety_travel_hint
@@ -519,7 +586,16 @@ internal fun safetySectionHint(section: String) = when (section) {
     else -> null
 }
 
-// Linking is always explicit; names, phone numbers and email addresses are never used to infer an account.
+/**
+ * Linking is always explicit; names, phone numbers and email addresses are never used to infer an account.
+ *
+ * @param friends List of friend records.
+ * @param selectedUid Selected user ID supplied to [TrustedContactLinkPicker].
+ * @param unavailableUids Collection of unavailable uids values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param tag Tag supplied to [TrustedContactLinkPicker].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 internal fun TrustedContactLinkPicker(
     friends: List<Friend>, selectedUid: String, unavailableUids: Set<String>,

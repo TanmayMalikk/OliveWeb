@@ -48,7 +48,12 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
-// Shows workout type, live controls, route, and recent outdoor workouts.
+/**
+ * Shows workout type, live controls, route, and recent outdoor workouts.
+ *
+ * @param accountId Account ID supplied to [FitnessOutdoorWorkoutCard].
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -93,7 +98,11 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
-    // Starts GPS tracking now, or asks for precise location first.
+    /**
+     * Starts GPS tracking now, or asks for precise location first.
+     *
+     * @param type Type supplied to [startWorkout].
+     */
     fun startWorkout(type: OutdoorWorkoutType) {
         val preciseLocationGranted = ContextCompat.checkSelfPermission(
             context,
@@ -194,7 +203,12 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     }
 }
 
-// Draws the workout type selector for the fitness cover.
+/**
+ * Draws the workout type selector for the fitness cover.
+ *
+ * @param selected Selected supplied to [WorkoutTypeSelector].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun WorkoutTypeSelector(
     selected: OutdoorWorkoutType,
@@ -211,7 +225,14 @@ private fun WorkoutTypeSelector(
         }
     }
 }
-// Draws one selectable walking, running, cycling, or hiking option.
+/**
+ * Draws one selectable walking, running, cycling, or hiking option.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param type Type supplied to [WorkoutTypeChip].
+ * @param selected Selected supplied to [WorkoutTypeChip].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun WorkoutTypeChip(
     modifier: Modifier,
@@ -234,7 +255,16 @@ private fun WorkoutTypeChip(
         modifier = modifier,
     )
 }
-// Shows live distance, duration, pace, map, pause, and finish controls.
+/**
+ * Shows live distance, duration, pace, map, pause, and finish controls.
+ *
+ * @param workout Workout supplied to [ActiveWorkoutContent].
+ * @param currentTime Current time supplied to [ActiveWorkoutContent].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onPause Callback invoked when pause changes or occurs.
+ * @param onResume Callback invoked when resume changes or occurs.
+ * @param onFinish Callback invoked when finish changes or occurs.
+ */
 @Composable
 private fun ActiveWorkoutContent(
     workout: OutdoorWorkoutSnapshot,
@@ -285,7 +315,12 @@ private fun ActiveWorkoutContent(
     }
 }
 
-// Draws the workout location map for the fitness cover.
+/**
+ * Draws the workout location map for the fitness cover.
+ *
+ * @param workout Workout supplied to [WorkoutLocationMap].
+ * @param elapsedMillis Duration or timestamp for elapsed, in milliseconds.
+ */
 @Composable
 private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: Long) {
     val points = workout.route
@@ -332,7 +367,11 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
     }
 }
 
-// Shows up to five recent outdoor workouts.
+/**
+ * Shows up to five recent outdoor workouts.
+ *
+ * @param workouts Collection of workouts values to process.
+ */
 @Composable
 private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
     Column(
@@ -388,7 +427,12 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
         }
     }
 }
-// Draws one live workout value and its label.
+/**
+ * Draws one live workout value and its label.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ */
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
     Column(
@@ -402,7 +446,11 @@ private fun WorkoutMetric(value: String, label: String) {
     }
 }
 
-// Formats the workout type label shown by the fitness cover.
+/**
+ * Formats the workout type label shown by the fitness cover.
+ *
+ * @param type Type supplied to [workoutTypeLabel].
+ */
 @Composable
 private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     // Gives each workout type its translated label.
@@ -414,11 +462,21 @@ private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     }
 )
 
-// Formats workout metres as kilometres.
+/**
+ * Formats workout metres as kilometres.
+ *
+ * @param distanceMeters Distance meters supplied to [formatDistance].
+ * @return The resulting format distance.
+ */
 private fun formatDistance(distanceMeters: Double) =
     String.format(Locale.ROOT, "%.2f km", distanceMeters / 1_000.0)
 
-// Formats workout time as hours, minutes, and seconds.
+/**
+ * Formats workout time as hours, minutes, and seconds.
+ *
+ * @param elapsedMillis Duration or timestamp for elapsed, in milliseconds.
+ * @return The resulting format duration string.
+ */
 private fun formatDuration(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis / 1_000L
     val hours = totalSeconds / 3_600L
@@ -431,14 +489,24 @@ private fun formatDuration(elapsedMillis: Long): String {
     }
 }
 
-// Formats average workout pace in minutes per kilometre.
+/**
+ * Formats average workout pace in minutes per kilometre.
+ *
+ * @param pace Optional pace supplied to [formatPace].
+ * @return The resulting format pace.
+ */
 private fun formatPace(pace: Double?) = pace?.let {
     val minutes = it.toInt()
     val seconds = ((it - minutes) * 60.0).toInt().coerceIn(0, 59)
     String.format(Locale.ROOT, "%d:%02d /km", minutes, seconds)
 } ?: "--"
 
-// Formats the completed workout date for recent history.
+/**
+ * Formats the completed workout date for recent history.
+ *
+ * @param timestamp Epoch timestamp in milliseconds.
+ * @return The resulting format workout date string.
+ */
 private fun formatWorkoutDate(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
 
@@ -451,7 +519,13 @@ internal object FitnessCloudSync {
     private val lastUploadAtByAccount = ConcurrentHashMap<String, Long>()
     private val lastPayloadByAccount = ConcurrentHashMap<String, String>()
 
-    // Uploads only changed summaries and never more than once every 30 seconds.
+    /**
+     * Uploads only changed summaries and never more than once every 30 seconds.
+     *
+     * @param accountId Account ID supplied to [upload].
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @param history Collection of history values to process.
+     */
     suspend fun upload(accountId: String, snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) {
         // Local previews and UI tests may not have a Firebase app; there is no cloud account to sync.
         val user = try {
@@ -490,7 +564,13 @@ internal object FitnessCloudSync {
         }
     }
 
-    // Converts today's fitness totals into the JSON sent to the watch.
+    /**
+     * Converts today's fitness totals into the JSON sent to the watch.
+     *
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @param history Collection of history values to process.
+     * @return The resulting summary JSON.
+     */
     private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
         put("stepGoal", snapshot.profile.stepGoal)
         put("calorieGoal", snapshot.profile.calorieGoal)

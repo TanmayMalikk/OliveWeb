@@ -15,19 +15,36 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * Invokes a protected Firebase HTTPS callable function and parses its Map response as JSON.
+ *
+ * @param name Name of the deployed Firebase HTTPS callable function.
+ * @param data Request payload map forwarded to the callable function.
+ * @return JSON object parsed from the callable's response map.
+ */
+internal suspend fun FirebaseFunctions.callJsonObject(
+    name: String,
+    data: Map<String, Any> = emptyMap(),
+): JSONObject {
+    val result = getHttpsCallable(name).call(data).await().data as? Map<*, *>
+        ?: error("Invalid response")
+    return JSONObject(result)
+}
+
 // Callable Functions verify current Auth roles and sharing on every read and write; no plaintext Firestore disk cache.
 internal class SafetyPlanRepository(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
-    // Calls a protected safety-plan function and returns its JSON response.
-    private suspend fun call(name: String, data: Map<String, Any> = emptyMap()): JSONObject {
-        val result = functions.getHttpsCallable(name).call(data).await().data as? Map<*, *>
-            ?: error("Invalid response")
-        return JSONObject(result)
-    }
 
-    // Watches a plan that Firestore rules have already approved for this signed-in account.
+    /**
+     * Watches a plan that Firestore rules have already approved for this signed-in account.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observe(
         ownerUid: String,
         onUpdate: (SafetyPlan) -> Unit,
@@ -47,14 +64,25 @@ internal class SafetyPlanRepository(
             }
         }
 
-    // Reads a server-confirmed plan without modifying any fields.
+    /**
+     * Reads a server-confirmed plan without modifying any fields.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return The resulting [SafetyPlan], or `null` if unavailable.
+     */
     suspend fun get(ownerUid: String): SafetyPlan? {
         val snapshot = firestore.collection("safetyPlans").document(ownerUid)
             .get(Source.SERVER).await()
         return snapshot.data?.let { SafetyPlan.fromJson(JSONObject(it)) }
     }
 
-    // Sends changed safety-plan fields and returns the merged server version.
+    /**
+     * Sends changed safety-plan fields and returns the merged server version.
+     *
+     * @param plan Safety plan data model.
+     * @param resolution Key-value mapping of resolution entries.
+     * @return The resulting [SafetyPlan] instance.
+     */
     suspend fun sync(plan: SafetyPlan, resolution: Map<String, Any>? = null): SafetyPlan {
         val changes =
             plan.fields.filterValues { it.mutationId != null && it.conflictRevision == null }
@@ -70,7 +98,7 @@ internal class SafetyPlanRepository(
                         "clientSequence" to field.clientSequence,
                     ) else emptyMap()
                 }
-        val result = call(
+        val result = functions.callJsonObject(
             "safetyPlanSync",
             mapOf(
                 "ownerUid" to plan.ownerUid,
@@ -81,35 +109,63 @@ internal class SafetyPlanRepository(
         return SafetyPlan.fromJson(result.getJSONObject("plan"))
     }
 
-    // Opens a new plan-consult ticket and shares the current safety plan with it.
+    /**
+     * Opens a new plan-consult ticket and shares the current safety plan with it.
+     *
+     * @param action Action supplied to [consult].
+     * @return The resulting consult.
+     */
     suspend fun consult(action: String) = SafetyPlan.fromJson(
-        call(
+        functions.callJsonObject(
             "safetyPlanConsult",
             mapOf("action" to action)
         ).getJSONObject("plan")
     )
 
-    // Shares the safety plan with the selected trusted contacts.
+    /**
+     * Shares the safety plan with the selected trusted contacts.
+     *
+     * @param friends List of friend records.
+     * @return The resulting share contacts.
+     */
     suspend fun shareContacts(friends: List<Friend>) =
-        SafetyPlan.fromJson(call("safetyPlanShareContacts", mapOf("contacts" to friends.map {
+        SafetyPlan.fromJson(functions.callJsonObject("safetyPlanShareContacts", mapOf("contacts" to friends.map {
             mapOf("uid" to it.uid, "friendshipId" to it.friendshipId, "name" to it.username)
         })).getJSONObject("plan"))
 
-    // Returns only the organization accounts that may open media attached to this user's plan.
+    /**
+     * Returns only the organization accounts that may open media attached to this user's plan.
+     *
+     * @return Map containing the resulting media recipients entries.
+     */
     suspend fun mediaRecipients(): Map<String, String> {
-        val rows = call("safetyPlanMediaRecipients").getJSONArray("recipients")
+        val rows = functions.callJsonObject("safetyPlanMediaRecipients").getJSONArray("recipients")
         return (0 until rows.length()).associate { index ->
             val row = rows.getJSONObject(index)
             row.getString("uid") to row.getString("username")
         }
     }
 
+    /**
+     * Starts observing recipient devices.
+     *
+     * @param usernames Collection of usernames values to process.
+     * @param onChange Callback invoked when the value or observed state changes.
+     * @return List of resulting observe recipient devices items.
+     */
     fun observeRecipientDevices(usernames: Collection<String>, onChange: () -> Unit): List<ListenerRegistration> =
         usernames.distinct().map { username ->
             firestore.collection("messageDirectory").document(username).collection("devices")
                 .addSnapshotListener { snapshot, error -> if (snapshot != null && error == null) onChange() }
         }
 
+    /**
+     * Starts observing access.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onChange Callback invoked when the value or observed state changes.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeAccess(uid: String, onChange: () -> Unit): ListenerRegistration {
         var revision = -1L
         return firestore.collection("syncInvalidations").document(uid)
@@ -123,14 +179,22 @@ internal class SafetyPlanRepository(
             }
     }
 
-    // Saves which trusted contact should receive safety-plan support access.
+    /**
+     * Saves which trusted contact should receive safety-plan support access.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun setSupportContact(uid: String) {
-        call("safetySupportContact", mapOf("safeContactUid" to uid))
+        functions.callJsonObject("safetySupportContact", mapOf("safeContactUid" to uid))
     }
 
-    // Loads safety plans that other users shared with this trusted contact.
+    /**
+     * Loads safety plans that other users shared with this trusted contact.
+     *
+     * @return List of resulting shared with me items.
+     */
     suspend fun sharedWithMe(): List<SharedSafetyPlan> {
-        val plans = call("safetyPlansSharedWithMe").getJSONArray("plans")
+        val plans = functions.callJsonObject("safetyPlansSharedWithMe").getJSONArray("plans")
         return (0 until plans.length()).map { index ->
             val row = plans.getJSONObject(index)
             SharedSafetyPlan(
@@ -141,9 +205,13 @@ internal class SafetyPlanRepository(
         }
     }
 
-    // Loads open and archived plan-consult tickets for this user.
+    /**
+     * Loads open and archived plan-consult tickets for this user.
+     *
+     * @return The resulting [Pair] instance.
+     */
     suspend fun consultations(): Pair<Boolean, List<SafetyConsultation>> {
-        val result = call("safetyPlanConsultations")
+        val result = functions.callJsonObject("safetyPlanConsultations")
         val plans = result.getJSONArray("plans")
         return result.getBoolean("available") to (0 until plans.length()).map { index ->
             val row = plans.getJSONObject(index)
@@ -158,9 +226,13 @@ internal class SafetyPlanRepository(
         }
     }
 
-    // Finds the staff member with the fewest active assignments.
+    /**
+     * Finds the staff member with the fewest active assignments.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     suspend fun available(value: Boolean) {
-        call("safetyPlanAvailability", mapOf("available" to value))
+        functions.callJsonObject("safetyPlanAvailability", mapOf("available" to value))
     }
 }
 
@@ -173,6 +245,12 @@ internal data class SafetyAccessIndex(
 internal class SafetyAccessIndexStore(private val vault: JsonVault) {
     constructor(context: Context) : this(EncryptedVault(context.applicationContext, "safety-access-index"))
 
+    /**
+     * Reads the safety access index store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SafetyAccessIndex] instance.
+     */
     fun read(uid: String): SafetyAccessIndex {
         requireUid(uid)
         val value = runCatching { vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(uid) }
@@ -197,6 +275,13 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
         }
     }
 
+    /**
+     * Computes replace consultations.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param available Whether to apply available.
+     * @param values Collection of values values to process.
+     */
     fun replaceConsultations(uid: String, available: Boolean, values: List<SafetyConsultation>) {
         requireUid(uid)
         vault.update { root -> root.child(ACCOUNTS).child(uid)
@@ -206,6 +291,12 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
             })) }
     }
 
+    /**
+     * Computes replace shared.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param values Collection of values values to process.
+     */
     fun replaceShared(uid: String, values: List<SharedSafetyPlan>) {
         requireUid(uid)
         vault.update { root -> root.child(ACCOUNTS).child(uid)
@@ -215,12 +306,29 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
             })) }
     }
 
+    /**
+     * Purges the safety access index store.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun purge(uid: String) {
         requireUid(uid)
         runCatching { vault.update { it.optJSONObject(ACCOUNTS)?.remove(uid) } }
     }
 
+    /**
+     * Validates required user ID.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting require user ID.
+     */
     private fun requireUid(uid: String) = require(uid.isNotBlank() && uid.length <= 128)
+    /**
+     * Computes rows for this JSON array.
+     *
+     * @param parse Function used to transform or provide parse.
+     * @return List of resulting rows items.
+     */
     private fun <T> JSONArray?.rows(parse: (JSONObject) -> T): List<T> = this?.let { values ->
         (0 until values.length()).mapNotNull { index -> runCatching { parse(values.getJSONObject(index)) }.getOrNull() }
     }.orEmpty()
@@ -273,12 +381,25 @@ internal data class SafetyChecklistConflictPreview(
     val value: String,
 )
 
-/** Shows only checklist row properties that differ between the owner's and incoming versions. */
+/**
+ * Shows only checklist row properties that differ between the owner's and incoming versions.
+ *
+ * @param mine Mine supplied to [safetyChecklistConflictPreview].
+ * @param incoming Incoming supplied to [safetyChecklistConflictPreview].
+ * @param showMine Whether to show mine.
+ * @return List of resulting safety checklist conflict preview items.
+ */
 internal fun safetyChecklistConflictPreview(
     mine: String,
     incoming: String,
     showMine: Boolean,
 ): List<SafetyChecklistConflictPreview>? {
+    /**
+     * Parses the safety checklist conflict preview.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return List of resulting parse items.
+     */
     fun parse(value: String): List<SafetyChecklistItem>? = runCatching {
         require(JSONObject(value).optInt("oliveSafetyChecklist") == 1)
         readSafetyChecklist(value)
@@ -332,7 +453,13 @@ internal fun safetyChecklistConflictPreview(
     }
 }
 
-// Finds semantic changes by stable row ID; row order alone is not a plan change.
+/**
+ * Finds semantic changes by stable row ID; row order alone is not a plan change.
+ *
+ * @param local Collection of local values to process.
+ * @param remote Collection of remote values to process.
+ * @return List of resulting safety checklist incoming changes items.
+ */
 internal fun safetyChecklistIncomingChanges(
     local: List<SafetyChecklistItem>,
     remote: List<SafetyChecklistItem>,

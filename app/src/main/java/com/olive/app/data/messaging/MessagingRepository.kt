@@ -1,7 +1,7 @@
 // All chat roles: loads and saves direct messages and friend requests.
 package com.olive.app.data.messaging
 
-import com.olive.app.data.sync.cloudStringMap
+import com.olive.app.data.network.cloudStringMap
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.QuerySnapshot
@@ -32,11 +32,20 @@ class MessagingRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val authorizePeer: suspend (String) -> Unit = ::authorizeMessagingPeer,
 ) {
+    /**
+     * Prepares support tickets.
+     */
     suspend fun prepareSupportTickets() {
         FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable("supportTicketsPrepare").call().await()
     }
 
+    /**
+     * Prepares ticket participant names.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @return Map containing the resulting prepare ticket participant names entries.
+     */
     internal suspend fun prepareTicketParticipantNames(conversationId: String): Map<String, String> {
         val result = FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable("conversationPrepareKeys")
@@ -44,7 +53,12 @@ class MessagingRepository(
         return result?.get("participantUsernames").cloudStringMap()
             ?: error("Ticket participant identities are unavailable")
     }
-    // Publishes this account's messaging key and device details to Firebase.
+    /**
+     * Publishes this account's messaging key and device details to Firebase.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param publicKey Public key supplied to [registerUser].
+     */
     suspend fun registerUser(
         identity: AccountIdentity,
         publicKey: PublicKey = KeyManager.getOrCreatePublicKey()
@@ -75,7 +89,13 @@ class MessagingRepository(
         ).await()
     }
 
-    // Resolves encryption identities only for existing authorized connections.
+    /**
+     * Resolves encryption identities only for existing authorized connections.
+     *
+     * @param query Search query string entered by the user.
+     * @param currentUid Current user ID supplied to [searchUsers].
+     * @return List of resulting search users items.
+     */
     suspend fun searchUsers(query: String, currentUid: String): List<DirectoryUser> {
         val normalized = query.trim().lowercase()
         require(normalized.matches(Regex("[a-z0-9_]{4,24}"))) { "Enter the exact 4-24 character username." }
@@ -93,7 +113,15 @@ class MessagingRepository(
         )
     }
 
-    // Streams friend requests, accepted friends, and directory changes for one signed-in account.
+    /**
+     * Streams friend requests, accepted friends, and directory changes for one signed-in account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @param onServerReady Callback invoked when server ready changes or occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeSocial(
         uid: String,
         onUpdate: (SocialSnapshot) -> Unit,
@@ -105,6 +133,12 @@ class MessagingRepository(
         var outgoing = emptyList<FriendRequest>()
         // Sends the newest friend and request lists after any listener changes.
         val confirmed = mutableSetOf<Int>()
+        /**
+         * Publishes the messaging repository.
+         *
+         * @param list List supplied to [publish].
+         * @param snapshot Firestore or data snapshot containing the latest state, or null when not provided.
+         */
         fun publish(list: Int, snapshot: QuerySnapshot?) {
             onUpdate(SocialSnapshot(friends, incoming, outgoing))
             if (snapshot?.metadata?.isFromCache == false && confirmed.add(list) && confirmed.size == 3) {
@@ -151,7 +185,12 @@ class MessagingRepository(
         return ChatSubscription { listeners.forEach(ListenerRegistration::remove) }
     }
 
-    // Creates a pending request after confirming both accounts and their roles may connect.
+    /**
+     * Creates a pending request after confirming both accounts and their roles may connect.
+     *
+     * @param current Current supplied to [sendFriendRequest].
+     * @param other Other supplied to [sendFriendRequest].
+     */
     suspend fun sendFriendRequest(current: AccountIdentity, other: DirectoryUser) {
         require(current.uid != other.uid) { "You cannot add yourself." }
         require(other.username.matches(Regex("[a-z0-9_]{4,24}"))) { "That username is not valid." }
@@ -170,7 +209,12 @@ class MessagingRepository(
         ).await()
     }
 
-    // Accepts a friend request and creates the shared friendship record.
+    /**
+     * Accepts a friend request and creates the shared friendship record.
+     *
+     * @param current Current supplied to [acceptRequest].
+     * @param request Request supplied to [acceptRequest].
+     */
     suspend fun acceptRequest(current: AccountIdentity, request: FriendRequest) {
         require(request.recipientUid == current.uid) { "Only the recipient can accept this request." }
         val requestRef = firestore.collection("friendRequests").document(request.id)
@@ -218,19 +262,35 @@ class MessagingRepository(
         batch.commit().await()
     }
 
-    // Declines an incoming friend request and removes its pending record.
+    /**
+     * Declines an incoming friend request and removes its pending record.
+     *
+     * @param currentUid Current user ID supplied to [declineRequest].
+     * @param request Request supplied to [declineRequest].
+     */
     suspend fun declineRequest(currentUid: String, request: FriendRequest) {
         require(request.recipientUid == currentUid) { "Only the recipient can decline this request." }
         firestore.collection("friendRequests").document(request.id).delete().await()
     }
 
-    // Removes an outgoing request only when the signed-in account originally sent it.
+    /**
+     * Removes an outgoing request only when the signed-in account originally sent it.
+     *
+     * @param currentUid Current user ID supplied to [cancelRequest].
+     * @param request Request supplied to [cancelRequest].
+     */
     suspend fun cancelRequest(currentUid: String, request: FriendRequest) {
         require(request.senderUid == currentUid) { "Only the sender can cancel this request." }
         firestore.collection("friendRequests").document(request.id).delete().await()
     }
 
-    // Opens the existing direct chat with a friend or creates a blank one.
+    /**
+     * Opens the existing direct chat with a friend or creates a blank one.
+     *
+     * @param current Current supplied to [conversationWith].
+     * @param friend Friend relationship record.
+     * @return The resulting [ChatConversation] for conversation with.
+     */
     suspend fun conversationWith(current: AccountIdentity, friend: Friend): ChatConversation {
         require(current.uid != friend.uid) { "Choose another user." }
         val friendship =
@@ -247,7 +307,15 @@ class MessagingRepository(
         return ChatConversation(friend.friendshipId, friend.friendshipId, ids, names)
     }
 
-    // Streams direct and support conversations visible to the signed-in participant.
+    /**
+     * Streams direct and support conversations visible to the signed-in participant.
+     *
+     * @param currentUid Current user ID supplied to [observeConversations].
+     * @param onUpdate Callback invoked when updated data is available.
+     * @param onError Callback invoked when an error occurs.
+     * @param onServerUpdate Callback invoked when server update changes or occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observeConversations(
         currentUid: String,
         onUpdate: (List<ChatConversation>) -> Unit,
@@ -273,6 +341,14 @@ class MessagingRepository(
         return listener.asSubscription()
     }
 
+    /**
+     * Starts observing membership events.
+     *
+     * @param id ID supplied to [observeMembershipEvents].
+     * @param actorUid Firebase UID of the account performing the action, or null when not provided.
+     * @param onUpdate Callback invoked when updated data is available.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     internal fun observeMembershipEvents(
         id: String,
         actorUid: String? = null,
@@ -300,19 +376,34 @@ class MessagingRepository(
         }.asSubscription()
     }
 
-    // Loads one server-confirmed conversation for durable attachment authorization.
+    /**
+     * Loads one server-confirmed conversation for durable attachment authorization.
+     *
+     * @param id ID supplied to [getConversation].
+     * @return The resulting [ChatConversation], or `null` if unavailable.
+     */
     suspend fun getConversation(id: String): ChatConversation? =
         conversationFrom(firestore.collection("conversations").document(id)
             .get(Source.SERVER).await())
 
-    // Loads a server-confirmed conversation index for background membership and key reconciliation.
+    /**
+     * Loads a server-confirmed conversation index for background membership and key reconciliation.
+     *
+     * @param currentUid Current user ID supplied to [listConversations].
+     * @return List of resulting list conversations items.
+     */
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
         firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
             .get(Source.SERVER).await().documents
             .mapNotNull(::conversationFrom)
             .sortedByDescending(ChatConversation::updatedAt)
 
-    // Loads incoming and outgoing friend requests for this account.
+    /**
+     * Loads incoming and outgoing friend requests for this account.
+     *
+     * @param row Row supplied to [requestFrom].
+     * @return The resulting [FriendRequest], or `null` if unavailable.
+     */
     private fun requestFrom(row: DocumentSnapshot): FriendRequest? {
         val senderUid = row.getString("senderUid") ?: return null
         val recipientUid = row.getString("recipientUid") ?: return null
@@ -326,7 +417,12 @@ class MessagingRepository(
         )
     }
 
-    // Converts a Firestore friend record into the app friend model.
+    /**
+     * Converts a Firestore friend record into the app friend model.
+     *
+     * @param row Row supplied to [friendFrom].
+     * @return The resulting [Friend], or `null` if unavailable.
+     */
     private fun friendFrom(row: DocumentSnapshot): Friend? {
         val friendshipId = row.getString("friendshipId") ?: return null
         val friendUid = row.getString("friendUid") ?: return null
@@ -334,7 +430,12 @@ class MessagingRepository(
         return Friend(friendshipId, friendUid, friendUsername)
     }
 
-    // Converts a Firestore chat record into the app conversation model.
+    /**
+     * Converts a Firestore chat record into the app conversation model.
+     *
+     * @param row Row supplied to [conversationFrom].
+     * @return The resulting [ChatConversation], or `null` if unavailable.
+     */
     private fun conversationFrom(row: DocumentSnapshot): ChatConversation? {
         val ids = (row.get("participantIds") as? List<*>)?.filterIsInstance<String>() ?: return null
         val names = row.get("participantUsernames").cloudStringMap().orEmpty()
@@ -364,10 +465,23 @@ class MessagingRepository(
         )
     }
 
-    // Messaging: Requests id.
+    /**
+     * Messaging: Requests id.
+     *
+     * @param senderUid Firebase UID of the sending account.
+     * @param recipientUid Firebase UID of the recipient account.
+     * @return The resulting request ID.
+     */
     private fun requestId(senderUid: String, recipientUid: String) = "$senderUid--$recipientUid"
 
-    // Loads the direct conversation data needed by secure messaging.
+    /**
+     * Loads the direct conversation data needed by secure messaging.
+     *
+     * @param friendshipId Unique identifier of the friendship record.
+     * @param participantIds Collection of participant IDs values to process.
+     * @param participantNames Key-value mapping of participant names entries.
+     * @return The resulting direct conversation data.
+     */
     private fun directConversationData(
         friendshipId: String,
         participantIds: List<String>,
@@ -383,24 +497,54 @@ class MessagingRepository(
         "lastSenderUid" to "",
     )
 
-    // Creates the same friendship ID regardless of which username comes first.
+    /**
+     * Creates the same friendship ID regardless of which username comes first.
+     *
+     * @param firstUid First user ID supplied to [friendshipId].
+     * @param secondUid Second user ID supplied to [friendshipId].
+     * @return The resulting friendship ID.
+     */
     private fun friendshipId(firstUid: String, secondUid: String) =
         listOf(firstUid, secondUid).sorted().joinToString("--")
 
-    // Wraps a Firebase listener so the screen can close it safely.
+    /**
+     * Wraps a Firebase listener so the screen can close it safely.
+     *
+     * @return The resulting as subscription.
+     */
     private fun ListenerRegistration.asSubscription() = ChatSubscription { remove() }
 }
 
 // All chat roles: persists queued ciphertext across process death and connectivity changes.
 
 internal interface MessageOutboxVault {
+    /**
+     * Reads the message outbox vault.
+     *
+     * @return JSON object representing read.
+     */
     fun read(): JSONObject
+    /**
+     * Updates the message outbox vault.
+     *
+     * @param change Action or callback executed for change.
+     */
     fun update(change: (JSONObject) -> Unit)
 }
 
 private class EncryptedMessageOutboxVault(context: Context) : MessageOutboxVault {
     private val vault = EncryptedVault(context, "message-outbox")
+    /**
+     * Reads the encrypted message outbox vault.
+     *
+     * @return The resulting read.
+     */
     override fun read() = vault.read()
+    /**
+     * Updates the encrypted message outbox vault.
+     *
+     * @param change Action or callback executed for change.
+     */
     override fun update(change: (JSONObject) -> Unit) = vault.update(change)
 }
 
@@ -408,6 +552,12 @@ private class EncryptedMessageOutboxVault(context: Context) : MessageOutboxVault
 class MessageOutboxStore internal constructor(private val vault: MessageOutboxVault) {
     constructor(context: Context) : this(EncryptedMessageOutboxVault(context.applicationContext))
 
+    /**
+     * Returns the message outbox store.
+     *
+     * @param id ID supplied to [get].
+     * @return The resulting [OutgoingMessage], or `null` if unavailable.
+     */
     fun get(id: String): OutgoingMessage? {
         val accounts = vault.read().optJSONObject(ACCOUNTS) ?: return null
         val owner = accounts.keys().asSequence().firstOrNull { uid ->
@@ -416,6 +566,12 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         return all(owner).firstOrNull { it.id == id }
     }
 
+    /**
+     * Computes all.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return List of resulting all items.
+     */
     fun all(ownerUid: String): List<OutgoingMessage> {
         var result = readMessages(ownerUid)
         if (result.any { it.clientSequence == 0L }) {
@@ -434,7 +590,12 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         )
     }
 
-    /** Assigns and persists the next sequence atomically with the ciphertext record. */
+    /**
+     * Assigns and persists the next sequence atomically with the ciphertext record.
+     *
+     * @param message Chat message or remote payload.
+     * @return The resulting [OutgoingMessage] instance.
+     */
     fun write(message: OutgoingMessage): OutgoingMessage {
         var persisted: OutgoingMessage? = null
         vault.update { root ->
@@ -469,6 +630,13 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         return checkNotNull(persisted)
     }
 
+    /**
+     * Updates the message outbox store.
+     *
+     * @param id ID supplied to [update].
+     * @param change Function used to transform or provide change.
+     * @return The resulting [OutgoingMessage] instance.
+     */
     fun update(id: String, change: (OutgoingMessage) -> OutgoingMessage): OutgoingMessage {
         var result: OutgoingMessage? = null
         vault.update { root ->
@@ -493,12 +661,24 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         return result
     }
 
-    /** The first unresolved message is a hard barrier for every later sequence. */
+    /**
+     * The first unresolved message is a hard barrier for every later sequence.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @return The resulting [OutgoingMessage], or `null` if unavailable.
+     */
     fun head(ownerUid: String, conversationId: String): OutgoingMessage? = all(ownerUid)
         .asSequence()
         .filter { it.conversationId == conversationId && it.status != MessageDeliveryStatus.SENT }
         .minByOrNull(OutgoingMessage::clientSequence)
 
+    /**
+     * Computes drainable conversation IDs.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return List of resulting drainable conversation IDs items.
+     */
     fun drainableConversationIds(ownerUid: String): Set<String> = all(ownerUid)
         .asSequence()
         .filter { it.status != MessageDeliveryStatus.SENT }
@@ -509,6 +689,12 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
                 ?.let { conversationId }
         }
 
+    /**
+     * Removes the message outbox store.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param id ID supplied to [remove].
+     */
     fun remove(ownerUid: String, id: String) {
         vault.update { root ->
             root.optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
@@ -517,23 +703,51 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         changes.tryEmit(ownerUid)
     }
 
+    /**
+     * Purges the message outbox store.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     fun purge(ownerUid: String) {
         vault.update { root -> root.optJSONObject(ACCOUNTS)?.remove(ownerUid) }
         changes.tryEmit(ownerUid)
     }
 
-    /** Emits an initial snapshot and each process-local update made by the UI or worker. */
+    /**
+     * Emits an initial snapshot and each process-local update made by the UI or worker.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observe(ownerUid: String): Flow<List<OutgoingMessage>> = changes
         .filter { it == ownerUid }
         .map { all(ownerUid) }
         .onStart { emit(all(ownerUid)) }
 
+    /**
+     * Computes messages.
+     *
+     * @param account Account supplied to [messages].
+     * @return JSON object representing messages.
+     */
     private fun messages(account: JSONObject): JSONObject =
         account.child(MESSAGES)
 
+    /**
+     * Computes counters.
+     *
+     * @param account Account supplied to [counters].
+     * @return JSON object representing counters.
+     */
     private fun counters(account: JSONObject): JSONObject =
         account.child(SEQUENCES)
 
+    /**
+     * Reads messages.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return List of resulting read messages items.
+     */
     private fun readMessages(ownerUid: String): List<OutgoingMessage> {
         val messages = vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
             ?.optJSONObject(MESSAGES) ?: return emptyList()
@@ -542,7 +756,11 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         }.toList()
     }
 
-    /** Gives records written by the previous schema a deterministic order before new sends. */
+    /**
+     * Gives records written by the previous schema a deterministic order before new sends.
+     *
+     * @param account Account supplied to [migrateAccount].
+     */
     private fun migrateAccount(account: JSONObject) {
         val messages = messages(account)
         val counters = counters(account)
@@ -564,6 +782,12 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         }
     }
 
+    /**
+     * Computes safe message.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting safe message.
+     */
     private fun safeMessage(value: JSONObject) = runCatching { OutgoingMessage.fromJson(value) }.getOrNull()
 
     private companion object {

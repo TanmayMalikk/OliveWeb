@@ -22,6 +22,13 @@ data class ModelConfig(
     val characterList: List<String>,
 ) {
     companion object {
+        /**
+         * Parses the model config.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param assetPath Asset path supplied to [parse].
+         * @return The resulting [ModelConfig] instance.
+         */
         fun parse(context: Context, assetPath: String): ModelConfig {
             val content = try {
                 context.assets.open(assetPath).bufferedReader().use { it.readText() }
@@ -42,6 +49,13 @@ data class ModelConfig(
             return ModelConfig(characterList = charListWithSpace)
         }
 
+        /**
+         * Extracts character dict.
+         *
+         * @param content Composable content lambda rendered inside this container.
+         * @param assetPath Asset path supplied to [extractCharacterDict].
+         * @return List of resulting extract character dict items.
+         */
         private fun extractCharacterDict(content: String, assetPath: String): List<String> {
             val lines = content.replace("\r\n", "\n").replace('\r', '\n').lines()
             val postProcessLine = lines.indexOfFirst { it.trim() == "PostProcess:" }
@@ -84,6 +98,14 @@ data class ModelConfig(
             return characters
         }
 
+        /**
+         * Finds character dict line.
+         *
+         * @param lines Collection of lines values to process.
+         * @param startLine Start line supplied to [findCharacterDictLine].
+         * @param postProcessIndent Post process indent supplied to [findCharacterDictLine].
+         * @return The computed find character dict line numeric value.
+         */
         private fun findCharacterDictLine(
             lines: List<String>,
             startLine: Int,
@@ -105,6 +127,12 @@ data class ModelConfig(
             return -1
         }
 
+        /**
+         * Parses yaml list scalar.
+         *
+         * @param rawValue Raw value supplied to [parseYamlListScalar].
+         * @return The resulting parse yaml list scalar string.
+         */
         private fun parseYamlListScalar(rawValue: String): String {
             val value = rawValue.dropWhile { it == ' ' }
             if (value.length >= 2 && value.first() == '\'' && value.last() == '\'') {

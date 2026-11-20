@@ -59,8 +59,15 @@ import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 
-// A tiny olive gives every cover the same private-entry shortcut without looking like a normal button.
-// Sighted users double-tap it. TalkBack users activate it with TalkBack's normal double-tap gesture.
+/**
+ * A tiny olive gives every cover the same private-entry shortcut without looking like a normal button. Sighted users double-tap it. TalkBack users activate it with TalkBack's normal double-tap gesture.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onEmergency Callback invoked when emergency changes or occurs.
+ * @param onEmergencyFeedback Callback invoked when emergency feedback changes or occurs.
+ */
 @Composable
 internal fun DiscreetCoverEntry(
     enabled: Boolean,
@@ -119,7 +126,12 @@ internal fun DiscreetCoverEntry(
     }
 }
 
-// Fitness and Game use this page for cover-account settings and the discreet entry olive.
+/**
+ * Fitness and Game use this page for cover-account settings and the discreet entry olive.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
@@ -145,11 +157,16 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             CoverAccountPanel(session)
+            AppVersionFooter()
         }
     }
 }
 
-// Shows cover-account settings and the hidden olive used for private entry.
+/**
+ * Shows cover-account settings and the hidden olive used for private entry.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
@@ -198,7 +215,11 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
 
 // Android reads launcher names/icons from aliases; switch them here when the saved cover changes.
 internal object CoverLauncher {
-    // Keep Android Studio's Run target alive without touching the user's visible cover icon.
+    /**
+     * Keep Android Studio's Run target alive without touching the user's visible cover icon.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun ensureStudioLauncher(context: Context) {
         val manager = context.packageManager
         val component = ComponentName(context.packageName, "${context.packageName}.OliveLauncher")
@@ -210,7 +231,13 @@ internal object CoverLauncher {
             )
     }
 
-    // Switches the visible launcher icon to the selected cover app.
+    /**
+     * Switches the visible launcher icon to the selected cover app.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param selected Selected supplied to [apply].
+     * @param role Account role determining workspace permissions.
+     */
     fun apply(context: Context, selected: CoverType, role: AccountRole) {
         val manager = context.packageManager
         val aliases = listOf(
@@ -260,7 +287,13 @@ internal object CoverLauncher {
 
 // Cover users: shows the olive game cover and its entry controls.
 
-/** A small, usable game cover. The nickname field also accepts the configured safe-entry phrase. */
+/**
+ * A small, usable game cover. The nickname field also accepts the configured safe-entry phrase.
+ *
+ * @param sessionViewModel Optional session view model supplied to [GameCover].
+ * @param interactive Whether to apply interactive.
+ * @param onEntryAttempt Function used to transform or provide on entry attempt.
+ */
 @Composable
 internal fun GameCover(
     sessionViewModel: SessionViewModel? = null,

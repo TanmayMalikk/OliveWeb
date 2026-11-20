@@ -27,6 +27,7 @@ import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 
 internal data class SessionNavigationState(
     val screen: SessionScreen = SessionScreen.Loading,
@@ -98,10 +99,13 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val navigationState = navigationFlow.asStateFlow()
     private var navigationSnapshot by mutableStateOf(navigationFlow.value)
 
+    /**
+     * Updates navigation.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateNavigation(transform: (SessionNavigationState) -> SessionNavigationState) {
-        val next = transform(navigationSnapshot)
-        navigationSnapshot = next
-        navigationFlow.value = next
+        navigationSnapshot = navigationFlow.updateAndGet(transform)
     }
 
     var screen: SessionScreen
@@ -136,12 +140,16 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         set(value) = updateNavigation { it.copy(coverReset = value) }
 
     private val accountFlow = MutableStateFlow(SessionAccountState())
+    val accountState = accountFlow.asStateFlow()
     private var accountSnapshot by mutableStateOf(accountFlow.value)
 
+    /**
+     * Updates account.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateAccount(transform: (SessionAccountState) -> SessionAccountState) {
-        val next = transform(accountSnapshot)
-        accountSnapshot = next
-        accountFlow.value = next
+        accountSnapshot = accountFlow.updateAndGet(transform)
     }
 
     var busy: Boolean
@@ -185,12 +193,16 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         set(value) = updateAccount { it.copy(creatingAccount = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
+    val activityState = activityFlow.asStateFlow()
     private var activitySnapshot by mutableStateOf(activityFlow.value)
 
+    /**
+     * Updates activity.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateActivity(transform: (SessionActivityState) -> SessionActivityState) {
-        val next = transform(activitySnapshot)
-        activitySnapshot = next
-        activityFlow.value = next
+        activitySnapshot = activityFlow.updateAndGet(transform)
     }
 
     var attempts: List<FailedAttempt>
@@ -216,10 +228,13 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val messagingState = messagingFlow.asStateFlow()
     private var messagingSnapshot by mutableStateOf(messagingFlow.value)
 
+    /**
+     * Updates messaging.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateMessaging(transform: (SessionMessagingState) -> SessionMessagingState) {
-        val next = transform(messagingSnapshot)
-        messagingSnapshot = next
-        messagingFlow.value = next
+        messagingSnapshot = messagingFlow.updateAndGet(transform)
     }
 
     var userSearchResults: List<DirectoryUser>
@@ -272,16 +287,25 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val dashboardState = dashboardFlow.asStateFlow()
     private var dashboardSnapshot by mutableStateOf(dashboardFlow.value)
 
+    /**
+     * Updates dashboard.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateDashboard(transform: (SessionDashboardState) -> SessionDashboardState) {
-        val next = transform(dashboardSnapshot)
-        dashboardSnapshot = next
-        dashboardFlow.value = next
+        dashboardSnapshot = dashboardFlow.updateAndGet(transform)
     }
 
     var adminCounts: AccountCounts
         get() = dashboardSnapshot.adminCounts
         set(value) = updateDashboard { it.copy(adminCounts = value) }
 
+    /**
+     * Sets admin summary.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param counts Counts supplied to [setAdminSummary].
+     */
     fun setAdminSummary(ownerUid: String, counts: AccountCounts) =
         updateDashboard { it.copy(adminSummaryOwner = ownerUid, adminCounts = counts) }
     var adminAccounts: List<AdminAccountSummary>
@@ -294,6 +318,11 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         get() = dashboardSnapshot.coverDataVersion
         set(value) = updateDashboard { it.copy(coverDataVersion = value) }
 
+    /**
+     * Clears messaging.
+     *
+     * @param clearRows Whether to apply clear rows.
+     */
     fun clearMessaging(clearRows: Boolean) = updateMessaging { state ->
         val closed = state.copy(
             activeConversation = null,

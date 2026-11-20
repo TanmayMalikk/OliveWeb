@@ -1,5 +1,10 @@
 package com.olive.app.ui
 
+import android.content.ComponentName
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -49,14 +54,19 @@ class CoverEmergencyGestureUiTest {
     }
     @Test
     fun deniedLocationDoesNotCrashAfterTheEmergencyTrackingStart() {
-        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
-            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION))
-        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
-            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION))
-        // Exercise the crash path without creating a real emergency alert or PDF.
-        com.olive.app.location.AdminLocationService.start(context, "synthetic-crash-regression", "Synthetic user")
-        android.os.SystemClock.sleep(6_000)
-        compose.runOnIdle { assertFalse(com.olive.app.location.AdminLocationService.active(context)) }
+        val app = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val denied = object : ContextWrapper(app) {
+            override fun checkPermission(permission: String, pid: Int, uid: Int): Int = when (permission) {
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION -> PackageManager.PERMISSION_DENIED
+                else -> super.checkPermission(permission, pid, uid)
+            }
+
+            override fun startForegroundService(service: Intent): ComponentName? =
+                throw AssertionError("Denied location must not start the foreground service")
+        }
+        assertFalse(com.olive.app.location.AdminLocationService.canStart(denied))
+        com.olive.app.location.AdminLocationService.start(denied, "synthetic-crash-regression", "Synthetic user")
     }
 }

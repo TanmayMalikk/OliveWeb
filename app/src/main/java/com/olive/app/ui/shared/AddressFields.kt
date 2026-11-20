@@ -29,6 +29,15 @@ import java.util.concurrent.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Renders the address fields composable.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param cityOnlyRequired Whether to apply city only required.
+ * @param cityError Optional city error supplied to [AddressFields].
+ * @param onFocus Callback invoked when focus changes or occurs.
+ * @param change Action or callback executed for change.
+ */
 @Composable
 internal fun AddressFields(
     value: DeliveryAddress,
@@ -78,6 +87,15 @@ internal fun AddressFields(
     ) { change(value.copy(country = it.take(160))) }
 }
 
+/**
+ * Renders the address text field composable.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param tag Tag supplied to [AddressTextField].
+ * @param onFocus Callback invoked when focus changes or occurs.
+ * @param change Action or callback executed for change.
+ */
 @Composable
 private fun AddressTextField(
     label: String,
@@ -97,6 +115,16 @@ private fun AddressTextField(
     )
 }
 
+/**
+ * Composes the address autocomplete UI element.
+ *
+ * @param current Current supplied to [AddressAutocomplete].
+ * @param label Accessible label or display caption.
+ * @param onFocus Callback invoked when focus changes or occurs.
+ * @param cityOnly Whether to apply city only.
+ * @param fieldError Optional field error supplied to [AddressAutocomplete].
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @Composable
 private fun AddressAutocomplete(
     current: DeliveryAddress,

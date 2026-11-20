@@ -41,6 +41,14 @@ import kotlinx.coroutines.withContext
 internal class VideoMediaCompressor(private val context:Context) {
     data class Result(val file:File,val mimeType:String,val fileExtension:String)
 
+    /**
+     * Computes compress.
+     *
+     * @param source Source input or object to read from.
+     * @param outputFolder Output folder supplied to [compress].
+     * @param declaredMimeType Declared mime type supplied to [compress].
+     * @return The resulting [Result] instance.
+     */
     suspend fun compress(source:File,outputFolder:File,declaredMimeType:String):Result {
         require(VideoCompressionPolicy.isSupportedMime(declaredMimeType)) {
             "Declared video type is unsupported"
@@ -108,7 +116,12 @@ internal class VideoMediaCompressor(private val context:Context) {
         val frameRate:Float,
     )
 
-    /** Avoids silently dropping additional media tracks by retaining the original container. */
+    /**
+     * Avoids silently dropping additional media tracks by retaining the original container.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @return The resulting [VideoInfo] instance.
+     */
     private fun inspect(file:File):VideoInfo {
         val extractor=MediaExtractor()
         try {
@@ -149,6 +162,16 @@ internal class VideoMediaCompressor(private val context:Context) {
         }
     }
 
+    /**
+     * Exports the video media compressor.
+     *
+     * @param source Source input or object to read from.
+     * @param output Output stream or target receiving processed data.
+     * @param target Target destination or output object to write to.
+     * @param bitrate Bitrate supplied to [export].
+     * @param sourceFrameRate Source frame rate supplied to [export].
+     * @param softwareDecoder Whether to apply software decoder.
+     */
     private suspend fun export(
         source:File,
         output:File,
@@ -179,10 +202,23 @@ internal class VideoMediaCompressor(private val context:Context) {
                     .build()
                 lateinit var transformer:Transformer
                 val listener=object:Transformer.Listener {
+                    /**
+                     * Handles the completed event.
+                     *
+                     * @param composition Composition supplied to [onCompleted].
+                     * @param exportResult Export result supplied to [onCompleted].
+                     */
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                         if(continuation.isActive) continuation.resumeWith(kotlin.Result.success(Unit))
                     }
 
+                    /**
+                     * Handles the error event.
+                     *
+                     * @param composition Composition supplied to [onError].
+                     * @param exportResult Export result supplied to [onError].
+                     * @param exportException Export exception supplied to [onError].
+                     */
                     override fun onError(
                         composition: Composition,
                         exportResult: ExportResult,
@@ -223,20 +259,45 @@ internal class VideoMediaCompressor(private val context:Context) {
             }
         }
 
+    /**
+     * Computes original.
+     *
+     * @param source Source input or object to read from.
+     * @param mimeType MIME content type of the payload.
+     * @return The resulting original.
+     */
     private fun original(source:File,mimeType:String)=Result(
         source,
         VideoCompressionPolicy.normalizedMimeType(mimeType),
         VideoCompressionPolicy.extensionFor(mimeType),
     )
 
+    /**
+     * Returns integer or null on media format.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @return The resulting get integer or null.
+     */
     @Suppress("SameParameterValue")
     private fun MediaFormat.getIntegerOrNull(key:String)=
         if(containsKey(key)) runCatching { getInteger(key) }.getOrNull() else null
 
+    /**
+     * Returns long or null on media format.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @return The resulting get long or null.
+     */
     @Suppress("SameParameterValue")
     private fun MediaFormat.getLongOrNull(key:String)=
         if(containsKey(key)) runCatching { getLong(key) }.getOrNull() else null
 
+    /**
+     * Returns float or null on media format.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @return The computed get float or null number, or `null` if unavailable.
+     */
     @Suppress("SameParameterValue")
     private fun MediaFormat.getFloatOrNull(key:String):Float? {
         if(!containsKey(key)) return null
@@ -267,10 +328,36 @@ internal object VideoCompressionPolicy {
         "video/mp4","video/quicktime","video/webm","video/3gpp","video/3gpp2","video/x-matroska",
     )
 
+    /**
+     * Computes normalized mime type.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting normalized mime type.
+     */
     fun normalizedMimeType(value:String)=value.substringBefore(';').trim().lowercase()
+    /**
+     * Checks whether supported mime.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if is supported mime, or `false` otherwise.
+     */
     fun isSupportedMime(value:String)=normalizedMimeType(value) in supported
+    /**
+     * Checks whether eligible.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param kind Kind supplied to [isEligible].
+     * @return `true` if is eligible, or `false` otherwise.
+     */
     fun isEligible(value:String,kind:MediaKind)=kind==MediaKind.VIDEO && isSupportedMime(value)
 
+    /**
+     * Computes matches container.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param mimeType MIME content type of the payload.
+     * @return `true` if matches container, or `false` otherwise.
+     */
     fun matchesContainer(file:File,mimeType:String):Boolean {
         val header=ByteArray(12)
         val count=file.inputStream().use { input ->
@@ -293,6 +380,14 @@ internal object VideoCompressionPolicy {
         }
     }
 
+    /**
+     * Computes target size.
+     *
+     * @param width Target or source width in pixels or layout units.
+     * @param height Target or source height in pixels or layout units.
+     * @param rotationDegrees Rotation degrees supplied to [targetSize].
+     * @return The resulting [Pair] for target size.
+     */
     fun targetSize(width:Int,height:Int,rotationDegrees:Int):Pair<Int,Int> {
         require(width>0 && height>0)
         val rotated=rotationDegrees.mod(180)!=0
@@ -306,6 +401,14 @@ internal object VideoCompressionPolicy {
         return even((displayWidth*scale).roundToInt()) to even((displayHeight*scale).roundToInt())
     }
 
+    /**
+     * Computes target bitrate.
+     *
+     * @param width Target or source width in pixels or layout units.
+     * @param height Target or source height in pixels or layout units.
+     * @param frameRate Frame rate supplied to [targetBitrate].
+     * @return The computed target bitrate numeric value.
+     */
     fun targetBitrate(width:Int,height:Int,frameRate:Float):Int {
         require(width>0 && height>0 && frameRate.isFinite() && frameRate>0)
         val outputFrameRate=minOf(frameRate,MAX_OUTPUT_FRAME_RATE)
@@ -313,12 +416,27 @@ internal object VideoCompressionPolicy {
             .coerceIn(MIN_VIDEO_BITRATE,MAX_VIDEO_BITRATE)
     }
 
+    /**
+     * Determines whether the app should avoid transcode.
+     *
+     * @param width Target or source width in pixels or layout units.
+     * @param height Target or source height in pixels or layout units.
+     * @param frameRate Frame rate supplied to [shouldAvoidTranscode].
+     * @param memoryClassMb Memory class mb supplied to [shouldAvoidTranscode].
+     * @return `true` if should avoid transcode, or `false` otherwise.
+     */
     fun shouldAvoidTranscode(width:Int,height:Int,frameRate:Float,memoryClassMb:Int):Boolean {
         require(width>0 && height>0 && frameRate.isFinite() && frameRate>0 && memoryClassMb>0)
         val inputIsUhd=maxOf(width,height)>MAX_LONG_SIDE && minOf(width,height)>MAX_SHORT_SIDE
         return inputIsUhd && memoryClassMb<=LOW_MEMORY_CLASS_MB
     }
 
+    /**
+     * Computes extension for.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting extension for.
+     */
     fun extensionFor(value:String)=when(normalizedMimeType(value)) {
         "video/quicktime" -> "mov"
         "video/webm" -> "webm"
@@ -328,6 +446,12 @@ internal object VideoCompressionPolicy {
         else -> "mp4"
     }
 
+    /**
+     * Computes even.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting even.
+     */
     private fun even(value:Int)=maxOf(2,value-(value and 1))
 
     private const val MAX_LONG_SIDE=1_920

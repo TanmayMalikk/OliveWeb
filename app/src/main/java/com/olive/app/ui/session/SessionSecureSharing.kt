@@ -33,7 +33,12 @@ import kotlinx.coroutines.coroutineScope
 
 /** Coordinates encrypted conversations and private-entry sharing without exposing keys to UI code. */
 internal class SessionSecureSharing(private val runtime: SessionRuntime) {
-    // Keeps the saved room key name in one place for the signed-in session.
+    /**
+     * Keeps the saved room key name in one place for the signed-in session.
+     *
+     * @param conversation Conversation metadata including participants and ticket status.
+     * @return The resulting [SecretKey] for room key.
+     */
     suspend fun roomKey(conversation: ChatConversation): javax.crypto.SecretKey {
         with(runtime) {
             val device = enrollment ?: error("No active account")
@@ -73,7 +78,11 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Shares the selected item for session secure sharing.
+    /**
+     * Shares the selected item for session secure sharing.
+     *
+     * @param entry Entry supplied to [share].
+     */
     fun share(entry: PrivateEntry) {
         with(runtime) {
             with(state) {
@@ -135,7 +144,11 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Shares the selected item for session secure sharing.
+    /**
+     * Shares the selected item for session secure sharing.
+     *
+     * @param document Safety document metadata record.
+     */
     fun share(document: SafetyDocument) {
         with(runtime) {
             with(state) {
@@ -172,6 +185,14 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
     var preparingVoiceConversationId by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * Sends voice.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param metadata Metadata supplied to [sendVoice].
+     * @param transfers Transfers supplied to [sendVoice].
+     * @return `true` if send voice, or `false` otherwise.
+     */
     fun sendVoice(file: File, metadata: String, transfers: MediaTransferController): Boolean = with(runtime) {
         with(state) {
             val conversation = activeConversation ?: return false
@@ -209,7 +230,9 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Sends safety plan for session secure sharing.
+    /**
+     * Sends safety plan for session secure sharing.
+     */
     fun shareSafetyPlan() {
         with(runtime) {
             with(state) {
@@ -243,7 +266,13 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session secure sharing: Sends live location.
+    /**
+     * Session secure sharing: Sends live location.
+     *
+     * @param durationMillis Duration or timestamp for duration, in milliseconds.
+     * @param controller Controller supplied to [shareLiveLocation].
+     * @param requestPermission Function used to transform or provide request permission.
+     */
     fun shareLiveLocation(
         durationMillis: Long,
         controller: LocationMapController,
@@ -282,7 +311,11 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Opens the requested item for session secure sharing.
+    /**
+     * Opens the requested item for session secure sharing.
+     *
+     * @param entryId Unique identifier of the private entry or note.
+     */
     fun open(entryId: String) {
         with(runtime) {
             with(state) {
@@ -311,7 +344,13 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Removes if shared from the signed-in session.
+    /**
+     * Removes if shared from the signed-in session.
+     *
+     * @param message Chat message or remote payload.
+     * @param conversation Conversation metadata including participants and ticket status.
+     * @param currentUid Current user ID supplied to [revokeIfShared].
+     */
     suspend fun revokeIfShared(
         message: ChatMessage,
         conversation: ChatConversation,
@@ -332,7 +371,9 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session secure sharing: Closes the active feature.
+    /**
+     * Session secure sharing: Closes the active feature.
+     */
     fun close() {
         runtime.state.viewedSharedEntry = null
     }

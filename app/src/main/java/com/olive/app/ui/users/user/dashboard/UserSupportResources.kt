@@ -59,7 +59,12 @@ internal val LocalLocationPermissionRequest =
 internal val LocalBackgroundLocationPermissionRequest =
     staticCompositionLocalOf<(suspend () -> Boolean)?> { null }
 
-// Start from the saved address. Device lookup is explicit and never writes the detected address to the account.
+/**
+ * Start from the saved address. Device lookup is explicit and never writes the detected address to the account.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile) {
     val context = LocalContext.current
@@ -288,7 +293,12 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     }
 }
 
-// Shows one hotline or shelter with its phone number, details, and safe action buttons.
+/**
+ * Shows one hotline or shelter with its phone number, details, and safe action buttons.
+ *
+ * @param resource Resource supplied to [HotlineResourceCard].
+ * @param onOpen Callback invoked when open changes or occurs.
+ */
 @Composable
 private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Boolean) -> Unit) {
     Card(
@@ -358,6 +368,9 @@ private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Bool
     }
 }
 
+/**
+ * Composes the hotline always open indicator UI element.
+ */
 @Composable
 private fun HotlineAlwaysOpenIndicator() {
     val description = stringResource(R.string.hotline_available_247)
@@ -375,7 +388,14 @@ private fun HotlineAlwaysOpenIndicator() {
     )
 }
 
-// Opening a dialer never calls automatically and needs no phone permission. Android leaving the app locks the safe area.
+/**
+ * Opening a dialer never calls automatically and needs no phone permission. Android leaving the app locks the safe area.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param value Input value to store, parse, or format.
+ * @param dial Whether to apply dial.
+ * @return `true` if open hotline destination, or `false` otherwise.
+ */
 private fun openHotlineDestination(context: Context, value: String, dial: Boolean): Boolean {
     val uri = value.toUri()
     if (if (dial) uri.scheme != "tel" else uri.scheme != "https" || uri.host.isNullOrBlank()) return false
@@ -396,7 +416,11 @@ private fun openHotlineDestination(context: Context, value: String, dial: Boolea
     }
 }
 
-// Changes a Canadian region code into the province or territory name shown on the hotline card.
+/**
+ * Changes a Canadian region code into the province or territory name shown on the hotline card.
+ *
+ * @param code Verification, invitation, or error code.
+ */
 @Composable
 private fun hotlineRegionName(code: String) = stringResource(
     // Match each short region code to its translated name. Unknown codes fall back to Canada.

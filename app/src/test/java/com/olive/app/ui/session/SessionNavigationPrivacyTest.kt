@@ -1,7 +1,9 @@
 package com.olive.app.ui.session
 
+import androidx.work.impl.WorkManagerImpl
 import com.olive.app.data.account.*
 import com.olive.app.data.messaging.*
+import com.olive.app.data.sync.AccountRevocationEvents
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.*
 import org.junit.Assert.*
@@ -88,6 +90,82 @@ class SessionNavigationPrivacyTest {
             assertEquals(CoverType.GAME, r.state.coverType)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
+        }
+    }
+
+    @Test
+    fun revocationOfThisAccountClosesItsPrivateWorkspaceAndIgnoresOtherAccounts() {
+        SessionRuntimeFixture(AccountRole.SAFE_CONTACT).use { fixture ->
+            val session = fixture.runtime
+            val privateEntry = PrivateEntry(title = "Synthetic private entry", body = "Private fixture")
+            session.state.profile = UserProfile("fixture_owner", "Synthetic", "", "", "2000-01-01", "English", "", "Edmonton", "")
+            session.state.viewedSharedEntry = privateEntry
+            session.state.privateEntries = listOf(privateEntry)
+            val work = mock(WorkManagerImpl::class.java)
+            `when`(fixture.accounts.authenticatedUid()).thenReturn(null)
+            WorkManagerImpl.setDelegate(work)
+            try {
+                AccountRevocationEvents.publish("other")
+                assertEquals("owner", session.enrollment?.uid)
+                assertEquals(privateEntry, session.state.viewedSharedEntry)
+                AccountRevocationEvents.publish("owner")
+                assertNull(session.enrollment)
+                assertNull(session.state.profile)
+                assertNull(session.state.viewedSharedEntry)
+                assertTrue(session.state.privateEntries.isEmpty())
+                assertEquals(SessionScreen.Cover, session.state.screen)
+            } finally {
+                WorkManagerImpl.setDelegate(null)
+            }
+        }
+    }
+
+    @Test
+    fun safeNavigationRecordsHistoryClearsCategoriesAndBackgroundsSignedInUsers() {
+        mockStatic(com.google.firebase.auth.FirebaseAuth::class.java).use { authSdk ->
+            authSdk.`when`<com.google.firebase.auth.FirebaseAuth> {
+                com.google.firebase.auth.FirebaseAuth.getInstance()
+            }.thenReturn(mock(com.google.firebase.auth.FirebaseAuth::class.java))
+            SessionRuntimeFixture().use { f ->
+                val r = f.runtime
+                val work = mock(WorkManagerImpl::class.java)
+                WorkManagerImpl.setDelegate(work)
+                `when`(f.accounts.authenticatedUid()).thenReturn("owner")
+                `when`(f.accounts.authenticatedUsername()).thenReturn("fixture_owner")
+                try {
+                    r.state.screen = SessionScreen.Safe
+                    r.navigation.navigate(SafePage.Settings)
+                    assertTrue(r.safePageHistory.contains(SafePage.Messages))
+                    r.navigation.navigate(SafePage.Profile)
+                    r.navigation.navigate(SafePage.Contacts)
+                    r.navigation.navigate(SafePage.Activity)
+                    r.state.activityCategory = ActivityCategory.Privacy
+                    r.navigation.back()
+                    assertNull(r.state.activityCategory)
+                    assertNull(r.state.message)
+
+                    r.navigation.navigate(SafePage.Notes)
+                    r.navigation.navigate(SafePage.Messages)
+                    assertEquals(SafePage.Messages, r.state.page)
+
+                    // background() while signed in as USER triggers quickExit()
+                    r.navigation.background()
+                    assertEquals(SessionScreen.Cover, r.state.screen)
+
+                    // back() returning to Cover with null enrollment resets coverType/role
+                    r.enrollment = null
+                    r.state.accountRole = AccountRole.STAFF
+                    r.state.coverType = CoverType.NEWS
+                    r.state.screen = SessionScreen.ReturningCredentials
+                    r.screenHistory += SessionScreen.Cover
+                    r.navigation.back()
+                    assertEquals(SessionScreen.Cover, r.state.screen)
+                    assertEquals(AccountRole.USER, r.state.accountRole)
+                    assertEquals(CoverType.FITNESS, r.state.coverType)
+                } finally {
+                    WorkManagerImpl.setDelegate(null)
+                }
+            }
         }
     }
 }

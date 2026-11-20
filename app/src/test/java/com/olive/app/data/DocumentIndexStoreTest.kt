@@ -96,6 +96,32 @@ class DocumentIndexStoreTest {
     }
 
     @Test
+    fun `offline reads preserve visible access until an authoritative deletion`() = runBlocking<Unit> {
+        val index = DocumentIndexStore(FakeJsonVault())
+        val remote = FakeRemote()
+        val original = document("cached", ALICE)
+        val repository = IndexedSafetyDocumentRepository(remote, index)
+        remote.documents = listOf(original)
+        repository.listFor(ALICE)
+        val observed = mutableListOf<DocumentListSnapshot>()
+        val errors = mutableListOf<String>()
+        val observation = repository.observeFor(ALICE, observed::add, errors::add)
+        val offline = IllegalStateException("Offline")
+        remote.listFailure = offline
+        remote.interrupt("Offline")
+        assertTrue(errors.isEmpty())
+        assertEquals(DocumentListSource.LOCAL_INDEX, observed.last().source)
+        assertEquals(listOf(original.id), repository.listFor(ALICE).documents.map { it.id })
+
+        repository.delete(original, ALICE)
+        assertNull(repository.cachedFor(ALICE, original.id))
+        remote.interrupt("Offline after deletion")
+        assertEquals(listOf("Offline after deletion"), errors)
+        assertTrue(runCatching { repository.listFor(ALICE) }.exceptionOrNull() === offline)
+        observation.close()
+    }
+
+    @Test
     fun `wide repeated index replacements remain deterministic`() {
         val store = DocumentIndexStore(FakeJsonVault())
         repeat(40) { round ->
@@ -127,16 +153,27 @@ class DocumentIndexStoreTest {
 
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
         var documents = emptyList<SafetyDocument>()
+        var listFailure: Exception? = null
         private var observer: ((DocumentListSnapshot) -> Unit)? = null
+        private var errorObserver: ((String) -> Unit)? = null
         fun emit(value: DocumentListSnapshot) = checkNotNull(observer).invoke(value)
-        override suspend fun listFor(uid: String) =
-            DocumentListSnapshot(documents, DocumentListSource.SERVER, 1)
+        fun interrupt(message: String) = checkNotNull(errorObserver).invoke(message)
+        override suspend fun listFor(uid: String): DocumentListSnapshot {
+            listFailure?.let { throw it }
+            return DocumentListSnapshot(documents, DocumentListSource.SERVER, 1)
+        }
         override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
             require(document.ownerUid == ownerUid)
             documents = documents.map { if (it.id == document.id) it.copy(evidence = evidence) else it }
         }
-        override fun observeFor(uid: String, onUpdate: (DocumentListSnapshot) -> Unit, onError: (String) -> Unit) =
-            ChatSubscription { observer = null }.also { observer = onUpdate }
+        override fun observeFor(uid: String, onUpdate: (DocumentListSnapshot) -> Unit, onError: (String) -> Unit): ChatSubscription {
+            observer = onUpdate
+            errorObserver = onError
+            return ChatSubscription {
+                observer = null
+                errorObserver = null
+            }
+        }
         override suspend fun getFor(uid: String, id: String): SafetyDocument {
             getFailure?.let { throw it }
             error("unused")

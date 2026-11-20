@@ -41,7 +41,12 @@ private data class SharedChatItem(
     val senderUid: String,
 )
 
-// Reads only the structured share messages so ordinary chat text stays out of the shared-items list.
+/**
+ * Reads only the structured share messages so ordinary chat text stays out of the shared-items list.
+ *
+ * @param messages Collection of messages values to process.
+ * @return List of resulting shared chat items items.
+ */
 private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> = messages
     .asSequence()
     .filterNot(ChatMessage::unsent)
@@ -64,6 +69,14 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
     .distinctBy(SharedChatItem::key)
     .toList()
 
+/**
+ * Displays the chat info dialog overlay.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param currentUid Current user ID supplied to [ChatInfoDialog].
+ * @param onClose Callback invoked when close changes or occurs.
+ * @param onOpenMedia Callback invoked when open media changes or occurs.
+ */
 @Composable
 internal fun ChatInfoDialog(
     session: SessionViewModel,

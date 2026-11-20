@@ -170,16 +170,36 @@ function Save-DeviceCoverage {
     $process.StartInfo.RedirectStandardError = $true
     $process.StartInfo.CreateNoWindow = $true
     $destination = Join-Path $directory "$Name.ec"
+    $partial = "$destination.partial"
+    $label = "$Module/$Name on $Serial"
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Value "Pull device coverage for $label"
     try {
         [void]$process.Start()
-        $stream = [System.IO.File]::Create($destination)
-        try { $process.StandardOutput.BaseStream.CopyTo($stream) } finally { $stream.Dispose() }
-        $failure = $process.StandardError.ReadToEnd()
-        $process.WaitForExit()
-        if ($process.ExitCode -ne 0 -or (Get-Item -LiteralPath $destination).Length -eq 0) {
-            throw "No device coverage produced for $Module/$Name on ${Serial}: $failure"
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $stream = [System.IO.File]::Create($partial)
+        try {
+            $copy = $process.StandardOutput.BaseStream.CopyToAsync($stream)
+            if (-not $process.WaitForExit(30000)) {
+                throw "ADB timed out while pulling device coverage for $label."
+            }
+            if (-not $copy.Wait(5000) -or -not $stderr.Wait(5000)) {
+                throw "ADB did not finish writing device coverage for $label."
+            }
+        } finally {
+            if (-not $process.HasExited) { $process.Kill() }
+            $stream.Dispose()
         }
-    } finally { $process.Dispose() }
+        if ($process.ExitCode -ne 0 -or (Get-Item -LiteralPath $partial).Length -eq 0) {
+            throw "No device coverage produced for ${label}: $($stderr.Result)"
+        }
+        Move-Item -LiteralPath $partial -Destination $destination -Force
+    } catch {
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "Pull device coverage for $label|1"
+        throw
+    } finally {
+        $process.Dispose()
+        if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force }
+    }
 }
 if ($WithCoverage -and $WithDeviceTests) {
     foreach ($module in @("app", "wear")) {
@@ -401,6 +421,7 @@ if ($WithDeviceTests) {
     )
     $deviceTestCount = 0
     $skippedDeviceLockTests = 0
+    $skippedInstrumentationTests = 0
     foreach ($testCase in $deviceTestCases) {
         $requiresPreparedPin = $deviceLockTestNames | Where-Object { $testCase.EndsWith($_) }
         if ($requiresPreparedPin -and -not $devicePinReady) {
@@ -422,13 +443,22 @@ if ($WithDeviceTests) {
             $instrumentationOutput | ForEach-Object { Write-Host $_ }
             $deviceResult = $instrumentationOutput -join "`n"
             $countMatch = [regex]::Match($deviceResult, 'OK \(([1-9][0-9]*) tests?\)')
-            $passed = $LASTEXITCODE -eq 0 -and $countMatch.Success -and $deviceResult -notmatch 'FAILURES!!!'
             $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null|INSTRUMENTATION_ABORTED: System has crashed'
+            $completed = $LASTEXITCODE -eq 0 -and -not $frameworkCrash -and $deviceResult -notmatch 'FAILURES!!!'
+            $skipped = $completed -and $deviceResult -match '(?m)^INSTRUMENTATION_STATUS_CODE: -(3|4)\s*$'
+            $passed = $completed -and $countMatch.Success -and -not $skipped
             if (-not $passed -and $attempt -eq 1 -and $frameworkCrash) {
                 Write-Warning "Android framework crashed during $testCase; retrying once in a clean process."
             }
         } while (-not $passed -and $attempt -lt 2 -and $frameworkCrash)
         $testDuration = ((Get-Date) - $testStarted).TotalSeconds
+        if ($skipped) {
+            $reason = [regex]::Match($deviceResult, '(?m)^INSTRUMENTATION_STATUS: stack=([^\r\n]+)').Groups[1].Value
+            if (-not $reason) { $reason = "AndroidJUnitRunner marked the test as skipped." }
+            Save-DeviceTestResult -TestCase $testCase -Status "SKIPPED" -Output $reason -DurationSeconds $testDuration
+            $skippedInstrumentationTests++
+            continue
+        }
         if (-not $passed) {
             Save-DeviceTestResult -TestCase $testCase -Status "FAILED" -Output $deviceResult -DurationSeconds $testDuration
             Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "Android device UI test $testCase|1"
@@ -440,7 +470,7 @@ if ($WithDeviceTests) {
         Save-DeviceTestResult -TestCase $testCase -Status "PASSED" -Output $deviceResult -DurationSeconds $testDuration
         $deviceTestCount += [int]$countMatch.Groups[1].Value
     }
-    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount passed, $skippedDeviceLockTests device-lock tests skipped)")
+    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount passed, $skippedDeviceLockTests device-lock tests skipped, $skippedInstrumentationTests instrumentation tests skipped)")
     } finally {
         # Device-lock tests use a known PIN only on a disposable emulator. Always remove it when
         # the suite ends, including after a failed test, so the emulator is not left secured.

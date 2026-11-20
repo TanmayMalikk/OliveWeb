@@ -1,20 +1,33 @@
 package com.olive.app.ui
 
+import android.Manifest
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityOptionsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.*
 import com.olive.app.ui.shared.OliveTheme
 import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -51,6 +64,49 @@ class NutritionControlsUiTest {
         compose.runOnIdle { assertEquals(150f, selected!!.calories, 0f) }
     }
 
+    @Test fun nutritionCameraDeletesTemporaryPhotosAfterCaptureCancellationAndInvalidInput() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.CAMERA)
+        val payload = byteArrayOf(3, 1, 4, 1, 5)
+        val received = AtomicReference<ByteArray>()
+        val errors = AtomicInteger()
+        val launches = AtomicInteger()
+        val registry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(
+                requestCode: Int,
+                contract: ActivityResultContract<I, O>,
+                input: I,
+                options: ActivityOptionsCompat?,
+            ) {
+                check(contract is ActivityResultContracts.TakePicture)
+                val attempt = launches.incrementAndGet()
+                if (attempt == 1) {
+                    requireNotNull(context.contentResolver.openOutputStream(input as Uri)).use { it.write(payload) }
+                }
+                // Android delivers the result after the launch call finishes.
+                Handler(Looper.getMainLooper()).post { dispatchResult(requestCode, attempt != 2) }
+            }
+        }
+        val owner = object : ActivityResultRegistryOwner { override val activityResultRegistry = registry }
+        val cache = File(context.cacheDir, "fitness-scans")
+        compose.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner) {
+                val launch = rememberNutritionCamera({ received.set(it) }, { errors.incrementAndGet() })
+                Button(onClick = launch) { Text("Fixture camera") }
+            }
+        }
+        val button = compose.onNodeWithText("Fixture camera")
+        button.performClick()
+        compose.waitUntil(10_000) { received.get() != null && cache.listFiles().orEmpty().isEmpty() }
+        assertArrayEquals(payload, received.get())
+        button.performClick()
+        compose.waitUntil(10_000) { launches.get() == 2 && cache.listFiles().orEmpty().isEmpty() }
+        assertEquals(0, errors.get())
+        button.performClick()
+        compose.waitUntil(10_000) { errors.get() == 1 && cache.listFiles().orEmpty().isEmpty() }
+        assertEquals(3, launches.get())
+    }
+
     @Test fun nutritionActionsAppearAboveSummaryWithWaterVisible() {
         val food = NutritionFood("demo", "Test food", "", "1 serving", 237.5f, 18.9f, 26.6f, 7.3f, FoodDataSource.MANUAL)
         compose.setContent { OliveTheme {
@@ -75,12 +131,15 @@ class NutritionControlsUiTest {
     }
 
     @Test fun extraNutrientsStartCollapsed() {
-        compose.setContent { OliveTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-            DailyNutritionCard(FitnessSnapshot(FitnessProfile(), 0, emptyList()))
-        } } }
+        compose.setContent { OliveTheme {
+            TodayPage(FitnessSnapshot(FitnessProfile(), 0, emptyList()), true, PaddingValues(0.dp), {}, {}, { _, _ -> })
+        } }
         compose.onNodeWithContentDescription(context.getString(R.string.sodium) + ", 0 mg").assertDoesNotExist()
+        compose.onNodeWithTag("fitness_today").performScrollToNode(hasText(context.getString(R.string.nutrition_other_nutrients)))
         compose.onNodeWithText(context.getString(R.string.nutrition_other_nutrients)).performClick()
-        compose.onNodeWithContentDescription(context.getString(R.string.sodium) + ", 0 mg").performScrollTo().assertIsDisplayed()
+        val sodium = hasContentDescription(context.getString(R.string.sodium) + ", 0 mg")
+        compose.onNodeWithTag("fitness_today").performScrollToNode(sodium)
+        compose.onNode(sodium).assertIsDisplayed()
     }
 
     @Test fun customServingWeightUpdatesSavedFactor() {
@@ -98,11 +157,14 @@ class NutritionControlsUiTest {
         var adjustment = 0
         compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { value, _ -> adjustment = value }) } }
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).assertDoesNotExist()
-        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).assertDoesNotExist()
+        val add = context.getString(R.string.fitness_diary_add_volume, 250)
+        compose.onNodeWithContentDescription(add).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_minus)).performClick()
-        compose.runOnIdle { assertEquals(-250, adjustment) }
-        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_plus)).performClick()
+        compose.runOnIdle { assertEquals(0, adjustment) }
+        compose.onNodeWithContentDescription(add).performClick()
+        compose.onNodeWithContentDescription(add).performClick()
+        compose.onNodeWithText(context.getString(R.string.save)).performClick()
         compose.runOnIdle { assertEquals(250, adjustment) }
     }
 
@@ -123,9 +185,8 @@ class NutritionControlsUiTest {
         var amount = 0
         compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { value, _ -> amount = value }) } }
         compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
-        compose.onNodeWithText("500 ml").performClick()
-        compose.onNodeWithText(context.getString(R.string.nutrition_add_water), useUnmergedTree = true)
-        compose.onAllNodesWithText(context.getString(R.string.nutrition_add_water)).onLast().performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.fitness_diary_add_volume, 500)).performClick()
+        compose.onNodeWithText(context.getString(R.string.save)).performClick()
         compose.runOnIdle { assertEquals(500, amount) }
     }
 

@@ -59,7 +59,11 @@ import com.olive.app.ui.users.shared.onboarding.OnboardingNavigation
 import com.olive.app.ui.users.shared.onboarding.OnboardingProgress
 import com.olive.app.ui.users.shared.onboarding.RequirementBullet
 
-// The safety answer changes the recommendation, never silently chooses an unlock method.
+/**
+ * The safety answer changes the recommendation, never silently chooses an unlock method.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafeEntrySetup(session: SessionViewModel) {
     var knowsPin by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -172,7 +176,12 @@ internal fun SafeEntrySetup(session: SessionViewModel) {
     }
 }
 
-// Draws the device lock prompt for the user safe app.
+/**
+ * Draws the device lock prompt for the user safe app.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onUseBackupPin Callback invoked when use backup PIN changes or occurs.
+ */
 @Composable
 internal fun DeviceLockPrompt(
     session: SessionViewModel,
@@ -205,7 +214,11 @@ internal fun DeviceLockPrompt(
     }
 }
 
-// The account owner sets this private trigger personally on first login.
+/**
+ * The account owner sets this private trigger personally on first login.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun TriggerSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -252,10 +265,19 @@ internal class SafeEntryPinDraft {
     var confirmation by mutableStateOf("")
 }
 
-// Both methods may be configured; only the preferred method appears on a normal trigger.
+/**
+ * Both methods may be configured; only the preferred method appears on a normal trigger.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafeEntryMethodSettings(session: SessionViewModel) {
     var pendingMethod by remember { mutableStateOf<SafeEntryMethod?>(null) }
+    /**
+     * Selects the target.
+     *
+     * @param method Method supplied to [select].
+     */
     fun select(method: SafeEntryMethod) {
         if (session.account.hasAppPin &&
             (session.account.preferredEntryMethod == SafeEntryMethod.APP_PIN || !session.account.phoneHasLock)
@@ -317,6 +339,12 @@ internal fun SafeEntryMethodSettings(session: SessionViewModel) {
     }
 }
 
+/**
+ * Composes the safe entry PIN settings UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param draft Draft supplied to [SafeEntryPinSettings].
+ */
 @Composable
 internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPinDraft) = with(draft) {
     val text = rememberResourceText()
@@ -342,7 +370,11 @@ internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPin
         showSecretToggle = true,
         enabled = !session.busy
     ) { confirmation = it.filter(Char::isDigit).take(6) }
-    // Validates the form before saving a new backup PIN or entry method.
+    /**
+     * Validates the form before saving a new backup PIN or entry method.
+     *
+     * @param usePin Whether to use PIN.
+     */
     fun save(usePin: Boolean) {
         session.account.saveSafeEntryPin(currentPin, newPin, confirmation, usePin)
         currentPin = ""

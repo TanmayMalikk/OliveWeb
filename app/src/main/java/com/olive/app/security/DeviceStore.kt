@@ -30,7 +30,11 @@ class DeviceStore(
 ) {
     private val histories = DeviceActivityStore(activityVault)
 
-    // Startup needs the enrollment and profile together; decrypt the vault once instead of once per value.
+    /**
+     * Startup needs the enrollment and profile together; decrypt the vault once instead of once per value.
+     *
+     * @return The resulting [DeviceSession], or `null` if unavailable.
+     */
     fun currentSession(): DeviceSession? {
         val root = vault.read()
         val uid = root.optString("activeUid")
@@ -42,7 +46,11 @@ class DeviceStore(
         )
     }
 
-    // Loads the account currently linked to this phone.
+    /**
+     * Loads the account currently linked to this phone.
+     *
+     * @return The resulting [DeviceEnrollment], or `null` if unavailable.
+     */
     fun current(): DeviceEnrollment? {
         val root = vault.read()
         val uid = root.optString("activeUid")
@@ -50,7 +58,12 @@ class DeviceStore(
         return enrollment(uid, entry)
     }
 
-    // A package update can leave Firebase signed in while the local active pointer is missing; relink only a saved enrollment.
+    /**
+     * A package update can leave Firebase signed in while the local active pointer is missing; relink only a saved enrollment.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [DeviceEnrollment], or `null` if unavailable.
+     */
     fun restoreActive(uid: String): DeviceEnrollment? {
         var restored: DeviceEnrollment? = null
         vault.update { root ->
@@ -62,7 +75,14 @@ class DeviceStore(
         return restored
     }
 
-    // Creates a PIN-based device enrollment and saves the protected account key.
+    /**
+     * Creates a PIN-based device enrollment and saves the protected account key.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     * @param pin User-entered PIN string.
+     * @return The resulting [DeviceEnrollment] instance.
+     */
     fun enroll(identity: AccountIdentity, profile: UserProfile, pin: String): DeviceEnrollment {
         require(InputPolicy.validPin(pin))
         val verifier = SecretVerifier.createPin(pin)
@@ -94,7 +114,13 @@ class DeviceStore(
         return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role)
     }
 
-    // Rebuilds one device enrollment from its saved JSON fields.
+    /**
+     * Rebuilds one device enrollment from its saved JSON fields.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param entry Entry supplied to [enrollment].
+     * @return The resulting enrollment.
+     */
     private fun enrollment(uid: String, entry: JSONObject) = DeviceEnrollment(
         uid,
         entry.optString("triggerHash"),
@@ -103,14 +129,26 @@ class DeviceStore(
         entry.has("pinVerifier")
     )
 
-    // Returns the short-lived proof that Android device authentication succeeded.
+    /**
+     * Returns the short-lived proof that Android device authentication succeeded.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return JSON object representing device lock grant.
+     */
     internal fun deviceLockGrant(uid: String): JSONObject {
         val entry = vault.read().getJSONObject("enrollments").getJSONObject(uid)
         check(SafeEntryMethod.fromStored(entry.optString("entryMethod")) == SafeEntryMethod.DEVICE_LOCK)
         return entry.getJSONObject("deviceLockGrant")
     }
 
-    // Creates a device-lock enrollment while keeping an optional backup app PIN.
+    /**
+     * Creates a device-lock enrollment while keeping an optional backup app PIN.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     * @param grant Grant supplied to [enrollDeviceLock].
+     * @return The resulting [DeviceEnrollment] for enroll device lock.
+     */
     internal fun enrollDeviceLock(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -136,7 +174,15 @@ class DeviceStore(
         )
     }
 
-    // Preserve the other configured method when changing the preference or replacing a PIN.
+    /**
+     * Preserve the other configured method when changing the preference or replacing a PIN.
+     *
+     * @param expected Expected supplied to [updateSafeEntry].
+     * @param method Optional method supplied to [updateSafeEntry].
+     * @param pin User-entered PIN string, or null when not provided.
+     * @param grant Optional grant supplied to [updateSafeEntry].
+     * @return The resulting [DeviceEnrollment] for update safe entry.
+     */
     internal fun updateSafeEntry(
         expected: DeviceEnrollment,
         method: SafeEntryMethod?,
@@ -160,7 +206,13 @@ class DeviceStore(
         return checkNotNull(updated)
     }
 
-    // Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
+    /**
+     * Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     * @return The resulting [DeviceEnrollment] for enroll without PIN.
+     */
     fun enrollWithoutPin(identity: AccountIdentity, profile: UserProfile): DeviceEnrollment {
         require(profile.role != AccountRole.USER)
         vault.update { root ->
@@ -174,7 +226,11 @@ class DeviceStore(
         return DeviceEnrollment(identity.uid, "", profile.role, hasAppPin = false)
     }
 
-    // Deletes the account's backup PIN while leaving its device-lock enrollment unchanged.
+    /**
+     * Deletes the account's backup PIN while leaving its device-lock enrollment unchanged.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun removePin(uid: String) {
         vault.update { root ->
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
@@ -186,7 +242,14 @@ class DeviceStore(
         }
     }
 
-    // Verify only the active User enrollment and count failures here; SessionAccess handles routing after the result.
+    /**
+     * Verify only the active User enrollment and count failures here; SessionAccess handles routing after the result.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param pin User-entered PIN string.
+     * @param now Current epoch timestamp in milliseconds.
+     * @return The resulting [PinResult] instance.
+     */
     fun verify(uid: String, pin: String, now: Long = System.currentTimeMillis()): PinResult {
         require(InputPolicy.validPin(pin))
         var result: PinResult = PinResult.Rejected(0)
@@ -228,11 +291,21 @@ class DeviceStore(
         return result
     }
 
-    // Reads the private profile saved for this account on the phone.
+    /**
+     * Reads the private profile saved for this account on the phone.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [UserProfile] instance.
+     */
     fun profile(uid: String): UserProfile =
         UserProfile.fromJson(vault.read().getJSONObject("profiles").getJSONObject(uid))
 
-    // Loads the profile, failed PIN attempts, and pending-sync state together.
+    /**
+     * Loads the profile, failed PIN attempts, and pending-sync state together.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [Triple] for unlock snapshot.
+     */
     fun unlockSnapshot(uid: String): Triple<UserProfile, List<FailedAttempt>, Boolean> {
         val root = vault.read()
         val profile = UserProfile.fromJson(root.getJSONObject("profiles").getJSONObject(uid))
@@ -241,7 +314,14 @@ class DeviceStore(
         return Triple(profile, attempts, pending)
     }
 
-    // Replaces the phone's saved copy of an account profile.
+    /**
+     * Replaces the phone's saved copy of an account profile.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param profile Account profile details.
+     * @param pending Whether to apply pending.
+     * @param audit Optional audit supplied to [cacheProfile].
+     */
     fun cacheProfile(
         uid: String,
         profile: UserProfile,
@@ -255,7 +335,14 @@ class DeviceStore(
         audit?.let { recordSettings(uid, it) }
     }
 
-    // Saves the discreet trigger phrase and whether matching should ignore letter case.
+    /**
+     * Saves the discreet trigger phrase and whether matching should ignore letter case.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param profile Account profile details.
+     * @param pending Whether to apply pending.
+     * @param audit Optional audit supplied to [updateTrigger].
+     */
     fun updateTrigger(
         uid: String,
         profile: UserProfile,
@@ -271,11 +358,21 @@ class DeviceStore(
         audit?.let { recordSettings(uid, it) }
     }
 
-    // Reports whether this profile still needs to be uploaded.
+    /**
+     * Reports whether this profile still needs to be uploaded.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting pending sync.
+     */
     fun pendingSync(uid: String) =
         vault.read().optJSONObject("pendingSync")?.optBoolean(uid) ?: false
 
-    // Returns the chats this account archived on this phone.
+    /**
+     * Returns the chats this account archived on this phone.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting archived conversation IDs items.
+     */
     fun archivedConversationIds(uid: String): Set<String> {
         val rows = vault.read().optJSONObject("archivedConversations")?.optJSONArray(uid)
             ?: return emptySet()
@@ -283,7 +380,13 @@ class DeviceStore(
             .toSet()
     }
 
-    // Adds or removes one chat from the phone's archived list.
+    /**
+     * Adds or removes one chat from the phone's archived list.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param archived Whether to apply archived.
+     */
     fun setConversationArchived(uid: String, conversationId: String, archived: Boolean) {
         require(conversationId.isNotBlank() && conversationId.length <= 160)
         vault.update { root ->
@@ -297,7 +400,12 @@ class DeviceStore(
         }
     }
 
-    // Returns completed chats this account chose to show in its regular chat list on this phone.
+    /**
+     * Returns completed chats this account chose to show in its regular chat list on this phone.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting restored closed conversation IDs items.
+     */
     fun restoredClosedConversationIds(uid: String): Set<String> {
         val rows = vault.read().optJSONObject("restoredClosedConversations")?.optJSONArray(uid)
             ?: return emptySet()
@@ -305,6 +413,12 @@ class DeviceStore(
             .toSet()
     }
 
+    /**
+     * Retains conversation preferences.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param visibleIds Collection of visible IDs values to process.
+     */
     internal fun retainConversationPreferences(uid: String, visibleIds: Set<String>) {
         vault.update { root ->
             for (key in listOf("archivedConversations", "restoredClosedConversations")) {
@@ -316,7 +430,13 @@ class DeviceStore(
         }
     }
 
-    // Changes only where a completed chat is displayed; it never reopens its completed ticket.
+    /**
+     * Changes only where a completed chat is displayed; it never reopens its completed ticket.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param restored Whether to apply restored.
+     */
     fun setClosedConversationRestored(uid: String, conversationId: String, restored: Boolean) {
         require(conversationId.isNotBlank() && conversationId.length <= 160)
         vault.update { root ->
@@ -330,7 +450,12 @@ class DeviceStore(
         }
     }
 
-    // Loads the private contact notes needed by app security.
+    /**
+     * Loads the private contact notes needed by app security.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return Map containing the resulting private contact notes entries.
+     */
     fun privateContactNotes(uid: String): Map<String, PrivateContactNote> {
         val rows = vault.read().optJSONObject("privateContactNotes")?.optJSONObject(uid)
             ?: return emptyMap()
@@ -341,7 +466,14 @@ class DeviceStore(
         }.toMap()
     }
 
-    // Saves the private contact note so app security can load it again.
+    /**
+     * Saves the private contact note so app security can load it again.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param targetUid Firebase UID of the target account.
+     * @param username Account username.
+     * @param text Text string to display, parse, or send.
+     */
     fun savePrivateContactNote(uid: String, targetUid: String, username: String, text: String) {
         val body = text.trim()
         require(targetUid.isNotBlank() && targetUid != uid && targetUid.length <= 160)
@@ -354,17 +486,32 @@ class DeviceStore(
         }
     }
 
-    // Saves when this phone last downloaded the account's history.
+    /**
+     * Saves when this phone last downloaded the account's history.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun markSynced(uid: String) {
         vault.update { it.child("pendingSync").put(uid, false) }
     }
 
-    // Loads the failed private-entry attempts for this account.
+    /**
+     * Loads the failed private-entry attempts for this account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting attempts items.
+     */
     fun attempts(uid: String): List<FailedAttempt> {
         return attemptsFrom(vault.read(), uid)
     }
 
-    // Parses failed PIN attempts from the encrypted file.
+    /**
+     * Parses failed PIN attempts from the encrypted file.
+     *
+     * @param root Root JSON object or directory being read or updated.
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting attempts from items.
+     */
     private fun attemptsFrom(root: JSONObject, uid: String): List<FailedAttempt> {
         val entries = root.optJSONObject("attempts")?.optJSONArray(uid) ?: JSONArray()
         return (0 until entries.length()).map { index ->
@@ -373,37 +520,98 @@ class DeviceStore(
         }.asReversed()
     }
 
-    // Delegate activity storage so PIN/account state remains isolated from history merging.
+    /**
+     * Delegate activity storage so PIN/account state remains isolated from history merging.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param event Sensor, UI, or lifecycle event being processed.
+     */
     fun recordSettings(uid: String, event: SettingsEvent) = histories.recordSettings(uid, event)
-    // Adds one account-setting change to private activity history.
+    /**
+     * Adds one account-setting change to private activity history.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting settings history.
+     */
     fun settingsHistory(uid: String) = histories.settingsHistory(uid)
-    // Records a discreet trigger change without saving the trigger text.
+    /**
+     * Records a discreet trigger change without saving the trigger text.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param event Sensor, UI, or lifecycle event being processed.
+     */
     fun recordTrigger(uid: String, event: TriggerEvent) = histories.recordTrigger(uid, event)
-    // Loads the saved discreet-trigger history.
+    /**
+     * Loads the saved discreet-trigger history.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting trigger history.
+     */
     fun triggerHistory(uid: String) = histories.triggerHistory(uid)
-    // Records when a cover app accepted or rejected a trigger attempt.
+    /**
+     * Records when a cover app accepted or rejected a trigger attempt.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [recordTriggerAttempt].
+     * @param accepted Whether to apply accepted.
+     */
     fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) =
         histories.recordTriggerAttempt(uid, id, accepted)
 
-    // Encrypts and saves one private note or incident entry.
+    /**
+     * Encrypts and saves one private note or incident entry.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param entry Entry supplied to [savePrivateEntry].
+     */
     fun savePrivateEntry(uid: String, entry: PrivateEntry) = histories.savePrivateEntry(uid, entry)
-    // Loads private notes and incidents that have not expired.
+    /**
+     * Loads private notes and incidents that have not expired.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting private entries.
+     */
     fun privateEntries(uid: String) = histories.privateEntries(uid)
-    // Permanently removes private entries whose trash timer has ended.
+    /**
+     * Permanently removes private entries whose trash timer has ended.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param now Current epoch timestamp in milliseconds.
+     * @return The resulting purge expired private entries.
+     */
     fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()) =
         histories.purgeExpiredPrivateEntries(uid, now)
 
-    // Loads history records that still need cloud sync.
+    /**
+     * Loads history records that still need cloud sync.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting pending history.
+     */
     fun pendingHistory(uid: String) = histories.pendingHistory(uid)
-    // Marks uploaded history records as synced on this phone.
+    /**
+     * Marks uploaded history records as synced on this phone.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param record Record supplied to [markHistorySynced].
+     */
     fun markHistorySynced(uid: String, record: HistoryRecord) =
         histories.markHistorySynced(uid, record)
 
-    // Merges downloaded history with this phone's encrypted copy.
+    /**
+     * Merges downloaded history with this phone's encrypted copy.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param records Collection of records values to process.
+     */
     fun mergeHistory(uid: String, records: List<HistoryRecord>) =
         histories.mergeHistory(uid, records)
 
-    // Removes this account's saved enrollment and private phone data.
+    /**
+     * Removes this account's saved enrollment and private phone data.
+     *
+     * @param expectedUid Optional expected user ID supplied to [forgetDevice].
+     */
     fun forgetDevice(expectedUid: String? = null) {
         vault.update {
             if (expectedUid == null || it.optString("activeUid") == expectedUid) it.remove("activeUid")
@@ -417,17 +625,44 @@ class DeviceStore(
 object SecretVerifier {
     private const val PASSWORD_ITERATIONS = 600_000
     private const val PIN_ITERATIONS = 120_000
-    // Creates a salted PIN verifier without storing the PIN itself.
+    /**
+     * Creates a salted PIN verifier without storing the PIN itself.
+     *
+     * @param secret Secret supplied to [create].
+     * @return The resulting create string.
+     */
     fun create(secret: String): String = encode(secret, PASSWORD_ITERATIONS)
 
-    // The PIN stays in the Keystore-encrypted phone vault; fewer rounds make local unlock quick.
+    /**
+     * The PIN stays in the Keystore-encrypted phone vault; fewer rounds make local unlock quick.
+     *
+     * @param pin User-entered PIN string.
+     * @return The resulting create PIN string.
+     */
     fun createPin(pin: String): String = encode(pin, PIN_ITERATIONS)
+    /**
+     * Creates trigger.
+     *
+     * @param normalized Normalized supplied to [createTrigger].
+     * @return The resulting create trigger string.
+     */
     fun createTrigger(normalized: String): String = encode(normalized, PASSWORD_ITERATIONS)
-    // Detects older PIN records that need stronger hashing after a valid sign-in.
+    /**
+     * Detects older PIN records that need stronger hashing after a valid sign-in.
+     *
+     * @param encoded Encoded supplied to [pinNeedsUpgrade].
+     * @return The resulting PIN needs upgrade.
+     */
     fun pinNeedsUpgrade(encoded: String) =
         encoded.substringBefore(':').toIntOrNull()?.let { it > PIN_ITERATIONS } ?: false
 
-    // Formats a PIN or trigger verifier for encrypted storage.
+    /**
+     * Formats a PIN or trigger verifier for encrypted storage.
+     *
+     * @param secret Secret supplied to [encode].
+     * @param iterations Iterations supplied to [encode].
+     * @return The resulting encode string.
+     */
     private fun encode(secret: String, iterations: Int): String {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         return "$iterations:${Base64.getEncoder().encodeToString(salt)}:${
@@ -435,7 +670,13 @@ object SecretVerifier {
         }"
     }
 
-    // Checks entered text against a saved verifier in constant time.
+    /**
+     * Checks entered text against a saved verifier in constant time.
+     *
+     * @param secret Secret supplied to [matches].
+     * @param encoded Encoded supplied to [matches].
+     * @return `true` if matches, or `false` otherwise.
+     */
     fun matches(secret: String, encoded: String): Boolean = runCatching {
         val parts = encoded.split(':')
         require(parts.size == 3)
@@ -447,7 +688,14 @@ object SecretVerifier {
         )
     }.getOrDefault(false)
 
-    // Creates the derive that protects app security.
+    /**
+     * Creates the derive that protects app security.
+     *
+     * @param secret Secret supplied to [derive].
+     * @param salt Raw salt byte array.
+     * @param iterations Iterations supplied to [derive].
+     * @return The resulting [ByteArray] instance.
+     */
     private fun derive(secret: String, salt: ByteArray, iterations: Int): ByteArray {
         val chars = secret.toCharArray()
         val spec = PBEKeySpec(chars, salt, iterations, 256)
@@ -462,65 +710,162 @@ object SecretVerifier {
 
 // Change username, password, PIN, trigger, or DOB limits here, then update the matching screen message and test.
 object InputPolicy {
-    // Trims and lowercases a username before the app checks or stores it.
+    /**
+     * Trims and lowercases a username before the app checks or stores it.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
-    // Makes sure the username contains at least one letter.
+    /**
+     * Makes sure the username contains at least one letter.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting username has letter.
+     */
     fun usernameHasLetter(value: String) = value.any { it in 'a'..'z' || it in 'A'..'Z' }
-    // Accepts only a new username with 8–24 letters, numbers, or underscores.
+    /**
+     * Accepts only a new username with 8–24 letters, numbers, or underscores.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun validUsername(value: String) =
         username(value).matches(Regex("[a-z0-9_]{8,24}")) && usernameHasLetter(value)
 
-    // Existing accounts created under the former four-character minimum remain able to sign in.
+    /**
+     * Existing accounts created under the former four-character minimum remain able to sign in.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
-    // Keeps passwords between 8 and 24 characters.
+    /**
+     * Keeps passwords between 8 and 24 characters.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting password has valid length.
+     */
     fun passwordHasValidLength(value: String) = value.length in 8..24
-    // Makes sure the password contains at least one letter.
+    /**
+     * Makes sure the password contains at least one letter.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting password has letter.
+     */
     fun passwordHasLetter(value: String) = value.any(Char::isLetter)
-    // Makes sure the password contains at least one number.
+    /**
+     * Makes sure the password contains at least one number.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting password has number.
+     */
     fun passwordHasNumber(value: String) = value.any(Char::isDigit)
-    // Makes sure the password contains a symbol that is not a space.
+    /**
+     * Makes sure the password contains a symbol that is not a space.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting password has special character.
+     */
     fun passwordHasSpecialCharacter(value: String) =
         value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
 
-    // Accepts a password only when every length and character rule passes.
+    /**
+     * Accepts a password only when every length and character rule passes.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting valid password.
+     */
     fun validPassword(value: String) = passwordHasValidLength(value) && passwordHasLetter(value) &&
             passwordHasNumber(value) && passwordHasSpecialCharacter(value)
 
-    // Stops a password from containing the account username.
+    /**
+     * Stops a password from containing the account username.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param accountUsername Account username supplied to [passwordExcludesUsername].
+     * @return `true` if password excludes username, or `false` otherwise.
+     */
     fun passwordExcludesUsername(value: String, accountUsername: String): Boolean =
         username(accountUsername).let { it.isNotEmpty() && !value.contains(it, ignoreCase = true) }
 
-    // Applies the password rules and also rejects the account username inside it.
+    /**
+     * Applies the password rules and also rejects the account username inside it.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param accountUsername Account username supplied to [validAccountPassword].
+     * @return The resulting valid account password.
+     */
     fun validAccountPassword(value: String, accountUsername: String) =
         validPassword(value) && passwordExcludesUsername(value, accountUsername)
 
-    // Accepts only a 4–6 digit private-entry PIN.
+    /**
+     * Accepts only a 4–6 digit private-entry PIN.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting valid PIN.
+     */
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
-    // Checks whether cover input matches the saved discreet trigger phrase.
+    /**
+     * Checks whether cover input matches the saved discreet trigger phrase.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun validTrigger(value: String) = value.trim().length in 3..64
-    // Creates the trigger hash that protects app security.
+    /**
+     * Creates the trigger hash that protects app security.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting trigger hash string.
+     */
     fun triggerHash(value: String): String = SecretVerifier.createTrigger(normalizeTrigger(value))
 
+    /**
+     * Computes matches trigger.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param stored Stored supplied to [matchesTrigger].
+     * @return `true` if matches trigger, or `false` otherwise.
+     */
     fun matchesTrigger(value: String, stored: String): Boolean {
         if (!validTrigger(value) || stored.isBlank()) return false
         return if (':' in stored) SecretVerifier.matches(normalizeTrigger(value), stored)
         else unsaltedTriggerHash(value) == stored || legacyTriggerHash(value) == stored
     }
 
+    /**
+     * Normalizes trigger.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting normalize trigger.
+     */
     private fun normalizeTrigger(value: String) = value.lowercase(Locale.ROOT).filterNot(Char::isWhitespace)
 
+    /**
+     * Computes unsalted trigger hash.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting unsalted trigger hash string.
+     */
     private fun unsaltedTriggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(
             normalizeTrigger(value).toByteArray(Charsets.UTF_8)
         )
         .joinToString("") { "%02x".format(it) }
 
-    // Creates the legacy trigger hash that protects app security.
+    /**
+     * Creates the legacy trigger hash that protects app security.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting legacy trigger hash string.
+     */
     fun legacyTriggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.trim().lowercase(Locale.ROOT).toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 
-    // Accepts real birth dates from today back to 130 years ago.
+    /**
+     * Accepts real birth dates from today back to 130 years ago.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if valid date of birth, or `false` otherwise.
+     */
     fun validDob(value: String): Boolean = runCatching {
         val date = LocalDate.parse(value)
         date <= LocalDate.now() && date >= LocalDate.now().minusYears(130)
@@ -529,7 +874,11 @@ object InputPolicy {
 
 // Five failures trigger the cooldown in DeviceStore and close the private screen.
 data class GateState(val failures: Int = 0) {
-    // Returns true when the failed-PIN limit has locked private entry.
+    /**
+     * Returns true when the failed-PIN limit has locked private entry.
+     *
+     * @return The resulting [GateState] instance.
+     */
     fun failed(): GateState =
         GateState(if (failures in 0..3) failures + 1 else if (failures == 4) 5 else 1)
 }
@@ -539,9 +888,23 @@ object IdlePolicy {
     const val MAX_TIMEOUT_SECONDS = 420
     val timeoutOptions = (1..7).map { it * 60 }
 
+    /**
+     * Normalizes timeout.
+     *
+     * @param seconds Seconds supplied to [normalizeTimeout].
+     * @return The computed normalize timeout numeric value.
+     */
     fun normalizeTimeout(seconds: Int): Int =
         timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }
 
+    /**
+     * Computes countdown.
+     *
+     * @param elapsedMs Duration or timestamp for elapsed, in milliseconds.
+     * @param warningDurationMs Duration or timestamp for warning duration, in milliseconds.
+     * @param idleDurationMs Duration or timestamp for idle duration, in milliseconds.
+     * @return The computed countdown number, or `null` if unavailable.
+     */
     fun countdown(elapsedMs: Long, warningDurationMs: Long = 15_000L, idleDurationMs: Long = 60_000L): Int? {
         val lockAt = idleDurationMs.coerceIn(DEFAULT_TIMEOUT_SECONDS * 1_000L, MAX_TIMEOUT_SECONDS * 1_000L)
         val warningAt = lockAt - warningDurationMs.coerceIn(15_000L, lockAt)
@@ -559,17 +922,31 @@ enum class SafeEntryMethod {
     APP_PIN, DEVICE_LOCK;
 
     companion object {
-        // Older enrollments always used a separate app PIN.
+        /**
+         * Older enrollments always used a separate app PIN.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting [SafeEntryMethod] for from stored.
+         */
         fun fromStored(value: String): SafeEntryMethod =
             entries.firstOrNull { it.name == value } ?: APP_PIN
 
-        // Recommends an app PIN when another person may know the phone's lock code.
+        /**
+         * Recommends an app PIN when another person may know the phone's lock code.
+         *
+         * @param abuserKnowsDevicePin Whether to apply abuser knows device PIN.
+         * @return The resulting recommended.
+         */
         fun recommended(abuserKnowsDevicePin: Boolean) =
             if (abuserKnowsDevicePin) APP_PIN else DEVICE_LOCK
     }
 }
 
-// A saved app PIN is an optional second route even when device lock stays preferred.
+/**
+ * A saved app PIN is an optional second route even when device lock stays preferred.
+ *
+ * @return `true` if allows app PIN, or `false` otherwise.
+ */
 internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin
 
 // All signed-in roles: defines PIN and device-lock settings.

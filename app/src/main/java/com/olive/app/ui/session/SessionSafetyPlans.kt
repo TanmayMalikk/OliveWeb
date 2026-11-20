@@ -9,6 +9,10 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
@@ -41,6 +45,18 @@ import java.util.UUID
 import android.os.SystemClock
 
 
+internal data class SafetyPlansUiState(
+    val plan: SafetyPlan? = null,
+    val error: Int? = null,
+    val saving: Int = 0,
+    val syncing: Boolean = false,
+    val loadingPlan: Boolean = true,
+    val loadingAccess: Boolean = true,
+    val consultations: List<SafetyConsultation> = emptyList(),
+    val sharedPlans: List<SharedSafetyPlan> = emptyList(),
+    val available: Boolean = true,
+)
+
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(
     private val runtime: SessionRuntime,
@@ -61,24 +77,46 @@ internal class SessionSafetyPlans(
     private var foregroundSync: Job? = null
     private val foregroundSyncRequests = Channel<Unit>(Channel.CONFLATED)
     private var immediateSyncRequested = false
-    var plan by mutableStateOf<SafetyPlan?>(null)
-        private set
-    var error by mutableStateOf<Int?>(null)
-        private set
-    var saving by mutableIntStateOf(0)
-        private set
-    var syncing by mutableStateOf(false)
-        private set
-    var loadingPlan by mutableStateOf(true)
-        private set
-    var loadingAccess by mutableStateOf(true)
-        private set
-    var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
-        private set
-    var sharedPlans by mutableStateOf<List<SharedSafetyPlan>>(emptyList())
-        private set
-    var available by mutableStateOf(true)
-        private set
+    private val consultationRefreshMutex = Mutex()
+    private var consultationsSession: Pair<String, Long>? = null
+    private var consultationsRefreshedAt = 0L
+    private var accessRevision = 0
+
+    private val uiStateFlow = MutableStateFlow(SafetyPlansUiState())
+    val uiState: StateFlow<SafetyPlansUiState> = uiStateFlow.asStateFlow()
+    private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
+
+    private inline fun updateUiState(transform: (SafetyPlansUiState) -> SafetyPlansUiState) {
+        uiStateSnapshot = uiStateFlow.updateAndGet(transform)
+    }
+
+    var plan: SafetyPlan?
+        get() = uiStateSnapshot.plan
+        private set(value) = updateUiState { it.copy(plan = value) }
+    var error: Int?
+        get() = uiStateSnapshot.error
+        private set(value) = updateUiState { it.copy(error = value) }
+    var saving: Int
+        get() = uiStateSnapshot.saving
+        private set(value) = updateUiState { it.copy(saving = value) }
+    var syncing: Boolean
+        get() = uiStateSnapshot.syncing
+        private set(value) = updateUiState { it.copy(syncing = value) }
+    var loadingPlan: Boolean
+        get() = uiStateSnapshot.loadingPlan
+        private set(value) = updateUiState { it.copy(loadingPlan = value) }
+    var loadingAccess: Boolean
+        get() = uiStateSnapshot.loadingAccess
+        private set(value) = updateUiState { it.copy(loadingAccess = value) }
+    var consultations: List<SafetyConsultation>
+        get() = uiStateSnapshot.consultations
+        internal set(value) = updateUiState { it.copy(consultations = value) }
+    var sharedPlans: List<SharedSafetyPlan>
+        get() = uiStateSnapshot.sharedPlans
+        private set(value) = updateUiState { it.copy(sharedPlans = value) }
+    var available: Boolean
+        get() = uiStateSnapshot.available
+        private set(value) = updateUiState { it.copy(available = value) }
 
     init {
         runtime.scope.launch {
@@ -88,6 +126,9 @@ internal class SessionSafetyPlans(
         }
     }
 
+    /**
+     * Starts observing access.
+     */
     fun observeAccess() {
         val actor = runtime.coverAccountId ?: return
         if (runtime.localMode || accessActor == actor) return
@@ -101,6 +142,11 @@ internal class SessionSafetyPlans(
         }
     }
 
+    /**
+     * Loads cached access lists.
+     *
+     * @param actor Actor supplied to [loadCachedAccessLists].
+     */
     private suspend fun loadCachedAccessLists(actor: String) {
         val cached = withContext(Dispatchers.IO) { accessIndex.read(actor) }
         if (!authorized() || actor != runtime.coverAccountId) return
@@ -109,7 +155,11 @@ internal class SessionSafetyPlans(
         sharedPlans = cached.sharedPlans
     }
 
-    // Allows plan work only while the signed-in role is on a screen that may use safety plans.
+    /**
+     * Allows plan work only while the signed-in role is on a screen that may use safety plans.
+     *
+     * @return The resulting authorized.
+     */
     private fun authorized() = runtime.enrollment != null &&
             ((runtime.state.accountRole in setOf(
                 AccountRole.USER,
@@ -118,12 +168,24 @@ internal class SessionSafetyPlans(
                     (runtime.state.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
                             runtime.state.screen == SessionScreen.Portal))
 
-    // Rejects old background results after the account, plan owner, or screen session changes.
+    /**
+     * Rejects old background results after the account, plan owner, or screen session changes.
+     *
+     * @param actor Actor supplied to [current].
+     * @param owner Owner supplied to [current].
+     * @param token Authentication, push notification, or session token.
+     * @return The resulting current.
+     */
     private fun current(actor: String, owner: String, token: Int) =
         authorized() && runtime.coverAccountId == actor && activeOwner == owner && generation == token
 
-    // Clears private plan data when its screen closes; a different screen cannot clear the active one.
-    fun close(screenLease: Any? = null) {
+    /**
+     * Clears private plan data when its screen closes; a different screen cannot clear the active one.
+     *
+     * @param screenLease Optional screen lease supplied to [close].
+     * @param preserveAdminIndex Whether to preserve admin index.
+     */
+    fun close(screenLease: Any? = null, preserveAdminIndex: Boolean = false) {
         if (screenLease != null && lease !== screenLease) return
         planListener?.remove()
         foregroundSync?.cancel()
@@ -142,7 +204,11 @@ internal class SessionSafetyPlans(
         error = null
         saving =
             0
-        if (screenLease == null) {
+        if (screenLease == null && !(preserveAdminIndex && runtime.state.accountRole == AccountRole.ADMIN &&
+                runtime.state.screen == SessionScreen.Portal)) {
+            accessRevision++
+            consultationsSession = null
+            consultationsRefreshedAt = 0L
             loadingAccess = true
             consultations = emptyList()
             sharedPlans = emptyList()
@@ -153,7 +219,14 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
+    /**
+     * Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param ownerName Owner name supplied to [open].
+     * @param defaults Key-value mapping of defaults entries.
+     * @param screenLease Screen lease supplied to [open].
+     */
     suspend fun open(
         ownerUid: String,
         ownerName: String,
@@ -238,7 +311,12 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Applies an allowed field change locally and saves it for background sync.
+    /**
+     * Applies an allowed field change locally and saves it for background sync.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @param value Input value to store, parse, or format.
+     */
     fun edit(key: String, value: String) {
         val old = plan ?: return
         if (!authorized() || runtime.state.accountRole == AccountRole.SAFE_CONTACT || key !in SAFETY_FIELD_KEYS || value.length > 4000) return
@@ -249,7 +327,12 @@ internal class SessionSafetyPlans(
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
 
-    // Resolves a sync conflict by keeping either the local text or the newer server text.
+    /**
+     * Resolves a sync conflict by keeping either the local text or the newer server text.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @param keepMine Whether to keep mine.
+     */
     fun resolve(key: String, keepMine: Boolean) {
         val old = plan ?: return
         if (runtime.state.accountRole != AccountRole.USER) return
@@ -293,7 +376,11 @@ internal class SessionSafetyPlans(
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
 
-    // Requests or ends staff help for the account owner's safety plan.
+    /**
+     * Requests or ends staff help for the account owner's safety plan.
+     *
+     * @param stop Whether to apply stop.
+     */
     fun consult(stop: Boolean = false) {
         if (runtime.localMode) {
             error = R.string.safety_account_required
@@ -347,6 +434,11 @@ internal class SessionSafetyPlans(
         }
     }
 
+    /**
+     * Opens consultation.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     */
     fun openConsultation(conversationId: String) {
         val actor = runtime.coverAccountId ?: return
         if (conversationId.isBlank()) return
@@ -366,6 +458,12 @@ internal class SessionSafetyPlans(
         }
     }
 
+    /**
+     * Shares consultation documents.
+     *
+     * @param actor Actor supplied to [shareConsultationDocuments].
+     * @param updated Updated supplied to [shareConsultationDocuments].
+     */
     private fun shareConsultationDocuments(actor: String, updated: SafetyPlan) {
         val source = runtime.safetyDocumentRepository ?: return
         val ids = updated.fields.filterKeys { it.endsWith("_documents") }.values.flatMap { field ->
@@ -388,7 +486,11 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Verifies the selected friends, syncs pending edits, and shares the plan with up to ten contacts.
+    /**
+     * Verifies the selected friends, syncs pending edits, and shares the plan with up to ten contacts.
+     *
+     * @param friends List of friend records.
+     */
     fun shareWithContacts(friends: List<Friend>) {
         if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode || friends.size > 10) return
         if (plan == null) return
@@ -419,7 +521,11 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Adds one already-approved safe contact to the user's staff support conversation.
+    /**
+     * Adds one already-approved safe contact to the user's staff support conversation.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun setSupportContact(uid: String) {
         if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode) return
         val old = plan ?: return
@@ -448,7 +554,9 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Loads the plans that other users currently share with this safe contact.
+    /**
+     * Loads the plans that other users currently share with this safe contact.
+     */
     fun refreshSharedPlans() {
         if (!authorized() || runtime.state.accountRole != AccountRole.SAFE_CONTACT || runtime.localMode) return
         val actor = runtime.coverAccountId
@@ -475,7 +583,11 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Loads the staff/admin encryption identities that can read attachments on the user's own plan.
+    /**
+     * Loads the staff/admin encryption identities that can read attachments on the user's own plan.
+     *
+     * @return Map containing the resulting media recipients entries.
+     */
     suspend fun mediaRecipients(): Map<String, String> {
         val actor = runtime.coverAccountId ?: return emptyMap()
         if (!authorized() || runtime.state.accountRole != AccountRole.USER || activeOwner != actor || runtime.localMode) {
@@ -484,10 +596,21 @@ internal class SessionSafetyPlans(
         return repository.mediaRecipients()
     }
 
+    /**
+     * Starts observing recipient devices.
+     *
+     * @param usernames Collection of usernames values to process.
+     * @param onChange Callback invoked when the value or observed state changes.
+     * @return The resulting observe recipient devices.
+     */
     fun observeRecipientDevices(usernames: Collection<String>, onChange: () -> Unit) =
         repository.observeRecipientDevices(usernames, onChange)
 
-    // Uploads publish their ID after the encrypted file is available in the owner's document list.
+    /**
+     * Uploads publish their ID after the encrypted file is available in the owner's document list.
+     *
+     * @param documents Collection of documents values to process.
+     */
     fun attachPublishedDocuments(documents: List<SafetyDocument>) {
         val draft = plan ?: return
         val fields = draft.fields.filterKeys { it.endsWith("_documents") }.mapValues { (key, field) ->
@@ -496,7 +619,11 @@ internal class SessionSafetyPlans(
         fields.forEach { (key, value) -> edit(key, value) }
     }
 
-    // Writes one plan change in order, then asks the durable worker to sync it when online.
+    /**
+     * Writes one plan change in order, then asks the durable worker to sync it when online.
+     *
+     * @param change Function used to transform or provide change.
+     */
     private fun persist(change: (SafetyPlan) -> SafetyPlan) {
         if (!authorized()) return
         val actor = runtime.coverAccountId ?: return
@@ -532,6 +659,14 @@ internal class SessionSafetyPlans(
         }
     }
 
+    /**
+     * Requests foreground sync.
+     *
+     * @param actor Actor supplied to [requestForegroundSync].
+     * @param owner Owner supplied to [requestForegroundSync].
+     * @param token Authentication, push notification, or session token.
+     * @param immediate Whether to apply immediate.
+     */
     private fun requestForegroundSync(actor: String, owner: String, token: Int, immediate: Boolean = false) {
         if (immediate) immediateSyncRequested = true
         foregroundSyncRequests.trySend(Unit)
@@ -592,7 +727,9 @@ internal class SessionSafetyPlans(
         coordinator.start()
     }
 
-    // Flushes the latest locally durable edit when a field loses focus or a discrete control changes.
+    /**
+     * Flushes the latest locally durable edit when a field loses focus or a discrete control changes.
+     */
     fun flushEdits() {
         if (runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
@@ -600,12 +737,19 @@ internal class SessionSafetyPlans(
         requestForegroundSync(actor, owner, generation, immediate = true)
     }
 
-    // Saves the current draft again after a local storage failure.
+    /**
+     * Saves the current draft again after a local storage failure.
+     */
     fun retrySave() {
         val draft = plan ?: return
         persist { saved -> saved.copy(fields = draft.fields, shareAction = draft.shareAction) }
     }
 
+    /**
+     * Computes flush consultation.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     */
     suspend fun flushConsultation(conversationId: String) {
         val actor = runtime.coverAccountId ?: return
         val draft = plan?.takeIf { it.consultationConversationId == conversationId } ?: return
@@ -620,7 +764,9 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Syncs queued changes, reloads the saved plan, and removes a shared copy when access is revoked.
+    /**
+     * Syncs queued changes, reloads the saved plan, and removes a shared copy when access is revoked.
+     */
     suspend fun refresh() {
         if (error == R.string.safety_storage_error) return
         if (!authorized() || saving > 0 || !sync.tryLock()) return
@@ -670,15 +816,24 @@ internal class SessionSafetyPlans(
         }
     }
 
-    // Loads assigned consultations and the staff member's availability from local and cloud storage.
-    suspend fun refreshConsultations() {
-        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
-        val actor = runtime.coverAccountId ?: return
-        // Turn an unexpected refresh consultations failure into a readable message.
-        loadingAccess = true
+    /**
+     * Loads assigned consultations and the staff member's availability from local and cloud storage.
+     *
+     * @param force Whether to apply force.
+     * @return The resulting refresh consultations.
+     */
+    suspend fun refreshConsultations(force: Boolean = true) = consultationRefreshMutex.withLock {
+        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return@withLock
+        val actor = runtime.coverAccountId ?: return@withLock
+        val session = actor to runtime.epoch
+        val revision = accessRevision
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force && consultationsSession == session && now - consultationsRefreshedAt < 90_000) return@withLock
+        // Once loaded, reconcile the index without replacing it with a skeleton.
+        loadingAccess = consultationsSession != session
         try {
             if (consultations.isEmpty()) loadCachedAccessLists(actor)
-            if (!hasValidatedInternetConnection(runtime.application)) return
+            if (!hasValidatedInternetConnection(runtime.application)) return@withLock
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
                 val cached = store.all(actor)
@@ -686,7 +841,9 @@ internal class SessionSafetyPlans(
                     .forEach { store.remove(actor, it.ownerUid) }
                 accessIndex.replaceConsultations(actor, result.first, result.second)
             }
-            if (authorized() && actor == runtime.coverAccountId) {
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) {
+                consultationsSession = session
+                consultationsRefreshedAt = android.os.SystemClock.elapsedRealtime()
                 available = result.first
                 consultations = result.second
                 error = null
@@ -694,13 +851,17 @@ internal class SessionSafetyPlans(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
-            if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) error = R.string.safety_sync_error
         } finally {
-            if (authorized() && actor == runtime.coverAccountId) loadingAccess = false
+            if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) loadingAccess = false
         }
     }
 
-    // Updates whether this staff member can receive new consultation requests.
+    /**
+     * Updates whether this staff member can receive new consultation requests.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun changeAvailability(value: Boolean) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
         val actor = runtime.coverAccountId

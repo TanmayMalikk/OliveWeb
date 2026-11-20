@@ -35,8 +35,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.compose.ui.text.font.FontWeight
 
-// Tap a range edge to choose its local calendar date first and clock time second.
-// UI sizing: date/time controls split the row evenly with 8dp gaps and 14x12dp button content padding.
+/**
+ * Tap a range edge to choose its local calendar date first and clock time second. UI sizing: date/time controls split the row evenly with 8dp gaps and 14x12dp button content padding.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format, or null when not provided.
+ * @param tag Tag supplied to [ActivityDateTimePicker].
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActivityDateTimePicker(
@@ -138,8 +144,11 @@ private fun ActivityDateTimePicker(
     }
 }
 
-// Activity stays grouped on the overview, then See more opens one searchable category at a time.
-// UI sizing/text: activity uses 24dp page padding, 14dp row gaps, 16dp cards, titleLarge sections, and bodySmall timestamps.
+/**
+ * Activity stays grouped on the overview, then See more opens one searchable category at a time. UI sizing/text: activity uses 24dp page padding, 14dp row gaps, 16dp cards, titleLarge sections, and bodySmall timestamps.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun ActivityHistory(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -151,7 +160,12 @@ internal fun ActivityHistory(session: SessionViewModel) {
     }
     var from by remember { mutableStateOf<Long?>(null) }
     var to by remember { mutableStateOf<Long?>(null) }
-    // Keeps history rows that fall inside the dates chosen by the user.
+    /**
+     * Keeps history rows that fall inside the dates chosen by the user.
+     *
+     * @param time Time supplied to [inRange].
+     * @return The resulting in range.
+     */
     fun inRange(time: Long) =
         (from == null || time >= from!!) && (to == null || time <= to!! + 59_999)
 
@@ -160,6 +174,13 @@ internal fun ActivityHistory(session: SessionViewModel) {
     val attempts = session.attempts.filter { inRange(it.timestamp) }
     val privacy = session.privacyHistory.filter { inRange(it.timestamp) }
     val selected = session.activityCategory
+    /**
+     * Computes visible.
+     *
+     * @param category Category supplied to [visible].
+     * @param rows Collection of rows values to process.
+     * @return The resulting visible.
+     */
     fun <T> visible(category: ActivityCategory, rows: List<T>) =
         if (selected == category) rows else rows.take(5)
 

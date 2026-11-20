@@ -45,7 +45,14 @@ private val PrivateEntryKind.cardPalette: EntryCardPalette
 
 
 
-// Shows trashed notes with restore and permanent-delete actions.
+/**
+ * Shows trashed notes with restore and permanent-delete actions.
+ *
+ * @param entries Collection of entries values to process.
+ * @param formatter Formatter supplied to [Trash].
+ * @param restore Action or callback executed for restore.
+ * @param close Action or callback executed for close.
+ */
 @Composable
 internal fun Trash(
     entries: List<PrivateEntry>, formatter: DateTimeFormatter,
@@ -148,7 +155,13 @@ internal fun Trash(
     }
 }
 
-// UI sizing/color: revision cards use 16dp padding, black outlines, soft olive badges, and small Muted timestamps.
+/**
+ * UI sizing/color: revision cards use 16dp padding, black outlines, soft olive badges, and small Muted timestamps.
+ *
+ * @param entry Entry supplied to [PrivateEntryEditLog].
+ * @param formatter Formatter supplied to [PrivateEntryEditLog].
+ * @param close Action or callback executed for close.
+ */
 @Composable
 internal fun PrivateEntryEditLog(
     entry: PrivateEntry,
@@ -258,7 +271,16 @@ internal fun PrivateEntryEditLog(
 // Safe-app users: shows the user’s private notes.
 
 
-// UI sizing/color: Trash cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
+/**
+ * UI sizing/color: Trash cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
+ *
+ * @param entry Entry supplied to [PrivateNoteCard].
+ * @param formatter Formatter supplied to [PrivateNoteCard].
+ * @param open Action or callback executed for open.
+ * @param pin User-entered PIN string.
+ * @param openLog Action or callback executed for open log.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun PrivateNoteCard(
     entry: PrivateEntry, formatter: DateTimeFormatter,

@@ -41,7 +41,11 @@ import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
-// Lists encrypted documents and provides upload, filter, open, and share actions.
+/**
+ * Lists encrypted documents and provides upload, filter, open, and share actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val uid = session.coverAccountId ?: return
@@ -224,7 +228,16 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     )
 }
 
-/** Keeps every document entry point on the same protected camera/media/file upload workflow. */
+/**
+ * Keeps every document entry point on the same protected camera/media/file upload workflow.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param visible Whether the UI component should be visible.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param tags Collection of tags values to process.
+ * @param onSelectExisting Callback invoked when select existing changes or occurs.
+ * @param onUploadStarted Callback invoked when upload started changes or occurs.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentUploadFlow(
@@ -245,6 +258,11 @@ internal fun SafetyDocumentUploadFlow(
             showOliveStorage = false
         }
     }
+    /**
+     * Finishes selection.
+     *
+     * @param uri Content or file URI identifying the selected local item, or null when not provided.
+     */
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         val uid = session.coverAccountId
@@ -263,6 +281,11 @@ internal fun SafetyDocumentUploadFlow(
         ActivityResultContracts.OpenDocument(),
         ::finishSelection,
     )
+    /**
+     * Launches protected picker.
+     *
+     * @param action Action or callback executed for action.
+     */
     fun launchProtectedPicker(action: () -> Unit) {
         onUploadStarted?.invoke()
         onDismiss()
@@ -390,7 +413,9 @@ internal fun SafetyDocumentUploadFlow(
     }
 }
 
-// user safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
+/**
+ * User safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
+ */
 @Composable
 private fun PreparingUploadCard() {
     val title = stringResource(R.string.documents_preparing_upload)
@@ -413,9 +438,14 @@ private fun PreparingUploadCard() {
     }
 }
 
-// Shows upload progress, errors, and retry controls for one pending file.
+/**
+ * Shows upload progress, errors, and retry controls for one pending file.
+ *
+ * @param upload Upload supplied to [PendingUploadCard].
+ * @param onRetry Callback invoked when retry changes or occurs.
+ */
 @Composable
-private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
+internal fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
     val waitingToRetry = upload.status == MediaTransferStatus.QUEUED && upload.error != null
     val retryable = failed || waitingToRetry

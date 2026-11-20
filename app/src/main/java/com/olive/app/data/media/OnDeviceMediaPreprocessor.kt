@@ -23,6 +23,14 @@ internal class OnDeviceMediaPreprocessor(
 ):MediaPreprocessor {
     private val folder=File(context.applicationContext.noBackupFilesDir,TEMP_FOLDER)
 
+    /**
+     * Processes the on device media preprocessor.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param mimeType MIME content type of the payload.
+     * @param kind Kind supplied to [process].
+     * @return The resulting [ProcessedMedia] instance.
+     */
     override suspend fun process(input:InputStream,mimeType:String,kind:MediaKind):ProcessedMedia =
         withContext(Dispatchers.IO) {
             val imageEligible=ImageCompressionPolicy.isEligible(mimeType,kind)
@@ -63,6 +71,13 @@ internal class OnDeviceMediaPreprocessor(
 
     private data class PreprocessedFile(val file:File,val mimeType:String,val fileExtension:String)
 
+    /**
+     * Copies bounded.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param target Target destination or output object to write to.
+     * @param maxBytes Maximum bytes supplied to [copyBounded].
+     */
     private fun copyBounded(input:InputStream,target:File,maxBytes:Long) {
         val buffer=ByteArray(BUFFER_BYTES)
         var total=0L
@@ -86,6 +101,11 @@ internal class OnDeviceMediaPreprocessor(
         }
     }
 
+    /**
+     * Purges stale files.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     */
     private fun purgeStaleFiles(now:Long=System.currentTimeMillis()) {
         folder.listFiles()?.asSequence()?.filter {
             it.isFile && TEMP_PREFIXES.any(it.name::startsWith) &&
@@ -93,6 +113,12 @@ internal class OnDeviceMediaPreprocessor(
         }?.forEach(File::delete)
     }
 
+    /**
+     * Computes normalized pass through mime.
+     *
+     * @param mimeType MIME content type of the payload.
+     * @return The resulting normalized pass through mime.
+     */
     private fun normalizedPassThroughMime(mimeType:String)=
         mimeType.substringBefore(';').trim().lowercase().ifBlank { "application/octet-stream" }
 
@@ -109,7 +135,14 @@ internal class OnDeviceMediaPreprocessor(
 
 /** Narrow, replaceable boundary between capture/OCR and authenticated encryption. */
 internal fun interface MediaPreprocessor {
-    /** Ownership of [input] transfers to the returned closeable result. */
+    /**
+     * Ownership of [input] transfers to the returned closeable result.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param mimeType MIME content type of the payload.
+     * @param kind Kind supplied to [process].
+     * @return The resulting [ProcessedMedia] instance.
+     */
     suspend fun process(input:InputStream,mimeType:String,kind:MediaKind):ProcessedMedia
 }
 
@@ -123,6 +156,12 @@ internal class ProcessedMedia(
     private val fileExtension:String?=null,
     private val cleanup:()->Unit={},
 ):Closeable {
+    /**
+     * Displays name.
+     *
+     * @param original Original supplied to [displayName].
+     * @return The resulting display name string.
+     */
     fun displayName(original:String):String {
         val extension=fileExtension?.trimStart('.')
             ?.takeIf { it.matches(EXTENSION_PATTERN) } ?: return original
@@ -132,6 +171,9 @@ internal class ProcessedMedia(
         return "$bounded.$extension"
     }
 
+    /**
+     * Closes the target.
+     */
     override fun close() {
         try { input.close() } finally { cleanup() }
     }
@@ -145,6 +187,14 @@ internal class ProcessedMedia(
 
 /** Used for formats that must remain byte-exact and by focused controller tests. */
 internal object PassThroughMediaPreprocessor:MediaPreprocessor {
+    /**
+     * Processes the pass through media preprocessor.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param mimeType MIME content type of the payload.
+     * @param kind Kind supplied to [process].
+     * @return The resulting process.
+     */
     override suspend fun process(input:InputStream,mimeType:String,kind:MediaKind)=
         ProcessedMedia(input,mimeType)
 }
@@ -153,6 +203,14 @@ internal object PassThroughMediaPreprocessor:MediaPreprocessor {
 internal class ImageMediaCompressor {
     data class Result(val file:File,val mimeType:String,val fileExtension:String)
 
+    /**
+     * Computes compress.
+     *
+     * @param source Source input or object to read from.
+     * @param outputFolder Output folder supplied to [compress].
+     * @param declaredMimeType Declared mime type supplied to [compress].
+     * @return The resulting [Result] instance.
+     */
     fun compress(source:File,outputFolder:File,declaredMimeType:String):Result {
         require(ImageCompressionPolicy.isSupportedStillMime(declaredMimeType)) {
             "Declared image type is unsupported"
@@ -213,6 +271,13 @@ internal class ImageMediaCompressor {
         }
     }
 
+    /**
+     * Applies orientation.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @param source Source input or object to read from.
+     * @return The resulting [Bitmap] for apply orientation.
+     */
     private fun applyOrientation(bitmap:Bitmap,source:File):Bitmap {
         val orientation=runCatching {
             ExifInterface(source.absolutePath).getAttributeInt(
@@ -232,6 +297,13 @@ internal class ImageMediaCompressor {
         return Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true)
     }
 
+    /**
+     * Computes replace.
+     *
+     * @param previous Previous supplied to [replace].
+     * @param next Next supplied to [replace].
+     * @return The resulting [Bitmap] instance.
+     */
     private fun replace(previous:Bitmap,next:Bitmap):Bitmap {
         if(previous!==next && !previous.isRecycled) previous.recycle()
         return next
@@ -248,14 +320,32 @@ internal class ImageMediaCompressor {
 internal object ImageCompressionPolicy {
     private val eligibleMimeTypes=setOf("image/jpeg","image/png","image/webp","image/heic","image/heif")
 
+    /**
+     * Computes normalized mime type.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting normalized mime type.
+     */
     fun normalizedMimeType(value:String)=when(val normalized=value.substringBefore(';').trim().lowercase()) {
         "image/jpg","image/pjpeg" -> "image/jpeg"
         "image/x-png" -> "image/png"
         else -> normalized
     }
 
+    /**
+     * Checks whether supported still mime.
+     *
+     * @param mimeType MIME content type of the payload.
+     * @return `true` if is supported still mime, or `false` otherwise.
+     */
     fun isSupportedStillMime(mimeType:String)=normalizedMimeType(mimeType) in eligibleMimeTypes
 
+    /**
+     * Computes detect mime type.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @return The resulting detect mime type string, or `null` when unavailable.
+     */
     fun detectMimeType(file:File):String? {
         val header=readHeader(file,32)
         if(header.size>=3 && header[0]==0xff.toByte() && header[1]==0xd8.toByte() &&
@@ -271,15 +361,34 @@ internal object ImageCompressionPolicy {
         return null
     }
 
+    /**
+     * Checks whether animated webp.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @return `true` if is animated webp, or `false` otherwise.
+     */
     fun isAnimatedWebp(file:File):Boolean {
         if(detectMimeType(file)!="image/webp") return false
         val header=readHeader(file,64)
         return header.size>=21 && ascii(header,12,4)=="VP8X" && (header[20].toInt() and 0x02)!=0 || (12..(header.size-4).coerceAtLeast(11)).any { ascii(header,it,4)=="ANIM" }
     }
 
+    /**
+     * Checks whether eligible.
+     *
+     * @param mimeType MIME content type of the payload.
+     * @param kind Kind supplied to [isEligible].
+     * @return `true` if is eligible, or `false` otherwise.
+     */
     fun isEligible(mimeType:String,kind:MediaKind)=
         kind in setOf(MediaKind.DOCUMENT,MediaKind.IMAGE) && isSupportedStillMime(mimeType)
 
+    /**
+     * Computes extension for.
+     *
+     * @param mimeType MIME content type of the payload.
+     * @return The resulting extension for.
+     */
     fun extensionFor(mimeType:String)=when(normalizedMimeType(mimeType)) {
         "image/jpeg" -> "jpg"
         "image/png" -> "png"
@@ -289,6 +398,14 @@ internal object ImageCompressionPolicy {
         else -> "img"
     }
 
+    /**
+     * Computes target size.
+     *
+     * @param width Target or source width in pixels or layout units.
+     * @param height Target or source height in pixels or layout units.
+     * @param maxDimension Maximum dimension supplied to [targetSize].
+     * @return The resulting [Pair] for target size.
+     */
     fun targetSize(width:Int,height:Int,maxDimension:Int=2_048):Pair<Int,Int> {
         require(width>0 && height>0 && maxDimension>0)
         val largest=max(width,height)
@@ -297,6 +414,14 @@ internal object ImageCompressionPolicy {
         return maxOf(1,(width*scale).roundToInt()) to maxOf(1,(height*scale).roundToInt())
     }
 
+    /**
+     * Computes sample size.
+     *
+     * @param width Target or source width in pixels or layout units.
+     * @param height Target or source height in pixels or layout units.
+     * @param maxDecodeDimension Maximum decode dimension supplied to [sampleSize].
+     * @return The computed sample size numeric value.
+     */
     fun sampleSize(width:Int,height:Int,maxDecodeDimension:Int=4_096):Int {
         require(width>0 && height>0 && maxDecodeDimension>0)
         var sample=1
@@ -304,6 +429,13 @@ internal object ImageCompressionPolicy {
         return sample
     }
 
+    /**
+     * Reads header.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param size Size or count limit for the operation.
+     * @return The resulting [ByteArray] for read header.
+     */
     private fun readHeader(file:File,size:Int):ByteArray {
         val buffer=ByteArray(size)
         val count=file.inputStream().use { input ->
@@ -317,8 +449,14 @@ internal object ImageCompressionPolicy {
         }
         return buffer.copyOf(count)
     }
-    //Linter believes length is always 4 here. I don't know why, but I don't see a need to mess
-    //with it.
+    /**
+     * Linter believes length is always 4 here. I don't know why, but I don't see a need to mess with it.
+     *
+     * @param bytes Raw byte array payload.
+     * @param start Start supplied to [ascii].
+     * @param length Length supplied to [ascii].
+     * @return The resulting ascii.
+     */
     @Suppress("SameParameterValue")
     private fun ascii(bytes:ByteArray,start:Int,length:Int)=String(bytes,start,length,Charsets.US_ASCII)
 }

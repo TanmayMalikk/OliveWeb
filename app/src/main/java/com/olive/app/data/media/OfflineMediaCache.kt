@@ -49,6 +49,13 @@ class OfflineMediaCache internal constructor(
         File(context.applicationContext.noBackupFilesDir, "offline-media"),
     )
 
+    /**
+     * Computes availability.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @return The resulting [OfflineMediaAvailability] instance.
+     */
     @Synchronized
     fun availability(uid: String, document: SafetyDocument): OfflineMediaAvailability {
         val entry = entry(uid, document.id) ?: return OfflineMediaAvailability.NOT_CACHED
@@ -73,7 +80,13 @@ class OfflineMediaCache internal constructor(
         }
     }
 
-    /** Performs the expensive hash check only when bytes are about to be decrypted. */
+    /**
+     * Performs the expensive hash check only when bytes are about to be decrypted.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @return The resulting [File], or `null` if unavailable.
+     */
     @Synchronized
     fun verifiedCiphertext(uid: String, document: SafetyDocument): File? {
         if (availability(uid, document) !in setOf(
@@ -90,6 +103,15 @@ class OfflineMediaCache internal constructor(
         return file
     }
 
+    /**
+     * Registers upload candidate.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     * @param source Source input or object to read from.
+     * @param size Size or count limit for the operation.
+     * @param checksum Checksum supplied to [registerUploadCandidate].
+     */
     @Synchronized
     fun registerUploadCandidate(
         uid: String,
@@ -111,10 +133,24 @@ class OfflineMediaCache internal constructor(
         enforceAutomaticLimit(uid)
     }
 
+    /**
+     * Promotes upload candidate.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @return `true` if promote upload candidate, or `false` otherwise.
+     */
     @Synchronized
     fun promoteUploadCandidate(uid: String, document: SafetyDocument): Boolean =
         promoteUploadCandidate(uid, document, CacheRetention.MANUAL)
 
+    /**
+     * Promotes upload candidate as recent.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @return `true` if promote upload candidate as recent, or `false` otherwise.
+     */
     @Synchronized
     fun promoteUploadCandidateAsRecent(uid: String, document: SafetyDocument): Boolean {
         if (!recentCachingEnabled(uid)) return false
@@ -123,6 +159,14 @@ class OfflineMediaCache internal constructor(
         return promoted
     }
 
+    /**
+     * Promotes upload candidate.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @param retention Retention supplied to [promoteUploadCandidate].
+     * @return `true` if promote upload candidate, or `false` otherwise.
+     */
     private fun promoteUploadCandidate(
         uid: String,
         document: SafetyDocument,
@@ -143,11 +187,25 @@ class OfflineMediaCache internal constructor(
         return true
     }
 
+    /**
+     * Retains downloaded.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @param source Source input or object to read from.
+     */
     @Synchronized
     fun retainDownloaded(uid: String, document: SafetyDocument, source: File) =
         retain(uid, document, source, CacheRetention.MANUAL)
 
-    /** Retains an authenticated online opening only when this account opted into recent caching. */
+    /**
+     * Retains an authenticated online opening only when this account opted into recent caching.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @param source Source input or object to read from.
+     * @return `true` if retain recent downloaded, or `false` otherwise.
+     */
     @Synchronized
     fun retainRecentDownloaded(uid: String, document: SafetyDocument, source: File): Boolean {
         if (!recentCachingEnabled(uid)) return false
@@ -156,7 +214,12 @@ class OfflineMediaCache internal constructor(
         return entry(uid, document.id) != null
     }
 
-    /** Promotes an evictable recent copy to an explicit user-selected offline copy. */
+    /**
+     * Promotes an evictable recent copy to an explicit user-selected offline copy.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     @Synchronized
     fun pin(uid: String, documentId: String) {
         requireIdentity(uid, documentId)
@@ -165,6 +228,12 @@ class OfflineMediaCache internal constructor(
             ?.put("retention", CacheRetention.MANUAL.name) }
     }
 
+    /**
+     * Computes recent caching enabled.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return `true` if recent caching enabled, or `false` otherwise.
+     */
     @Synchronized
     fun recentCachingEnabled(uid: String): Boolean {
         requireIdentity(uid)
@@ -172,7 +241,12 @@ class OfflineMediaCache internal constructor(
             ?.optBoolean(RECENT_CACHING_ENABLED, false) == true
     }
 
-    /** Disabling the preference removes only evictable recent copies, never manually pinned files. */
+    /**
+     * Disabling the preference removes only evictable recent copies, never manually pinned files.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     @Synchronized
     fun setRecentCachingEnabled(uid: String, enabled: Boolean) {
         requireIdentity(uid)
@@ -180,6 +254,12 @@ class OfflineMediaCache internal constructor(
         if (!enabled) removeRecentEntries(uid) else enforceAutomaticLimit(uid)
     }
 
+    /**
+     * Computes mark revalidated.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     @Synchronized
     fun markRevalidated(uid: String, documentId: String) {
         requireIdentity(uid, documentId)
@@ -187,7 +267,12 @@ class OfflineMediaCache internal constructor(
             ?.optJSONObject(ENTRIES)?.optJSONObject(documentId)?.put("validatedAt", now()) }
     }
 
-    /** Called only with a server-confirmed list; absent documents are treated as revoked. */
+    /**
+     * Called only with a server-confirmed list; absent documents are treated as revoked.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documents Collection of documents values to process.
+     */
     @Synchronized
     fun reconcile(uid: String, documents: List<SafetyDocument>) {
         val accessible = documents.filter { uid in it.allowedUsers }.associateBy(SafetyDocument::id)
@@ -202,6 +287,12 @@ class OfflineMediaCache internal constructor(
         cleanupExpiredCandidates()
     }
 
+    /**
+     * Removes the offline media cache.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     @Synchronized
     fun remove(uid: String, documentId: String) {
         requireIdentity(uid, documentId)
@@ -211,7 +302,11 @@ class OfflineMediaCache internal constructor(
         vault.update { it.optJSONObject(ACCOUNTS)?.optJSONObject(uid)?.optJSONObject(ENTRIES)?.remove(documentId) }
     }
 
-    /** Purges only one account; another account's ciphertext is never touched. */
+    /**
+     * Purges only one account; another account's ciphertext is never touched.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     @Synchronized
     fun purge(uid: String) {
         requireIdentity(uid)
@@ -223,7 +318,9 @@ class OfflineMediaCache internal constructor(
         runCatching { vault.update { it.optJSONObject(ACCOUNTS)?.remove(uid) } }
     }
 
-    /** Removes stale unpinned upload bytes even if the document screen was never opened. */
+    /**
+     * Removes stale unpinned upload bytes even if the document screen was never opened.
+     */
     @Synchronized
     fun cleanupExpiredCandidates() {
         val rootJson = safeRoot()
@@ -244,6 +341,14 @@ class OfflineMediaCache internal constructor(
         accounts.keys().asSequence().toList().forEach(::enforceAutomaticLimit)
     }
 
+    /**
+     * Retains the offline media cache.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param document Safety document metadata record.
+     * @param source Source input or object to read from.
+     * @param requestedRetention Requested retention supplied to [retain].
+     */
     @SuppressLint("UsableSpace")
     private fun retain(
         uid: String,
@@ -298,11 +403,24 @@ class OfflineMediaCache internal constructor(
         }
     }
 
+    /**
+     * Computes touch.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     private fun touch(uid: String, documentId: String) = vault.update { root ->
         root.optJSONObject(ACCOUNTS)?.optJSONObject(uid)?.optJSONObject(ENTRIES)
             ?.optJSONObject(documentId)?.put("lastAccessedAt", now())
     }
 
+    /**
+     * Computes entry.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     * @return The resulting [CacheEntry], or `null` if unavailable.
+     */
     private fun entry(uid: String, documentId: String): CacheEntry? {
         requireIdentity(uid, documentId)
         val value = safeRoot().optJSONObject(ACCOUNTS)?.optJSONObject(uid)
@@ -313,6 +431,11 @@ class OfflineMediaCache internal constructor(
                 .getOrDefault(CacheRetention.MANUAL)) }.getOrNull()
     }
 
+    /**
+     * Removes recent entries.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     private fun removeRecentEntries(uid: String) {
         val rootJson = safeRoot()
         val rows = rootJson.optJSONObject(ACCOUNTS)?.optJSONObject(uid)
@@ -330,7 +453,11 @@ class OfflineMediaCache internal constructor(
         } }
     }
 
-    /** Enforces one deterministic per-account budget across all automatically retained ciphertext. */
+    /**
+     * Enforces one deterministic per-account budget across all automatically retained ciphertext.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     private fun enforceAutomaticLimit(uid: String) {
         val rootJson = safeRoot()
         val account = rootJson.optJSONObject(ACCOUNTS)?.optJSONObject(uid) ?: return
@@ -368,26 +495,72 @@ class OfflineMediaCache internal constructor(
         vault.update { root -> root.child(ACCOUNTS).child(uid).put(ENTRIES, entries).put(CANDIDATES, candidates) }
     }
 
+    /**
+     * Returns the safe root.
+     *
+     * @return JSON object representing safe root.
+     */
     private fun safeRoot(): JSONObject = try { vault.read() } catch (_: Exception) {
         vault.clear()
         root.deleteRecursively()
         JSONObject()
     }
 
+    /**
+     * Computes entries.
+     *
+     * @param rootJson Root JSON supplied to [entries].
+     * @param uid Firebase UID of the target user account.
+     * @return JSON object representing entries.
+     */
     private fun entries(rootJson: JSONObject, uid: String): JSONObject =
         rootJson.child(ACCOUNTS).child(uid).child(ENTRIES)
 
+    /**
+     * Computes candidates.
+     *
+     * @param rootJson Root JSON supplied to [candidates].
+     * @param uid Firebase UID of the target user account.
+     * @return `true` if candidates, or `false` otherwise.
+     */
     private fun candidates(rootJson: JSONObject, uid: String): JSONObject =
         rootJson.child(ACCOUNTS).child(uid).child(CANDIDATES)
 
+    /**
+     * Computes account directory.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting account directory.
+     */
     private fun accountDirectory(uid: String) = File(root, opaqueName(uid))
+    /**
+     * Computes cached file.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param fileName File name supplied to [cachedFile].
+     * @return The resulting [File] for cached file.
+     */
     private fun cachedFile(uid: String, fileName: String): File =
         File(accountDirectory(uid), fileName.takeIf { it.matches(CACHE_FILE) } ?: "invalid")
 
+    /**
+     * Computes matches.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param size Size or count limit for the operation.
+     * @param checksum Checksum supplied to [matches].
+     * @return `true` if matches, or `false` otherwise.
+     */
     private fun matches(file: File, size: Long, checksum: String): Boolean =
         file.isFile && file.length() == size && checksum.matches(SHA_256) && sha256(file).equals(checksum, true)
 
-    private fun sha256(file: File): String {
+    /**
+     * Computes the lowercase hexadecimal SHA-256 digest of a file's contents.
+     *
+     * @param file Local file to stream and hash.
+     * @return Lowercase 64-character hexadecimal SHA-256 checksum.
+     */
+    internal fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(64 * 1024)
         try { file.inputStream().use { input -> while (true) {
@@ -398,19 +571,43 @@ class OfflineMediaCache internal constructor(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun opaqueName(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    /**
+     * Computes opaque name.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting opaque name string.
+     */
+    private fun opaqueName(value: String): String = sha256Hex(value)
 
+    /**
+     * Checks whether app private candidate.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @return `true` if is app private candidate, or `false` otherwise.
+     */
     private fun isAppPrivateCandidate(file: File): Boolean = runCatching {
         file.canonicalFile.toPath().startsWith(checkNotNull(root.parentFile).canonicalFile.toPath()) &&
             file.canonicalFile != root.canonicalFile
     }.getOrDefault(false)
 
+    /**
+     * Discards candidate.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     * @param source Source input or object to read from.
+     */
     private fun discardCandidate(uid: String, documentId: String, source: File) {
         if (isAppPrivateCandidate(source)) source.delete()
         removeCandidateRecord(uid, documentId)
     }
 
+    /**
+     * Removes candidate record.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     private fun removeCandidateRecord(uid: String, documentId: String) = vault.update {
         it.optJSONObject(ACCOUNTS)?.optJSONObject(uid)?.optJSONObject(CANDIDATES)?.remove(documentId)
     }
@@ -447,7 +644,21 @@ class OfflineMediaCache internal constructor(
     }
 }
 
-private fun requireIdentity(uid: String, documentId: String? = null) {
+/**
+ * Computes the lowercase hexadecimal SHA-256 digest of a UTF-8 string.
+ *
+ * @param value UTF-8 input string to hash cleanly into a cache-safe identifier.
+ * @return Lowercase 64-character hexadecimal SHA-256 digest.
+ */
+internal fun sha256Hex(value: String): String = com.olive.app.data.network.sha256Hex(value)
+
+/**
+ * Validates that an account UID and optional document ID are non-blank and within bounds.
+ *
+ * @param uid Firebase UID of the target user account.
+ * @param documentId Optional unique identifier of the referenced document, or null when omitted.
+ */
+internal fun requireIdentity(uid: String, documentId: String? = null) {
     require(uid.isNotBlank() && uid.length <= 160)
     documentId?.let { require(it.isNotBlank() && it.length <= 160) }
 }
@@ -467,19 +678,38 @@ private fun requireIdentity(uid: String, documentId: String? = null) {
 class MediaTransferStore(context:Context) {
     private val vault=EncryptedVault(context,"media-transfers")
 
-    /** Reads one job by its client-generated idempotency key. */
+    /**
+     * Reads one job by its client-generated idempotency key.
+     *
+     * @param id ID supplied to [get].
+     * @return The resulting [MediaUploadJob], or `null` if unavailable.
+     */
     fun get(id:String):MediaUploadJob?=vault.read().optJSONObject(JOBS)?.optJSONObject(id)?.let(MediaUploadJob::fromJson)
 
-    /** Returns all durable jobs, including completed/failed records available for diagnostics. */
+    /**
+     * Returns all durable jobs, including completed/failed records available for diagnostics.
+     *
+     * @return List of resulting all items.
+     */
     fun all():List<MediaUploadJob> {
         val jobs=vault.read().optJSONObject(JOBS) ?: return emptyList()
         return jobs.keys().asSequence().mapNotNull { jobs.optJSONObject(it)?.let(MediaUploadJob::fromJson) }.toList()
     }
 
-    /** Inserts or replaces one complete job snapshot in a single encrypted-vault update. */
+    /**
+     * Inserts or replaces one complete job snapshot in a single encrypted-vault update.
+     *
+     * @param job Job supplied to [write].
+     */
     fun write(job:MediaUploadJob) { vault.update { root -> jobs(root).put(job.id,job.toJson()) } }
 
-    /** Atomically derives and persists the next state from the current state. */
+    /**
+     * Atomically derives and persists the next state from the current state.
+     *
+     * @param id ID supplied to [update].
+     * @param change Function used to transform or provide change.
+     * @return The resulting [MediaUploadJob] instance.
+     */
     fun update(id:String,change:(MediaUploadJob)->MediaUploadJob):MediaUploadJob {
         var result:MediaUploadJob?=null
         vault.update { root ->
@@ -490,17 +720,34 @@ class MediaTransferStore(context:Context) {
         return checkNotNull(result)
     }
 
-    /** Removes bookkeeping only; callers must separately decide whether ciphertext should be deleted. */
+    /**
+     * Removes bookkeeping only; callers must separately decide whether ciphertext should be deleted.
+     *
+     * @param id ID supplied to [remove].
+     */
     fun remove(id:String) { vault.update { it.optJSONObject(JOBS)?.remove(id) } }
 
-    // Loads pending media-transfer jobs that belong to this account.
+    /**
+     * Loads pending media-transfer jobs that belong to this account.
+     *
+     * @param root Root JSON object or directory being read or updated.
+     * @return The resulting jobs.
+     */
     private fun jobs(root:JSONObject)=root.optJSONObject(JOBS) ?: JSONObject().also { root.put(JOBS,it) }
     private companion object { const val JOBS="jobs" }
 }
 
 // Approved viewers: checks encrypted download size and checksum before decryption.
 
-/** Streams ciphertext once while enforcing its immutable byte count and SHA-256 digest. */
+/**
+ * Streams ciphertext once while enforcing its immutable byte count and SHA-256 digest.
+ *
+ * @param input Input stream, matrix, or value to process.
+ * @param output Output stream or target receiving processed data.
+ * @param expectedSize Expected size supplied to [copyAndVerifyEncryptedDownload].
+ * @param expectedSha256 Expected sha 256 supplied to [copyAndVerifyEncryptedDownload].
+ * @return The computed copy and verify encrypted download numeric value.
+ */
 internal suspend fun copyAndVerifyEncryptedDownload(
     input:InputStream,
     output:OutputStream,
@@ -544,6 +791,13 @@ internal suspend fun copyAndVerifyEncryptedDownload(
 internal class DocumentDownloadGate {
     private val locks=ConcurrentHashMap<String,Mutex>()
 
+    /**
+     * Computes with document lock.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @param block Callback or suspending lambda executed within this scope.
+     * @return The resulting [T] for with document lock.
+     */
     suspend fun <T> withDocumentLock(documentId:String,block:suspend ()->T):T =
         locks.computeIfAbsent(documentId) { Mutex() }.withLock { block() }
 }

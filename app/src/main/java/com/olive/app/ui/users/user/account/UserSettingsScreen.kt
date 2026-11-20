@@ -56,6 +56,7 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.UserProfile
 import com.olive.app.ui.shared.AddressFields
+import com.olive.app.ui.shared.AppVersionFooter
 import com.olive.app.ui.shared.CardTintEnabled
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
@@ -73,7 +74,12 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.math.roundToInt
 
 
-// Saves profile and situation edits from the user settings screen.
+/**
+ * Saves profile and situation edits from the user settings screen.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -107,11 +113,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             SafeBack(session)
-            Text(
-                uiText(R.string.settings),
-                modifier = Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.headlineSmall
-            )
+            SettingsHeading(Modifier.weight(1f))
         }
         SecondaryScrollableTabRow(
             selectedTabIndex = tabs.indexOf(activeTab),
@@ -366,6 +368,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     SettingsCategory.Permissions -> SafePermissionsSettings()
                 }
                 Status(session)
+                AppVersionFooter()
             }
         }
     }
@@ -381,6 +384,26 @@ internal enum class SettingsCategory(val label: Int, val tag: String) {
 
 internal val accountSettingsTabs = listOf(SettingsCategory.Profile, SettingsCategory.Password, SettingsCategory.Permissions)
 
+/**
+ * Composes the settings heading UI element.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ */
+@Composable
+internal fun SettingsHeading(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(R.string.settings),
+        modifier = modifier.semantics { heading() },
+        style = MaterialTheme.typography.headlineSmall,
+    )
+}
+
+/**
+ * Composes the settings section UI element.
+ *
+ * @param title Primary display title text.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Surface(
@@ -404,12 +427,23 @@ internal fun SettingsSection(title: String, content: @Composable ColumnScope.() 
     }
 }
 
+/**
+ * Composes the idle timeout setting UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun IdleTimeoutSetting(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val options = IdlePolicy.timeoutOptions
     var timeout by remember(session.coverAccountId) { mutableIntStateOf(session.idleTimeoutSeconds()) }
     val title = uiText(R.string.idle_lock_setting)
+    /**
+     * Computes duration.
+     *
+     * @param seconds Seconds supplied to [duration].
+     * @return The resulting duration string.
+     */
     fun duration(seconds: Int): String =
         if (seconds % 60 == 0) uiText(R.string.idle_lock_minutes, seconds / 60)
         else uiText(R.string.idle_lock_minutes_seconds, seconds / 60, seconds % 60)
@@ -440,7 +474,13 @@ private fun IdleTimeoutSetting(session: SessionViewModel) {
     }
 }
 
-// UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
+/**
+ * UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
+ *
+ * @param selected Selected supplied to [CoverPicker].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onSelect Callback invoked when select changes or occurs.
+ */
 @Composable
 internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (CoverType) -> Unit) {
     val uiText = rememberResourceText()

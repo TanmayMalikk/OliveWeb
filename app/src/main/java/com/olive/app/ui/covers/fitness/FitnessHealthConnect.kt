@@ -31,20 +31,48 @@ internal object FitnessHealthConnect {
     val permissions = setOf(HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class))
 
+    /**
+     * Computes available.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting available.
+     */
     fun available(context: Context) = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
+    /**
+     * Computes permissions for.
+     *
+     * @param client Client supplied to [permissionsFor].
+     * @return List of resulting permissions for items.
+     */
     fun permissionsFor(client: HealthConnectClient): Set<String> =
         if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
             HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) {
             permissions + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
         } else permissions
 
+    /**
+     * Schedules the fitness health connect.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [schedule].
+     */
     fun schedule(context: Context, owner: String) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("fitness-health-${fitnessAccountKey(owner)}",
             ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<FitnessHealthWorker>(15, TimeUnit.MINUTES)
                 .setInputData(workDataOf("uid" to owner)).build())
     }
 
+    /**
+     * Reads the fitness health connect.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [read].
+     * @param background Whether to apply background.
+     * @param authenticatedUid Function used to transform or provide authenticated user ID.
+     * @param healthProvider Function used to transform or provide health provider.
+     * @return The resulting read.
+     */
     suspend fun read(
         context: Context,
         owner: String,
@@ -101,6 +129,11 @@ internal object FitnessHealthConnect {
 }
 
 internal class FitnessHealthWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result {
         val owner = inputData.getString("uid") ?: return Result.failure()
         if (fitnessAuthenticatedUid() != owner) return Result.success()
@@ -111,6 +144,12 @@ internal class FitnessHealthWorker(context: Context, params: WorkerParameters) :
     }
 }
 
+/**
+ * Composes the fitness health connection UI element.
+ *
+ * @param accountId Account ID supplied to [FitnessHealthConnection].
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -137,6 +176,11 @@ internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
 }
 
 internal class FitnessHealthPrivacyActivity : androidx.activity.ComponentActivity() {
+    /**
+     * Initializes the component and sets up its state or UI when created by Android.
+     *
+     * @param savedInstanceState Previously saved instance state bundle, or null on a fresh creation.
+     */
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(android.widget.TextView(this).apply {

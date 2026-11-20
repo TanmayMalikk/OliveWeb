@@ -61,8 +61,15 @@ import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.rememberResourceText
 import java.net.URI
 
-// Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering.
-// Story details form one TalkBack target; the bookmark remains a separate action.
+/**
+ * Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering. Story details form one TalkBack target; the bookmark remains a separate action.
+ *
+ * @param article Article supplied to [NewsArticleCard].
+ * @param language Language supplied to [NewsArticleCard].
+ * @param saved Whether to apply saved.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param onBookmark Callback invoked when bookmark changes or occurs.
+ */
 @Composable
 internal fun NewsArticleCard(
     article: NewsArticle,
@@ -226,11 +233,24 @@ internal fun NewsArticleCard(
     }
 }
 
-// Google News and publisher redirects stay inside the reader; local files and app intents do not open.
+/**
+ * Google News and publisher redirects stay inside the reader; local files and app intents do not open.
+ *
+ * @param url HTTPS URL to validate, fetch, or open.
+ * @return `true` if is news reader URL allowed, or `false` otherwise.
+ */
 internal fun isNewsReaderUrlAllowed(url: String): Boolean = isSecureNewsUrl(url)
 
-// Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher.
-// Publisher pages require JavaScript. Navigation remains HTTPS-only and the WebView exposes no native bridge or files.
+/**
+ * Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher. Publisher pages require JavaScript. Navigation remains HTTPS-only and the WebView exposes no native bridge or files.
+ *
+ * @param article Article supplied to [NewsArticleReader].
+ * @param saved Whether to apply saved.
+ * @param active Whether to apply active.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onBookmark Callback invoked when bookmark changes or occurs.
+ */
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun NewsArticleReader(
@@ -261,7 +281,9 @@ internal fun NewsArticleReader(
     // Pauses the article browser when this reader is hidden or the app is paused.
     DisposableEffect(browser, active, lifecycle) {
         val view = browser
-        // Pauses the WebView off-screen and resumes it only while this article is visible.
+        /**
+         * Pauses the WebView off-screen and resumes it only while this article is visible.
+         */
         fun updateVisibility() {
             if (active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view?.onResume()
             else view?.onPause()
@@ -326,13 +348,24 @@ internal fun NewsArticleReader(
                             settings.setSupportMultipleWindows(false)
                             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
                             webChromeClient = object : WebChromeClient() {
-                                // Updates the loading bar as the publisher page loads.
+                                /**
+                                 * Updates the loading bar as the publisher page loads.
+                                 *
+                                 * @param view View supplied to [onProgressChanged].
+                                 * @param newProgress New progress supplied to [onProgressChanged].
+                                 */
                                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                                     progress = newProgress
                                 }
                             }
                             webViewClient = object : WebViewClient() {
-                                // Keeps HTTPS news links in the reader and blocks unsafe link types.
+                                /**
+                                 * Keeps HTTPS news links in the reader and blocks unsafe link types.
+                                 *
+                                 * @param view View supplied to [shouldOverrideUrlLoading].
+                                 * @param request Request supplied to [shouldOverrideUrlLoading].
+                                 * @return `true` if should override URL loading, or `false` otherwise.
+                                 */
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -342,7 +375,13 @@ internal fun NewsArticleReader(
                                     return blocked
                                 }
 
-                                // Resets the reader state when a new publisher page starts loading.
+                                /**
+                                 * Resets the reader state when a new publisher page starts loading.
+                                 *
+                                 * @param view View supplied to [onPageStarted].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 * @param favicon Optional favicon supplied to [onPageStarted].
+                                 */
                                 override fun onPageStarted(
                                     view: WebView,
                                     url: String,
@@ -353,13 +392,24 @@ internal fun NewsArticleReader(
                                     progress = 0
                                 }
 
-                                // Records the final URL and completes the loading bar.
+                                /**
+                                 * Records the final URL and completes the loading bar.
+                                 *
+                                 * @param view View supplied to [onPageFinished].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 */
                                 override fun onPageFinished(view: WebView, url: String) {
                                     currentUrl = url
                                     progress = 100
                                 }
 
-                                // Clears only the Google News redirect from Back history.
+                                /**
+                                 * Clears only the Google News redirect from Back history.
+                                 *
+                                 * @param view View supplied to [doUpdateVisitedHistory].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 * @param isReload Whether is reload.
+                                 */
                                 override fun doUpdateVisitedHistory(
                                     view: WebView,
                                     url: String,
@@ -374,7 +424,13 @@ internal fun NewsArticleReader(
                                     currentUrl = url
                                 }
 
-                                // Shows the reader error screen when the main page fails to load.
+                                /**
+                                 * Shows the reader error screen when the main page fails to load.
+                                 *
+                                 * @param view View supplied to [onReceivedError].
+                                 * @param request Request supplied to [onReceivedError].
+                                 * @param error Throwable or error message describing a failure.
+                                 */
                                 override fun onReceivedError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -386,7 +442,13 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
-                                // Treats a failed HTTP response for the main article as a reader error.
+                                /**
+                                 * Treats a failed HTTP response for the main article as a reader error.
+                                 *
+                                 * @param view View supplied to [onReceivedHttpError].
+                                 * @param request Request supplied to [onReceivedHttpError].
+                                 * @param response Response supplied to [onReceivedHttpError].
+                                 */
                                 override fun onReceivedHttpError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -398,7 +460,13 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
-                                // Cancels invalid HTTPS certificates instead of opening an unsafe article.
+                                /**
+                                 * Cancels invalid HTTPS certificates instead of opening an unsafe article.
+                                 *
+                                 * @param view View supplied to [onReceivedSslError].
+                                 * @param handler Handler supplied to [onReceivedSslError].
+                                 * @param error Throwable or error message describing a failure.
+                                 */
                                 override fun onReceivedSslError(
                                     view: WebView,
                                     handler: SslErrorHandler,

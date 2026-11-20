@@ -49,7 +49,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.olive.app.data.account.PrivateEntryKind
 
 
-// Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
+/**
+ * Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ */
 @Composable
 internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
     val profile = session.profile ?: return
@@ -74,7 +79,11 @@ internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
+/**
+ * Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun SafeContactHome(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -191,7 +200,12 @@ private fun SafeContactHome(session: SessionViewModel) {
     }
 }
 
-// Shows the trusted contact's own profile and account actions.
+/**
+ * Shows the trusted contact's own profile and account actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -245,7 +259,11 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
     }
 }
 
-// safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
     val entry = session.viewedSharedEntry ?: return
@@ -327,7 +345,13 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
     }
 }
 
-// Shows one decrypted incident value as a familiar read-only form field inside chat.
+/**
+ * Shows one decrypted incident value as a familiar read-only form field inside chat.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param minLines Minimum lines supplied to [SharedIncidentField].
+ */
 @Composable
 private fun SharedIncidentField(label: String, value: String, minLines: Int = 1) {
     OutlinedTextField(
@@ -343,7 +367,12 @@ private fun SharedIncidentField(label: String, value: String, minLines: Int = 1)
 // Safe contacts: shows shared user details on safe-contact cards.
 
 
-// Shows the trusted contact's profile summary on their dashboard.
+/**
+ * Shows the trusted contact's profile summary on their dashboard.
+ *
+ * @param profile Account profile details.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
     Surface(
@@ -396,7 +425,17 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
     }
 }
 
-// safe contact dashboard cards shows this safe contact action card view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard cards shows this safe contact action card view so the user can view its details and use its actions.
+ *
+ * @param label Accessible label or display caption.
+ * @param description Description supplied to [SafeContactActionCard].
+ * @param icon Icon supplied to [SafeContactActionCard].
+ * @param tag Tag supplied to [SafeContactActionCard].
+ * @param badgeCount Badge count supplied to [SafeContactActionCard].
+ * @param onClick Callback invoked when the control is activated.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun SafeContactActionCard(
     label: String, description: String, icon: ImageVector, tag: String, badgeCount: Int,
@@ -444,7 +483,13 @@ internal fun SafeContactActionCard(
     }
 }
 
-// safe contact dashboard cards shows this safe contact profile row view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard cards shows this safe contact profile row view so the user can view its details and use its actions.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param icon Icon supplied to [SafeContactProfileRow].
+ */
 @Composable
 internal fun SafeContactProfileRow(label: String, value: String, icon: ImageVector) {
     Row(

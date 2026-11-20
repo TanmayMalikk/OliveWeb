@@ -8,10 +8,20 @@ import org.json.JSONArray
 
 // Persists account-isolated state for the cover applications.
 class CoverStateStore(private val vault: EncryptedVault) {
-    // Restores the saved news feed for the given account.
+    /**
+     * Restores the saved news feed for the given account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting restore items.
+     */
     fun restore(uid: String): List<NewsArticle> = news(uid)
 
-    // Reads cached news articles from the encrypted local vault.
+    /**
+     * Reads cached news articles from the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting news items.
+     */
     fun news(uid: String): List<NewsArticle> {
         val item = vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
         val rows = item.optJSONArray("news") ?: JSONArray()
@@ -20,7 +30,12 @@ class CoverStateStore(private val vault: EncryptedVault) {
         }
     }
 
-    // Saves cached news articles into the encrypted local vault.
+    /**
+     * Saves cached news articles into the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param articles Collection of articles values to process.
+     */
     fun saveNews(uid: String, articles: List<NewsArticle>) {
         vault.update { root ->
             root.child("accounts").child(uid).put(

@@ -99,6 +99,25 @@ test("safe contacts can switch shared plans and lose access when it is revoked",
   await expect(page.getByText("Other identification")).toHaveCount(0);
 });
 
+test("incident attachments can be uploaded, retry after failure and are marked as evidence", async ({ page }) => {
+  await openPlan(page, "owner", "notes");
+  await page.getByRole("button", { name: "New entry" }).click();
+  await page.getByRole("tab", { name: "Incident" }).click();
+  await page.getByLabel("Incident details (required)").fill("Synthetic incident with evidence");
+  await page.getByText("Add attachment", { exact: true }).click();
+  const attachment = page.locator('input[type="file"]');
+  await attachment.setInputFiles({ name: "empty.txt", mimeType: "text/plain", buffer: Buffer.alloc(0) });
+  await expect(page.getByRole("alert")).toHaveText("This file is empty.");
+  await attachment.setInputFiles({ name: "Evidence.txt", mimeType: "text/plain", buffer: Buffer.from("Synthetic evidence") });
+  await expect(page.getByRole("checkbox", { name: "Evidence.txt", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Save entry" }).click();
+  const entry = page.getByRole("button", { name: /Synthetic incident with evidence/ });
+  await expect(entry).toContainText("1 attached file");
+  await entry.click();
+  await page.getByText("Add attachment", { exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Evidence.txt · Evidence" })).toBeChecked();
+});
+
 test("documents persist evidence, report rejected uploads, and hide locked previews", async ({ page }) => {
   await openPlan(page, "owner", "documents");
   const original = page.getByRole("article").filter({ hasText: "Identification.txt" });
@@ -124,15 +143,15 @@ test("documents persist evidence, report rejected uploads, and hide locked previ
 });
 
 test("location page reports denied permission and shows the new location after retry", async ({ page, context }) => {
-  await page.route("https://www.openstreetmap.org/**", route => route.fulfill({ body: "Test map" }));
   await context.setGeolocation({ latitude: 53.5, longitude: -113.5, accuracy: 12 });
   await openPlan(page, "owner", "location");
   await expect(page.getByRole("alert")).toContainText("Location is unavailable.");
-  await expect(page.getByTitle("Current location map")).toHaveCount(0);
+  const map = page.getByRole("region", { name: "Current location map" });
+  await expect(map).toHaveCount(0);
   await context.grantPermissions(["geolocation"]);
   await page.getByRole("button", { name: "Update location" }).click();
-  await expect(page.getByTitle("Current location map")).toHaveAttribute("src", /marker=53\.5%2C-113\.5/);
-  await expect(page.getByText("Accuracy about 12 m")).toBeVisible();
+  await expect(map).toBeVisible();
+  await expect(page.getByText("Accuracy about 12 m · 53.5000, -113.5000")).toBeVisible();
 });
 
 test("assigned staff can update both checklists, preview an attachment and complete the consultation", async ({ page }) => {
@@ -219,6 +238,41 @@ test("invites replace friend discovery and keep existing requests and ticket cha
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled();
   await page.getByRole("tab", { name: "Ticket chats" }).press("Home");
   await expect(code).toBeVisible();
+});
+
+test("ticket owners open shared records, manage invited friends and can unsend their messages", async ({ page }) => {
+  await openPlan(page, "owner", "shared-messages");
+  await page.getByRole("tab", { name: "Ticket chats" }).click();
+  await page.getByRole("button", { name: /Support Ticket #501/ }).click();
+  const log = page.getByRole("log");
+  await log.getByRole("button", { name: /Shared fixture incident/ }).click();
+  const incident = page.getByRole("dialog", { name: "Private fixture incident" });
+  await expect(incident.getByText("Synthetic incident details")).toBeVisible();
+  await expect(incident.getByText(/Fixture location/)).toBeVisible();
+  await incident.getByRole("button", { name: "Open attached evidence" }).click();
+  const document = page.getByRole("dialog", { name: "Identification.txt" });
+  await expect(document.getByText("Private sample document")).toBeVisible();
+  await document.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await incident.getByRole("button", { name: "Close dialog" }).click();
+  await log.getByRole("button", { name: /Unavailable record/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "This protected record is not stored" })).toBeVisible();
+  await log.getByRole("button", { name: /Plan fixture/ }).click();
+  await log.getByRole("button", { name: /Shared live location/ }).click();
+  expect(await page.evaluate(() => (window as Window & { panelEvents?: unknown[][] }).panelEvents)).toEqual([
+    ["page", "SafetyPlan"], ["page", "Location"],
+  ]);
+  await page.getByRole("button", { name: "Manage added friends" }).click();
+  await expect(page.getByRole("button", { name: "Remove Staff" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove Guest Fixture" }).click();
+  await expect(page.getByText("No added friends to remove.")).toBeVisible();
+  await page.getByRole("button", { name: "Hide added friends" }).click();
+  await page.getByRole("textbox", { name: "Write a message" }).fill("Synthetic reply");
+  await page.getByRole("button", { name: "Send message" }).click();
+  const reply = log.locator("article").filter({ hasText: "Synthetic reply" });
+  await reply.getByRole("button", { name: "Unsend" }).click();
+  await expect(reply).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to conversations" }).click();
+  await expect(page.getByText("Select a ticket chat")).toBeVisible();
 });
 
 test("administrator filters accounts and confirms deletion only for eligible records", async ({ page }) => {

@@ -64,6 +64,30 @@ class MediaTransferDownloadTest {
     }
 
     @Test
+    fun disablingRecentCachingClearsTemporaryCopiesButRetainsPinnedFiles() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val pinned = f.document.copy(id = "pinned")
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.RECENT_AVAILABLE)
+            `when`(f.cache.availability("owner", pinned)).thenReturn(OfflineMediaAvailability.AVAILABLE)
+            f.controller.onDocumentSnapshot("owner", listOf(f.document, pinned), false)
+            withTimeout(5_000) { while (f.controller.offlineCopies.size != 2) delay(10) }
+            f.controller.setRecentCachingPreference("owner", false)
+            withTimeout(5_000) {
+                while (f.controller.offlineCopies[f.document.id] != OfflineMediaAvailability.NOT_CACHED) delay(10)
+            }
+            assertEquals(OfflineMediaAvailability.AVAILABLE, f.controller.offlineCopies[pinned.id])
+            verify(f.cache).setRecentCachingEnabled("owner", false)
+
+            doThrow(IllegalStateException("Fixture storage unavailable"))
+                .`when`(f.cache).setRecentCachingEnabled("owner", true)
+            `when`(f.cache.recentCachingEnabled("owner")).thenReturn(false)
+            f.controller.setRecentCachingPreference("owner", true)
+            withTimeout(5_000) { while (f.controller.recentCachingEnabled) delay(10) }
+            assertFalse(f.controller.recentCachingEnabled)
+        }
+    }
+
+    @Test
     fun remoteDownloadVerifiesCiphertextAndOnlyReturnsAuthenticatedPlaintext() = runBlocking<Unit> {
         Fixture().use { f ->
             f.ticket()
@@ -172,6 +196,29 @@ class MediaTransferDownloadTest {
             assertArrayEquals(f.plaintext, opened.readBytes())
             verify(f.repository).recoverDocumentKey("doc")
             opened.delete()
+        }
+    }
+
+    @Test
+    fun recentUploadPromotionRevalidationAndHttpErrorsAreHandledCleanly() = runBlocking<Unit> {
+        Fixture().use { f ->
+            `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(true)
+            `when`(f.cache.verifiedCiphertext("owner", f.document)).thenReturn(null, f.encrypted, null, f.encrypted, null)
+            val promoted = f.controller.downloadFile(f.document, "owner")
+            assertArrayEquals(f.plaintext, promoted.readBytes())
+            promoted.delete()
+
+            `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(false)
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.REVALIDATION_REQUIRED)
+            f.ticket()
+            val revalidated = f.controller.downloadFile(f.document, "owner")
+            assertArrayEquals(f.plaintext, revalidated.readBytes())
+            verify(f.cache).markRevalidated("owner", "doc")
+            revalidated.delete()
+
+            `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.status = 500
+            assertThrows(IllegalStateException::class.java) { runBlocking { f.controller.downloadFile(f.document, "owner") } }
         }
     }
 }

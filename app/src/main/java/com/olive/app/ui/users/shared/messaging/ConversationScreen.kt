@@ -72,7 +72,15 @@ private sealed interface ConversationTimelineItem {
     }
 }
 
-// UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
+/**
+ * UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param currentUid Current user ID supplied to [ChatPane].
+ * @param showBack Whether to show back.
+ * @param exit Action or callback executed for exit.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun ChatPane(
     session: SessionViewModel, currentUid: String, showBack: Boolean,
@@ -688,7 +696,13 @@ internal fun ChatPane(
     }
 }
 
-// Shows one voice call status card in the conversation timeline.
+/**
+ * Shows one voice call status card in the conversation timeline.
+ *
+ * @param call Call supplied to [CallHistoryRow].
+ * @param canJoin Whether can join.
+ * @param onJoin Callback invoked when join changes or occurs.
+ */
 @Composable
 internal fun CallHistoryRow(
     call: VoipCall,

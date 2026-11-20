@@ -42,6 +42,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Closes revoked account.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     private fun closeRevokedAccount(uid: String) = with(runtime) {
         if (enrollment?.uid != uid) return@with
         accountSyncSubscription?.close()
@@ -57,7 +62,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         state.screen = SessionScreen.Cover
     }
 
-    // Restores the saved account and sends the person to the correct first screen.
+    /**
+     * Restores the saved account and sends the person to the correct first screen.
+     */
     fun load() {
         val state = runtime.state
         if (state.busy) return
@@ -93,20 +100,30 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             }
         }
     }
-    // Account choices are available only before a device has joined an account.
+    /**
+     * Account choices are available only before a device has joined an account.
+     *
+     * @return `true` if can choose account, or `false` otherwise.
+     */
     private fun canChooseAccount(): Boolean {
         val state = runtime.state
         return state.screen == SessionScreen.Welcome && runtime.enrollment == null && !state.busy
     }
 
-    // Saves the account type chosen on the welcome screen.
+    /**
+     * Saves the account type chosen on the welcome screen.
+     *
+     * @param role Account role determining workspace permissions.
+     */
     fun selectRole(role: AccountRole) {
         if (!canChooseAccount()) return
         runtime.state.accountRole = role
         runtime.state.message = null
         runtime.state.credentialFieldError = null
     }
-    // Starts account creation after blocking staff and admin self-registration.
+    /**
+     * Starts account creation after blocking staff and admin self-registration.
+     */
     fun chooseNew() {
         if (!canChooseAccount()) return
         val state = runtime.state
@@ -121,7 +138,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.NewCredentials)
     }
 
-    // Opens the sign-in form for a person who already has an account.
+    /**
+     * Opens the sign-in form for a person who already has an account.
+     */
     fun chooseReturning() {
         if (!canChooseAccount()) return
         runtime.state.creatingAccount = false
@@ -129,7 +148,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.ReturningCredentials)
     }
 
-    // Opens first-time setup when the cover app has not joined an account yet.
+    /**
+     * Opens first-time setup when the cover app has not joined an account yet.
+     */
     fun openAccountSetup() {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
@@ -140,13 +161,19 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.Welcome)
     }
 
-    // Clears the old sign-in error before the person tries again.
+    /**
+     * Clears the old sign-in error before the person tries again.
+     */
     fun clearCredentialError() {
         runtime.state.credentialFieldError = null
         runtime.state.message = null
     }
 
-    // Validates and saves the profile entered during account setup.
+    /**
+     * Validates and saves the profile entered during account setup.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun saveSetupProfile(value: UserProfile) {
         if (runtime.state.screen != SessionScreen.ProfileSetup) return
         with(runtime) {
@@ -205,7 +232,12 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Validates and encrypts a new backup PIN before completing user enrollment.
+    /**
+     * Validates and encrypts a new backup PIN before completing user enrollment.
+     *
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [createDevicePin].
+     */
     fun createDevicePin(pin: String, confirmation: String) {
         with(runtime) { if (state.busy || state.screen != SessionScreen.DevicePin || enrollment != null || state.accountRole != AccountRole.USER) return }
         with(runtime) {
@@ -226,7 +258,13 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Finishes enrollment only if this is still the same setup attempt.
+    /**
+     * Finishes enrollment only if this is still the same setup attempt.
+     *
+     * @param saved Saved supplied to [finishEnrollment].
+     * @param value Input value to store, parse, or format.
+     * @param token Authentication, push notification, or session token.
+     */
     internal suspend fun finishEnrollment(
         saved: DeviceEnrollment,
         value: UserProfile,
@@ -254,7 +292,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves the private trigger phrase before asking the user to create a PIN.
+    /**
+     * Saves the private trigger phrase before asking the user to create a PIN.
+     *
+     * @param trigger Trigger supplied to [saveProvisionedTrigger].
+     */
     fun saveProvisionedTrigger(trigger: String) {
         with(runtime) {
             with(state) {
@@ -278,7 +320,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Stops private services, clears the session, and returns to account entry.
+    /**
+     * Stops private services, clears the session, and returns to account entry.
+     */
     fun signOut() {
         with(runtime) {
             with(state) {
@@ -379,7 +423,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reads the encrypted device session without blocking the main UI thread.
+    /**
+     * Reads the encrypted device session without blocking the main UI thread.
+     *
+     * @return The resulting [DeviceSession], or `null` if unavailable.
+     */
     private suspend fun restoreStoredSession(): DeviceSession? = with(runtime) {
         withContext(Dispatchers.IO) {
             store.currentSession() ?: if (!localMode) {
@@ -391,7 +439,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Rebuilds the correct cover, PIN, safe-app, or staff/admin screen from a saved session.
+    /**
+     * Rebuilds the correct cover, PIN, safe-app, or staff/admin screen from a saved session.
+     *
+     * @param restored Restored supplied to [restorePresentation].
+     */
     private suspend fun restorePresentation(restored: DeviceSession) {
         with(runtime) {
             with(state) {
@@ -421,7 +473,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reloads Storage data when the same account changes on another phone or browser.
+    /**
+     * Reloads Storage data when the same account changes on another phone or browser.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     */
     internal fun watchAccountChanges(identity: AccountIdentity) = with(runtime) {
         accountSyncSubscription?.close()
         accountSyncSubscription = null
@@ -458,7 +514,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         )
     }
 
-    // Account session controller: Routes restored account.
+    /**
+     * Account session controller: Routes restored account.
+     */
     private fun routeRestoredAccount() {
         with(runtime) {
             with(state) {
@@ -477,6 +535,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
 
 // Keeps private-note actions separate from the rest of the signed-in session.
 internal class SessionPrivacy(private val runtime: SessionRuntime) {
+    /**
+     * Returns the idle timeout seconds.
+     *
+     * @return The computed idle timeout seconds numeric value.
+     */
     fun idleTimeoutSeconds(): Int {
         val uid = runtime.coverAccountId ?: return IdlePolicy.DEFAULT_TIMEOUT_SECONDS
         val preferences = runtime.cloudState
@@ -484,6 +547,11 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         return IdlePolicy.normalizeTimeout(preferences.getInt("idle_timeout_seconds_$uid", previousMinutes * 60))
     }
 
+    /**
+     * Sets idle timeout seconds.
+     *
+     * @param seconds Seconds supplied to [setIdleTimeoutSeconds].
+     */
     fun setIdleTimeoutSeconds(seconds: Int) {
         val uid = runtime.coverAccountId ?: return
         runtime.cloudState.edit()
@@ -491,7 +559,9 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
             .apply()
         noteInteraction()
     }
-    // Opens or closes the private note editor for the selected person.
+    /**
+     * Opens or closes the private note editor for the selected person.
+     */
     fun noteInteraction() {
         with(runtime) {
             with(state) {
@@ -502,7 +572,11 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // Records a screenshot or screen-recording alert in private activity history.
+    /**
+     * Records a screenshot or screen-recording alert in private activity history.
+     *
+     * @param kind Kind supplied to [captureDetected].
+     */
     fun captureDetected(kind: String) {
         with(runtime) {
             with(state) {
@@ -528,7 +602,9 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // Records when Android says screen recording has stopped.
+    /**
+     * Records when Android says screen recording has stopped.
+     */
     fun recordingStopped() {
         with(runtime) {
             with(state) {
@@ -537,7 +613,9 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // This warning applies only while the User safe area is open; background locking remains immediate.
+    /**
+     * This warning applies only while the User safe area is open; background locking remains immediate.
+     */
     fun startIdleTimer() {
         with(runtime) {
             with(state) {
@@ -574,8 +652,9 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // A full-screen call is active interaction. Preserve the underlying Safe page and restart
-    // its full inactivity window only after the call overlay has gone away.
+    /**
+     * A full-screen call is active interaction. Preserve the underlying Safe page and restart its full inactivity window only after the call overlay has gone away.
+     */
     fun pauseIdleTimerForCall() {
         with(runtime) {
             with(state) {
@@ -588,6 +667,9 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Resumes idle timer after call.
+     */
     fun resumeIdleTimerAfterCall() {
         with(runtime) {
             if (!idlePausedForCall) return

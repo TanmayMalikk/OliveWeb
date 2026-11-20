@@ -7,7 +7,12 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 
-// Amplitude is a hardware request; devices without amplitude control use their default strength.
+/**
+ * Amplitude is a hardware request; devices without amplitude control use their default strength.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @return `true` if perform emergency vibration, or `false` otherwise.
+ */
 @Suppress("DEPRECATION")
 internal fun performEmergencyVibration(context: Context): Boolean {
     val vibrator = if (Build.VERSION.SDK_INT >= 31)

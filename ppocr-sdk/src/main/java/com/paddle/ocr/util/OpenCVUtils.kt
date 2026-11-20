@@ -23,6 +23,12 @@ object OpenCVUtils {
 
     private var initialized = false
 
+    /**
+     * Initializes the open cv utils.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return `true` if init, or `false` otherwise.
+     */
     fun init(context: Context): Boolean {
         if (initialized) return true
         try {

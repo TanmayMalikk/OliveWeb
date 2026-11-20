@@ -17,6 +17,12 @@ package com.paddle.ocr.util
 // Groups the data and actions for yaml utils.
 object YamlUtils {
 
+    /**
+     * Computes leading spaces.
+     *
+     * @param line Line supplied to [leadingSpaces].
+     * @return The computed leading spaces numeric value.
+     */
     fun leadingSpaces(line: String): Int {
         return line.indexOfFirst { it != ' ' }.let { if (it < 0) line.length else it }
     }

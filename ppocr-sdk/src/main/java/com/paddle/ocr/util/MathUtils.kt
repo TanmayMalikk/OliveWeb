@@ -19,6 +19,12 @@ import kotlin.math.floor
 // Groups the data and actions for math utils.
 object MathUtils {
 
+    /**
+     * Computes round half to even.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The computed round half to even numeric value.
+     */
     fun roundHalfToEven(value: Double): Int {
         val floored = floor(value)
         val diff = value - floored

@@ -6,14 +6,25 @@ import androidx.compose.runtime.*
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.updateAndGet
 import androidx.core.content.edit
 import kotlin.time.Duration.Companion.milliseconds
 
 
-// Calls are private-account features. Direct and personal group chats can call; support chats cannot.
+/**
+ * Calls are private-account features. Direct and personal group chats can call; support chats cannot.
+ *
+ * @param role Account role determining workspace permissions.
+ * @param conversation Conversation metadata including participants and ticket status.
+ * @param currentUid Current user ID supplied to [canCallFromConversation].
+ * @param featureAvailable Whether to apply feature available.
+ * @return `true` if can call from conversation, or `false` otherwise.
+ */
 internal fun canCallFromConversation(
     role: AccountRole,
     conversation: ChatConversation,
@@ -26,13 +37,31 @@ internal fun canCallFromConversation(
     currentUid in conversation.participantIds &&
     conversation.participantIds.any { it != currentUid }
 
+/**
+ * Checks whether the caller can use VoIP.
+ *
+ * @param role Account role determining workspace permissions.
+ * @return `true` if can use VoIP, or `false` otherwise.
+ */
 internal fun canUseVoip(role: AccountRole): Boolean =
     role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
 
+/**
+ * Determines whether the app should show call overlay.
+ *
+ * @param screen Screen supplied to [shouldShowCallOverlay].
+ * @param role Account role determining workspace permissions.
+ * @return `true` if should show call overlay, or `false` otherwise.
+ */
 internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
     screen == SessionScreen.Safe && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
 
-// A failed call with no room attached is shown inside its eligible chat instead of covering every safe-app page.
+/**
+ * A failed call with no room attached is shown inside its eligible chat instead of covering every safe-app page.
+ *
+ * @param state Current state instance to read or render.
+ * @return `true` if should show active call, or `false` otherwise.
+ */
 internal fun shouldShowActiveCall(state: VoipSessionState): Boolean = when (state) {
     is VoipSessionState.Connecting,
     is VoipSessionState.Active,
@@ -41,6 +70,14 @@ internal fun shouldShowActiveCall(state: VoipSessionState): Boolean = when (stat
     VoipSessionState.Idle -> false
 }
 
+/**
+ * Resolves incoming caller.
+ *
+ * @param invitation Invitation supplied to [resolveIncomingCaller].
+ * @param conversations Collection of conversations values to process.
+ * @param currentUid Current user ID supplied to [resolveIncomingCaller].
+ * @return The resulting [VoipInvitation], or `null` if unavailable.
+ */
 internal fun resolveIncomingCaller(
     invitation: VoipInvitation,
     conversations: List<ChatConversation>,
@@ -52,12 +89,26 @@ internal fun resolveIncomingCaller(
     return invitation.copy(name = callerUsername).takeIf { callerUsername.isNotBlank() }
 }
 
+/**
+ * Determines whether the app should leave group call.
+ *
+ * @param call Call supplied to [shouldLeaveGroupCall].
+ * @param currentUid Current user ID supplied to [shouldLeaveGroupCall].
+ * @param remoteParticipantCount Remote participant count supplied to [shouldLeaveGroupCall].
+ * @return `true` if should leave group call, or `false` otherwise.
+ */
 internal fun shouldLeaveGroupCall(
     call: VoipCall,
     currentUid: String,
     remoteParticipantCount: Int,
 ): Boolean = call.participants.size > 2 && currentUid.isNotBlank() &&
     (call.callerId != currentUid || remoteParticipantCount > 0)
+
+internal data class SessionCallsUiState(
+    val invitations: List<VoipInvitation> = emptyList(),
+    val callHistory: List<VoipCall> = emptyList(),
+    val message: String? = null,
+)
 
 internal class SessionCalls(
     private val application: Application,
@@ -81,12 +132,23 @@ internal class SessionCalls(
     private val invitationFirstSeenAt = mutableMapOf<String, Long>()
 
     val state: StateFlow<VoipSessionState> = controller.state
-    var invitations by mutableStateOf(emptyList<VoipInvitation>())
-        private set
-    var callHistory by mutableStateOf(emptyList<VoipCall>())
-        private set
-    var message by mutableStateOf<String?>(null)
-        private set
+    private val uiStateFlow = MutableStateFlow(SessionCallsUiState())
+    val uiState: StateFlow<SessionCallsUiState> = uiStateFlow.asStateFlow()
+    private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
+
+    private inline fun updateUiState(transform: (SessionCallsUiState) -> SessionCallsUiState) {
+        uiStateSnapshot = uiStateFlow.updateAndGet(transform)
+    }
+
+    var invitations: List<VoipInvitation>
+        get() = uiStateSnapshot.invitations
+        private set(value) = updateUiState { it.copy(invitations = value) }
+    var callHistory: List<VoipCall>
+        get() = uiStateSnapshot.callHistory
+        private set(value) = updateUiState { it.copy(callHistory = value) }
+    var message: String?
+        get() = uiStateSnapshot.message
+        private set(value) = updateUiState { it.copy(message = value) }
 
     init {
         // Keeps the microphone session running while the phone is on Home or another app is open.
@@ -105,7 +167,12 @@ internal class SessionCalls(
         }
     }
 
-    // Starts one invitation listener while this signed-in person has the messaging screen open.
+    /**
+     * Starts one invitation listener while this signed-in person has the messaging screen open.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param role Account role determining workspace permissions.
+     */
     fun observeInvitations(uid: String, role: AccountRole) {
         if (configuredRole != role && uid.isNotBlank()) {
             configuredRole = role
@@ -171,7 +238,13 @@ internal class SessionCalls(
         }
     }
 
-    // Starts a call with every other person in a direct or personal group chat.
+    /**
+     * Starts a call with every other person in a direct or personal group chat.
+     *
+     * @param conversation Conversation metadata including participants and ticket status.
+     * @param callerUid Caller user ID supplied to [start].
+     * @param role Account role determining workspace permissions.
+     */
     fun start(conversation: ChatConversation, callerUid: String, role: AccountRole) {
         if (!canCallFromConversation(role, conversation, callerUid, available)) {
             message = "Voice calls are available only in personal User and Safe Contact chats"
@@ -198,20 +271,35 @@ internal class SessionCalls(
         }
     }
 
-    // Accepts the selected invitation and joins its LiveKit audio room.
+    /**
+     * Accepts the selected invitation and joins its LiveKit audio room.
+     *
+     * @param invitation Invitation supplied to [accept].
+     * @param currentUid Current user ID supplied to [accept].
+     * @param role Account role determining workspace permissions.
+     */
     fun accept(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (!canUseVoip(role) || currentUid.isBlank()) return
         suppressInvitation(invitation.callId)
         launchCallJoin { controller.acceptAndJoin(invitation.callId, currentUid) }
     }
 
-    // Hides the invitation before Android opens its microphone permission window. This prevents
-    // the polling loop from restoring the full-screen prompt while permission is being answered.
+    /**
+     * Hides the invitation before Android opens its microphone permission window. This prevents the polling loop from restoring the full-screen prompt while permission is being answered.
+     *
+     * @param invitation Invitation supplied to [hide].
+     */
     fun hide(invitation: VoipInvitation) {
         suppressInvitation(invitation.callId)
     }
 
-    // Declines the invitation without opening the microphone or joining its room.
+    /**
+     * Declines the invitation without opening the microphone or joining its room.
+     *
+     * @param invitation Invitation supplied to [decline].
+     * @param currentUid Current user ID supplied to [decline].
+     * @param role Account role determining workspace permissions.
+     */
     fun decline(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (!canUseVoip(role) || currentUid.isBlank()) return
         suppressInvitation(invitation.callId)
@@ -222,7 +310,13 @@ internal class SessionCalls(
         }
     }
 
-    // Joins an active call from the event shown in chat, using the member's current call status.
+    /**
+     * Joins an active call from the event shown in chat, using the member's current call status.
+     *
+     * @param call Call supplied to [joinActive].
+     * @param currentUid Current user ID supplied to [joinActive].
+     * @param role Account role determining workspace permissions.
+     */
     fun joinActive(call: VoipCall, currentUid: String, role: AccountRole) {
         if (!canUseVoip(role) ||
             !call.canBeJoinedBy(currentUid)
@@ -237,27 +331,53 @@ internal class SessionCalls(
         }
     }
 
-    // Updates whether other people in the active call can hear this device's microphone.
+    /**
+     * Updates whether other people in the active call can hear this device's microphone.
+     *
+     * @param muted Whether to apply muted.
+     */
     fun setMuted(muted: Boolean) {
         scope.launch { runCallAction { controller.setMicrophoneMuted(muted) } }
     }
 
+    /**
+     * Sets speaker enabled.
+     *
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     fun setSpeakerEnabled(enabled: Boolean) {
         scope.launch { runCallAction { controller.setSpeakerEnabled(enabled) } }
     }
 
+    /**
+     * Launches call join.
+     *
+     * @param action Action or callback executed for action.
+     */
     private fun launchCallJoin(action: suspend () -> Unit) {
         if (callJoinJob?.isActive == true) return
         callJoinJob = scope.launch { runCallAction(action) }
     }
 
+    /**
+     * Checks whether the caller can handle notification.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     * @return `true` if can handle notification, or `false` otherwise.
+     */
     fun canHandleNotification(callId: String): Boolean = when (val current = state.value) {
         is VoipSessionState.Connecting -> current.call.callId == callId
         is VoipSessionState.Active -> current.call.callId == callId
         else -> false
     }
 
-    // A caller ends the room. A member leaving a group only disconnects their own phone.
+    /**
+     * A caller ends the room. A member leaving a group only disconnects their own phone.
+     *
+     * @param currentUid Current user ID supplied to [finish].
+     * @param expectedCallId Optional expected call ID supplied to [finish].
+     * @return The resulting [Job] instance.
+     */
     fun finish(currentUid: String, expectedCallId: String? = null): Job {
         val joining = callJoinJob
         return scope.launch {
@@ -284,15 +404,25 @@ internal class SessionCalls(
         }
     }
 
+    /**
+     * Clears message.
+     */
     fun clearMessage() {
         message = null
     }
 
+    /**
+     * Reports the session calls.
+     *
+     * @param message Chat message or remote payload.
+     */
     fun report(message: String) {
         this.message = message
     }
 
-    // Stops network polling when the session is cleared or the account no longer supports calls.
+    /**
+     * Stops network polling when the session is cleared or the account no longer supports calls.
+     */
     fun close() {
         stopObserving()
         VoipCallForegroundService.stop(application)
@@ -301,6 +431,9 @@ internal class SessionCalls(
             current is VoipSessionState.Error) finish("")
     }
 
+    /**
+     * Stops observing.
+     */
     private fun stopObserving() {
         invitationJob?.cancel()
         invitationJob = null
@@ -309,20 +442,42 @@ internal class SessionCalls(
         invitationFirstSeenAt.clear()
     }
 
+    /**
+     * Computes history for.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param role Account role determining workspace permissions.
+     * @return List of resulting history for items.
+     */
     fun historyFor(conversationId: String, role: AccountRole): List<VoipCall> =
         if (canUseVoip(role)) callHistory.filter { it.conversationId == conversationId }
         else emptyList()
 
+    /**
+     * Cancels notification.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     */
     private fun cancelNotification(callId: String) {
         androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())
     }
 
+    /**
+     * Computes suppress invitation.
+     *
+     * @param callId Unique identifier of the VoIP call session.
+     */
     private fun suppressInvitation(callId: String) {
         rememberSuppressed(setOf(callId))
         invitations = invitations.filterNot { it.callId == callId }
         cancelNotification(callId)
     }
 
+    /**
+     * Computes remember suppressed.
+     *
+     * @param callIds Collection of call IDs values to process.
+     */
     private fun rememberSuppressed(callIds: Set<String>) {
         suppressedInvitationIds += callIds
         invitationPreferences.edit {
@@ -330,6 +485,11 @@ internal class SessionCalls(
             }
     }
 
+    /**
+     * Executes call action.
+     *
+     * @param action Action or callback executed for action.
+     */
     private suspend fun runCallAction(action: suspend () -> Unit) {
         message = null
         try {

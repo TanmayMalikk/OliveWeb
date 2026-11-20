@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_readiness_title">Preparación para emergencias</string>
+    <string name="emergency_readiness_location">Permite el acceso a tu ubicación para incluir tus coordenadas en el informe de emergencia y ayudar a que te encuentren.</string>
+    <string name="emergency_readiness_device_location">Activa la ubicación del dispositivo para incluir dónde estás en el informe de emergencia.</string>
+    <string name="emergency_readiness_background">Permite la ubicación en segundo plano para que los administradores puedan seguir viendo tu ubicación si sales de la aplicación.</string>
+    <string name="emergency_readiness_notifications">Activa las notificaciones para ver el aviso mientras compartes tu ubicación.</string>
+    <string name="emergency_readiness_allow_location">Permitir ubicación</string>
+    <string name="emergency_readiness_enable_location">Activar ubicación</string>
+    <string name="emergency_readiness_allow_background">Permitir en segundo plano</string>
+    <string name="emergency_readiness_notification_settings">Ajustes de notificaciones</string>
+    <string name="emergency_readiness_remind_later">Recordármelo más tarde</string>
+    <string name="emergency_readiness_location_settings_path">Elige %1$s. Si Android abre la información de la aplicación, ve a Permisos y luego a Ubicación.</string>
+</resources>

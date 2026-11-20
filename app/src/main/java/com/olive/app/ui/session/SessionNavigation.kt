@@ -18,13 +18,21 @@ import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.SupportRepository
 import com.olive.app.data.news.NewsArticle
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
 
 // Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
 internal class SessionNavigation(private val runtime: SessionRuntime) {
-    // Opens a Safe App screen and remembers where Back should return.
+    /**
+     * Opens a Safe App screen and remembers where Back should return.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun openScreen(value: SessionScreen) {
         with(runtime) {
             with(state) {
@@ -35,7 +43,9 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
-    // User exits also advance the cover-focus event so TalkBack leaves the old private screen.
+    /**
+     * User exits also advance the cover-focus event so TalkBack leaves the old private screen.
+     */
     fun quickExit() {
         with(runtime) {
             with(state) {
@@ -45,6 +55,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     accessibilityExitVersion++
                 }
                 safety.close()
+                adminPreloader.clear()
                 epoch++
                 pinAuthorizedUid = null
                 pinAuthorizedEpoch = -1L
@@ -90,7 +101,9 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
-    // Moves the app into its background state for session navigation.
+    /**
+     * Moves the app into its background state for session navigation.
+     */
     fun background() {
         with(runtime) {
             with(state) {
@@ -115,7 +128,9 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
-    // Returns to the previous screen for session navigation.
+    /**
+     * Returns to the previous screen for session navigation.
+     */
     fun back() {
         with(runtime) {
             with(state) {
@@ -144,7 +159,11 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session navigation: Opens the requested screen.
+    /**
+     * Session navigation: Opens the requested screen.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun navigate(value: SafePage) {
         with(runtime) {
             with(state) {
@@ -178,7 +197,11 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
 
 // Owns account-scoped cover persistence.
 internal class SessionCoverState(private val runtime: SessionRuntime) {
-    // Loads the signed-in account's saved news state.
+    /**
+     * Loads the signed-in account's saved news state.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun restoreCoverData(uid: String) {
         with(runtime) {
             with(state) {
@@ -189,7 +212,11 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
-    // Switches news bookmark on or off.
+    /**
+     * Switches news bookmark on or off.
+     *
+     * @param article Article supplied to [toggleNewsBookmark].
+     */
     fun toggleNewsBookmark(article: NewsArticle) {
         with(runtime) {
             with(state) {
@@ -213,34 +240,66 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
 
 // Users and staff: manages support tickets separately from safety-plan consultations.
 
+internal data class StaffSupportUiState(
+    val requested: Boolean = false,
+    val staffUid: String = "",
+    val conversationId: String = "",
+    val saving: Int = 0,
+    val error: Int? = null,
+    val addParticipantError: String? = null,
+    val requestStaffError: String? = null,
+)
+
 internal class StaffSupportController(
     private val runtime: SessionRuntime,
     repositoryFactory: () -> SupportRepository = { SupportRepository() },
 ) {
     private val repository by lazy(repositoryFactory)
+    private val uiStateFlow = MutableStateFlow(StaffSupportUiState())
+    val uiState: StateFlow<StaffSupportUiState> = uiStateFlow.asStateFlow()
+    private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
-    var requested by mutableStateOf(false)
-        private set
-    var staffUid by mutableStateOf("")
-        private set
-    var conversationId by mutableStateOf("")
-        private set
-    var saving by mutableIntStateOf(0)
-        private set
-    var error by mutableStateOf<Int?>(null)
-        private set
-    var addParticipantError by mutableStateOf<String?>(null)
-        private set
-    var requestStaffError by mutableStateOf<String?>(null)
-        private set
+    private inline fun updateUiState(transform: (StaffSupportUiState) -> StaffSupportUiState) {
+        uiStateSnapshot = uiStateFlow.updateAndGet(transform)
+    }
 
-    // Requests help for staff support controller.
+    var requested: Boolean
+        get() = uiStateSnapshot.requested
+        private set(value) = updateUiState { it.copy(requested = value) }
+    var staffUid: String
+        get() = uiStateSnapshot.staffUid
+        private set(value) = updateUiState { it.copy(staffUid = value) }
+    var conversationId: String
+        get() = uiStateSnapshot.conversationId
+        private set(value) = updateUiState { it.copy(conversationId = value) }
+    var saving: Int
+        get() = uiStateSnapshot.saving
+        private set(value) = updateUiState { it.copy(saving = value) }
+    var error: Int?
+        get() = uiStateSnapshot.error
+        private set(value) = updateUiState { it.copy(error = value) }
+    var addParticipantError: String?
+        get() = uiStateSnapshot.addParticipantError
+        private set(value) = updateUiState { it.copy(addParticipantError = value) }
+    var requestStaffError: String?
+        get() = uiStateSnapshot.requestStaffError
+        private set(value) = updateUiState { it.copy(requestStaffError = value) }
+
+    /**
+     * Requests help for staff support controller.
+     */
     fun requestHelp() = updateRequest(cancel = false)
 
-    // Returns true while a staff-help request is waiting and may be cancelled.
+    /**
+     * Returns true while a staff-help request is waiting and may be cancelled.
+     */
     fun cancelRequest() = updateRequest(cancel = true)
 
-    // Keep the current account's ticket on screen; responses from a previous account are ignored.
+    /**
+     * Keep the current account's ticket on screen; responses from a previous account are ignored.
+     *
+     * @param cancel Whether to apply cancel.
+     */
     private fun updateRequest(cancel: Boolean) {
         if (saving > 0) return
         if (runtime.localMode) {
@@ -283,7 +342,11 @@ internal class StaffSupportController(
         }
     }
 
-    // Staff support controller: Requests admin.
+    /**
+     * Staff support controller: Requests admin.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     */
     fun requestAdmin(conversationId: String) {
         if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank()) return
         saving++
@@ -302,7 +365,12 @@ internal class StaffSupportController(
         }
     }
 
-    // Adds an accepted personal contact to the open chat after the server checks both accounts.
+    /**
+     * Adds an accepted personal contact to the open chat after the server checks both accounts.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param participantUid Participant user ID supplied to [addParticipant].
+     */
     fun addParticipant(conversationId: String, participantUid: String) {
         if (runtime.localMode || conversationId.isBlank() || participantUid.isBlank() || saving > 0) return
         val actor = runtime.coverAccountId ?: return
@@ -324,7 +392,12 @@ internal class StaffSupportController(
         }
     }
 
-    // Removes a member from a group after the server verifies group ownership and the two-person minimum.
+    /**
+     * Removes a member from a group after the server verifies group ownership and the two-person minimum.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param participantUid Participant user ID supplied to [removeParticipant].
+     */
     fun removeParticipant(conversationId: String, participantUid: String) {
         if (runtime.localMode || conversationId.isBlank() || participantUid.isBlank() || saving > 0) return
         val actor = runtime.coverAccountId ?: return
@@ -346,7 +419,12 @@ internal class StaffSupportController(
         }
     }
 
-    // Creates a new support chat from an existing user and safe-contact conversation.
+    /**
+     * Creates a new support chat from an existing user and safe-contact conversation.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param onCreated Callback invoked when created changes or occurs.
+     */
     fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) {
         if (runtime.localMode || conversationId.isBlank() || saving > 0 ||
             runtime.state.accountRole !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
@@ -373,13 +451,21 @@ internal class StaffSupportController(
         }
     }
 
-    // Removes old Chat Info errors before another chat is opened.
+    /**
+     * Removes old Chat Info errors before another chat is opened.
+     */
     fun clearChatInfoErrors() {
         addParticipantError = null
         requestStaffError = null
     }
 
-    // Staff support controller: Closes the active feature.
+    /**
+     * Staff support controller: Closes the active feature.
+     *
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param planCompleted Whether to apply plan completed.
+     * @param onClosed Callback invoked when closed changes or occurs.
+     */
     fun close(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) {
         if (runtime.localMode ||
             runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) ||
@@ -418,7 +504,11 @@ internal class StaffSupportController(
 
 // Searches the directory and manages friend requests.
 internal class FriendActions(private val runtime: SessionRuntime) {
-    // Finds users for the signed-in session.
+    /**
+     * Finds users for the signed-in session.
+     *
+     * @param query Search query string entered by the user.
+     */
     fun searchUsers(query: String) {
         with(runtime) {
             with(state) {
@@ -434,7 +524,12 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Loads the current friend relationship before changing it.
+    /**
+     * Loads the current friend relationship before changing it.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [FriendRelationship] for relationship for.
+     */
     fun relationshipFor(uid: String): FriendRelationship {
         with(runtime) {
             with(state) {
@@ -448,7 +543,11 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Sends a request to the selected directory account and refreshes the social list on success.
+    /**
+     * Sends a request to the selected directory account and refreshes the social list on success.
+     *
+     * @param user User supplied to [sendFriendRequest].
+     */
     fun sendFriendRequest(user: DirectoryUser) {
         with(runtime) {
             with(state) {
@@ -461,7 +560,11 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session friend actions: Accepts friend request. It runs the repository request through the shared messaging error handler.
+    /**
+     * Session friend actions: Accepts friend request. It runs the repository request through the shared messaging error handler.
+     *
+     * @param request Request supplied to [acceptFriendRequest].
+     */
     fun acceptFriendRequest(request: FriendRequest) {
         with(runtime) {
             with(state) {
@@ -474,7 +577,11 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session friend actions: Declines friend request. It runs the repository request through the shared messaging error handler.
+    /**
+     * Session friend actions: Declines friend request. It runs the repository request through the shared messaging error handler.
+     *
+     * @param request Request supplied to [declineFriendRequest].
+     */
     fun declineFriendRequest(request: FriendRequest) {
         with(runtime) {
             return messaging.runMessagingAction("Unable to decline this friend request.") { repository, device, _ ->
@@ -483,7 +590,11 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Cancels friend request.
+    /**
+     * Cancels friend request.
+     *
+     * @param request Request supplied to [cancelFriendRequest].
+     */
     fun cancelFriendRequest(request: FriendRequest) {
         with(runtime) {
             return messaging.runMessagingAction("Unable to cancel this friend request.") { repository, device, _ ->
@@ -492,7 +603,11 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Creates or opens a direct message after confirming the friend relationship.
+    /**
+     * Creates or opens a direct message after confirming the friend relationship.
+     *
+     * @param friend Friend relationship record.
+     */
     fun startConversation(friend: Friend) {
         with(runtime) {
             with(state) {

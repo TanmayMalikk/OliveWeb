@@ -7,8 +7,8 @@ import com.olive.app.ui.shared.localizedTitle
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.DeliveryAddress
@@ -221,13 +221,8 @@ class SafetyPlanUiTest : OliveUiTestBase() {
                 R.string.a11y_returned_to_cover,
                 session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
             )
-            compose.onNodeWithContentDescription(returnedToCover)
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.LiveRegion,
-                        LiveRegionMode.Polite
-                    )
-                )
+            compose.waitUntil(10_000) { returnedToCover in talkBack.announcements }
+            compose.onNodeWithContentDescription(returnedToCover).assertDoesNotExist()
             assertTrue(
                 "Quick-exit status must not move TalkBack focus",
                 talkBack.focused.none { it.contains(returnedToCover) })
@@ -270,8 +265,11 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safety_upload_primary_documents_0").performScrollTo()
             .assertIsEnabled().performClick()
         waitFor("documents_choose_document")
-        androidx.test.espresso.Espresso.pressBack()
-        compose.onNodeWithTag("documents_choose_document").assertDoesNotExist()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("documents_choose_document").fetchSemanticsNodes().isEmpty()
+        }
         val originalCount =
             readSafetyChecklist(session.safetyPlans.plan!!.fields.getValue("primary_documents").value).size
         compose.onNodeWithTag("safety_check_primary_documents_0").performScrollTo().performClick()
@@ -283,7 +281,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         click("safety_jump_documents")
         compose.onNodeWithContentDescription("Driver’s licence / government-issued photo ID")
             .performScrollTo().assertExists()
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        hideKeyboard()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         java.io.File(
             instrumentation.targetContext.getExternalFilesDir(null),

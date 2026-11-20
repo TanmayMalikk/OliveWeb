@@ -26,6 +26,11 @@ private val oliveLightColors = lightColorScheme(
     errorContainer = OliveErrorContainer, onErrorContainer = OliveError,
 )
 
+/**
+ * Composes the olive theme UI element.
+ *
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun OliveTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = oliveLightColors, typography = OliveTypography, content = content)

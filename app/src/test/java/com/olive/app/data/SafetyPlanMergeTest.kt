@@ -75,6 +75,21 @@ class SafetyPlanMergeTest {
         assertNull(safetyChecklistConflictPreview("Plain text", "Other text", true))
     }
 
+    @Test
+    fun concurrentAttachmentUpdatesMergeChecklistListsWithoutConflict() {
+        val rows = listOf(SafetyChecklistItem("a", "Docs", attachmentIds = listOf("d1"), excludedAttachmentIds = listOf("e0")))
+        val base = writeSafetyChecklist(rows)
+        val mine = writeSafetyChecklist(listOf(rows[0].copy(attachmentIds = listOf("d1", "d2"), excludedAttachmentIds = emptyList())))
+        val remote = writeSafetyChecklist(listOf(rows[0].copy(attachmentIds = listOf("d1", "d3"), excludedAttachmentIds = listOf("e0"))))
+        val merged = checkNotNull(mergeSafetyChecklist(base, mine, remote))
+        assertFalse(merged.conflicted)
+        val mergedRow = readSafetyChecklist(merged.localValue).single()
+        assertTrue("d1" in mergedRow.attachmentIds)
+        assertTrue("d2" in mergedRow.attachmentIds)
+        assertTrue("d3" in mergedRow.attachmentIds)
+        assertTrue(mergedRow.excludedAttachmentIds.isEmpty())
+    }
+
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))
 
@@ -267,5 +282,16 @@ class SafetyPlanMergeTest {
             shareAction = "stop"
         )
         assertEquals(plan, SafetyPlan.fromJson(plan.toJson()))
+    }
+
+    @Test
+    fun deletedRowOrMalformedChecklistAttachmentListTriggersConflict() {
+        val beforeJson = """{"oliveSafetyChecklist":1,"items":[{"id":"row-1","text":"Passport","checked":false,"attachmentIds":["a"]},{"id":"row-2","text":"Keys","checked":false,"attachmentIds":"not-a-list"}]}"""
+        val localJson = """{"oliveSafetyChecklist":1,"items":[{"id":"row-2","text":"Keys","checked":false,"attachmentIds":["b"]}]}"""
+        val remoteJson = """{"oliveSafetyChecklist":1,"items":[{"id":"row-1","text":"Passport Updated","checked":true},{"id":"row-2","text":"Keys","checked":false,"attachmentIds":["c"]}]}"""
+
+        val merged = mergeSafetyChecklist(beforeJson, localJson, remoteJson)
+        assertNotNull(merged)
+        assertTrue(merged!!.conflicted)
     }
 }

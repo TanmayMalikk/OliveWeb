@@ -48,8 +48,76 @@ async function unlock(page: Page, link: string) {
     page.getByRole("heading", { name: "Your Safe Space" }),
   ).toBeVisible();
 }
+test("account settings validate new credentials and rotate only a confirmed entry link", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const link = await onboard(page);
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await expect(page.getByRole("heading", { name: "Nature Pairs" })).toBeVisible();
+  await unlock(page, link);
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  const entryLink = page.getByRole("textbox", { name: "Personal entry link", exact: true });
+  await expect(entryLink).toHaveValue(link);
+  await page.getByRole("button", { name: "Copy link" }).click();
+  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+  await page.getByRole("button", { name: "Create a replacement link" }).click();
+  await page.getByRole("button", { name: "Keep current link" }).click();
+  await expect(entryLink).toHaveValue(link);
+  await page.getByRole("button", { name: "Create a replacement link" }).click();
+  await page.getByRole("button", { name: "Create replacement", exact: true }).click();
+  await expect(entryLink).not.toHaveValue(link);
+  await expect(entryLink).toHaveValue(/\/entry#[A-Za-z0-9_-]{43}$/);
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click();
+
+  await page.getByLabel("Current PIN", { exact: true }).fill("123456");
+  await page.getByLabel("New PIN", { exact: true }).fill("345678");
+  await page.getByLabel("Confirm new PIN", { exact: true }).fill("345679");
+  await page.getByRole("button", { name: "Change PIN", exact: true }).click();
+  await expect(page.getByText("Enter matching PINs with 4–6 digits.")).toBeVisible();
+  await page.getByLabel("Confirm new PIN", { exact: true }).fill("345678");
+  await page.getByRole("button", { name: "Change PIN", exact: true }).click();
+  await expect(page.getByText("Browser PIN updated.")).toBeVisible();
+  await page.getByLabel("New trigger phrase", { exact: true }).fill("synthetic fitness cover");
+  await page.getByRole("button", { name: "Save trigger" }).click();
+  await expect(page.getByText("Cover trigger updated.")).toBeVisible();
+});
+test("incident entry can be edited, pinned, found and restored from trash", async ({ page }) => {
+  const link = await onboard(page);
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await expect(page.getByRole("heading", { name: "Nature Pairs" })).toBeVisible();
+  await unlock(page, link);
+  await page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }).click();
+  await page.getByRole("button", { name: "New entry" }).click();
+  await page.getByRole("tab", { name: "Incident" }).click();
+  await page.getByLabel("Title (optional)").fill("Synthetic incident");
+  await page.getByLabel("Date of incident").fill("2026-05-15");
+  await page.getByLabel("Approx. time of incident").fill("13:20");
+  await page.getByLabel("Location of incident").fill("Synthetic location");
+  await page.getByLabel("Incident details (required)").fill("First version");
+  await page.getByRole("button", { name: "Save entry" }).click();
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await expect(page.getByText("No entries match your filter.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await page.getByRole("button", { name: "Pin Synthetic incident" }).click();
+  await expect(page.getByRole("button", { name: "Unpin Synthetic incident" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: /Synthetic incident First version/ }).click();
+  await expect(page.getByLabel("Date of incident")).toHaveValue("2026-05-15");
+  await expect(page.getByLabel("Location of incident")).toHaveValue("Synthetic location");
+  await page.getByLabel("Incident details (required)").fill("Revised body");
+  await page.getByRole("button", { name: "Save entry" }).click();
+  await page.getByRole("button", { name: "Edit history" }).click();
+  const history = page.getByRole("dialog", { name: "Entry edit history" });
+  await expect(history.getByText("First version")).toBeVisible();
+  await expect(history.getByText("Revised body")).toBeVisible();
+  await history.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Move Synthetic incident to trash" }).click();
+  await page.getByRole("button", { name: "Trash", exact: true }).click();
+  await expect(page.getByText(/Expires in/)).toBeVisible();
+  await page.getByRole("button", { name: "Restore" }).click();
+  await page.getByRole("button", { name: "Back to notes" }).click();
+  await expect(page.getByRole("heading", { name: "Synthetic incident" })).toBeVisible();
+});
 test("incident pin loads and keeps the selected location when address lookup is unavailable", async ({ page }) => {
-  await page.route("**/api/map-tiles/**", (route) => route.fulfill({ status: 404 }));
   await page.route("**/api/locations?**", (route) => route.fulfill({ status: 503, json: {} }));
   const link = await onboard(page);
   await page.getByRole("button", { name: "Continue to my cover" }).click();
@@ -59,15 +127,23 @@ test("incident pin loads and keeps the selected location when address lookup is 
   await page.getByRole("tab", { name: "Incident", exact: true }).click();
   await page.getByRole("button", { name: "Choose incident location on map" }).click();
 
-  const map = page.getByRole("application", { name: /Incident location map/ });
-  await map.click({ position: { x: 100, y: 100 } });
-  const pin = map.getByAltText("Incident pin");
-  await expect(pin).toBeVisible();
-  await expect.poll(() => pin.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   const location = page.getByLabel("Location of incident");
+  await expect(page.getByText("Loading map…")).toHaveCount(0, { timeout: 20000 });
+  const unavailable = page.getByText("Map unavailable.");
+  if (!process.env.VITE_MAPBOX_ACCESS_TOKEN?.startsWith("pk.") && await unavailable.isVisible()) {
+    await location.fill("Typed incident location");
+    await expect(location).toHaveValue("Typed incident location");
+    return;
+  }
+  const map = page.getByRole("region", { name: "Incident location map" });
+  await expect(unavailable).toHaveCount(0);
+  const canvas = map.locator("canvas");
+  await canvas.click({ position: { x: 100, y: 100 }, timeout: 5000 });
+  const pin = map.locator('[aria-label="Incident pin"]');
+  await expect(pin).toBeVisible();
   await expect(location).toHaveValue(/^Dropped pin/);
   const first = await location.inputValue();
-  await map.click({ position: { x: 170, y: 130 } });
+  await canvas.click({ position: { x: 170, y: 130 }, timeout: 5000 });
   await expect(location).not.toHaveValue(first);
   await expect(location).toHaveValue(/^Dropped pin/);
 });
@@ -148,6 +224,25 @@ test("plain domain and guessed private paths show Little Grove", async ({
       page.getByText("Your personal entry", { exact: true }),
     ).toHaveCount(0);
   }
+});
+
+test("hotlines filter by province, city, type, and phone number", async ({ page }) => {
+  const link = await onboard(page);
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await unlock(page, link);
+  await page.getByRole("main").getByRole("button", { name: "Hotlines", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Support hotlines and shelters" })).toBeVisible();
+  await page.getByLabel("Province or territory").selectOption("AB");
+  await page.getByLabel("City").selectOption("Edmonton");
+  await page.getByLabel("Resource type").selectOption("Hotlines");
+  const search = page.getByRole("searchbox", { name: "Search resources" });
+  await search.fill("7804824357");
+  await expect(page.getByRole("heading", { name: "Distress Line (CMHA Edmonton)" })).toBeVisible();
+  await search.fill("synthetic unmatched hotline");
+  await expect(page.getByText("No matching resources")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByLabel("Province or territory")).toHaveValue("");
 });
 // Inputs: the values in this case. Expected: account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry.
 test("account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry", async ({

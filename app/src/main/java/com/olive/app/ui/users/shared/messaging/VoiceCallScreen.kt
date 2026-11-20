@@ -38,6 +38,12 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Formats call duration.
+ *
+ * @param totalSeconds Total seconds supplied to [formatCallDuration].
+ * @return The resulting format call duration string.
+ */
 internal fun formatCallDuration(totalSeconds: Long): String {
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
@@ -46,6 +52,14 @@ internal fun formatCallDuration(totalSeconds: Long): String {
     else "%02d:%02d".format(minutes, seconds)
 }
 
+/**
+ * Displays the incoming call dialog overlay.
+ *
+ * @param invitation Invitation supplied to [IncomingCallDialog].
+ * @param onAccept Callback invoked when accept changes or occurs.
+ * @param onDecline Callback invoked when decline changes or occurs.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ */
 @Composable
 internal fun IncomingCallDialog(
     invitation: VoipInvitation,
@@ -81,6 +95,17 @@ internal fun IncomingCallDialog(
     }
 }
 
+/**
+ * Displays the active call dialog overlay.
+ *
+ * @param state Current state instance to read or render.
+ * @param currentUid Current user ID supplied to [ActiveCallDialog].
+ * @param onMute Callback invoked when mute changes or occurs.
+ * @param onSpeaker Callback invoked when speaker changes or occurs.
+ * @param onFinish Callback invoked when finish changes or occurs.
+ * @param onMinimize Callback invoked when minimize changes or occurs.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ */
 @Composable
 internal fun ActiveCallDialog(
     state: VoipSessionState,
@@ -214,7 +239,12 @@ internal fun ActiveCallDialog(
     }
 }
 
-// Shows a small movable call button while the user works elsewhere inside Olive Branch.
+/**
+ * Shows a small movable call button while the user works elsewhere inside Olive Branch.
+ *
+ * @param state Current state instance to read or render.
+ * @param onOpen Callback invoked when open changes or occurs.
+ */
 @Composable
 internal fun DraggableCallBubble(
     state: VoipSessionState,
@@ -278,12 +308,25 @@ internal fun DraggableCallBubble(
     }
 }
 
-// Prevents a dragged call bubble from covering the system edges or leaving the app window.
+/**
+ * Prevents a dragged call bubble from covering the system edges or leaving the app window.
+ *
+ * @param parent Parent supplied to [coerceInside].
+ * @param child Child supplied to [coerceInside].
+ * @return The resulting [Offset] for coerce inside.
+ */
 private fun Offset.coerceInside(parent: IntSize, child: IntSize): Offset = Offset(
     x = x.coerceIn(0f, (parent.width - child.width).coerceAtLeast(0).toFloat()),
     y = y.coerceIn(0f, (parent.height - child.height).coerceAtLeast(0).toFloat()),
 )
 
+/**
+ * Displays the full screen call dialog overlay.
+ *
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 private fun FullScreenCallDialog(
     onBack: () -> Unit,
@@ -330,6 +373,14 @@ private fun FullScreenCallDialog(
     }
 }
 
+/**
+ * Composes the call identity UI element.
+ *
+ * @param name Field, key, or display name.
+ * @param status Status supplied to [CallIdentity].
+ * @param isError Whether is error.
+ * @param isGroup Whether is group.
+ */
 @Composable
 private fun CallIdentity(
     name: String,
@@ -367,6 +418,9 @@ private fun CallIdentity(
     )
 }
 
+/**
+ * Composes the audio waveform UI element.
+ */
 @Composable
 private fun AudioWaveform() {
     Row(
@@ -382,6 +436,16 @@ private fun AudioWaveform() {
     }
 }
 
+/**
+ * Composes the call action UI element.
+ *
+ * @param label Accessible label or display caption.
+ * @param icon Action or callback executed for icon.
+ * @param onClick Callback invoked when the control is activated.
+ * @param color Color supplied to [CallAction].
+ * @param selected Whether to apply selected.
+ * @param tag Tag supplied to [CallAction].
+ */
 @Composable
 private fun CallAction(
     label: String,

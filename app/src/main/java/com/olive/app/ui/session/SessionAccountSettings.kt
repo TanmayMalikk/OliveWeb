@@ -28,7 +28,16 @@ import kotlinx.coroutines.sync.withLock
 
 // Saves private profile, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime: SessionRuntime) {
-    // Saves the user's cover choice and other general account settings.
+    /**
+     * Saves the user's cover choice and other general account settings.
+     *
+     * @param fullName Full name supplied to [saveSettings].
+     * @param affected Affected supplied to [saveSettings].
+     * @param abuserName Abuser name supplied to [saveSettings].
+     * @param dob Date of birth supplied to [saveSettings].
+     * @param situation Situation supplied to [saveSettings].
+     * @param address Address supplied to [saveSettings].
+     */
     fun saveSettings(
         fullName: String,
         affected: String,
@@ -60,7 +69,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves settings that belong to the current discreet cover app.
+    /**
+     * Saves settings that belong to the current discreet cover app.
+     *
+     * @param fullName Full name supplied to [saveCoverSettings].
+     * @param dob Date of birth supplied to [saveCoverSettings].
+     * @param address Address supplied to [saveCoverSettings].
+     */
     fun saveCoverSettings(fullName: String, dob: String, address: DeliveryAddress) {
         with(runtime) {
             with(state) {
@@ -109,7 +124,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves private Safe App profile changes on the phone and in the cloud.
+    /**
+     * Saves private Safe App profile changes on the phone and in the cloud.
+     *
+     * @param updated Updated supplied to [saveSafeProfile].
+     */
     fun saveSafeProfile(updated: UserProfile) {
         with(runtime) {
             with(state) {
@@ -146,7 +165,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Checks cover requirements before saving the newly selected cover.
+    /**
+     * Checks cover requirements before saving the newly selected cover.
+     *
+     * @param type Type supplied to [changeCover].
+     */
     fun changeCover(type: CoverType) {
         with(runtime) {
             with(state) {
@@ -197,7 +220,12 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Checks and saves the discreet trigger phrase used by cover apps.
+    /**
+     * Checks and saves the discreet trigger phrase used by cover apps.
+     *
+     * @param trigger Trigger supplied to [changeTrigger].
+     * @param pin User-entered PIN string.
+     */
     fun changeTrigger(trigger: String, pin: String) {
         with(runtime) {
             with(state) {
@@ -233,7 +261,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Stores a trigger phrase after the current entry method proves the user is authorized.
+    /**
+     * Stores a trigger phrase after the current entry method proves the user is authorized.
+     *
+     * @param device Device supplied to [saveVerifiedTrigger].
+     * @param trigger Trigger supplied to [saveVerifiedTrigger].
+     * @param token Authentication, push notification, or session token.
+     */
     internal suspend fun saveVerifiedTrigger(
         device: DeviceEnrollment,
         trigger: String,
@@ -265,7 +299,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves the user's trusted contacts to the encrypted profile and cloud copy.
+    /**
+     * Saves the user's trusted contacts to the encrypted profile and cloud copy.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun saveContacts(value: List<SafeContact>) {
         with(runtime) {
             with(state) {
@@ -298,7 +336,9 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Retries a profile upload that was saved on the phone while the cloud was unavailable.
+    /**
+     * Retries a profile upload that was saved on the phone while the cloud was unavailable.
+     */
     fun sync() {
         with(runtime) {
             with(state) {
@@ -314,7 +354,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Uploads a locally edited user profile and clears its pending-sync marker after confirmation.
+    /**
+     * Uploads a locally edited user profile and clears its pending-sync marker after confirmation.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param value Input value to store, parse, or format.
+     * @param token Authentication, push notification, or session token.
+     */
     suspend fun syncProfile(uid: String, value: UserProfile, token: Long) {
         with(runtime) {
             with(state) {
@@ -347,7 +393,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Changes the account password after checking the current one.
+    /**
+     * Changes the account password after checking the current one.
+     *
+     * @param currentPassword Current password supplied to [changePassword].
+     * @param newPassword New password supplied to [changePassword].
+     * @param confirmation Confirmation supplied to [changePassword].
+     */
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) {
         with(runtime) {
             with(state) {
@@ -425,7 +477,12 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         private set
     var failedUid by mutableStateOf<String?>(null)
         private set
-    // Adds a non-sensitive settings action to private account history.
+    /**
+     * Adds a non-sensitive settings action to private account history.
+     *
+     * @param area Area supplied to [recordSettingsInteraction].
+     * @param action Action supplied to [recordSettingsInteraction].
+     */
     fun recordSettingsInteraction(area: String, action: String) {
         with(runtime) {
             with(state) {
@@ -444,7 +501,11 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reloads local activity history and private notes for the current account.
+    /**
+     * Reloads local activity history and private notes for the current account.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun refreshHistory(uid: String) {
         with(runtime) {
             with(state) {
@@ -480,7 +541,11 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Opens the private activity page with the requested history category selected.
+    /**
+     * Opens the private activity page with the requested history category selected.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun showActivityCategory(value: ActivityCategory) {
         with(runtime) {
             with(state) {
@@ -493,7 +558,9 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Leaves a history category, or leaves the activity page when no category is open.
+    /**
+     * Leaves a history category, or leaves the activity page when no category is open.
+     */
     fun activityBack() {
         with(runtime) {
             with(state) {
@@ -502,7 +569,12 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Downloads account activity, merges it with local records, and refreshes the selected history page.
+    /**
+     * Downloads account activity, merges it with local records, and refreshes the selected history page.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param username Account username.
+     */
     fun loadCloudHistory(uid: String, username: String) {
         with(runtime) {
             scope.launch {
@@ -522,7 +594,9 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts a background upload when local history has not reached the cloud yet.
+    /**
+     * Starts a background upload when local history has not reached the cloud yet.
+     */
     fun queueHistorySync() {
         with(runtime) {
             with(state) {

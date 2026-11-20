@@ -52,17 +52,26 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var waitingForConversations = false
     private var indexLoadTimeout: Job? = null
 
+    /**
+     * Updates index loading.
+     */
     private fun updateIndexLoading() {
         loadingIndex = waitingForSocial || waitingForConversations
     }
     private var cacheIndexUpdate: Job? = null
 
-    // Session messaging: Reports whether messaging screen active.
+    /**
+     * Session messaging: Reports whether messaging screen active.
+     */
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
     }
-    // Starts the account's friend and conversation listeners once the current screen may show messages.
+    /**
+     * Starts the account's friend and conversation listeners once the current screen may show messages.
+     *
+     * @param showFeedback Whether to show feedback.
+     */
     fun ensureMessagingObservation(showFeedback: Boolean = false) {
         with(runtime) {
             with(state) {
@@ -72,7 +81,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts friend and chat listeners for the signed-in account.
+    /**
+     * Starts friend and chat listeners for the signed-in account.
+     *
+     * @param showFeedback Whether to show feedback.
+     */
     fun startMessaging(showFeedback: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -100,6 +113,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 waitingForConversations = online
                 updateIndexLoading()
                 val token = epoch
+                /**
+                 * Checks whether current listener.
+                 *
+                 * @return `true` if is current listener, or `false` otherwise.
+                 */
                 fun isCurrentListener() = indexGeneration == listenerGeneration && epoch == token &&
                     enrollment?.uid == device.uid && accounts.authenticatedUid() == device.uid
                 identityCheck = scope.launch {
@@ -186,7 +204,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Rebuilds messaging listeners after the account or network connection changes.
+    /**
+     * Rebuilds messaging listeners after the account or network connection changes.
+     *
+     * @param password Account password string.
+     * @param onConnected Callback invoked when connected changes or occurs.
+     */
     fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) {
         with(runtime) {
             with(state) {
@@ -223,7 +246,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Watches all conversations, including tickets for accounts without friends.
+    /**
+     * Watches all conversations, including tickets for accounts without friends.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param isCurrent Function used to transform or provide is current.
+     */
     private fun observeConversations(ownerUid: String, isCurrent: () -> Boolean) {
         with(runtime) {
             with(state) {
@@ -289,7 +317,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs one messaging change and shows a readable Firebase error if it fails.
+    /**
+     * Runs one messaging change and shows a readable Firebase error if it fails.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @param block Callback or suspending lambda executed within this scope.
+     */
     fun runMessagingAction(
         failure: String,
         block: suspend (MessagingRepository, DeviceEnrollment, Long) -> Unit
@@ -335,7 +368,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Removes friend and conversation listeners when messaging is no longer needed.
+    /**
+     * Removes friend and conversation listeners when messaging is no longer needed.
+     *
+     * @param clearRows Whether to apply clear rows.
+     */
     fun stopMessaging(clearRows: Boolean = true) {
         listenerGeneration++
         if (clearRows) rowsOwner = null
@@ -362,7 +399,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Registers messaging identity for session messaging.
+    /**
+     * Registers messaging identity for session messaging.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     */
     suspend fun registerMessagingIdentity(identity: AccountIdentity) {
         with(runtime) {
             check(accounts.authenticatedUid() == identity.uid)
@@ -379,7 +420,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reconnects device notifications to the conversations visible to the current account.
+    /**
+     * Reconnects device notifications to the conversations visible to the current account.
+     */
     fun syncLocalNotificationHandler() {
         with(runtime) {
             val device = enrollment ?: return
@@ -393,7 +436,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
 // All account roles: checks credentials, loads the account, and opens the next screen.
 
 internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
-    // Session account sign in: Authenticates the account.
+    /**
+     * Session account sign in: Authenticates the account.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     */
     fun authenticate(username: String, password: String, create: Boolean) {
         if (!canStart()) return
         if (!credentialsAreValid(username, password, create)) return
@@ -423,14 +472,25 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
     }
 
-    // Stops a second sign-in request while the first request is still running.
+    /**
+     * Stops a second sign-in request while the first request is still running.
+     *
+     * @return `true` if can start, or `false` otherwise.
+     */
     private fun canStart(): Boolean {
         val state = runtime.state
         return !state.busy && runtime.enrollment == null &&
             state.screen in setOf(SessionScreen.NewCredentials, SessionScreen.ReturningCredentials)
     }
 
-    // Check the form before sending credentials to the account repository.
+    /**
+     * Check the form before sending credentials to the account repository.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     * @return `true` if credentials are valid, or `false` otherwise.
+     */
     private fun credentialsAreValid(username: String, password: String, create: Boolean): Boolean {
         val state = runtime.state
         state.credentialFieldError = null
@@ -462,7 +522,14 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
-    // Keep the old sign-in error messages while letting unexpected failures reach the operation handler.
+    /**
+     * Keep the old sign-in error messages while letting unexpected failures reach the operation handler.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @param create Whether to apply create.
+     * @param sessionVersion Session version supplied to [showCredentialFailure].
+     * @return `true` if show credential failure, or `false` otherwise.
+     */
     private fun showCredentialFailure(failure: Exception, create: Boolean, sessionVersion: Long): Boolean {
         val details = failure.message.orEmpty()
         val usernameUnavailable = create && (
@@ -498,7 +565,12 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
-    // Loads the signed-in profile before choosing the next screen.
+    /**
+     * Loads the signed-in profile before choosing the next screen.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting [UserProfile], or `null` if unavailable.
+     */
     private suspend fun loadProfile(identity: AccountIdentity): UserProfile? {
         val remote = runtime.accounts.profile(identity)
         return withContext(Dispatchers.IO) {
@@ -506,7 +578,13 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reject organization accounts that were never provisioned and accounts opened under the wrong role.
+    /**
+     * Reject organization accounts that were never provisioned and accounts opened under the wrong role.
+     *
+     * @param profile Account profile details, or null when not provided.
+     * @param create Whether to apply create.
+     * @return `true` if validate account role, or `false` otherwise.
+     */
     private fun validateAccountRole(profile: UserProfile?, create: Boolean): Boolean {
         val chosenRole = runtime.state.accountRole
         if (profile == null && !create && chosenRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
@@ -528,7 +606,12 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
-    // Opens setup, the cover, or the role portal after sign-in succeeds.
+    /**
+     * Opens setup, the cover, or the role portal after sign-in succeeds.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details, or null when not provided.
+     */
     private suspend fun openNextScreen(identity: AccountIdentity, profile: UserProfile?) {
         if (profile != null && profile.role == AccountRole.SAFE_CONTACT &&
             AccountPolicy.personalProfileNeedsSetup(profile)
@@ -554,7 +637,12 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(nextScreen)
     }
 
-    // Safe contacts enter the safe app; staff and admins enter their separate portal.
+    /**
+     * Safe contacts enter the safe app; staff and admins enter their separate portal.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     */
     private suspend fun openReturningNonUser(identity: AccountIdentity, profile: UserProfile) {
         val enrolled = withContext(Dispatchers.IO) { runtime.store.enrollWithoutPin(identity, profile) }
         runtime.enrollment = enrolled

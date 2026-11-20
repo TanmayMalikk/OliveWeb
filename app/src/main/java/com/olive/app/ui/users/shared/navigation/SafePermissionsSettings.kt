@@ -77,6 +77,12 @@ private enum class PermissionStatus(val label: Int) {
     Automatic(R.string.app_permissions_automatic_status),
 }
 
+/**
+ * Computes permission status.
+ *
+ * @param allowed Whether to apply allowed.
+ * @return The resulting permission status.
+ */
 private fun permissionStatus(allowed: Boolean) = if (allowed) PermissionStatus.Allowed else PermissionStatus.Denied
 
 private data class HealthAccess(val requested: Set<String>, val missing: Set<String>) {
@@ -95,6 +101,9 @@ private val automaticPermissions = listOf(
     R.string.app_permissions_system to R.string.app_permissions_system_why,
 )
 
+/**
+ * Composes the safe permissions settings UI element.
+ */
 @Composable
 internal fun SafePermissionsSettings() {
     val context = LocalContext.current
@@ -124,8 +133,20 @@ internal fun SafePermissionsSettings() {
             HealthAccess(emptySet(), emptySet())
         }
     }
+    /**
+     * Computes granted.
+     *
+     * @param permission Permission supplied to [granted].
+     * @return The resulting granted.
+     */
     fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    /**
+     * Computes status.
+     *
+     * @param feature Feature supplied to [status].
+     * @return The resulting [PermissionStatus] instance.
+     */
     fun status(feature: PermissionFeature): PermissionStatus = when (feature) {
         PermissionFeature.Notifications -> permissionStatus(NotificationManagerCompat.from(context).areNotificationsEnabled())
         PermissionFeature.Location -> when {
@@ -144,9 +165,21 @@ internal fun SafePermissionsSettings() {
         PermissionFeature.Health -> health?.status ?: PermissionStatus.Checking
         else -> permissionStatus(feature.runtime.all(::granted))
     }
+    /**
+     * Opens the target.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
     fun open(intent: Intent) {
         feedback = if (openSystem(intent)) null else R.string.app_permissions_settings_unavailable
     }
+    /**
+     * Computes permission action.
+     *
+     * @param feature Feature supplied to [permissionAction].
+     * @param status Status supplied to [permissionAction].
+     * @return The resulting [PermissionAction], or `null` if unavailable.
+     */
     fun permissionAction(feature: PermissionFeature, status: PermissionStatus): PermissionAction? {
         if (feature == PermissionFeature.Notifications && status == PermissionStatus.Denied &&
             (Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS))
@@ -221,6 +254,15 @@ internal fun SafePermissionsSettings() {
     }
 }
 
+/**
+ * Composes the permission explanation UI element.
+ *
+ * @param title Primary display title text.
+ * @param reason Reason supplied to [PermissionExplanation].
+ * @param status Status supplied to [PermissionExplanation].
+ * @param action Optional action supplied to [PermissionExplanation].
+ * @param id Optional ID supplied to [PermissionExplanation].
+ */
 @Composable
 private fun PermissionExplanation(
     title: Int, reason: Int, status: PermissionStatus, action: PermissionAction? = null, id: String? = null,
@@ -263,10 +305,19 @@ internal data class SafeSystemLaunchers(
     val permissions: SafePermissionActions,
 )
 
+/**
+ * Composes the remember safe system launchers UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @return The resulting [SafeSystemLaunchers] for remember safe system launchers.
+ */
 @Composable
 internal fun rememberSafeSystemLaunchers(session: SessionViewModel): SafeSystemLaunchers {
     val view = LocalView.current
     var revision by remember { mutableIntStateOf(0) }
+    /**
+     * Computes returned.
+     */
     fun returned() {
         revision++
         session.safeSystemActivityResult(view)
@@ -284,6 +335,13 @@ internal fun rememberSafeSystemLaunchers(session: SessionViewModel): SafeSystemL
     )
 }
 
+/**
+ * Launches with safe session.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param launch Action or callback executed for launch.
+ * @return `true` if launch with safe session, or `false` otherwise.
+ */
 private inline fun launchWithSafeSession(session: SessionViewModel, launch: () -> Unit): Boolean {
     val marker = session.beginSafeSystemActivity() ?: return false
     try {

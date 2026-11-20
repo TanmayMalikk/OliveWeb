@@ -19,7 +19,10 @@ describe("public advertising boundary", () => {
 
   it("keeps ad capabilities out of private CSP and uses nonce-based trust on public pages", () => {
     const privatePolicy = contentSecurityPolicy(null);
-    expect(privatePolicy).not.toContain("unsafe-eval");
+    const privateScriptSources = privatePolicy.split("; ")
+      .find(directive => directive.startsWith("script-src ")).split(/\s+/);
+    expect(privateScriptSources).not.toContain("'unsafe-eval'");
+    expect(privateScriptSources).toContain("'wasm-unsafe-eval'");
     expect(privatePolicy).not.toContain("strict-dynamic");
     expect(privatePolicy).toContain("frame-ancestors 'none'");
     const nonce = publicPageNonce("/");

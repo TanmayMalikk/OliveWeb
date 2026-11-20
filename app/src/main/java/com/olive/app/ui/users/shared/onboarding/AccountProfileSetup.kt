@@ -40,6 +40,13 @@ import java.util.UUID
 // USER and SAFE CONTACT: shared profile questions live here.
 private data class AffectedPersonDraft(val name: String = "", val age: String = "")
 
+/**
+ * Renders the affected people fields composable.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @Composable
 private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (String) -> Unit) {
     val uiText = rememberResourceText()
@@ -50,6 +57,11 @@ private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (Str
                 ?: AffectedPersonDraft(line)
         }.ifEmpty { listOf(AffectedPersonDraft()) })
     }
+    /**
+     * Updates the affected person draft.
+     *
+     * @param rows Collection of rows values to process.
+     */
     fun update(rows: List<AffectedPersonDraft>) {
         val saved = rows.filter { it.name.isNotBlank() }.joinToString("\n") {
             it.name.trim() + if (it.age.isNotEmpty()) " (${it.age})" else ""
@@ -79,8 +91,11 @@ private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (Str
     ) { Text(uiText(R.string.feedback_add_person)) }
 }
 
-// USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks.
-// UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
+/**
+ * USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks. UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun ProfileSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -132,7 +147,11 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val totalRequired = credentialCount + required.size + if (safeContact) 0 else 2
     val progressCompleted = credentialCount + completed
     val pageCompletion = listOf(true) + localCompletion + true
-    // Gives account storage the collected contacts it needs.
+    /**
+     * Gives account storage the collected contacts it needs.
+     *
+     * @return The resulting collected contacts.
+     */
     fun collectedContacts() =
         (contacts.toList() + if (contactName.isNotBlank() && contactDetails.isNotBlank())
             listOf(
@@ -146,6 +165,9 @@ internal fun ProfileSetup(session: SessionViewModel) {
     // Checks the onboarding fields and saves the completed account profile.
     val saveScope = rememberCoroutineScope()
     var preparingProfile by remember { mutableStateOf(false) }
+    /**
+     * Saves profile.
+     */
     fun saveProfile() {
         if (preparingProfile) return
         val draftTrigger = trigger
@@ -352,7 +374,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
             }
         }
         if (page == pages.lastIndex) {
-            com.olive.app.ui.users.shared.messaging.InviteCodeEntry(enabled = !session.localMode,
+            com.olive.app.ui.users.shared.messaging.InviteCodeEntry(messages = session.messages, enabled = !session.localMode,
                 accountUid = session.runtime.pendingIdentity?.uid)
         }
         Status(session)
@@ -401,7 +423,12 @@ internal class ProfileSetupValidation(
                 InputPolicy.validTrigger(trigger) && supportValid
             )
 
-    // Validate the step index, independently of the translated heading displayed on that page.
+    /**
+     * Validate the step index, independently of the translated heading displayed on that page.
+     *
+     * @param page Page supplied to [isPageValid].
+     * @return `true` if is page valid, or `false` otherwise.
+     */
     fun isPageValid(page: Int) = when (page) {
         0 -> personalValid
         1 -> address.locationValid

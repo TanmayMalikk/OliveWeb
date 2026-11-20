@@ -1,16 +1,10 @@
 // Safe-app users and safe contacts: draws the interactive location map and route.
-const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([53.5461,-113.4938],12);
+const map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:1,maxZoom:19}).setView([53.5461,-113.4938],12);
 window.oliveResizeTo=function(height){
   document.getElementById('map').style.height=height+'px';
   map.invalidateSize(false);
 };
-const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  maxZoom:19,
-  attribution:'&copy; OpenStreetMap contributors'
-}).addTo(map);
-// Marker updates and controls work before network tiles arrive; do not block the map on OSM latency.
-requestAnimationFrame(function(){document.title='olive-map-ready';});
-tiles.on('tileerror',function(event){console.error('Map tile failed: '+event.tile.src);});
+window.oliveLoadBasemap?.(map);
 const markers={};
 const markerAnimations={};
 const markerTargets={};

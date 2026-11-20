@@ -40,7 +40,11 @@ private val privateTypography = defaultTypography.copy(
     titleMedium = defaultTypography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
 )
 
-// Opt in from private screens so covers and role portals retain their own appearance.
+/**
+ * Opt in from private screens so covers and role portals retain their own appearance.
+ *
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
     val inheritedColors = MaterialTheme.colorScheme
@@ -62,6 +66,13 @@ internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
     )
 }
 
+/**
+ * Composes the floating quick exit UI element.
+ *
+ * @param onClick Callback invoked when the control is activated.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param compact Whether the layout should render in compact phone sizing.
+ */
 @Composable
 internal fun FloatingQuickExit(onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     val label = stringResource(R.string.a11y_quick_exit)

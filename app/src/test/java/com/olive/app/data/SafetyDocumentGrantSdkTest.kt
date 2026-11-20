@@ -73,6 +73,39 @@ class SafetyDocumentGrantSdkTest {
             f.repo.share(f.doc,"owner",emptyMap())
             val revoked=mockingDetails(f.media).invocations.single { it.method.name=="updateAccess" }
             assertEquals(setOf("owner"),(revoked.arguments[1] as Map<*,*>).keys)
+
+            // Blank username preserves pre-existing wrappedKeys for that recipient
+            val currentDocRecord = f.db.records.getValue("files/doc")
+            @Suppress("UNCHECKED_CAST")
+            val existingWrapped = currentDocRecord["wrapped_keys"] as Map<String, String>
+            f.db.records["files/doc"] = currentDocRecord + ("wrapped_keys" to (existingWrapped + ("retained" to "wrapped-retained")))
+            val retainedDoc = f.doc.copy(wrappedKeys = f.doc.wrappedKeys + ("retained" to "wrapped-retained"))
+            f.repo.share(retainedDoc, "owner", mapOf("retained" to ""))
+            val retainedCall = mockingDetails(f.media).invocations.last { it.method.name == "updateAccess" }
+            assertEquals("wrapped-retained", (retainedCall.arguments[1] as Map<*, *>)["retained"])
+
+            // Recovery-ready listFor decrypts unreadable metadata via recoverDocumentKey and tolerates failures
+            f.db.records["files/recovered"] = mapOf(
+                "owner_id" to "owner", "object_key" to "encrypted/recovered",
+                "allowed_users" to listOf("owner"),
+                "wrapped_keys" to mapOf("other" to "unreadable"),
+                "encryption_version" to 2L,
+                "account_recovery_ready" to true,
+                "encrypted_metadata" to EncryptionUtils.encryptText("""{"name":"Recovered.pdf","mimeType":"application/pdf"}""", f.key),
+            )
+            f.db.records["files/failed"] = mapOf(
+                "owner_id" to "owner", "object_key" to "encrypted/failed",
+                "allowed_users" to listOf("owner"),
+                "wrapped_keys" to mapOf("other" to "unreadable"),
+                "encryption_version" to 2L,
+                "account_recovery_ready" to true,
+                "encrypted_metadata" to "unreadable-cipher",
+            )
+            `when`(f.media.recoverDocumentKey("recovered")).thenReturn(f.key)
+            `when`(f.media.recoverDocumentKey("failed")).thenThrow(IllegalStateException("Unavailable"))
+            val listed = f.repo.listFor("owner").documents
+            assertTrue(listed.any { it.id == "recovered" && it.name == "Recovered.pdf" })
+            assertTrue(listed.any { it.id == "failed" && it.name == "Encrypted document" })
         }
     }
 }

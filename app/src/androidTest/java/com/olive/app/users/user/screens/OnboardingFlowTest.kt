@@ -5,8 +5,12 @@ import com.olive.app.ui.users.shared.navigation.*
 
 import android.view.WindowManager
 import androidx.compose.ui.test.*
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.UserProfile
+import com.olive.app.R
+import com.olive.app.security.InputPolicy
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -29,6 +33,56 @@ class OnboardingFlowTest : OliveUiTestBase() {
         nextOnboarding()
         fill("trigger", "moon garden")
         hideKeyboard()
+    }
+
+    @Test
+    fun provisionedAccountValidatesThePrivateTriggerBeforeShowingThePinChoices() {
+        openOnboarding()
+        click("new_user")
+        fill("username", "provisioned_fixture")
+        fill("password", "test-password-123")
+        fill("confirm_password", "test-password-123")
+        click("credentials_submit")
+        waitFor("full_name")
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle {
+            session.runtime.pendingProfile = UserProfile(
+                "provisioned_fixture", "Fixture Member", "", "", "2000-01-01", "English", "", "Edmonton", "",
+            )
+            session.runtime.navigation.openScreen(SessionScreen.TriggerSetup)
+        }
+        waitFor("trigger_setup_submit")
+        fill("trigger", "ab")
+        hideKeyboard()
+        click("trigger_setup_submit")
+        compose.onNodeWithText(compose.activity.getString(R.string.ui_invalid_trigger)).assertExists()
+        fill("trigger", "quiet garden")
+        hideKeyboard()
+        click("trigger_setup_submit")
+        chooseAppPin()
+        compose.runOnIdle {
+            assertTrue(InputPolicy.matchesTrigger("quiet garden", session.runtime.pendingProfile?.triggerHash.orEmpty()))
+        }
+    }
+
+    @Test
+    fun addingAnEmergencyContactRequiresBothFieldsAndSupportsRemoval() {
+        reachCoverPicker("onboard_contact_fixture")
+        val add = compose.onNodeWithTag("add_onboarding_contact")
+        add.performScrollTo().assertIsNotEnabled()
+        fill("setup_contact_name", "Synthetic contact")
+        hideKeyboard()
+        add.performScrollTo().assertIsNotEnabled()
+        fill("setup_contact_details", "Call after 5 pm")
+        hideKeyboard()
+        add.performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText("Synthetic contact").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Call after 5 pm").assertExists()
+        val remove = compose.onNodeWithContentDescription(compose.activity.getString(R.string.ui_remove_safe_contact))
+        remove.performScrollTo().performClick()
+        compose.onNodeWithText("Synthetic contact").assertDoesNotExist()
+        compose.onNodeWithText("Call after 5 pm").assertDoesNotExist()
+        add.assertIsNotEnabled()
     }
 
     // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.
@@ -77,7 +131,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Invalid password").assertExists()
         compose.onNodeWithText("Passwords differ").assertExists()
         compose.onNodeWithText("0 of 9 required", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
+        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 5")
     }
 
     // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
@@ -341,8 +395,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitCover()
         unlock()
-        click("sign_out")
-        openOnboarding()
+        signOutAndOpenOnboarding()
         waitFor("returning_user")
         click("returning_user")
         fill("username", "returning_user_tester")

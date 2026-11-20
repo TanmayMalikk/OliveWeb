@@ -39,7 +39,12 @@ internal data class WatchTileSnapshot(
 )
 
 internal object WatchTileData {
-    // Reads the latest synchronized fitness snapshot used by both watch tiles.
+    /**
+     * Reads the latest synchronized fitness snapshot used by both watch tiles.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [WatchTileSnapshot] instance.
+     */
     fun read(context: Context): WatchTileSnapshot {
         val state = WatchFitnessData.snapshot(context)
         return WatchTileSnapshot(
@@ -54,11 +59,22 @@ internal object WatchTileData {
 }
 
 class OliveActivityTileService : Material3TileService() {
-    // Builds the glanceable step, distance, and calorie tile shown outside the watch app.
+    /**
+     * Builds the glanceable step, distance, and calorie tile shown outside the watch app.
+     *
+     * @param requestParams Request params supplied to [tileResponse].
+     * @return The resulting [Tile] for tile response.
+     */
     override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile =
         tile(timeline = Timeline.fromLayoutElement(activityTileLayout(WatchTileData.read(this@OliveActivityTileService))))
 }
 
+/**
+ * Computes activity tile layout for this material scope.
+ *
+ * @param data Data supplied to [activityTileLayout].
+ * @return The resulting [LayoutElement] for activity tile layout.
+ */
 internal fun MaterialScope.activityTileLayout(data: WatchTileSnapshot): LayoutElement {
     val progress = (data.steps.toFloat() / data.stepGoal).coerceIn(0f, 1f)
     return primaryLayout(
@@ -94,11 +110,22 @@ internal fun MaterialScope.activityTileLayout(data: WatchTileSnapshot): LayoutEl
 }
 
 class OliveVitalsTileService : Material3TileService() {
-    // Builds the glanceable heart-rate tile and its no-reading state.
+    /**
+     * Builds the glanceable heart-rate tile and its no-reading state.
+     *
+     * @param requestParams Request params supplied to [tileResponse].
+     * @return The resulting [Tile] for tile response.
+     */
     override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile =
         tile(timeline = Timeline.fromLayoutElement(vitalsTileLayout(WatchTileData.read(this@OliveVitalsTileService))))
 }
 
+/**
+ * Computes vitals tile layout for this material scope.
+ *
+ * @param data Data supplied to [vitalsTileLayout].
+ * @return The resulting [LayoutElement] for vitals tile layout.
+ */
 internal fun MaterialScope.vitalsTileLayout(data: WatchTileSnapshot): LayoutElement {
     val current = data.currentHeartRate?.toString() ?: "--"
     val range = if (data.lowestHeartRate != null && data.peakHeartRate != null) {
@@ -137,7 +164,12 @@ internal fun MaterialScope.vitalsTileLayout(data: WatchTileSnapshot): LayoutElem
     )
 }
 
-// Opens the full Olive Fitness watch app when a user taps either tile.
+/**
+ * Opens the full Olive Fitness watch app when a user taps either tile.
+ *
+ * @param id ID supplied to [openWatchApp].
+ * @return The resulting open watch app.
+ */
 private fun MaterialScope.openWatchApp(id: String) = clickable(
     id = id,
     action = launchAction(

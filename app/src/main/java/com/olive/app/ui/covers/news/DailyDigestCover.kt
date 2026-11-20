@@ -40,8 +40,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
-// UI sizing/color: the feed uses Cream bars, 20dp side padding, 14dp gaps, and the shared Olive typography/colors.
+/**
+ * Daily Digest refreshes local/global headlines while bookmarks stay saved separately. UI sizing/color: the feed uses Cream bars, 20dp side padding, 14dp gaps, and the shared Olive typography/colors.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param locationPermissionVersion Location permission version supplied to [NewsCover].
+ * @param interactive Whether to apply interactive.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun NewsCover(
@@ -285,7 +290,15 @@ internal fun NewsCover(
     }
 }
 
-// news cover shows this news location dialog view so the user can view its details and use its actions.
+/**
+ * News cover shows this news location dialog view so the user can view its details and use its actions.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param onValueChange Callback invoked when value change changes or occurs.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSave Callback invoked when save changes or occurs.
+ * @param onUseDeviceLocation Callback invoked when use device location changes or occurs.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewsLocationDialog(

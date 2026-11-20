@@ -79,6 +79,12 @@ import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRe
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import kotlinx.coroutines.launch
 
+/**
+ * Renders the private route controls composable.
+ *
+ * @param controller Controller supplied to [PrivateRouteControls].
+ * @param state Current state instance to read or render.
+ */
 @Composable
 private fun PrivateRouteControls(controller: LocationMapController, state: LocationMapState) {
     if (state.navigating) {
@@ -95,12 +101,26 @@ private fun PrivateRouteControls(controller: LocationMapController, state: Locat
     }
 }
 
-// Shows the user and trusted-contact map, sharing controls, and route tools.
+/**
+ * Shows the user and trusted-contact map, sharing controls, and route tools.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
+    LocationMapScreen(session, session.locationMap)
+}
+
+/**
+ * Renders the location map screen UI.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param controller Controller supplied to [LocationMapScreen].
+ */
+@Composable
+internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMapController) {
     val profile = session.profile ?: return
     val uid = session.coverAccountId ?: return
-    val controller = session.locationMap
     val requestPermission = LocalLocationPermissionRequest.current
     val requestBackgroundPermission = LocalBackgroundLocationPermissionRequest.current
     val youLabel = stringResource(R.string.you)
@@ -115,6 +135,12 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     var explainBackground by remember(uid) { mutableStateOf(false) }
     var offeredBackground by remember(uid) { mutableStateOf(false) }
     val permissionScope = rememberCoroutineScope()
+    /**
+     * Requests map access.
+     *
+     * @param retry Whether to apply retry.
+     * @return `true` if request map access, or `false` otherwise.
+     */
     suspend fun requestMapAccess(retry: Boolean = false): Boolean {
         val granted = if (retry || permissionResult == null) requestPermission() else permissionResult == true
         permissionResult = granted
@@ -131,7 +157,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         AccountIdentity(uid, profile.username), profile, session.messages.friends,
         session.localMode, youLabel, savedLocationLabel
     )
-    LaunchedEffect(uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
+    LaunchedEffect(controller, uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
         controller.open(configuration) { requestMapAccess() }
     }
     DisposableEffect(controller) { onDispose(controller::closeMap) }
@@ -490,6 +516,16 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     }
 }
 
+/**
+ * Renders the location share friend picker composable.
+ *
+ * @param accountId Account ID supplied to [LocationShareFriendPicker].
+ * @param friends List of friend records.
+ * @param contactNames Key-value mapping of contact names entries.
+ * @param selected Collection of selected values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onSelectionChange Callback invoked when selection change changes or occurs.
+ */
 @Composable
 internal fun LocationShareFriendPicker(
     accountId: String,

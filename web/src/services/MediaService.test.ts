@@ -1,29 +1,40 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { importKey, toBase64 } from "./EncryptionService";
-import { listBrowserDocuments, openBrowserDocument, uploadBrowserDocument, type BrowserDocument } from "./MediaService";
+import { listBrowserDocuments, observeBrowserDocuments, observeDocumentRecipientDevices, openBrowserDocument, openVoiceMessage, prepareVoiceMessage, publishVoiceMessage, setBrowserDocumentEvidence, shareBrowserPlanDocument, uploadBrowserDocument, type BrowserDocument } from "./MediaService";
 
 const mocks = vi.hoisted(() => ({
   rows: vi.fn(),
   callable: vi.fn(),
   directory: vi.fn(),
+  serverRow: vi.fn(),
+  snapshot: vi.fn(),
+  unwrap: vi.fn(),
 }));
 
 vi.mock("./AccountService", () => ({ firebase: async () => ({ db: {}, functions: {} }) }));
 vi.mock("./MessagingService", () => ({
   messageDevice: async () => ({ deviceId: "new-browser" }),
-  register: vi.fn(),
-  unwrapRoomKeyBytes: vi.fn().mockRejectedValue(new Error("Wrapped for Android")),
+  register: async () => undefined,
+  unwrapRoomKeyBytes: (...args: unknown[]) => mocks.unwrap(...args),
+  encryptChatMessage: async (text: string) => `encrypted:${text}`,
 }));
 vi.mock("firebase/firestore", () => ({
-  collection: vi.fn(), query: vi.fn(), where: vi.fn(),
-  doc: vi.fn(), getDoc: async () => mocks.directory(),
+  collection: (...parts: unknown[]) => parts.at(-1), query: vi.fn(), where: vi.fn(),
+  doc: (...parts: unknown[]) => parts.at(-1), getDoc: async (id: string) => mocks.directory(id),
+  getDocFromServer: async (id: string) => mocks.serverRow(id),
+  onSnapshot: (...args: unknown[]) => mocks.snapshot(...args),
   getDocs: async () => ({ docs: mocks.rows() }),
 }));
 vi.mock("firebase/functions", () => ({
   httpsCallable: (_functions: unknown, name: string) => (data: unknown) => mocks.callable(name, data),
 }));
 
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => mocks.unwrap.mockRejectedValue(new Error("Wrapped for Android")));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.resetAllMocks();
+});
 
 it("opens an Android upload on a fresh browser using the signed-in account's recovery key", async () => {
   const raw = crypto.getRandomValues(new Uint8Array(32));
@@ -149,4 +160,106 @@ it("rejects tampered ciphertext before decryption and blocks a non-HTTPS ticket"
   mocks.callable.mockResolvedValueOnce({ data: { url: "http://storage.example.test/fixture" } });
   await expect(openBrowserDocument(document)).rejects.toThrow("invalid");
   expect(send).toHaveBeenCalledTimes(2);
+});
+
+it("publishes an owner recording with keys for the current participants and rejects stale membership", async () => {
+  await configureUpload("SINGLE");
+  const account = mocks.directory();
+  const publicKey = account.get("publicKey");
+  mocks.directory.mockReturnValue({ get: (field: string) => field === "uid" ? "friend" : publicKey });
+  mocks.rows.mockReturnValue([{ data: () => ({ uid: "friend", publicKey, deviceId: "friend-phone" }) }]);
+  mocks.unwrap.mockResolvedValue(crypto.getRandomValues(new Uint8Array(32)));
+  const chat: Parameters<typeof prepareVoiceMessage>[1] = {
+    id: "room",
+    friendshipId: "friendship",
+    participantIds: [owner.uid, "friend"],
+    participantUsernames: { friend: "friend" },
+    lastMessage: "",
+    updatedAt: 0,
+    type: "DIRECT",
+    ownerUid: owner.uid,
+    staffUid: "",
+    adminUid: "",
+    supportOrigin: "",
+    supportTag: "",
+    closedAt: 0,
+  };
+  const file = { owner_id: owner.uid, wrapped_keys: { [owner.uid]: "owner-envelope" } };
+  mocks.serverRow.mockImplementation((id) => ({ data: () => id === "room" ? chat : file }));
+  const pending = await prepareVoiceMessage("recording", chat, await importKey(crypto.getRandomValues(new Uint8Array(32))));
+  expect(pending).toMatchObject({ mediaId: "recording", conversationId: "room", ciphertext: "encrypted:SHARED_VOICE:recording" });
+  await publishVoiceMessage(pending, owner);
+  expect(mocks.callable).toHaveBeenLastCalledWith("mediaShareInChat", {
+    ...pending, recipientUids: ["friend"], wrappedKeys: { [owner.uid]: "owner-envelope", friend: expect.any(String) },
+    deviceWrappedKeys: { "friend--friend-phone": expect.any(String) },
+  });
+  chat.participantIds = ["friend"];
+  await expect(publishVoiceMessage(pending, owner)).rejects.toThrow("no longer available");
+  expect(mocks.callable.mock.calls.filter(([name]) => name === "mediaShareInChat")).toHaveLength(1);
+});
+
+it("adds plan access for available recipients, keeps existing device access and reports missing recipients", async () => {
+  await configureUpload("SINGLE");
+  const publicKey = mocks.directory().get("publicKey");
+  const file = { owner_id: owner.uid, wrapped_keys: { [owner.uid]: "owner-envelope" },
+    allowed_users: [owner.uid, "existing"], device_wrapped_keys: { "existing--phone": "existing-envelope" } };
+  mocks.directory.mockImplementation((name) => name === "document" ? { data: () => file }
+    : { get: (field: string) => field === "publicKey" && name !== "missing" ? publicKey : name });
+  mocks.rows.mockReturnValue(["existing", "new-friend"].map((uid) => ({ data: () => ({ uid, publicKey, deviceId: "phone" }) })));
+  mocks.unwrap.mockImplementation(async () => crypto.getRandomValues(new Uint8Array(32)));
+  await shareBrowserPlanDocument("document", owner, []);
+  await expect(shareBrowserPlanDocument("document", owner, [
+    { uid: "existing", username: "existing" }, { uid: "new-friend", username: "new-friend" }, { uid: "missing", username: "unregistered" },
+  ])).rejects.toThrow("sign in on their device");
+  expect(mocks.callable).toHaveBeenLastCalledWith("mediaUpdateAccess", {
+    mediaId: "document", forPlan: true,
+    wrappedKeys: { [owner.uid]: "owner-envelope", "new-friend": expect.any(String) },
+    deviceWrappedKeys: { "new-friend--phone": expect.any(String) },
+  });
+  await expect(shareBrowserPlanDocument("document", { ...owner, uid: "other" }, [{ uid: "existing", username: "existing" }])).rejects.toThrow("document owner");
+  file.wrapped_keys[owner.uid] = "";
+  await expect(shareBrowserPlanDocument("document", owner, [{ uid: "existing", username: "existing" }])).rejects.toThrow("encrypted copy");
+});
+
+it("discards superseded document snapshots, cleans up listeners and saves evidence separately", async () => {
+  const unsubscribe = vi.fn();
+  mocks.snapshot.mockReturnValue(unsubscribe);
+  const update = vi.fn();
+  const error = vi.fn();
+  const stop = await observeBrowserDocuments(owner, update, error);
+  const [, emit, fail] = mocks.snapshot.mock.calls[0];
+  const pendingError = new Error("Disconnected");
+  emit({ docs: [{ id: "stale", data: () => ({}) }] });
+  emit({ docs: [{ id: "current", data: () => ({ owner_id: owner.uid, evidence: true }) }] });
+  await vi.waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith([expect.objectContaining({ id: "current", evidence: true })]));
+  fail(pendingError);
+  expect(error).toHaveBeenCalledWith(pendingError);
+  stop();
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  const changed = vi.fn();
+  const stopDevices = await observeDocumentRecipientDevices([{ username: "friend" }, { username: "neighbor" }], changed);
+  const [, emitDevice, ignoreDeviceError] = mocks.snapshot.mock.calls[1];
+  emitDevice();
+  ignoreDeviceError(pendingError);
+  expect(changed).toHaveBeenCalledOnce();
+  stopDevices();
+  expect(unsubscribe).toHaveBeenCalledTimes(3);
+  await setBrowserDocumentEvidence("current", true);
+  expect(mocks.callable).toHaveBeenLastCalledWith("mediaUpdateEvidence", { mediaId: "current", evidence: true });
+});
+
+it("reports missing recordings and storage errors without producing a preview", async () => {
+  mocks.serverRow.mockReturnValue({ exists: () => false });
+  await expect(openVoiceMessage("missing", owner)).rejects.toThrow("unavailable");
+  mocks.serverRow.mockReturnValue({ id: "document", exists: () => true, data: () => ({}) });
+  await expect(openVoiceMessage("document", owner)).rejects.toThrow("could not be opened");
+  const document: BrowserDocument = { id: "document", name: "fixture.pdf", mimeType: "application/pdf", ownerUid: owner.uid,
+    createdAt: 0, approved: false, approvalMessage: "Access unavailable", evidence: false, ciphertextSha256: "", ciphertextSize: 0 };
+  await expect(openBrowserDocument(document)).rejects.toThrow("Access unavailable");
+  const unlocked = { ...document, key: await importKey(crypto.getRandomValues(new Uint8Array(32))) };
+  mocks.callable.mockResolvedValue({ data: { url: "https://storage.example.test/fixture" } });
+  const send = vi.fn().mockRejectedValueOnce(new Error("Offline")).mockResolvedValueOnce(new Response(null, { status: 503 }));
+  vi.stubGlobal("fetch", send);
+  await expect(openBrowserDocument(unlocked)).rejects.toThrow("could not reach encrypted storage");
+  await expect(openBrowserDocument(unlocked)).rejects.toThrow("Cloud download failed (503)");
 });

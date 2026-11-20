@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>olive-map-loading</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com; connect-src https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com; worker-src blob:">
   <link rel="stylesheet" href="leaflet.css">
   <style>
     html,body{height:100%;width:100%;margin:0;background:#f1ede4}
@@ -36,6 +36,7 @@
 <body>
   <div id="map"></div>
   <script src="leaflet.js"></script>
+  <script src="mapbox-basemap.js"></script>
   <script src="map.js"></script>
 </body>
 </html>

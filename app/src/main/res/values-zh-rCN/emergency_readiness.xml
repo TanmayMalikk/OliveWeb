@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_readiness_title">紧急情况准备</string>
+    <string name="emergency_readiness_location">允许访问位置，以便在紧急报告中附上你的坐标，帮助响应人员找到你。</string>
+    <string name="emergency_readiness_device_location">开启设备定位，以便在紧急报告中附上你的位置。</string>
+    <string name="emergency_readiness_background">允许后台定位，以便在你离开应用后管理员仍能看到你的位置。</string>
+    <string name="emergency_readiness_notifications">开启通知，以便在位置共享期间看到提示。</string>
+    <string name="emergency_readiness_allow_location">允许访问位置</string>
+    <string name="emergency_readiness_enable_location">开启设备定位</string>
+    <string name="emergency_readiness_allow_background">允许后台定位</string>
+    <string name="emergency_readiness_notification_settings">通知设置</string>
+    <string name="emergency_readiness_remind_later">稍后提醒我</string>
+    <string name="emergency_readiness_location_settings_path">请选择%1$s。如果 Android 打开应用信息页面，请依次选择权限和位置。</string>
+</resources>

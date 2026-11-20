@@ -13,12 +13,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Send an explicitly requested report without unlocking or exposing the Safe App on the cover.
+/**
+ * Send an explicitly requested report without unlocking or exposing the Safe App on the cover.
+ */
 internal fun SessionViewModel.sendCoverEmergency() {
     val uid = coverAccountId ?: return
     if (accountRole != AccountRole.USER || screen != SessionScreen.Cover || busy || coverEmergencyInFlight) return
     coverEmergencyInFlight = true
     val token = runtime.epoch
+    /**
+     * Finishes the target.
+     *
+     * @param result Result payload delivered to the callback.
+     */
     fun finish(result: Result<Unit>) {
         coverEmergencyInFlight = false
         if (coverAccountId == uid && runtime.epoch == token && result.isFailure) {

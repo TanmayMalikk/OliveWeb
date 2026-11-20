@@ -11,7 +11,8 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.location.DeviceLocation
-import com.olive.app.data.location.GeoapifyClient
+import com.olive.app.data.location.AddressCoordinateResolver
+import com.olive.app.data.location.AndroidAddressCoordinateResolver
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationTrailPoint
@@ -24,6 +25,9 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationState
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -59,7 +63,12 @@ internal data class LocationMapState(
     val routeError: String? = null,
     val locating: Boolean = false,
 ) {
-    // Chooses the user's own map marker from live or saved location data.
+    /**
+     * Chooses the user's own map marker from live or saved location data.
+     *
+     * @param role Account role determining workspace permissions.
+     * @return The resulting displayed own.
+     */
     fun displayedOwn(role: AccountRole) =
         if (role == AccountRole.USER) livePoint ?: ownPoint else ownPoint
 }
@@ -69,6 +78,7 @@ internal class LocationMapController(
     context: Context,
     private val scope: CoroutineScope,
     private val repository: LocationSharingDataSource?,
+    private val addressResolver: AddressCoordinateResolver = AndroidAddressCoordinateResolver(context.applicationContext),
     private val requestRoute: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? =
         if (MapboxDirectionsClient.configured) {
             { origin, target ->
@@ -82,8 +92,15 @@ internal class LocationMapController(
     private var expiryJob: Job? = null
     private var subscription: ChatSubscription? = null
     private var generation = 0
-    var state by mutableStateOf(LocationMapState())
-        private set
+    private val stateMutableFlow = MutableStateFlow(LocationMapState())
+    val stateFlow: StateFlow<LocationMapState> = stateMutableFlow.asStateFlow()
+    private var stateSnapshot by mutableStateOf(stateMutableFlow.value)
+    var state: LocationMapState
+        get() = stateSnapshot
+        private set(value) {
+            stateMutableFlow.value = value
+            stateSnapshot = value
+        }
 
     init {
         scope.launch {
@@ -93,7 +110,12 @@ internal class LocationMapController(
         }
     }
 
-    // Opens a saved user or trusted-contact marker on the map.
+    /**
+     * Opens a saved user or trusted-contact marker on the map.
+     *
+     * @param configuration Configuration supplied to [open].
+     * @param requestPermission Function used to transform or provide request permission.
+     */
     fun open(configuration: LocationMapConfiguration, requestPermission: suspend () -> Boolean) {
         closeMap()
         val token = ++generation
@@ -133,71 +155,70 @@ internal class LocationMapController(
             }
         }
         locationJob = scope.launch {
-            if (requestPermission()) {
-                // User location controller: Keeps open active while is active.
-                while (isActive) {
-                    DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+            try {
+                if (requestPermission()) {
+                    // User location controller: Keeps open active while is active.
+                    while (isActive) {
+                        DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+                            // Apply the map result only if it belongs to the newest open request.
+                            if (token == generation) {
+                                val previous = state.ownPoint
+                                val trail = previous?.trail.orEmpty()
+                                    .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
+                                    .toMutableList()
+                                val moved = previous == null || FloatArray(1).also { result ->
+                                    Location.distanceBetween(
+                                        previous.latitude,
+                                        previous.longitude,
+                                        fix.latitude,
+                                        fix.longitude,
+                                        result
+                                    )
+                                }[0] >= MIN_TRAIL_DISTANCE_METERS
+                                if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp)
+                                    trail += LocationTrailPoint(
+                                        fix.latitude,
+                                        fix.longitude,
+                                        fix.timestamp
+                                    )
+                                state = state.copy(
+                                    ownPoint = MapLocationPoint(
+                                        uid,
+                                        configuration.youLabel,
+                                        fix.latitude,
+                                        fix.longitude,
+                                        fix.timestamp,
+                                        true,
+                                        fix.accuracy,
+                                        trail = trail.takeLast(MAX_TRAIL_POINTS)
+                                    )
+                                )
+                            }
+                        }
+                        if (token == generation && state.locating) state = state.copy(locating = false)
+                        delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
+                    }
+                } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
+                    val coordinates = addressResolver.coordinates(configuration.profile.address)
+                    coordinates?.let { (latitude, longitude) ->
                         // Apply the map result only if it belongs to the newest open request.
                         if (token == generation) {
-                            val previous = state.ownPoint
-                            val trail = previous?.trail.orEmpty()
-                                .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
-                                .toMutableList()
-                            val moved = previous == null || FloatArray(1).also { result ->
-                                Location.distanceBetween(
-                                    previous.latitude,
-                                    previous.longitude,
-                                    fix.latitude,
-                                    fix.longitude,
-                                    result
-                                )
-                            }[0] >= MIN_TRAIL_DISTANCE_METERS
-                            if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp)
-                                trail += LocationTrailPoint(
-                                    fix.latitude,
-                                    fix.longitude,
-                                    fix.timestamp
-                                )
                             state = state.copy(
                                 ownPoint = MapLocationPoint(
                                     uid,
-                                    configuration.youLabel,
-                                    fix.latitude,
-                                    fix.longitude,
-                                    fix.timestamp,
-                                    true,
-                                    fix.accuracy,
-                                    trail = trail.takeLast(MAX_TRAIL_POINTS)
+                                    configuration.savedLocationLabel,
+                                    latitude,
+                                    longitude,
+                                    System.currentTimeMillis(),
+                                    false
                                 )
                             )
                         }
                     }
-                    if (token == generation && state.locating) state = state.copy(locating = false)
-                    delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                 }
-            } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
-                val coordinates = GeoapifyClient.coordinates(configuration.profile.address)
-                    ?: DeviceLocation.coordinatesForAddress(
-                        applicationContext,
-                        configuration.profile.address
-                    )
-                coordinates?.let { (latitude, longitude) ->
-                    // Apply the map result only if it belongs to the newest open request.
-                    if (token == generation) {
-                        state = state.copy(
-                            ownPoint = MapLocationPoint(
-                                uid,
-                                configuration.savedLocationLabel,
-                                latitude,
-                                longitude,
-                                System.currentTimeMillis(),
-                                false
-                            )
-                        )
-                    }
-                }
+            } finally {
+                if (token == generation && state.locating) state = state.copy(locating = false)
             }
-            if (token == generation && state.locating) state = state.copy(locating = false)
         }
         if (
             configuration.profile.role == AccountRole.SAFE_CONTACT &&
@@ -207,7 +228,9 @@ internal class LocationMapController(
         watchExpiry()
     }
 
-    // User location controller: Stops map.
+    /**
+     * User location controller: Stops map.
+     */
     fun closeMap() {
         generation++
         locationJob?.cancel()
@@ -221,18 +244,31 @@ internal class LocationMapController(
         state = state.copy(privateDestination = null, route = null, navigating = false, routeWorking = false)
     }
 
-    // Clears the selected route, target, and navigation message.
+    /**
+     * Clears the selected route, target, and navigation message.
+     */
     fun clear() {
         closeMap()
         state = LocationMapState()
     }
 
-    // Selects which trusted contact or user the map should route toward.
+    /**
+     * Selects which trusted contact or user the map should route toward.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun selectNavigationTarget(uid: String) {
         if (!state.navigating && state.contacts.any { it.uid == uid && it.live })
             state = state.copy(navigationTargetUid = uid, routeError = null)
     }
 
+    /**
+     * Selects private destination.
+     *
+     * @param name Field, key, or display name.
+     * @param latitude Latitude supplied to [selectPrivateDestination].
+     * @param longitude Longitude supplied to [selectPrivateDestination].
+     */
     fun selectPrivateDestination(name: String, latitude: Double, longitude: Double) {
         if (state.navigating) return
         state = state.copy(
@@ -241,7 +277,13 @@ internal class LocationMapController(
         )
     }
 
-    // Requests a route to the selected person and starts map navigation.
+    /**
+     * Requests a route to the selected person and starts map navigation.
+     *
+     * @param notConfiguredMessage Not configured message supplied to [startNavigation].
+     * @param unavailableMessage Unavailable message supplied to [startNavigation].
+     * @param failedMessage Failed message supplied to [startNavigation].
+     */
     fun startNavigation(
         notConfiguredMessage: String,
         unavailableMessage: String,
@@ -306,7 +348,9 @@ internal class LocationMapController(
         }
     }
 
-    // Stops route guidance and clears the selected destination.
+    /**
+     * Stops route guidance and clears the selected destination.
+     */
     fun stopNavigation() {
         navigationJob?.cancel()
         navigationJob = null
@@ -318,7 +362,14 @@ internal class LocationMapController(
         )
     }
 
-    // Routes needs refresh for user location controller.
+    /**
+     * Routes needs refresh for user location controller.
+     *
+     * @param origin Origin supplied to [routeNeedsRefresh].
+     * @param target Target destination or output object to write to.
+     * @param lastTarget Optional last target supplied to [routeNeedsRefresh].
+     * @return `true` if route needs refresh, or `false` otherwise.
+     */
     private fun routeNeedsRefresh(
         origin: MapLocationPoint,
         target: MapLocationPoint,
@@ -328,7 +379,13 @@ internal class LocationMapController(
         return lastTarget == null || distanceBetween(target, lastTarget) >= TARGET_REROUTE_METERS || distanceFromRouteMeters(origin.latitude, origin.longitude, route) >= OFF_ROUTE_METERS
     }
 
-    // Calculates the straight-line distance between two map points.
+    /**
+     * Calculates the straight-line distance between two map points.
+     *
+     * @param first First supplied to [distanceBetween].
+     * @param second Second supplied to [distanceBetween].
+     * @return The computed distance between numeric value.
+     */
     private fun distanceBetween(first: MapLocationPoint, second: MapLocationPoint): Float {
         val result = FloatArray(1)
         Location.distanceBetween(
@@ -341,14 +398,27 @@ internal class LocationMapController(
         return result[0]
     }
 
-    // Adds or removes one safe contact from the next live-location share.
+    /**
+     * Adds or removes one safe contact from the next live-location share.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     fun selectContact(uid: String, enabled: Boolean) {
         if (state.liveActive || state.working) return
         val updated = if (enabled) state.selected + uid else state.selected - uid
         state = state.copy(selected = updated)
     }
 
-    // Starts the user's live-location sharing session.
+    /**
+     * Starts the user's live-location sharing session.
+     *
+     * @param configuration Configuration supplied to [startSharing].
+     * @param durationMillis Duration or timestamp for duration, in milliseconds.
+     * @param requestPermission Function used to transform or provide request permission.
+     * @param permissionError Permission error supplied to [startSharing].
+     * @param startError Start error supplied to [startSharing].
+     */
     fun startSharing(
         configuration: LocationMapConfiguration,
         durationMillis: Long,
@@ -367,7 +437,18 @@ internal class LocationMapController(
         )
     }
 
-    // Starts live sharing with the selected trusted contact.
+    /**
+     * Starts live sharing with the selected trusted contact.
+     *
+     * @param configuration Configuration supplied to [startSharingWith].
+     * @param recipients Collection of recipients values to process.
+     * @param durationMillis Duration or timestamp for duration, in milliseconds.
+     * @param requestPermission Function used to transform or provide request permission.
+     * @param permissionError Permission error supplied to [startSharingWith].
+     * @param startError Start error supplied to [startSharingWith].
+     * @param onError Callback invoked when an error occurs.
+     * @param onStarted Callback invoked when started changes or occurs.
+     */
     fun startSharingWith(
         configuration: LocationMapConfiguration, recipients: List<Friend>, durationMillis: Long,
         requestPermission: suspend () -> Boolean, permissionError: String, startError: String,
@@ -424,7 +505,9 @@ internal class LocationMapController(
         }
     }
 
-    // User location controller: Stops sharing.
+    /**
+     * User location controller: Stops sharing.
+     */
     fun stopSharing() {
         LiveLocationController.stop(applicationContext)
         state = state.copy(liveActive = false, expiresAt = 0L)
@@ -432,7 +515,12 @@ internal class LocationMapController(
         expiryJob = null
     }
 
-    // Publishes or removes the user's saved-address marker for approved safe contacts.
+    /**
+     * Publishes or removes the user's saved-address marker for approved safe contacts.
+     *
+     * @param configuration Configuration supplied to [updateStaticSharing].
+     * @param enabled Whether this feature or control is currently enabled.
+     */
     fun updateStaticSharing(configuration: LocationMapConfiguration, enabled: Boolean) {
         if (configuration.localMode || state.working) return
         scope.launch {
@@ -456,7 +544,9 @@ internal class LocationMapController(
         }
     }
 
-    // Counts down live sharing and stops it when its expiry time arrives.
+    /**
+     * Counts down live sharing and stops it when its expiry time arrives.
+     */
     private fun watchExpiry() {
         expiryJob?.cancel()
         expiryJob = scope.launch {
@@ -487,11 +577,21 @@ internal object ShareDurationPolicy {
     const val MAX_CUSTOM_HOURS = 72L
     private const val MILLISECONDS_PER_HOUR = 60L * 60L * 1_000L
 
-    // Converts an allowed number of hours to milliseconds; values outside the supported range are rejected.
+    /**
+     * Converts an allowed number of hours to milliseconds; values outside the supported range are rejected.
+     *
+     * @param hours Hours supplied to [millisecondsForHours].
+     * @return The computed milliseconds for hours number, or `null` if unavailable.
+     */
     fun millisecondsForHours(hours: Long): Long? =
         hours.takeIf { it in 1..MAX_CUSTOM_HOURS }?.times(MILLISECONDS_PER_HOUR)
 
-    // Reads custom hours from the field and rejects text, zero, negative values, and overflow.
+    /**
+     * Reads custom hours from the field and rejects text, zero, negative values, and overflow.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The computed custom duration milliseconds number, or `null` if unavailable.
+     */
     fun customDurationMilliseconds(value: String): Long? =
         value.toLongOrNull()?.let(::millisecondsForHours)
 }

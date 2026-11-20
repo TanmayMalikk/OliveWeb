@@ -1,6 +1,5 @@
 package com.olive.app.ui.shared
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -32,12 +29,18 @@ import com.olive.app.R
 internal enum class SkeletonLayout {
     Conversation, ChatList, TicketList, Contacts, Documents, Notes, Checklist, SharedPlans,
     History, Accounts, StaffWorkload, DashboardCounts, EmergencyAlerts, HotlineDirectory,
-    SupportAssignment, NearbySupport, Directions, Map, NewsFeed, NewsArticle, FitnessSummary,
+    SupportAssignment, NearbySupport, Directions, NewsFeed, NewsArticle, FitnessSummary,
     FitnessActivity, FitnessVitals, FitnessNutrition, FoodResults, Form, Action, Image, Video,
     DocumentPage, TextDocument,
 }
 
-/** Draws the shape of the incoming content without showing sample data or controls. */
+/**
+ * Draws the shape of the incoming content without showing sample data or controls.
+ *
+ * @param layout Layout supplied to [LoadingSkeleton].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param rows Rows supplied to [LoadingSkeleton].
+ */
 @Composable
 internal fun LoadingSkeleton(
     layout: SkeletonLayout,
@@ -166,7 +169,6 @@ internal fun LoadingSkeleton(
                 SkeletonBlock(Modifier.size(28.dp), CircleShape, foreground)
                 SkeletonBlock(Modifier.fillMaxWidth(.62f).height(14.dp), color = foreground)
             }
-            SkeletonLayout.Map -> MapPlaceholder()
             SkeletonLayout.NewsFeed, SkeletonLayout.NewsArticle -> repeat(rows) {
                 SkeletonCard {
                     val article = layout == SkeletonLayout.NewsArticle
@@ -242,6 +244,12 @@ internal fun LoadingSkeleton(
     }
 }
 
+/**
+ * Renders the skeleton card composable.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 private fun SkeletonCard(
     modifier: Modifier = Modifier.fillMaxWidth(),
@@ -252,6 +260,13 @@ private fun SkeletonCard(
     }
 }
 
+/**
+ * Composes the skeleton lines UI element.
+ *
+ * @param widths Variable number of widths arguments.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param height Target or source height in pixels or layout units.
+ */
 @Composable
 private fun SkeletonLines(
     vararg widths: Float,
@@ -263,6 +278,12 @@ private fun SkeletonLines(
     }
 }
 
+/**
+ * Renders the metric row composable.
+ *
+ * @param columns Columns supplied to [MetricRow].
+ * @param compact Whether the layout should render in compact phone sizing.
+ */
 @Composable
 private fun MetricRow(columns: Int, compact: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,6 +304,11 @@ private fun MetricRow(columns: Int, compact: Boolean = false) {
     }
 }
 
+/**
+ * Composes the skeleton actions UI element.
+ *
+ * @param count Count supplied to [SkeletonActions].
+ */
 @Composable
 private fun SkeletonActions(count: Int) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -290,6 +316,9 @@ private fun SkeletonActions(count: Int) {
     }
 }
 
+/**
+ * Composes the food result placeholder UI element.
+ */
 @Composable
 private fun FoodResultPlaceholder() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -299,6 +328,9 @@ private fun FoodResultPlaceholder() {
     }
 }
 
+/**
+ * Composes the fitness chart placeholder UI element.
+ */
 @Composable
 private fun FitnessChartPlaceholder() {
     SkeletonCard {
@@ -313,22 +345,13 @@ private fun FitnessChartPlaceholder() {
     }
 }
 
-@Composable
-private fun MapPlaceholder() {
-    val map = MaterialTheme.colorScheme.surfaceContainer
-    val roads = MaterialTheme.colorScheme.outline.copy(alpha = .22f)
-    Canvas(Modifier.fillMaxSize().heightIn(min = 140.dp).background(map, MaterialTheme.shapes.large)) {
-        val width = size.width
-        val height = size.height
-        drawLine(roads, Offset(width * .08f, height * .73f), Offset(width * .91f, height * .28f),
-            8.dp.toPx(), StrokeCap.Round)
-        drawLine(roads, Offset(width * .12f, height * .32f), Offset(width * .89f, height * .80f),
-            5.dp.toPx(), StrokeCap.Round)
-        drawLine(roads, Offset(width * .59f, height * .12f), Offset(width * .43f, height * .88f),
-            6.dp.toPx(), StrokeCap.Round)
-    }
-}
-
+/**
+ * Composes the skeleton block UI element.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param shape Shape supplied to [SkeletonBlock].
+ * @param color Color supplied to [SkeletonBlock].
+ */
 @Composable
 internal fun SkeletonBlock(
     modifier: Modifier,
@@ -338,7 +361,11 @@ internal fun SkeletonBlock(
     Spacer(modifier.background(color, shape))
 }
 
-/** Uses the app's existing polite live-region pattern for an in-progress secure file open. */
+/**
+ * Uses the app's existing polite live-region pattern for an in-progress secure file open.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun SecureFileOpeningIndicator(modifier: Modifier = Modifier) {
     Row(

@@ -83,4 +83,31 @@ class AccountSignInControllerTest {
             assertTrue(f.runtime.state.message.orEmpty().contains("registered_as"))
         }
     }
+
+    @Test
+    fun completedSafeContactAndStaffProfilesReturnToTheirOwnWorkspaces() = runBlocking<Unit> {
+        SessionRuntimeFixture(dispatcher = Dispatchers.Default, localMode = true).use { fixture ->
+            for ((role, screen) in listOf(AccountRole.SAFE_CONTACT to SessionScreen.Safe, AccountRole.STAFF to SessionScreen.Portal)) {
+                val session = fixture.runtime
+                val password = "Synthetic!123"
+                val restored = profile.copy(role = role, email = "fixture@example.test")
+                val account = identity.copy(uid = "fixture-${role.name.lowercase()}")
+                session.enrollment = null
+                session.state.accountRole = role
+                session.state.screen = SessionScreen.ReturningCredentials
+                session.safePageHistory.add(SafePage.Messages)
+                `when`(fixture.accounts.authenticate(account.username, password, role)).thenReturn(account)
+                `when`(fixture.accounts.profile(account)).thenReturn(restored)
+
+                session.accountSignIn.authenticate(account.username, password, false)
+                fixture.await { !session.state.busy }
+                assertEquals("Role $role returned ${session.state.message}", screen, session.state.screen)
+                assertEquals(account.uid, session.enrollment?.uid)
+                assertEquals(role, session.enrollment?.role)
+                assertEquals(restored, session.state.profile)
+                assertTrue(session.safePageHistory.isEmpty())
+                if (role == AccountRole.SAFE_CONTACT) assertEquals(SafePage.Home, session.state.page)
+            }
+        }
+    }
 }
