@@ -14,10 +14,12 @@ import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,7 +69,9 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var recoveryCredentialToRemove by remember { mutableStateOf<String?>(null) }
     val cacheUid = session.coverAccountId
+    val recoveryCredentials = session.passkeyRecoveryCredentials
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
         if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
@@ -236,10 +240,12 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted,
             )
-            if (session.passkeyRecoveryCredentials.isEmpty()) {
+            if (recoveryCredentials == null) {
+                Text(stringResource(R.string.passkey_recovery_list_unavailable))
+            } else if (recoveryCredentials.isEmpty()) {
                 Text(stringResource(R.string.passkey_recovery_none))
             } else {
-                session.passkeyRecoveryCredentials.forEachIndexed { index, credential ->
+                recoveryCredentials.forEachIndexed { index, credential ->
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -252,7 +258,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedButton(
-                            onClick = { session.removePasskeyRecovery(credential.credentialId) },
+                            onClick = { recoveryCredentialToRemove = credential.credentialId },
                             enabled = !session.busy,
                             modifier = Modifier.testTag("remove_recovery_passkey_$index"),
                         ) {
@@ -267,6 +273,26 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 modifier = Modifier.testTag("add_recovery_passkey"),
             ) {
                 Text(stringResource(R.string.passkey_recovery_enable))
+            }
+            recoveryCredentialToRemove?.let { credentialId ->
+                AlertDialog(
+                    onDismissRequest = { recoveryCredentialToRemove = null },
+                    title = { Text(stringResource(R.string.passkey_recovery_remove_confirm_title)) },
+                    text = { Text(stringResource(R.string.passkey_recovery_remove_confirm_help)) },
+                    confirmButton = {
+                        Button(onClick = {
+                            recoveryCredentialToRemove = null
+                            session.removePasskeyRecovery(credentialId)
+                        }) {
+                            Text(stringResource(R.string.passkey_recovery_remove))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { recoveryCredentialToRemove = null }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    },
+                )
             }
             HorizontalDivider()
             Text(

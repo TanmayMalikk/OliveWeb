@@ -478,4 +478,7 @@
     <string name="passkey_recovery_none">Aucune clé d’accès de récupération n’est enregistrée.</string>
     <string name="passkey_recovery_synced_factor">Clé d’accès de récupération synchronisée</string>
     <string name="passkey_recovery_device_factor">Clé d’accès de récupération de l’appareil</string>
+    <string name="passkey_recovery_list_unavailable">Impossible de vérifier les clés d’accès de récupération. Connectez-vous à Internet et rouvrez les paramètres.</string>
+    <string name="passkey_recovery_remove_confirm_title">Supprimer cette clé d’accès de récupération ?</string>
+    <string name="passkey_recovery_remove_confirm_help">Cette clé d’accès ne pourra plus restaurer votre clé de chiffrement. Les autres clés d’accès de récupération enregistrées ne sont pas modifiées.</string>
 </resources>

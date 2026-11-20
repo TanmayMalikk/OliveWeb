@@ -472,4 +472,7 @@
     <string name="passkey_recovery_none">尚未注册恢复通行密钥。</string>
     <string name="passkey_recovery_synced_factor">同步的恢复通行密钥</string>
     <string name="passkey_recovery_device_factor">设备恢复通行密钥</string>
+    <string name="passkey_recovery_list_unavailable">无法检查恢复通行密钥。请连接互联网并重新打开设置。</string>
+    <string name="passkey_recovery_remove_confirm_title">要移除此恢复通行密钥吗？</string>
+    <string name="passkey_recovery_remove_confirm_help">此通行密钥将无法再恢复您的加密密钥。其他已注册的恢复通行密钥不会更改。</string>
 </resources>

@@ -11,6 +11,7 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.messaging.ChatMembershipEvent
@@ -59,7 +60,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
     val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
-    val passkeyRecoveryCredentials get() = runtime.state.passkeyRecoveryCredentials
+    val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
+        get() = runtime.state.passkeyRecoveryCredentials
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val profile get() = runtime.state.profile

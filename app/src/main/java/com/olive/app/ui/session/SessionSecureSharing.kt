@@ -509,7 +509,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var busy by mutableStateOf(false)
     var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
     var passkeyCredentialRequest by mutableStateOf<PasskeyCredentialRequest?>(null)
-    var passkeyRecoveryCredentials by mutableStateOf(emptyList<PasskeyRecoveryRepository.Credential>())
+    var passkeyRecoveryCredentials by mutableStateOf<List<PasskeyRecoveryRepository.Credential>?>(null)
     var message by mutableStateOf<String?>(null)
     var profile by mutableStateOf<UserProfile?>(null)
     var attempts by mutableStateOf(emptyList<FailedAttempt>())

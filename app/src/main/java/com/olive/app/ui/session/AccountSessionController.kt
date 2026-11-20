@@ -54,7 +54,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         state.accountRole = AccountRole.USER
         state.privateEntries = emptyList()
         state.viewedSharedEntry = null
-        state.passkeyRecoveryCredentials = emptyList()
+        state.passkeyRecoveryCredentials = null
         state.screen = SessionScreen.Cover
     }
 
@@ -370,7 +370,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         archivedConversationIds = emptySet()
                         restoredClosedConversationIds = emptySet()
                         privateContactNotes = emptyMap()
-                        passkeyRecoveryCredentials = emptyList()
+                        passkeyRecoveryCredentials = null
                         coverDataVersion++
                         screen = SessionScreen.Cover
                     } catch (_: Exception) { // A failed quick exit must fail closed and leave the private interface locked.

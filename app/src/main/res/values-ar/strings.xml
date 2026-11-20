@@ -487,4 +487,7 @@
     <string name="passkey_recovery_none">لا توجد مفاتيح مرور مسجلة للاسترداد.</string>
     <string name="passkey_recovery_synced_factor">مفتاح مرور استرداد متزامن</string>
     <string name="passkey_recovery_device_factor">مفتاح مرور استرداد على الجهاز</string>
+    <string name="passkey_recovery_list_unavailable">تعذر التحقق من مفاتيح مرور الاسترداد. اتصل بالإنترنت ثم أعد فتح الإعدادات.</string>
+    <string name="passkey_recovery_remove_confirm_title">هل تريد إزالة مفتاح مرور الاسترداد هذا؟</string>
+    <string name="passkey_recovery_remove_confirm_help">لن يتمكن مفتاح المرور هذا من استعادة مفتاح التشفير بعد الآن. لن تتغير مفاتيح مرور الاسترداد الأخرى المسجلة.</string>
 </resources>

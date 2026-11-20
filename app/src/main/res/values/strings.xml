@@ -458,4 +458,7 @@
     <string name="passkey_recovery_none">No recovery passkeys are enrolled.</string>
     <string name="passkey_recovery_synced_factor">Synced recovery passkey</string>
     <string name="passkey_recovery_device_factor">Device recovery passkey</string>
+    <string name="passkey_recovery_list_unavailable">Recovery passkeys could not be checked. Connect to the internet and reopen settings.</string>
+    <string name="passkey_recovery_remove_confirm_title">Remove this recovery passkey?</string>
+    <string name="passkey_recovery_remove_confirm_help">This passkey will no longer restore your encryption key. Other enrolled recovery passkeys are not changed.</string>
 </resources>
