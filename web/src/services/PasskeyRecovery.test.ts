@@ -4,6 +4,7 @@ import {
   decryptRecoveryKeyWithPrf,
   encryptRecoveryKeyWithPrf,
   getRequiredPrfOutput,
+  accountKeysetWrappers,
   unlockAccountKeyset,
   type AccountKeysetEnvelope,
 } from "./PasskeyRecovery";
@@ -142,6 +143,58 @@ describe("passkey PRF recovery", () => {
       ...envelope,
       ciphertext: `${envelope.ciphertext.slice(0, -2)}aa`,
     })).rejects.toThrow(PasskeyRecoveryError);
+  });
+
+  it("wraps one content key for the matching account keyset and rejects substitutions", async () => {
+    const pair = await crypto.subtle.generateKey(
+      { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true,
+      ["encrypt", "decrypt"],
+    );
+    const keyId = "123e4567-e89b-12d3-a456-426614174000";
+    const raw = new Uint8Array(32).fill(21);
+    const publicKey = bytesToBase64(
+      new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey)),
+    );
+    const wrapper = await accountKeysetWrappers.wrap(accountId, raw, {
+      ownerUid: accountId,
+      keyId,
+      epoch: 1,
+      algorithm: "RSA-OAEP-256",
+      publicKey,
+    });
+    const keyset = {
+      accountId,
+      keyId,
+      epoch: 1,
+      publicKey: pair.publicKey,
+      privateKey: pair.privateKey,
+    };
+
+    await expect(accountKeysetWrappers.unwrap(accountId, wrapper, keyset)).resolves.toEqual(raw);
+    await expect(accountKeysetWrappers.unwrap("account-b", wrapper, keyset)).resolves.toBeNull();
+    await expect(accountKeysetWrappers.unwrap(accountId, { ...wrapper, epoch: 2 }, keyset))
+      .resolves.toBeNull();
+    await expect(accountKeysetWrappers.unwrap(accountId, { ...wrapper, wrappedKey: "invalid" }, keyset))
+      .resolves.toBeNull();
+  });
+
+  it("rejects malformed account key directories and wrappers across input classes", async () => {
+    const raw = new Uint8Array(32).fill(22);
+    const invalidDirectories = [null, "directory", [], {}, { ownerUid: accountId }];
+    for (const value of invalidDirectories) {
+      await expect(accountKeysetWrappers.wrap(accountId, raw, value)).rejects.toThrow(PasskeyRecoveryError);
+    }
+    await expect(accountKeysetWrappers.wrap("account-b", raw, {
+      ownerUid: accountId,
+      keyId: "123e4567-e89b-12d3-a456-426614174000",
+      epoch: 1,
+      algorithm: "RSA-OAEP-256",
+      publicKey: "public-key",
+    })).rejects.toThrow(PasskeyRecoveryError);
+    for (const value of [null, "wrapper", [], {}, { keyId: "wrong" }]) {
+      expect(accountKeysetWrappers.parse(value)).toBeNull();
+    }
   });
 });
 

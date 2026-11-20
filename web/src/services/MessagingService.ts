@@ -16,8 +16,9 @@ import {
   serverTimestamp,
   runTransaction,
 } from "firebase/firestore";
-import { firebase } from "./AccountService";
+import { accountKeysetSession, firebase } from "./AccountService";
 import { database } from "./LocalDataStore";
+import { accountKeysetWrappers } from "./PasskeyRecovery";
 import type { Identity } from "../domain/DomainModels";
 export interface DirectoryUser {
   uid: string;
@@ -470,6 +471,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     conversationData = { ...conversationData, participantUsernames: result.data.participantUsernames };
   }
   const device = await messageDevice(current.uid);
+  const conversation = doc(db, "conversations", id);
   const deviceKeyReference = doc(
     db,
     "conversations",
@@ -484,13 +486,35 @@ export async function roomKey(id: string, current: Identity, conversationData: C
       try {
         const key = await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
         const sharingKey = raw.slice();
-        void shareRoomKeyWithDevices(id, conversationData, sharingKey)
+        void shareRoomKeyWithParticipants(id, conversationData, sharingKey)
           .catch(() => { /* Another device can retry approval on its next open. */ })
           .finally(() => sharingKey.fill(0));
         return key;
       } finally {
         raw.fill(0);
       }
+    }
+  }
+  const recoverySnapshot = await getDoc(conversation);
+  if (!recoverySnapshot.exists()) throw new Error("This conversation is no longer available.");
+  const recoveryData = recoverySnapshot.data();
+  const participants = Array.isArray(recoveryData.participantIds)
+    ? recoveryData.participantIds.filter((uid): uid is string => typeof uid === "string")
+    : [];
+  if (!participants.includes(current.uid)) throw new Error("This conversation is no longer available.");
+  const recovered = await accountKeysetWrappers.unwrap(
+    current.uid,
+    recoveryData.accountRoomKeys?.[current.uid],
+    accountKeysetSession.current(current.uid),
+  );
+  if (recovered) {
+    try {
+      await shareRoomKeyWithParticipants(id, conversationData, recovered).catch(() => undefined);
+      return await crypto.subtle.importKey(
+        "raw", recovered.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"],
+      );
+    } finally {
+      recovered.fill(0);
     }
   }
   const directory = await Promise.all(conversationData.participantIds.map(async (uid) => {
@@ -514,7 +538,6 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     ),
   );
   const ownDeviceWrapped = await wrapRoomKey(raw, device.publicKey);
-  const conversation = doc(db, "conversations", id);
   const messages = await getDocs(query(collection(conversation, "messages"), limit(1)));
   try {
     const selected = await runTransaction(db, async (transaction) => {
@@ -549,7 +572,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     });
     const selectedRaw = await unwrapRoomKeyBytes(current.uid, selected);
     try {
-      await shareRoomKeyWithDevices(id, conversationData, selectedRaw);
+      await shareRoomKeyWithParticipants(id, conversationData, selectedRaw);
       return await crypto.subtle.importKey("raw", selectedRaw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
     } finally {
       selectedRaw.fill(0);
@@ -559,8 +582,8 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   }
 }
 
-// Publish an envelope for every registered device so either platform can open a new support ticket.
-async function shareRoomKeyWithDevices(id: string, conversation: Conversation, raw: Uint8Array) {
+// Publishes device and account envelopes without ever sending the plaintext room key.
+async function shareRoomKeyWithParticipants(id: string, conversation: Conversation, raw: Uint8Array) {
   const { db } = await firebase();
   for (const uid of conversation.participantIds) {
     const username = conversation.participantUsernames[uid]?.trim().toLowerCase();
@@ -584,6 +607,38 @@ async function shareRoomKeyWithDevices(id: string, conversation: Conversation, r
       }
     }
     if (count) await batch.commit();
+  }
+  const wrappers = Object.fromEntries((await Promise.allSettled(
+    conversation.participantIds.map(async (uid) => {
+      const snapshot = await getDoc(doc(db, "accountKeyDirectories", uid));
+      if (!snapshot.exists()) throw new Error("Account recovery is not enrolled.");
+      return [uid, await accountKeysetWrappers.wrap(uid, raw, snapshot.data())] as const;
+    }),
+  )).flatMap((result) => result.status === "fulfilled" ? [result.value] : []));
+  if (!Object.keys(wrappers).length) return;
+  const reference = doc(db, "conversations", id);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      if (!snapshot.exists()) throw new Error("This conversation is no longer available.");
+      const currentParticipants = Array.isArray(snapshot.data().participantIds)
+        ? snapshot.data().participantIds.filter((uid: unknown): uid is string => typeof uid === "string")
+        : [];
+      if (currentParticipants.length !== conversation.participantIds.length ||
+          currentParticipants.some((uid: string) => !conversation.participantIds.includes(uid))) {
+        throw new Error("Conversation membership changed during key distribution.");
+      }
+      const saved = snapshot.data().accountRoomKeys;
+      const retained = saved && typeof saved === "object" && !Array.isArray(saved)
+        ? Object.fromEntries(Object.entries(saved).filter(([uid]) => currentParticipants.includes(uid)))
+        : {};
+      transaction.update(reference, {
+        accountRoomKeys: { ...retained, ...wrappers },
+        updatedAt: serverTimestamp(),
+      });
+    });
+  } catch {
+    // Device access remains usable; a later open can retry optional account recovery publication.
   }
 }
 // Encrypts a message on this browser, then saves only the locked text in Firebase.

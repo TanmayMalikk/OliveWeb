@@ -16,6 +16,10 @@ import {
   unwrapRoomKeyBytes,
 } from "./MessagingService";
 import { importKey } from "./EncryptionService";
+import {
+  accountKeysetWrappers,
+  type AccountWrappedKey,
+} from "./PasskeyRecovery";
 import type { Identity } from "../domain/DomainModels";
 
 type StoredMedia = {
@@ -31,13 +35,6 @@ type StoredMedia = {
   encryption_version?: unknown;
   created_at?: { toMillis?: () => number };
   evidence?: unknown;
-};
-
-type AccountWrappedKey = {
-  keyId: string;
-  epoch: number;
-  algorithm: "RSA-OAEP-256";
-  wrappedKey: string;
 };
 
 export type BrowserDocument = {
@@ -279,12 +276,13 @@ async function wrapForDocumentRecipient(raw: Uint8Array, { uid, username }: { ui
       algorithm !== "RSA-OAEP-256" || typeof accountPublicKey !== "string" || !accountPublicKey) {
     throw new Error("The recipient's account recovery key is invalid.");
   }
-  const accountKeysetKey: AccountWrappedKey = {
+  const accountKeysetKey = await accountKeysetWrappers.wrap(uid, raw, {
+    ownerUid: uid,
     keyId,
     epoch,
     algorithm,
-    wrappedKey: await wrapForPublicKey(raw, accountPublicKey, "SHA-256"),
-  };
+    publicKey: accountPublicKey,
+  });
   return { accountKey, deviceKeys, accountKeysetKey };
 }
 
@@ -302,31 +300,12 @@ async function unwrapBrowserDocumentKey(uid: string, deviceId: string, value: St
 
 function accountWrappedKey(uid: string, value: StoredMedia): AccountWrappedKey | null {
   const wrapper = (value.account_wrapped_keys as Record<string, unknown> | undefined)?.[uid];
-  if (!wrapper || typeof wrapper !== "object") return null;
-  const candidate = wrapper as Partial<AccountWrappedKey>;
-  return typeof candidate.keyId === "string" && Number.isSafeInteger(candidate.epoch) &&
-    candidate.epoch! >= 1 && candidate.algorithm === "RSA-OAEP-256" &&
-    typeof candidate.wrappedKey === "string" && candidate.wrappedKey
-    ? candidate as AccountWrappedKey
-    : null;
+  return accountKeysetWrappers.parse(wrapper);
 }
 
 async function unwrapAccountDocumentKey(uid: string, value: StoredMedia) {
   const wrapper = accountWrappedKey(uid, value);
-  const keyset = accountKeysetSession.current(uid);
-  if (!wrapper || !keyset || wrapper.keyId !== keyset.keyId || wrapper.epoch !== keyset.epoch) return null;
-  try {
-    const raw = new Uint8Array(await crypto.subtle.decrypt(
-      { name: "RSA-OAEP" }, keyset.privateKey, fromBase64(wrapper.wrappedKey),
-    ));
-    if (raw.byteLength !== 32) {
-      raw.fill(0);
-      return null;
-    }
-    return raw;
-  } catch {
-    return null;
-  }
+  return accountKeysetWrappers.unwrap(uid, wrapper, accountKeysetSession.current(uid));
 }
 
 async function resolveDocumentKey(identity: Identity, deviceId: string, value: StoredMedia) {
