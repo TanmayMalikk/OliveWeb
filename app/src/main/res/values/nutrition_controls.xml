@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_manual_short">Manual food</string>
+    <string name="nutrition_label_short">Values per serving. Enter 0 for nutrients listed as zero.</string>
+    <string name="nutrition_serving_short">Serving size</string>
+    <string name="nutrition_scan_barcode">Scan barcode</string>
+    <string name="nutrition_barcode_failed">No single valid barcode found. Try a clearer photo or type its digits.</string>
+    <string name="nutrition_other_nutrients">Other nutrients</string>
+    <string name="nutrition_custom_portion">Custom amount</string>
+    <string name="nutrition_amount">Amount</string>
+    <string name="nutrition_water">Water</string>
+    <string name="nutrition_add_water">Add water</string>
+    <string name="nutrition_water_amount">Amount drunk</string>
+    <string name="nutrition_water_goal">Daily goal</string>
+    <string name="nutrition_water_progress">Water: %1$d of %2$d ml. Tap to add water.</string>
+    <string name="nutrition_water_minus">Remove 250 ml of water</string>
+    <string name="nutrition_water_plus">Add 250 ml of water</string>
+    <string name="nutrition_edit_food">Edit food entry</string>
+    <string name="nutrition_edit_details">Edit food details</string>
+    <string name="nutrition_volume_unit">ml</string>
+    <string name="nutrition_recent_foods">Recently logged</string>
+    <string name="nutrition_saved_foods">Saved foods</string>
+    <string name="nutrition_recent_searches">Recent searches</string>
+    <string name="nutrition_no_recent_foods">No recently logged foods.</string>
+    <string name="nutrition_no_saved_foods">You haven’t saved any foods yet.</string>
+    <string name="nutrition_save_food">Save food</string>
+    <string name="nutrition_unsave_food">Remove saved food</string>
+    <string name="nutrition_saved_unavailable">Couldn’t load this saved food.</string>
+</resources>

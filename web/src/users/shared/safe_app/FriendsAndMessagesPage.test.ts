@@ -26,6 +26,16 @@ describe("shared chat attachments", () => {
     expect(sharedMessage("hello there")).toBeNull();
   });
 
+  it("recognizes voice recordings from either client and rejects invalid IDs", () => {
+    expect(sharedMessage("SHARED_VOICE:recording-123")).toEqual({
+      kind: "voice",
+      id: "recording-123",
+      title: "Voice message",
+    });
+    expect(sharedMessage("SHARED_VOICE:../file")).toBeNull();
+    expect(sharedMessage("SHARED_VOICE:")).toBeNull();
+  });
+
   it("rejects an incomplete media code instead of showing a broken Open button", () => {
     expect(sharedMessage("SHARED_MEDIA")).toBeNull();
   });

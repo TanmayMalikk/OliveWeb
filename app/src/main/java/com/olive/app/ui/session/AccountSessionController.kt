@@ -266,8 +266,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         runtime.application.getString(R.string.choose_a_trigger_word_or_phrase_of_3_64_characters)
                     return
                 }
-                val updated = existing.copy(triggerHash = InputPolicy.triggerHash(trigger))
                 operations.runOperation(runtime.application.getString(R.string.ui_the_trigger_word_could_not_be_saved_retry_here)) { token ->
+                    val updated = existing.copy(triggerHash = withContext(Dispatchers.Default) { InputPolicy.triggerHash(trigger) })
                     accounts.saveProfile(identity, updated)
                     withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, updated) }
                     if (epoch == token) {
@@ -480,6 +480,20 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
 
 // Keeps private-note actions separate from the rest of the signed-in session.
 internal class SessionPrivacy(private val runtime: SessionRuntime) {
+    fun idleTimeoutSeconds(): Int {
+        val uid = runtime.coverAccountId ?: return IdlePolicy.DEFAULT_TIMEOUT_SECONDS
+        val preferences = runtime.cloudState
+        val previousMinutes = preferences.getInt("idle_timeout_minutes_$uid", 1).coerceIn(1, 5)
+        return IdlePolicy.normalizeTimeout(preferences.getInt("idle_timeout_seconds_$uid", previousMinutes * 60))
+    }
+
+    fun setIdleTimeoutSeconds(seconds: Int) {
+        val uid = runtime.coverAccountId ?: return
+        runtime.cloudState.edit()
+            .putInt("idle_timeout_seconds_$uid", IdlePolicy.normalizeTimeout(seconds))
+            .apply()
+        noteInteraction()
+    }
     // Opens or closes the private note editor for the selected person.
     fun noteInteraction() {
         with(runtime) {
@@ -549,7 +563,8 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
                             )?.toLong() ?: 15_000L else 15_000L
                         val countdown = IdlePolicy.countdown(
                             SystemClock.elapsedRealtime() - lastTouchAt,
-                            warningDuration
+                            warningDuration,
+                            idleTimeoutSeconds() * 1_000L,
                         )
                         if (countdown == 0) {
                             navigation.quickExit()

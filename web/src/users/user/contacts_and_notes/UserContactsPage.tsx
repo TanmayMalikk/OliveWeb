@@ -14,7 +14,7 @@ export default function Contacts() {
   return (
     <>
       <div className="page-toolbar">
-        <p>A name. A number. Someone you trust.</p>
+        <p>A name. A number. Someone you trust. ({p.contacts.length} of 25)</p>
         <Button
           disabled={p.contacts.length >= 25}
           onClick={() =>
@@ -27,7 +27,7 @@ export default function Contacts() {
       <div className="safe-card-grid">
         {p.contacts.map((contact) => (
           <article className="contact-card panel" key={contact.id}>
-            <span className="avatar">{contact.name[0].toUpperCase()}</span>
+            <span className="avatar">{(contact.name.trim()[0] || "?").toUpperCase()}</span>
             <h2>{contact.name}</h2>
             <p className="preserve-lines">{contact.details}</p>
             <div className="toolbar-actions">
@@ -60,7 +60,7 @@ export default function Contacts() {
         </Empty>
       )}
       {editing && (
-        <Modal title="A person in your corner" onClose={() => setEditing(null)}>
+        <Modal title={editing.name ? "Edit contact" : "A person in your corner"} onClose={() => setEditing(null)}>
           <Form
             onSubmit={async (data) => {
               await s.perform(async () => {

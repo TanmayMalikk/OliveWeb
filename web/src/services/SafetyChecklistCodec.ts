@@ -5,6 +5,7 @@ export const safetySections = [
   "destination",
   "travel",
   "contacts",
+  "finances",
   "aftercare",
 ] as const;
 export const olderSafetySections = ["essentials", "dependants"] as const;
@@ -14,6 +15,7 @@ export const safetySectionLabels: Record<string, string> = {
   destination: "Safe destination",
   travel: "Transportation",
   contacts: "Trusted contact / safe place to stay",
+  finances: "Finances",
   aftercare: "After leaving",
   essentials: "Essential items and documents",
   dependants: "Children, dependants and pets",

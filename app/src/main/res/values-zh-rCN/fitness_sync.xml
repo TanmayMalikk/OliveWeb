@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_connect_health">连接 Health Connect</string>
+    <string name="fitness_health_permissions">健康权限</string>
+    <string name="fitness_health_privacy">Olive Fitness 读取步数和心率来更新健身记录。授予后台权限后，应用关闭时也可同步。记录私密保存于已登录的 Firebase 个人资料中。可随时在 Health Connect 中撤销权限。</string>
+    <string name="fitness_sync_pending">健身同步暂不可用。更改已保存在此设备上，将自动重试。</string>
+</resources>

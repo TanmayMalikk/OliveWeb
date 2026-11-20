@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="idle_lock_minutes">%d min</string>
+    <string name="idle_lock_minutes_seconds">%1$d min %2$d s</string>
+    <string name="idle_lock_recommended">%s (Recomendado)</string>
+    <string name="idle_lock_setting">Tiempo de espera para el bloqueo</string>
+    <string name="incident_date_format">Fecha del incidente (AAAA-MM-DD)</string>
+    <string name="incident_time_format">Hora aproximada (HH:mm)</string>
+    <string name="incident_invalid_date">Introduce una fecha válida en formato AAAA-MM-DD.</string>
+    <string name="incident_invalid_time">Introduce una hora válida de 24 horas en formato HH:mm.</string>
+    <string name="role_picker_expanded">Expandido</string>
+    <string name="role_picker_collapsed">Contraído</string>
+    <string name="admin_search_accounts">Buscar cuentas</string>
+    <string name="admin_all_account_statuses">Todos los estados</string>
+    <string name="note_attachment_count">Archivos adjuntos: %d</string>
+    <string name="chat_unread_only">Solo sin leer</string>
+    <string name="chat_search_messages">Buscar mensajes</string>
+    <string name="chat_no_matching_messages">No hay mensajes que coincidan</string>
+    <string name="chat_incoming_announcement">Nuevos mensajes recibidos: %d</string>
+    <string name="incident_no_address_suggestions">No hay sugerencias. Puedes conservar la dirección escrita o volver a intentarlo.</string>
+    <string name="incident_latitude">Latitud</string>
+    <string name="incident_longitude">Longitud</string>
+    <string name="incident_use_coordinates">Usar coordenadas</string>
+    <string name="resource_hours">Horario: %s</string>
+    <string name="private_route_destination">Ruta a un destino</string>
+    <string name="private_route_help">Introduce una dirección o el nombre y la ciudad de un refugio. El proveedor de mapas recibe las coordenadas para calcular la ruta.</string>
+    <string name="private_route_address_not_found">Destino no encontrado. Prueba con una dirección completa.</string>
+    <string name="safety_finances_heading">Finanzas</string>
+    <string name="safety_finances_access">Anota el dinero y los métodos de pago a los que puedes acceder por tu cuenta.</string>
+    <string name="safety_finances_costs">Planifica cómo pagar el transporte, un alojamiento temporal y lo esencial.</string>
+    <string name="safety_finances_support">Anota a quién puedes consultar sobre ayuda financiera o cuentas conjuntas.</string>
+    <string name="admin_emergency_response">Respuesta a emergencias</string>
+    <string name="admin_emergency_response_help">Consulta los tickets escalados y la información que haya compartido la persona. Este panel no moviliza servicios de emergencia.</string>
+    <string name="safety_documents_dependants">Reúne identificaciones y los documentos escolares o de cuidados que correspondan de las personas que se van contigo.</string>
+    <string name="feedback_person_name">Nombre de la persona %d</string>
+    <string name="feedback_person_age">Edad de la persona %d (opcional)</string>
+    <string name="feedback_remove_person">Quitar a la persona %d</string>
+    <string name="feedback_add_person">Añadir otra persona</string>
+    <string name="feedback_situation_hint">Si quieres, describe lo que ocurre, como el daño físico, emocional o económico.</string>
+    <plurals name="note_search_results_count">
+        <item quantity="one">%d resultado</item>
+        <item quantity="other">%d resultados</item>
+    </plurals>
+    <string name="dob_date_range_error">Introduce una fecha entre hoy y hace 130 años.</string>
+    <string name="dob_picker_title">Elegir fecha de nacimiento</string>
+    <string name="dob_pick_year_range">Elige un intervalo de años</string>
+    <string name="dob_pick_year">Elige un año</string>
+    <string name="dob_pick_month">Elige un mes</string>
+    <string name="dob_pick_day">Elige un día</string>
+    <string name="dob_clear">Borrar fecha de nacimiento</string>
+    <string name="location_background_access">Activar la ubicación en segundo plano</string>
+    <string name="location_background_settings">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. En los ajustes de Android, elige %1$s y vuelve aquí.</string>
+    <string name="location_background_dialog">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. Elige Permitir siempre en el aviso de Android.</string>
+    <string name="chat_dms_tab">Mensajes directos</string>
+    <string name="chat_tickets_tab">Chats de tickets</string>
+</resources>

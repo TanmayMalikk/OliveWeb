@@ -2,6 +2,8 @@
 package com.olive.app.data
 
 import com.olive.app.data.media.*
+import com.olive.app.data.messaging.OutgoingAttachment
+import com.olive.app.data.messaging.OutgoingMessage
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -38,6 +40,27 @@ class MediaTransferModelsEdgeCaseTest {
         )
 
         assertEquals(original, MediaUploadJob.fromJson(original.toJson()))
+    }
+
+    @Test
+    fun voiceSendSurvivesRestartBeforeAndAfterMediaIdAssignment() {
+        val staged = MediaUploadJob(
+            id = "voice-job", ownerUid = "owner", source = source(),
+            voiceDraft = PendingVoiceMessage("chat", "sender", "wrapped room key", "2400,01239841"),
+        )
+        assertEquals(staged, MediaUploadJob.fromJson(staged.toJson()))
+        val prepared = staged.copy(
+            voiceDraft = null,
+            mediaId = "media",
+            voiceMessage = OutgoingMessage(
+                id = staged.id, ownerUid = staged.ownerUid, conversationId = "chat",
+                senderUsername = "sender", ciphertext = "encrypted chat message",
+                clientSentAt = staged.createdAt, attachment = OutgoingAttachment("media"),
+            ),
+        )
+        val restored = MediaUploadJob.fromJson(prepared.toJson())
+        assertEquals(prepared, restored)
+        assertFalse(prepared.toJson().toString().contains("wrapped room key"))
     }
 
     // Inputs: the values shown below. Expected: older upload jobs receive safe encryption and ocr defaults.

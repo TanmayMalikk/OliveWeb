@@ -169,7 +169,6 @@ export default function SafeApp() {
                 <Settings size={21} aria-hidden="true" />
               </button>
             )}
-            {p.role === "USER" && <Button variant="exit" onClick={s.quickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>}
           </div>
         </header>
         <main id="main" tabIndex={-1}>
@@ -193,6 +192,9 @@ export default function SafeApp() {
           <button className="text-link" onClick={() => void s.perform(s.signOut)}>Sign out</button>
         </footer>
       </div>
+      {p.role === "USER" && (
+        <Button variant="exit floating-quick-exit" onClick={s.quickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>
+      )}
       {s.idleSeconds !== null && (
         <Modal title="Your Safe Space is about to lock" onClose={s.noteInteraction}>
           <p>Little Grove will reopen in {s.idleSeconds} seconds.</p>

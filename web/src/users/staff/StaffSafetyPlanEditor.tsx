@@ -110,6 +110,9 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
             return (
               <fieldset className="safety-checklist" key={key} id={"consultation-" + kind + "-" + section} tabIndex={-1}>
                 <legend>{safetySectionLabels[section]}</legend>
+                <p className="safety-progress">
+                  {items.filter((item) => item.checked).length} of {items.length} prepared
+                </p>
                 {items.map((item) => {
                   const draftKey = `${key}:${item.id}`;
                   const draft = drafts[draftKey];
@@ -120,8 +123,10 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
                           const checked = event.currentTarget.checked;
                           void session.perform(() => saveStep(key, item.id, { checked }));
                         }} />
-                      {item.id.startsWith("trusted-contact:") ? <span>{safetyChecklistText(item)}</span> :
-                      <input type="text" value={draft?.text ?? item.text} maxLength={1000}
+                      {item.id.startsWith("trusted-contact:") ? (
+                        <span className={item.checked ? "completed" : ""}>{safetyChecklistText(item)}</span>
+                      ) : (
+                      <input type="text" className={item.checked ? "completed" : ""} value={draft?.text ?? item.text} maxLength={1000}
                         aria-label={`${kind} ${section} step`} readOnly={session.busy}
                         onChange={(event) => {
                           lastAttempt.current = null;
@@ -141,7 +146,8 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
                             delete next[draftKey];
                             return next;
                           });
-                        }} />}
+                        }} />
+                      )}
                     </label>
                     {(item.attachmentIds ?? []).map((id) => {
                       const document = documents.find((file) => file.id === id && file.ownerUid === plan.ownerUid);
@@ -164,7 +170,7 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
           })}
         </div>
       </div>
-      {feedback && <p role="status">{feedback}</p>}
+      {feedback && <p className="status-banner" role="status">{feedback}</p>}
       {identity?.role === "STAFF" && plan.staffUid === identity.uid && plan.consultationConversationId && (
         <Button disabled={session.busy || Object.keys(drafts).length > 0} onClick={() => void session.perform(async () => {
           await completePlans(plan.consultationConversationId!);

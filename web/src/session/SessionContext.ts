@@ -52,6 +52,8 @@ export type SessionValue = {
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
   idleSeconds: number | null;
+  idleTimeoutSeconds: number;
+  setIdleTimeoutSeconds: (seconds: number) => Promise<void>;
   noteInteraction: () => void;
   cloudMode: boolean;
   onboardingProfile: Profile | null;

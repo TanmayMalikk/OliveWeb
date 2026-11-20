@@ -298,6 +298,7 @@ export async function subscribeSocial(
 }
 // Sends a friend request by saving both account names and their shared friendship ID.
 export async function sendRequest(current: Identity, peer: DirectoryUser) {
+  await register(current);
   const { db } = await firebase();
   const id = `${current.uid}--${peer.uid}`;
   await setDoc(doc(db, "friendRequests", id), {
@@ -313,6 +314,7 @@ export async function sendRequest(current: Identity, peer: DirectoryUser) {
 export async function acceptRequest(current: Identity, request: Request) {
   if (request.recipientUid !== current.uid)
     throw new Error("Only the recipient can accept.");
+  await register(current);
   const { db } = await firebase();
   const id = request.friendshipId;
   const participantIds = [current.uid, request.senderUid].sort();
@@ -599,22 +601,12 @@ export async function sendMessage(
   const { db } = await firebase();
   const conversation = doc(db, "conversations", id);
   const message = doc(collection(conversation, "messages"));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      key,
-      new TextEncoder().encode(body),
-    ),
-  );
-  const combined = new Uint8Array(iv.length + encrypted.length);
-  combined.set(iv);
-  combined.set(encrypted, iv.length);
+  const ciphertext = await encryptChatMessage(body, key);
   const batch = writeBatch(db);
   batch.set(message, {
     senderUid: current.uid,
     senderUsername: current.username.toLowerCase(),
-    ciphertext: bytesToBase64(combined),
+    ciphertext,
     deleted: false,
     sentAt: serverTimestamp(),
     clientSentAt: Date.now(),
@@ -627,6 +619,21 @@ export async function sendMessage(
   });
   await batch.commit();
 }
+export async function encryptChatMessage(body: string, key: CryptoKey) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      new TextEncoder().encode(body),
+    ),
+  );
+  const combined = new Uint8Array(iv.length + encrypted.length);
+  combined.set(iv);
+  combined.set(encrypted, iv.length);
+  return bytesToBase64(combined);
+}
+
 // Un-sends the account's own message. The locked text is replaced and the chat preview is updated.
 export async function unsendMessage(
   id: string,

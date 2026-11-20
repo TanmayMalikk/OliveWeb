@@ -1,8 +1,8 @@
 // Admins: lets admins list and manage organization accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
-const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, isTemporaryEmail, profileComplete, defaultProfile} = require("./accountPolicy");
-const {writeProfile, saveOrganizationLogin, requireAdmin, usernameExistsGlobally} = require("./accountStorage");
+const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, isTemporaryEmail, profileComplete, defaultProfile, roleFromUser} = require("./accountPolicy");
+const {writeProfile, saveOrganizationLogin, requireAdmin, usernameExistsGlobally, listEveryUser} = require("./accountStorage");
 
 // Reads a Firestore aggregate so dashboard totals never download the matching documents.
 async function count(query) {
@@ -11,18 +11,16 @@ async function count(query) {
 
 // Loads the six small totals shown on the admin dashboard.
 async function dashboardCounts() {
-  const directory = db.collection("accountDirectory");
   const conversations = db.collection("conversations").where("type", "==", "SUPPORT");
-  const [users, safeContacts, staff, admins, allTickets, closedTickets] = await Promise.all([
-    count(directory.where("role", "==", "USER")),
-    count(directory.where("role", "==", "SAFE_CONTACT")),
-    count(directory.where("role", "==", "STAFF")),
-    count(directory.where("role", "==", "ADMIN")),
+  const [accounts, allTickets, closedTickets] = await Promise.all([
+    listEveryUser(),
     count(conversations),
     count(conversations.where("ticketStatus", "==", "COMPLETED")),
   ]);
+  const counts = {USER: 0, SAFE_CONTACT: 0, STAFF: 0, ADMIN: 0};
+  for (const account of accounts) counts[roleFromUser(account)]++;
   return {
-    counts: {USER: users, SAFE_CONTACT: safeContacts, STAFF: staff, ADMIN: admins},
+    counts,
     tickets: {open: Math.max(0, allTickets - closedTickets), closed: closedTickets},
   };
 }

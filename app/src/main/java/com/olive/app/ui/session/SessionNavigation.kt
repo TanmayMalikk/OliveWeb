@@ -97,7 +97,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 // Also discard partially entered onboarding fields when leaving the app.
-                if (screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
+                if (screen == SessionScreen.Cover || screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
                 // Without a saved enrollment, private entry must return to account setup.
                 if (enrollment == null) {
                     epoch++
@@ -215,8 +215,11 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
 
 // Users and staff: manages support tickets separately from safety-plan consultations.
 
-internal class StaffSupportController(private val runtime: SessionRuntime) {
-    private val repository by lazy { SupportRepository() }
+internal class StaffSupportController(
+    private val runtime: SessionRuntime,
+    repositoryFactory: () -> SupportRepository = { SupportRepository() },
+) {
+    private val repository by lazy(repositoryFactory)
 
     var requested by mutableStateOf(false)
         private set
@@ -452,7 +455,9 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 return messaging.runMessagingAction("Unable to send this friend request.") { repository, device, _ ->
-                    repository.sendFriendRequest(AccountIdentity(device.uid, coverUsername), user)
+                    val identity = AccountIdentity(device.uid, coverUsername)
+                    messaging.registerMessagingIdentity(identity)
+                    if (enrollment?.uid == identity.uid) repository.sendFriendRequest(identity, user)
                 }
             }
         }
@@ -463,7 +468,9 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 return messaging.runMessagingAction("Unable to accept this friend request.") { repository, device, _ ->
-                    repository.acceptRequest(AccountIdentity(device.uid, coverUsername), request)
+                    val identity = AccountIdentity(device.uid, coverUsername)
+                    messaging.registerMessagingIdentity(identity)
+                    if (enrollment?.uid == identity.uid) repository.acceptRequest(identity, request)
                 }
             }
         }

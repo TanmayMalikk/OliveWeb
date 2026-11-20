@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_manual_short">Aliment manuel</string>
+    <string name="nutrition_label_short">Valeurs par portion. Saisissez 0 pour les valeurs nulles.</string>
+    <string name="nutrition_serving_short">Portion</string>
+    <string name="nutrition_scan_barcode">Scanner le code-barres</string>
+    <string name="nutrition_barcode_failed">Aucun code-barres unique valide. Réessayez une photo plus nette ou saisissez les chiffres.</string>
+    <string name="nutrition_other_nutrients">Autres nutriments</string>
+    <string name="nutrition_custom_portion">Quantité personnalisée</string>
+    <string name="nutrition_amount">Quantité</string>
+    <string name="nutrition_water">Eau</string>
+    <string name="nutrition_add_water">Ajouter de l’eau</string>
+    <string name="nutrition_water_amount">Quantité bue</string>
+    <string name="nutrition_water_goal">Objectif quotidien</string>
+    <string name="nutrition_water_progress">Eau : %1$d sur %2$d ml. Touchez pour ajouter.</string>
+    <string name="nutrition_water_minus">Retirer 250 ml d’eau</string>
+    <string name="nutrition_water_plus">Ajouter 250 ml d’eau</string>
+    <string name="nutrition_edit_food">Modifier l’aliment</string>
+    <string name="nutrition_edit_details">Modifier les valeurs</string>
+    <string name="nutrition_recent_foods">Ajouts récents</string>
+    <string name="nutrition_saved_foods">Aliments enregistrés</string>
+    <string name="nutrition_recent_searches">Recherches récentes</string>
+    <string name="nutrition_no_recent_foods">Aucun aliment ajouté récemment.</string>
+    <string name="nutrition_no_saved_foods">Vous n’avez encore enregistré aucun aliment.</string>
+    <string name="nutrition_save_food">Enregistrer l’aliment</string>
+    <string name="nutrition_unsave_food">Retirer l’aliment enregistré</string>
+    <string name="nutrition_saved_unavailable">Impossible de charger cet aliment enregistré.</string>
+</resources>

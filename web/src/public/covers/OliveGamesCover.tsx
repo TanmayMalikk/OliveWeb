@@ -1,24 +1,184 @@
-// Cover users: shows the olive games cover.
-import { useEffect, useState, type CSSProperties } from "react";
+// Cover users: shows the Little Grove cover with 6 botanical games and touch-ready controls.
+import { Suspense, lazy, useEffect, useState, type CSSProperties } from "react";
 import {
-  Leaf,
-  RotateCcw,
-  Flower2,
-  Sun,
   Cloud,
+  Feather,
+  Flower2,
+  Footprints,
+  LayoutGrid,
+  Leaf,
   Moon,
+  RotateCcw,
+  Sparkles,
   Sprout,
+  Sun,
   TreePine,
+  Blocks,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
 import { readCover, writeCover } from "../../services/CoverStateStore";
-import OliveFlight from "./OliveFlight";
-import OliveCrossing from "./OliveCrossing";
+import { GameOverlay } from "./GameOverlay";
+import { gameSfx, isGameMuted, setGameMuted } from "./game-audio";
 import { createMemoryBoard } from "./olive-memory-board";
+
+const loadFlight = () => import("./OliveFlight");
+const loadCrossing = () => import("./OliveCrossing");
+const loadBreaker = () => import("./OliveBreaker");
+const loadMerge = () => import("./GroveMerge");
+const loadTetris = () => import("./GroveTetris");
+
+const OliveFlight = lazy(loadFlight);
+const OliveCrossing = lazy(loadCrossing);
+const OliveBreaker = lazy(loadBreaker);
+const GroveMerge = lazy(loadMerge);
+const Tetris = lazy(loadTetris);
+
+function preloadGame(id: GroveGameId) {
+  if (id === "flight") void loadFlight();
+  else if (id === "crossing") void loadCrossing();
+  else if (id === "breaker") void loadBreaker();
+  else if (id === "merge") void loadMerge();
+  else if (id === "tetris") void loadTetris();
+}
+
+type GroveGameId =
+  | "pairs"
+  | "flight"
+  | "crossing"
+  | "breaker"
+  | "merge"
+  | "tetris";
+
+const GAME_META: Record<
+  GroveGameId,
+  {
+    label: string;
+    eyebrow: string;
+    description: [string, string];
+    icon: typeof Flower2;
+  }
+> = {
+  pairs: {
+    label: "Nature Pairs",
+    eyebrow: "Take a breath",
+    description: [
+      "One little discovery at a time.",
+      "Turn over two cards and find what belongs together.",
+    ],
+    icon: Flower2,
+  },
+  flight: {
+    label: "Olive Flight",
+    eyebrow: "Steady rhythm",
+    description: [
+      "One little olive. A whole grove to explore.",
+      "Find your rhythm and flutter between the branches.",
+    ],
+    icon: Feather,
+  },
+  crossing: {
+    label: "Olive Crossing",
+    eyebrow: "Mindful pace",
+    description: [
+      "Help a little olive cross the busy grove paths.",
+      "Swipe or tap to steer, watch the carts, and cross safely.",
+    ],
+    icon: Footprints,
+  },
+  breaker: {
+    label: "Canopy Breaker",
+    eyebrow: "Arcade focus",
+    description: [
+      "Bounce the olive off the log paddle.",
+      "Clear both brick walls and catch falling power-ups with the paddle.",
+    ],
+    icon: Sparkles,
+  },
+  merge: {
+    label: "Grove 2048",
+    eyebrow: "Botanical puzzle",
+    description: [
+      "Slide tiles across the garden bed to evolve each stage.",
+      "Swipe in any direction to grow from Seed up to Ancient Olive.",
+    ],
+    icon: LayoutGrid,
+  },
+  tetris: {
+    label: "Tetris",
+    eyebrow: "Falling block puzzle",
+    description: [
+      "Rotate and stack falling pieces to clear full rows.",
+      "Use the keyboard or the on-screen controls.",
+    ],
+    icon: Blocks,
+  },
+};
+
 const symbols = [Leaf, Flower2, Sun, Cloud, Moon, TreePine];
+
+function GameCoverPlaceholder({
+  id,
+  label,
+}: {
+  id: GroveGameId;
+  label: string;
+}) {
+  const arenaClass =
+    id === "crossing"
+      ? "crossing-arena"
+      : id === "flight"
+        ? "flight-arena"
+        : id === "merge"
+          ? "merge-arena"
+          : "canvas-arena";
+  const stageClass =
+    id === "crossing"
+      ? "crossing-stage"
+      : id === "flight"
+        ? "flight-stage"
+        : id === "merge"
+          ? "merge-board-wrap"
+          : "canvas-stage";
+
+  return (
+    <section
+      className="grove-game grove-cover-placeholder"
+      aria-label={`${label} loading`}
+      aria-busy="true"
+    >
+      <div className="game-score" aria-hidden="true">
+        <span>
+          SCORE <strong>—</strong>
+        </span>
+        <span>
+          ROUND <strong>—</strong>
+        </span>
+        <span>
+          YOUR BEST <strong>—</strong>
+        </span>
+      </div>
+      <div className={arenaClass}>
+        <div className={`${stageClass} grove-placeholder-stage`}>
+          <div className="grove-placeholder-card">
+            <Sprout size={24} aria-hidden="true" />
+            <strong>{label}</strong>
+            <span>Preparing stage…</span>
+          </div>
+        </div>
+      </div>
+      <div className="game-bottom">
+        <p role="status">Loading {label}…</p>
+      </div>
+    </section>
+  );
+}
+
 export default function Game({ landing = false }: { landing?: boolean }) {
   const Content = landing ? "main" : "div";
-  const [game, setGame] = useState<"pairs" | "flight" | "crossing">("pairs");
+  const [game, setGame] = useState<GroveGameId>("pairs");
+  const [muted, setMuted] = useState(() => isGameMuted());
   const [size, setSize] = useState(5);
   const pairCount = Math.floor((size * size) / 2);
   const [cards, setCards] = useState(() => createMemoryBoard(5));
@@ -26,8 +186,9 @@ export default function Game({ landing = false }: { landing?: boolean }) {
   const [matched, setMatched] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState<number | null>(null);
+  const [previousBest, setPreviousBest] = useState<number | null>(null);
   const [storageReady, setStorageReady] = useState(false);
-  // Start a new memory board when the chosen pair count changes.
+
   useEffect(() => {
     let live = true;
     setStorageReady(false);
@@ -36,6 +197,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       .then((v) => {
         if (!live) return;
         setBest(v);
+        setPreviousBest(v);
         setStorageReady(true);
       })
       .catch(() => {
@@ -45,20 +207,28 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       live = false;
     };
   }, [size]);
-  // Keep the latest memory-game state available to the timer.
+
   useEffect(() => {
     if (flipped.length !== 2) return;
     const [a, b] = flipped;
+    const isMatch = cards[a] === cards[b];
     const timer = setTimeout(
       () => {
-        if (cards[a] === cards[b]) setMatched((old) => [...old, a, b]);
+        if (isMatch) {
+          setMatched((old) => {
+            const next = [...old, a, b];
+            if (next.length === pairCount * 2) gameSfx.win();
+            else gameSfx.match();
+            return next;
+          });
+        }
         setFlipped([]);
       },
-      cards[a] === cards[b] ? 350 : 1000,
+      isMatch ? 320 : 880,
     );
     return () => clearTimeout(timer);
-  }, [flipped, cards]);
-  // Count playing time only while the memory round is active.
+  }, [flipped, cards, pairCount]);
+
   useEffect(() => {
     if (
       matched.length === pairCount * 2 &&
@@ -69,7 +239,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       void writeCover(`grove-best-${size}`, moves).catch(() => {});
     }
   }, [matched, moves, best, storageReady, pairCount, size]);
-  // Flips two cards and checks whether they form a matching pair.
+
   function turn(index: number) {
     if (
       flipped.length >= 2 ||
@@ -77,81 +247,95 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       matched.includes(index)
     )
       return;
+    gameSfx.tap();
     setFlipped((old) => [...old, index]);
     if (flipped.length === 1) setMoves((n) => n + 1);
   }
-  // Clears the board and starts a new memory game.
+
   function restart(nextSize = size) {
+    setPreviousBest(best);
     setSize(nextSize);
     setCards(createMemoryBoard(nextSize));
     setFlipped([]);
     setMatched([]);
     setMoves(0);
+    gameSfx.tap();
   }
+
+  const toggleAudio = () => {
+    const next = !muted;
+    setGameMuted(next);
+    setMuted(next);
+    if (!next) gameSfx.tap();
+  };
+
+  const completed = matched.length === pairCount * 2;
+  const activeCopy = GAME_META[game];
+
   return (
     <div className={`grove ${landing ? "grove-landing" : ""}`}>
       <header className="grove-header">
         <div className="grove-brand">
-          <Sprout strokeWidth={1.4} />
-          <span>
-            little grove<small>A SMALL DAILY PAUSE</small>
+          <span className="grove-brand-mark" aria-hidden="true">
+            <Sprout size={20} strokeWidth={1.75} />
           </span>
+          <span>
+            Little Grove<small>Daily workspace</small>
+          </span>
+        </div>
+        <div className="grove-header-tools">
+          <span className="grove-header-pill">{activeCopy.label}</span>
+          <button
+            type="button"
+            className="grove-sound-btn"
+            aria-pressed={!muted}
+            aria-label={muted ? "Unmute game sounds" : "Mute game sounds"}
+            onClick={toggleAudio}
+          >
+            {muted ? (
+              <VolumeX size={16} aria-hidden="true" />
+            ) : (
+              <Volume2 size={16} aria-hidden="true" />
+            )}
+            <span>{muted ? "Sound off" : "Sound on"}</span>
+          </button>
         </div>
       </header>
       <Content id={landing ? "main" : undefined} className="grove-main">
-        <div className="grove-intro">
-          <span className="eyebrow">
-            {game === "pairs"
-              ? "TAKE A BREATH. FIND A PAIR."
-              : game === "flight"
-                ? "SPREAD YOUR LEAVES. TAKE FLIGHT."
-                : "ONE BRAVE OLIVE. ONE BUSY ROAD."}
-          </span>
-          <h1>
-            A little less rush.
-            <br />
-            <em>A little more play.</em>
-          </h1>
-          <p>
-            {game === "pairs" ? (
-              <>
-                {pairCount} pairs. One little discovery at a time.
-                <br />
-                Turn over two cards and find what belongs together.
-              </>
-            ) : game === "flight" ? (
-              <>
-                One little olive. A whole grove to explore.
-                <br />
-                Find your rhythm and flutter between the branches.
-              </>
-            ) : (
-              <>
-                Help a little olive cross the busy grove paths.
-                <br />
-                Keep moving, watch the carts, and see how far you get.
-              </>
-            )}
-          </p>
-          <div className="grove-games" role="group" aria-label="Choose a game">
-            <button
-              aria-pressed={game === "pairs"}
-              onClick={() => setGame("pairs")}
-            >
-              Nature Pairs
-            </button>
-            <button
-              aria-pressed={game === "flight"}
-              onClick={() => setGame("flight")}
-            >
-              Olive Flight
-            </button>
-            <button
-              aria-pressed={game === "crossing"}
-              onClick={() => setGame("crossing")}
-            >
-              Olive Crossing
-            </button>
+        <aside className="grove-intro" aria-label="Little Grove library">
+          <div className="grove-intro-head">
+            <span className="eyebrow">{activeCopy.eyebrow}</span>
+            <h1>{activeCopy.label}</h1>
+            <p>
+              {game === "pairs"
+                ? `${pairCount} pairs. ${activeCopy.description[0]}`
+                : activeCopy.description[0]}{" "}
+              {activeCopy.description[1]}
+            </p>
+          </div>
+          <div className="grove-rail-section">
+            <p className="grove-rail-heading">Games</p>
+            <div className="grove-games" role="group" aria-label="Choose a game">
+              {(Object.keys(GAME_META) as GroveGameId[]).map((id) => {
+                const NavIcon = GAME_META[id].icon;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={game === id}
+                    onMouseEnter={() => preloadGame(id)}
+                    onFocus={() => preloadGame(id)}
+                    onClick={() => {
+                      setGame(id);
+                      gameSfx.tap();
+                    }}
+                  >
+                    <NavIcon size={17} aria-hidden="true" />
+                    <span>{GAME_META[id].label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {game === "pairs" && (
             <div className="memory-options">
@@ -177,11 +361,35 @@ export default function Game({ landing = false }: { landing?: boolean }) {
               </small>
             </div>
           )}
-        </div>
-        {game === "flight" ? (
-          <OliveFlight />
-        ) : game === "crossing" ? (
-          <OliveCrossing />
+          <div className="grove-sidebar-bottom">
+            <span className="grove-rail-badge" aria-hidden="true">
+              <Sprout size={16} />
+            </span>
+            <div>
+              <strong>No hurry</strong>
+              <small>Touch, swipe, or keyboard</small>
+            </div>
+          </div>
+        </aside>
+
+        {game !== "pairs" ? (
+          <Suspense
+            fallback={
+              <GameCoverPlaceholder id={game} label={activeCopy.label} />
+            }
+          >
+            {game === "flight" ? (
+              <OliveFlight />
+            ) : game === "crossing" ? (
+              <OliveCrossing />
+            ) : game === "breaker" ? (
+              <OliveBreaker />
+            ) : game === "merge" ? (
+              <GroveMerge />
+            ) : (
+              <Tetris />
+            )}
+          </Suspense>
         ) : (
           <section className="grove-game" aria-label="Nature pairs memory game">
             <div className="game-score">
@@ -231,28 +439,38 @@ export default function Game({ landing = false }: { landing?: boolean }) {
                       }
                       aria-disabled={matched.includes(index)}
                     >
-                      <span>
-                        {visible ? (
-                          <>
-                            <Icon
-                              size={44}
-                              strokeWidth={1.2}
-                              aria-hidden="true"
-                            />
-                            <b>{symbol + 1}</b>
-                          </>
-                        ) : (
+                      <span className="memory-flip" aria-hidden="true">
+                        <span className="memory-face memory-face-down">
                           <Sprout size={30} strokeWidth={1} />
-                        )}
+                        </span>
+                        <span className="memory-face memory-face-up">
+                          <Icon size={44} strokeWidth={1.2} />
+                          <b>{symbol + 1}</b>
+                        </span>
                       </span>
                     </button>
                   );
                 })}
               </div>
+              {completed && (
+                <GameOverlay
+                  tone="won"
+                  title="A lovely little finish"
+                  subtitle={`All ${pairCount} pairs matched in ${moves} moves.`}
+                  score={moves}
+                  scoreLabel="Moves"
+                  best={best}
+                  bestLabel="Best"
+                  isNewBest={previousBest === null || moves < previousBest}
+                  actionLabel="Play again"
+                  actionAriaLabel="Play Nature Pairs again"
+                  onAction={() => restart()}
+                />
+              )}
             </div>
             <div className="game-bottom">
               <p role="status">
-                {matched.length === pairCount * 2
+                {completed
                   ? "A lovely little finish. Play another round?"
                   : "No timer. No hurry. Just a little discovery."}
               </p>
@@ -265,7 +483,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       </Content>
       <footer className="grove-footer">
         <span>Nothing to chase. A moment to enjoy.</span>
-        <span>PLAY A LITTLE. FEEL A LITTLE LIGHTER.</span>
+        <span>Play a little. Feel a little lighter.</span>
       </footer>
     </div>
   );

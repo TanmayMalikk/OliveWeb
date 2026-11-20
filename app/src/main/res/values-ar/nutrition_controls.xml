@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_manual_short">طعام يدوي</string>
+    <string name="nutrition_label_short">القيم لحصة واحدة. أدخل 0 للقيم الصفرية.</string>
+    <string name="nutrition_serving_short">حجم الحصة</string>
+    <string name="nutrition_scan_barcode">مسح الرمز الشريطي</string>
+    <string name="nutrition_barcode_failed">لم يتم العثور على رمز واحد صالح. جرّب صورة أوضح أو اكتب الأرقام.</string>
+    <string name="nutrition_other_nutrients">عناصر غذائية أخرى</string>
+    <string name="nutrition_custom_portion">كمية مخصصة</string>
+    <string name="nutrition_amount">الكمية</string>
+    <string name="nutrition_water">الماء</string>
+    <string name="nutrition_add_water">إضافة ماء</string>
+    <string name="nutrition_water_amount">الكمية المشروبة</string>
+    <string name="nutrition_water_goal">الهدف اليومي</string>
+    <string name="nutrition_water_progress">الماء: %1$d من %2$d مل. اضغط للإضافة.</string>
+    <string name="nutrition_water_minus">إزالة 250 مل ماء</string>
+    <string name="nutrition_water_plus">إضافة 250 مل ماء</string>
+    <string name="nutrition_edit_food">تعديل الطعام</string>
+    <string name="nutrition_edit_details">تعديل التفاصيل</string>
+    <string name="nutrition_recent_foods">الأطعمة المسجّلة مؤخرًا</string>
+    <string name="nutrition_saved_foods">الأطعمة المحفوظة</string>
+    <string name="nutrition_recent_searches">عمليات البحث الأخيرة</string>
+    <string name="nutrition_no_recent_foods">لا توجد أطعمة مسجّلة مؤخرًا.</string>
+    <string name="nutrition_no_saved_foods">لم تحفظ أي أطعمة بعد.</string>
+    <string name="nutrition_save_food">حفظ الطعام</string>
+    <string name="nutrition_unsave_food">إزالة الطعام المحفوظ</string>
+    <string name="nutrition_saved_unavailable">تعذّر تحميل هذا الطعام المحفوظ.</string>
+</resources>

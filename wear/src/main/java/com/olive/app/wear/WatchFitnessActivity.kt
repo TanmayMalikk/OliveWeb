@@ -21,6 +21,22 @@ class WatchFitnessActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         fitnessViewModel.restartSensors()
+        requestBackgroundHealthPermission()
+    }
+    private val backgroundPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        WatchPassiveRegistration.schedule(this)
+    }
+    private fun requestBackgroundHealthPermission() {
+        if (Build.VERSION.SDK_INT < 33) return
+        val foreground = if (Build.VERSION.SDK_INT >= 36) "android.permission.health.READ_HEART_RATE" else Manifest.permission.BODY_SENSORS
+        val background = if (Build.VERSION.SDK_INT >= 36) "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" else "android.permission.BODY_SENSORS_BACKGROUND"
+        val preferences = getSharedPreferences("watch_permissions", MODE_PRIVATE)
+        if (ContextCompat.checkSelfPermission(this, foreground) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, background) != PackageManager.PERMISSION_GRANTED &&
+            !preferences.getBoolean("background_requested", false)) {
+            preferences.edit().putBoolean("background_requested", true).apply()
+            backgroundPermission.launch(background)
+        }
     }
 
     // Starts the watch fitness screen and requests access to its health sensors.
@@ -57,6 +73,7 @@ class WatchFitnessActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
+        else requestBackgroundHealthPermission()
     }
 }
 

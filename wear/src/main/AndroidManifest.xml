@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.BODY_SENSORS" android:maxSdkVersion="35" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -19,6 +22,16 @@
             android:name="com.google.android.wearable.standalone"
             android:value="false" />
 
+        <service android:name=".WatchPhoneListener" android:exported="true">
+            <intent-filter><action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/olive/" /></intent-filter>
+        </service>
+        <service android:name=".WatchPassiveFitnessService" android:exported="true"
+            android:permission="com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING" />
+        <receiver android:name=".WatchFitnessBootReceiver" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
         <activity
             android:name=".WatchFitnessActivity"
             android:taskAffinity=""

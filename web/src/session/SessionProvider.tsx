@@ -27,6 +27,7 @@ function accountSyncError(error: unknown) {
   return error instanceof Error ? error.message : "Account sync is unavailable.";
 }
 
+const requestedSavedEntry = location.pathname === "/entry" && location.hash === "#open";
 const initialEntryToken =
   (location.pathname === "/" || location.pathname === "/entry") &&
   validEntryToken(location.hash.slice(1))
@@ -48,7 +49,7 @@ export function SessionProvider({
       ? "/account/sign-in"
       : mode === "download"
         ? "/get"
-        : initialEntryToken
+        : initialEntryToken || requestedSavedEntry
           ? "/account/sign-in"
           : canonicalPath(location.pathname),
   );
@@ -157,6 +158,12 @@ export function SessionProvider({
         setEnrollment(savedEnrollment);
         if (savedEnrollment && (stored?.webCover !== webCover.id || stored?.cover !== undefined))
           await (await database).put("device", savedEnrollment, "current");
+        // The public cover opens /entry without reading account data in its ad document.
+        if (requestedSavedEntry && savedEnrollment && !pendingEntry.current) {
+          const saved = await savedEntryLink(savedEnrollment.uid);
+          const token = saved ? new URL(saved).hash.slice(1) : "";
+          if (live && validEntryToken(token)) pendingEntry.current = token;
+        }
         // A saved account and a pending link are both needed before showing PIN entry.
         if (savedEnrollment && pendingEntry.current) {
           let authenticated = true;
@@ -212,7 +219,7 @@ export function SessionProvider({
     window.scrollTo({ top: 0 });
   }, [mode, profile?.role]);
 
-  const noteInteraction = useSessionSecurity({
+  const { noteInteraction, idleTimeoutSeconds, setIdleTimeoutSeconds } = useSessionSecurity({
     enrollment, entryOwner, epoch, mode, pendingEntry, phase,
     role: profile?.role ?? null, quickExit, setBusy,
     setEnrollmentAttempt: setEntryAttempt, setHistory, setIdleSeconds,
@@ -468,7 +475,7 @@ export function SessionProvider({
         profile, history, enrollment, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
         beginEntry, quickExit, unlock, saveProfile, saveEntry,
-        record, refresh, signOut, idleSeconds, noteInteraction, cloudMode, onboardingProfile,
+        record, refresh, signOut, idleSeconds, idleTimeoutSeconds, setIdleTimeoutSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >
       {children}
