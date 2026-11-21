@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- Credential Manager needs this app-side pointer as well as the hosted assetlinks.json.
+             It is debug-only because the PRF probe is not a release feature. -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/debug_asset_statements" />
+        <!-- Debug-only launcher. It is merged into debug builds only and never into a release APK. -->
+        <activity
+            android:name=".debug.PasskeyPrfProbeActivity"
+            android:exported="true"
+            android:label="Olive PRF Probe">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <receiver
             android:name=".debug.DebugVoipTokenReceiver"
             android:exported="true"

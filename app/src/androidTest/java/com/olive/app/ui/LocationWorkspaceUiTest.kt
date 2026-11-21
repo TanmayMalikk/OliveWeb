@@ -56,7 +56,7 @@ class LocationWorkspaceUiTest {
     private fun session(role: AccountRole, locations: Locations): SessionViewModel {
         val app = compose.activity.application
         val sources = SessionDataSources(LocalAccountRepository(EncryptedVault(app, "map-test-accounts")),
-            null, null, null, null, null, null, locations, null)
+            null, null, null, null, null, null, locations, null, null, null)
         lateinit var session: SessionViewModel
         instrumentation.runOnMainSync {
             session = ViewModelProvider(compose.activity, object : ViewModelProvider.Factory {

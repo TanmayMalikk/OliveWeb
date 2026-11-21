@@ -14,6 +14,7 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.messaging.ChatMembershipEvent
@@ -71,6 +72,9 @@ internal class SessionViewModel @JvmOverloads constructor(
     val activityCategory get() = runtime.state.activityCategory
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
+    val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
+    val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
+        get() = runtime.state.passkeyRecoveryCredentials
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val profile get() = runtime.state.profile
@@ -381,6 +385,10 @@ internal interface SessionAccountManagementActions {
     // Checks the current password before replacing it with the new password.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
+    fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
+    fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
+    fun removePasskeyRecovery(credentialId: String) =
+        runtime.settings.removePasskeyRecovery(credentialId)
 }
 
 // Connects cover, private note, activity, and privacy screens to their workflows.

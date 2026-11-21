@@ -69,6 +69,9 @@ class OliveActivity : FragmentActivity() {
     private val deviceLock by lazy(LazyThreadSafetyMode.NONE) {
         com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
     }
+    private val passkeyCredentials by lazy(LazyThreadSafetyMode.NONE) {
+        com.olive.app.security.AndroidPasskeyCredentials(this)
+    }
 
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
     private val screenCaptureProtectionEnabled by lazy {
@@ -134,6 +137,11 @@ class OliveActivity : FragmentActivity() {
             DisposableEffect(authentication) {
                 authentication?.let(deviceLock::show)
                 onDispose { deviceLock.cancel() }
+            }
+            val passkeyRequest = session.passkeyCredentialRequest
+            DisposableEffect(passkeyRequest) {
+                passkeyRequest?.let(passkeyCredentials::show)
+                onDispose { passkeyCredentials.cancel() }
             }
 
             val selectedCover = session.coverType
@@ -211,7 +219,7 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // The Safe App stays on its current page until the system permission result arrives.
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
+        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult &&
             !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
         ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
@@ -289,7 +297,7 @@ class OliveActivity : FragmentActivity() {
 
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
+        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
             !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,

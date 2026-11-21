@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- This lets the debug build retrieve the public Digital Asset Links declaration. The URL
+         contains no credential, key, user, or environment-specific secret. -->
+    <string name="debug_asset_statements" translatable="false">[{"include":"https://yourolivebranch.ca/.well-known/assetlinks.json"}]</string>
+    <string name="debug_prf_probe_title" translatable="false">Passkey PRF compatibility probe</string>
+    <string name="debug_prf_probe_description" translatable="false">Debug-only check. It creates a disposable passkey for yourolivebranch.ca and verifies that this device returns a 32-byte PRF result. No key material is displayed, logged, uploaded, or saved.</string>
+    <string name="debug_prf_probe_start" translatable="false">Test passkey PRF compatibility</string>
+    <string name="debug_prf_probe_idle" translatable="false">Ready to test.</string>
+    <string name="debug_prf_probe_creating" translatable="false">Creating disposable passkey…</string>
+    <string name="debug_prf_probe_ready_for_assertion" translatable="false">Passkey created. Tap below to request the PRF assertion.</string>
+    <string name="debug_prf_probe_assert" translatable="false">Request PRF assertion</string>
+    <string name="debug_prf_probe_asserting" translatable="false">Requesting PRF assertion…</string>
+    <string name="debug_prf_probe_supported" translatable="false">PRF supported — 32-byte result received.</string>
+    <string name="debug_prf_probe_unavailable" translatable="false">PRF unavailable — cross-platform recovery cannot be enabled on this credential provider.</string>
+    <string name="debug_prf_probe_cancelled" translatable="false">Passkey request was cancelled.</string>
+    <string name="debug_prf_probe_assertion_timed_out" translatable="false">Passkey was created, but the provider did not return a PRF assertion. This provider cannot complete the compatibility test.</string>
+    <string name="debug_prf_probe_provider_configuration" translatable="false">Passkey provider is not configured. Enable or update your device credential provider, then retry.</string>
+    <string name="debug_prf_probe_unsupported" translatable="false">Passkeys are unavailable on this device or credential provider. Update or enable Credential Manager, then retry.</string>
+    <string name="debug_prf_probe_security_rejected" translatable="false">SecurityError: the provider rejected the app or website association.</string>
+    <string name="debug_prf_probe_not_allowed" translatable="false">NotAllowedError: user verification, device policy, or provider permission prevented passkey creation.</string>
+    <string name="debug_prf_probe_constraint_rejected" translatable="false">ConstraintError: this provider cannot satisfy the requested passkey capabilities.</string>
+    <string name="debug_prf_probe_invalid_state" translatable="false">InvalidStateError: an equivalent passkey may already exist in this provider.</string>
+    <string name="debug_prf_probe_request_rejected" translatable="false">The credential provider rejected the passkey creation request. Update the provider, then retry.</string>
+    <string name="debug_prf_probe_creation_failed" translatable="false">Passkey creation failed. Check the app-to-website link, screen lock, and credential provider.</string>
+    <string name="debug_prf_probe_assertion_failed" translatable="false">Passkey was created, but PRF authentication failed. This provider may not support PRF.</string>
+</resources>
