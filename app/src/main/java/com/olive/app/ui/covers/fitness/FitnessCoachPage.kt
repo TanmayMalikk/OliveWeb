@@ -214,14 +214,12 @@ internal fun FitnessCoachPage(
         scope.launch {
             try {
                 val history = withContext(Dispatchers.IO) { store.coachHistory() }
-                val hint = when {
-                    isWorkoutOrMealAdvice(message, "") ->
-                        "\n(Format with each day/meal section separated by blank lines and each exercise/food as a bulleted item starting with • on its own line. Provide specific exercises, sets, and reps or food ideas, not step count suggestions.)"
-                    isCasualOrGreeting(message) ->
-                        "\n(Respond warmly, naturally, and conversationally like a real human coach. Do not pitch workouts, steps, or meals unless asked.)"
-                    else -> ""
+                val hint = if (isWorkoutOrMealAdvice(message, "")) {
+                    "\n(Format with each day/meal section separated by blank lines and each exercise/food as a bulleted item starting with • on its own line. Provide specific exercises, sets, and reps or food ideas, not step count suggestions.)"
+                } else {
+                    "\n(Respond warmly, naturally, and concisely as a real personal coach. Do NOT give an unprompted workout routine, exercises, meal plan, or step pitch. Only provide workout routines or meal plans if explicitly requested.)"
                 }
-                val outgoingMessage = if (hint.isNotEmpty() && message.length + hint.length <= 1200) {
+                val outgoingMessage = if (message.length + hint.length <= 1200) {
                     "$message$hint"
                 } else {
                     message
@@ -379,15 +377,6 @@ private fun isWorkoutOrMealAdvice(query: String, reply: String): Boolean {
     val lowerQuery = query.lowercase()
     val lowerReply = reply.lowercase()
     return keywords.any { it in lowerQuery } || keywords.any { it in lowerReply }
-}
-
-private fun isCasualOrGreeting(query: String): Boolean {
-    val trimmed = query.trim().lowercase().removeSuffix("?").removeSuffix("!").removeSuffix(".")
-    val greetings = setOf(
-        "hi", "hello", "hey", "how are you", "how are you doing", "how's it going",
-        "what's up", "good morning", "good afternoon", "good evening", "thanks", "thank you",
-    )
-    return trimmed in greetings || trimmed.startsWith("hi ") || trimmed.startsWith("hello ") || trimmed.startsWith("hey ")
 }
 
 /**
