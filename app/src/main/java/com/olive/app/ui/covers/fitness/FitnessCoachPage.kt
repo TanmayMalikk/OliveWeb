@@ -214,7 +214,13 @@ internal fun FitnessCoachPage(
         scope.launch {
             try {
                 val history = withContext(Dispatchers.IO) { store.coachHistory() }
-                val response = client.send(message, previousTurns, before, history)
+                val hint = "\n(Provide specific exercises and routine details or food ideas, not step count suggestions.)"
+                val outgoingMessage = if (isWorkoutOrMealAdvice(message, "") && message.length + hint.length <= 1200) {
+                    "$message$hint"
+                } else {
+                    message
+                }
+                val response = client.send(outgoingMessage, previousTurns, before, history)
                 val disclaimer = context.getString(R.string.fitness_coach_disclaimer)
                 val replyText = if (isWorkoutOrMealAdvice(message, response.text) &&
                     !response.text.contains("fitness or nutrition expert", ignoreCase = true)
