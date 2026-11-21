@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- This lets the debug build retrieve the public Digital Asset Links declaration. The URL
-         contains no credential, key, user, or environment-specific secret. -->
-    <string name="debug_asset_statements" translatable="false">[{"include":"https://yourolivebranch.ca/.well-known/assetlinks.json"}]</string>
     <string name="debug_prf_probe_title" translatable="false">Passkey PRF compatibility probe</string>
     <string name="debug_prf_probe_description" translatable="false">Debug-only check. It creates a disposable passkey for yourolivebranch.ca and verifies that this device returns a 32-byte PRF result. No key material is displayed, logged, uploaded, or saved.</string>
     <string name="debug_prf_probe_start" translatable="false">Test passkey PRF compatibility</string>

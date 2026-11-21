@@ -111,3 +111,13 @@ test("passkey recovery rejects malformed factor IDs across input classes", () =>
     );
   }
 });
+
+test("passkey recovery requires a recent signed-in session before factor removal", () => {
+  const now = 1_700_000_000_000;
+  assert.doesNotThrow(() => recovery.requireRecentAuthentication({
+    auth: {token: {auth_time: Math.floor((now - 299_000) / 1000)}},
+  }, now));
+  for (const authTime of [undefined, Math.floor((now - 301_000) / 1000), Math.floor((now + 61_000) / 1000)]) {
+    assert.throws(() => recovery.requireRecentAuthentication({auth: {token: {auth_time: authTime}}}, now));
+  }
+});

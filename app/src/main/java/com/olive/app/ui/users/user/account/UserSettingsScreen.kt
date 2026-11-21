@@ -385,16 +385,25 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     Text(stringResource(R.string.passkey_recovery_enable))
                                 }
                                 recoveryCredentialToRemove?.let { credentialId ->
+                                    val removingLastCredential = recoveryCredentials?.size == 1
                                     AlertDialog(
                                         onDismissRequest = { recoveryCredentialToRemove = null },
-                                        title = { Text(stringResource(R.string.passkey_recovery_remove_confirm_title)) },
-                                        text = { Text(stringResource(R.string.passkey_recovery_remove_confirm_help)) },
+                                        title = { Text(stringResource(
+                                            if (removingLastCredential) R.string.passkey_recovery_remove_last_title
+                                            else R.string.passkey_recovery_remove_confirm_title,
+                                        )) },
+                                        text = { Text(stringResource(
+                                            if (removingLastCredential) R.string.passkey_recovery_remove_last_help
+                                            else R.string.passkey_recovery_remove_confirm_help,
+                                        )) },
                                         confirmButton = {
-                                            Button(onClick = {
-                                                recoveryCredentialToRemove = null
-                                                session.removePasskeyRecovery(credentialId)
-                                            }) {
-                                                Text(stringResource(R.string.passkey_recovery_remove))
+                                            if (!removingLastCredential) {
+                                                Button(onClick = {
+                                                    recoveryCredentialToRemove = null
+                                                    session.removePasskeyRecovery(credentialId)
+                                                }) {
+                                                    Text(stringResource(R.string.passkey_recovery_remove))
+                                                }
                                             }
                                         },
                                         dismissButton = {
