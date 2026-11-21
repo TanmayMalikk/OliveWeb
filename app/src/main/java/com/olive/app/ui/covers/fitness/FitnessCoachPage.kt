@@ -221,15 +221,7 @@ internal fun FitnessCoachPage(
                     message
                 }
                 val response = client.send(outgoingMessage, previousTurns, before, history)
-                val disclaimer = context.getString(R.string.fitness_coach_disclaimer)
-                val withDisclaimer = if (isWorkoutOrMealAdvice(message, response.text) &&
-                    !response.text.contains("fitness or nutrition expert", ignoreCase = true)
-                ) {
-                    "$disclaimer\n\n${response.text}"
-                } else {
-                    response.text
-                }
-                val replyText = formatCoachReply(withDisclaimer)
+                val replyText = formatCoachReply(response.text)
                 withContext(Dispatchers.IO + NonCancellable) { chatHistory.append(message, replyText) }
                 draft = ""
                 turns = previousTurns + CoachTurn("user", message) + CoachTurn("model", replyText)

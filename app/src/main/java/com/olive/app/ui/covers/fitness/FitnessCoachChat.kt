@@ -20,6 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -28,8 +31,11 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 
 /**
  * Draws the gradient and heading within the selected fitness tab.
@@ -102,17 +108,39 @@ internal fun FitnessCoachChat(
     onApplyGoals: () -> Unit,
 ) {
     val list = rememberLazyListState(initialFirstVisibleItemIndex = turns.lastIndex.coerceAtLeast(0))
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val itemCount = turns.size + (if (pendingMessage != null) 2 else 0) +
+        (if (appliedGoals.isNotEmpty()) 1 else 0) + (if (proposed.isNotEmpty()) 1 else 0)
+
     LaunchedEffect(turns.size, pendingMessage, proposed, appliedGoals) {
-        val count = turns.size + (if (pendingMessage != null) 2 else 0) +
-            (if (appliedGoals.isNotEmpty()) 1 else 0) + (if (proposed.isNotEmpty()) 1 else 0)
-        if (count > 0) list.animateScrollToItem(count - 1)
+        if (itemCount > 0) list.animateScrollToItem(itemCount - 1)
+        if (pendingMessage == null) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
     }
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0 && itemCount > 0) {
+            delay(120.milliseconds)
+            list.animateScrollToItem(itemCount - 1)
+        }
+    }
+    val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().imePadding()) {
         if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text(
+            stringResource(R.string.fitness_coach_disclaimer),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+        )
         LazyColumn(
             state = list,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
         ) {
             if (turns.isEmpty() && pendingMessage == null) {
@@ -246,6 +274,16 @@ private fun CoachComposer(
 ) {
     val colors = MaterialTheme.colorScheme
     val messageLabel = stringResource(R.string.message)
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(awaitingReply) {
+        if (awaitingReply) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+
     Surface(color = colors.surfaceContainerLow, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
@@ -277,7 +315,11 @@ private fun CoachComposer(
                     maxLines = 4,
                 )
                 FilledIconButton(
-                    onClick = onSend,
+                    onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onSend()
+                    },
                     enabled = !awaitingReply && !billingBusy && draft.isNotBlank(),
                     modifier = Modifier.size(48.dp),
                 ) {
@@ -293,8 +335,8 @@ private fun CoachComposer(
  */
 internal fun formatCoachReply(rawText: String): String {
     var text = rawText.trim()
-    val disclaimerRegex = Regex("(Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.)\\s*", RegexOption.IGNORE_CASE)
-    text = disclaimerRegex.replace(text) { "${it.groupValues[1]}\n\n" }
+    val disclaimerRegex = Regex("(Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.?)\\s*", RegexOption.IGNORE_CASE)
+    text = disclaimerRegex.replace(text, "").trim()
 
     val dayWords = "(?:Day\\s+\\d+|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
 
