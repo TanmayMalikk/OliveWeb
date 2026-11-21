@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -46,14 +45,9 @@ internal fun FitnessCoachFrame(
 ) {
     val colors = MaterialTheme.colorScheme
     Box(
-        Modifier.fillMaxSize().background(colors.surface).testTag("fitness_coach_screen"),
+        Modifier.fillMaxSize().testTag("fitness_coach_screen"),
         contentAlignment = Alignment.TopCenter,
     ) {
-        Spacer(
-            Modifier.fillMaxWidth().height(256.dp).background(
-                Brush.verticalGradient(colors = listOf(colors.primaryContainer, colors.surface)),
-            ),
-        )
         Column(Modifier.widthIn(max = 680.dp).fillMaxWidth().fillMaxHeight()) {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 16.dp, end = 8.dp),

@@ -70,6 +70,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.ripple
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -232,8 +233,16 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     }
 
     OliveTheme {
+        val colors = MaterialTheme.colorScheme
+        val coachGradient = remember(colors) {
+            Brush.verticalGradient(listOf(colors.primaryContainer, FitnessBackground))
+        }
         Box(
-            Modifier.fillMaxSize().background(FitnessBackground)
+            Modifier.fillMaxSize()
+                .then(
+                    if (page == FitnessPage.COACH) Modifier.background(coachGradient)
+                    else Modifier.background(FitnessBackground)
+                )
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             Column(
@@ -355,6 +364,9 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
  * @param onPage Callback invoked when page changes or occurs.
  * @param onSettings Callback invoked when settings changes or occurs.
  */
+private val FitnessTabBarShape = RoundedCornerShape(28.dp)
+private val FitnessTabShape = RoundedCornerShape(24.dp)
+
 @Composable
 private fun FitnessHeader(
     page: FitnessPage,
@@ -393,7 +405,7 @@ private fun FitnessHeader(
             }
         }
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            Modifier.fillMaxWidth().clip(FitnessTabBarShape)
                 .background(LightSage).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -458,8 +470,8 @@ private fun FitnessTab(
     val source = rememberOliveInteraction()
     Column(
         modifier.olivePress(source, enabled)
-            .shadow(if (selected && enabled) 2.dp else 0.dp, OlivePill)
-            .clip(OlivePill)
+            .shadow(if (selected && enabled) 2.dp else 0.dp, FitnessTabShape)
+            .clip(FitnessTabShape)
             .background(if (selected) Paper else Color.Transparent)
             .selectable(
                 selected = selected,
