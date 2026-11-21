@@ -118,7 +118,11 @@ internal fun FitnessCoachChat(
             if (turns.isEmpty() && pendingMessage == null) {
                 item { CoachConversationStarters(onDraftChange, enabled = !billingBusy && draft.isBlank()) }
             }
-            items(turns) { turn -> CoachBubble(turn.role == "user") { Text(turn.text) } }
+            items(turns) { turn ->
+                CoachBubble(turn.role == "user") {
+                    Text(if (turn.role == "user") turn.text else formatCoachReply(turn.text))
+                }
+            }
             if (pendingMessage != null) {
                 item { CoachBubble(fromUser = true) { Text(pendingMessage) } }
                 item { CoachBubble(fromUser = false) { CoachTypingIndicator() } }
@@ -282,4 +286,38 @@ private fun CoachComposer(
             }
         }
     }
+}
+
+/**
+ * Formats coach replies with clean paragraph breaks and bullet points for workouts and meals.
+ */
+internal fun formatCoachReply(rawText: String): String {
+    var text = rawText.trim()
+    val disclaimerRegex = Regex("(Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.)\\s*", RegexOption.IGNORE_CASE)
+    text = disclaimerRegex.replace(text) { "${it.groupValues[1]}\n\n" }
+
+    val dayHeaderRegex = Regex("(?<!\\n)\\s*(Day\\s+\\d+[:·\\-])", RegexOption.IGNORE_CASE)
+    text = dayHeaderRegex.replace(text) { "\n\n${it.groupValues[1]}" }
+
+    val dayBlockRegex = Regex("(Day\\s+\\d+[:·\\-])\\s*([^\\n]+?)(?=(?:\\n\\nDay\\s+\\d+|\\n\\nRepeat|\\n\\nTake|\\n\\nRemember|$))", RegexOption.IGNORE_CASE)
+    text = dayBlockRegex.replace(text) { match ->
+        val header = match.groupValues[1]
+        val exercises = match.groupValues[2].trim()
+        val parts = exercises.split(Regex("[,;]\\s*(?=\\d+\\s*sets|\\d+\\s*reps|\\d+\\s*sec|\\d+\\s*min)", RegexOption.IGNORE_CASE))
+            .map { it.trim().trimEnd('.') }.filter { it.isNotEmpty() }
+        if (parts.size > 1) {
+            val bullets = parts.joinToString("\n") { "• $it" }
+            "$header\n$bullets"
+        } else {
+            match.value
+        }
+    }
+
+    val mealRegex = Regex("(?<!\\n)\\s*((?:Breakfast|Lunch|Dinner|Snack(?:s)?)\\s*[:·\\-])", RegexOption.IGNORE_CASE)
+    text = mealRegex.replace(text) { "\n\n• ${it.groupValues[1]}" }
+
+    val restRegex = Regex("(?<!\\n)\\s*(Repeat this cycle|Take rest days|Remember to rest|Stay hydrated|Drink plenty of water)", RegexOption.IGNORE_CASE)
+    text = restRegex.replace(text) { "\n\n${it.groupValues[1]}" }
+
+    return text.replace(Regex("\\n{3,}"), "\n\n").trim()
 }
