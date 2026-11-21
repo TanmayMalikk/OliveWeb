@@ -305,8 +305,20 @@ internal class SafetyDocumentsController(
      * @param document Safety document metadata record.
      * @param ownerUid Firebase UID of the resource owner.
      */
-    fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
-        checkNotNull(repository).delete(document, ownerUid)
+    fun delete(document: SafetyDocument, ownerUid: String) {
+        if (state.ownerUid != ownerUid) return
+        val previous = state.files
+        state = state.copy(files = previous.filterNot { it.id == document.id }, error = null)
+        media?.onDocumentSnapshot(ownerUid, state.files, true)
+        scope.launch {
+            runCatching {
+                checkNotNull(repository).delete(document, ownerUid)
+            }.onFailure {
+                if (state.ownerUid == ownerUid) {
+                    state = state.copy(files = previous, error = localizedFailure(it))
+                }
+            }
+        }
     }
 
     /**
