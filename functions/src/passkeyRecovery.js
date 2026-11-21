@@ -82,10 +82,15 @@ function recoveryEnvelope(value, uid, id) {
 }
 
 function credentialRecord(credential, uid, registrationInfo) {
-  const id = credentialId(credential?.id);
-  const publicKey = credential?.publicKey;
+  const rawId = credential?.id ?? credential?.credentialId;
+  const id = credentialId(rawId);
+  const storedPublicKey = credential?.publicKey;
+  const publicKey = storedPublicKey instanceof Uint8Array ? storedPublicKey :
+    typeof storedPublicKey?.toUint8Array === "function" ? storedPublicKey.toUint8Array() : null;
   const counter = credential?.counter;
-  if (!id || !(publicKey instanceof Uint8Array) || publicKey.length < 16 ||
+  if (!id || (credential?.id != null && credential?.credentialId != null &&
+      credential.id !== credential.credentialId) ||
+      !(publicKey instanceof Uint8Array) || publicKey.length < 16 ||
       publicKey.length > MAX_CREDENTIAL_BYTES || !Number.isSafeInteger(counter) || counter < 0) {
     throw new HttpsError("invalid-argument", "Invalid passkey credential.");
   }
