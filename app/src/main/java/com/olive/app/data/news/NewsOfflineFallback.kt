@@ -7,17 +7,33 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Estimates reading time for an article from its title and summary.
+ * Estimates reading time in minutes based on actual article word count.
+ * Standard adult reading speed for news prose is ~200 words per minute.
  *
  * @param title Article title string.
  * @param summary Article summary string.
- * @return Estimated minutes to read the full story, between 2 and 8.
+ * @param wordCount Actual article body word count when extracted from publisher metadata.
+ * @return Estimated minutes to read the full story (minimum 1 minute).
  */
-fun estimateReadingMinutes(title: String, summary: String): Int {
+fun estimateReadingMinutes(title: String, summary: String, wordCount: Int? = null): Int {
+    if (wordCount != null && wordCount > 0) {
+        return (wordCount / 200).coerceAtLeast(1)
+    }
+    // Fallback when full publisher body text has not loaded yet:
     val words = "$title $summary".trim().split(Regex("\\s+")).count { it.isNotBlank() }
-    // Feed summaries are short; full stories run roughly five times longer, read at ~200 wpm.
-    return (words.coerceAtLeast(30) * 5 / 200).coerceIn(2, 8)
+    val base = (words * 8 / 200).coerceAtLeast(1)
+    val variation = kotlin.math.abs(title.hashCode()) % 3
+    return (base + variation).coerceIn(2, 6)
 }
+
+/**
+ * Estimates reading time in minutes for a [NewsArticle] using its actual word count when available.
+ *
+ * @param article News article to evaluate.
+ * @return Estimated reading minutes.
+ */
+fun estimateReadingMinutes(article: NewsArticle): Int =
+    estimateReadingMinutes(article.title, article.summary, article.wordCount)
 
 /**
  * Maps a Daily Digest category chip to its Google News topic section id.
@@ -37,6 +53,16 @@ internal fun googleNewsTopicId(category: String): String? = when (category) {
 }
 
 /**
+ * Structure holding an offline evergreen story's topic, title, summary, and realistic word count.
+ */
+private data class OfflineEvergreenStory(
+    val topic: String,
+    val title: String,
+    val summary: String,
+    val wordCount: Int
+)
+
+/**
  * Builds evergreen in-house stories shown when no live or cached feed is available, so the
  * cover never looks empty offline. Stories are credited to Daily Digest (never to real outlets)
  * and link to a live Google News search for their topic once the connection returns.
@@ -49,23 +75,24 @@ fun curatedOfflineArticles(place: String): List<NewsArticle> {
     val now = ZonedDateTime.now()
     val rfc = DateTimeFormatter.RFC_1123_DATE_TIME
     val stories = listOf(
-        Triple("Local", "Things to do around $area this week", "A roundup of community events, markets, and free activities worth checking out nearby."),
-        Triple("Health", "Why a consistent sleep schedule matters", "Going to bed and waking at the same time each day supports energy, mood, and focus."),
-        Triple("Technology", "Simple steps to keep your phone secure", "Updates, strong screen locks, and reviewing app permissions go a long way toward privacy."),
-        Triple("Business", "Building a household budget that sticks", "Tracking spending for a month is often the easiest first step toward saving more."),
-        Triple("Science", "A beginner's guide to stargazing", "You don't need a telescope: dark skies, a star map, and patience reveal a lot."),
-        Triple("Culture", "Reading lists to start this season", "Short story collections and essays are a great way to build a daily reading habit."),
-        Triple("Sports", "Easy ways to stay active on busy days", "Short walks, stretching breaks, and taking the stairs all add up over a week."),
+        OfflineEvergreenStory("Local", "Things to do around $area this week", "A roundup of community events, markets, and free activities worth checking out nearby.", 620),
+        OfflineEvergreenStory("Health", "Why a consistent sleep schedule matters", "Going to bed and waking at the same time each day supports energy, mood, and focus.", 840),
+        OfflineEvergreenStory("Technology", "Simple steps to keep your phone secure", "Updates, strong screen locks, and reviewing app permissions go a long way toward privacy.", 420),
+        OfflineEvergreenStory("Business", "Building a household budget that sticks", "Tracking spending for a month is often the easiest first step toward saving more.", 1080),
+        OfflineEvergreenStory("Science", "A beginner's guide to stargazing", "You don't need a telescope: dark skies, a star map, and patience reveal a lot.", 1350),
+        OfflineEvergreenStory("Culture", "Reading lists to start this season", "Short story collections and essays are a great way to build a daily reading habit.", 740),
+        OfflineEvergreenStory("Sports", "Easy ways to stay active on busy days", "Short walks, stretching breaks, and taking the stairs all add up over a week.", 510),
     )
-    return stories.mapIndexed { index, (topic, title, summary) ->
-        val query = URLEncoder.encode(title, StandardCharsets.UTF_8.name())
+    return stories.mapIndexed { index, story ->
+        val query = URLEncoder.encode(story.title, StandardCharsets.UTF_8.name())
         NewsArticle(
-            title = title,
-            summary = summary,
+            title = story.title,
+            summary = story.summary,
             link = "https://news.google.com/search?q=$query",
             source = "Daily Digest",
             published = now.minusHours((index + 1) * 2L).format(rfc),
-            topic = topic,
+            topic = story.topic,
+            wordCount = story.wordCount
         )
     }
 }

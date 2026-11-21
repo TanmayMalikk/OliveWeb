@@ -11,9 +11,12 @@ import org.junit.Test
 
 class NewsOfflineFallbackTest {
     @Test
-    fun readingTimeIsClampedToRealisticRange() {
-        assertEquals(2, estimateReadingMinutes("Short", ""))
-        assertEquals(8, estimateReadingMinutes("Long", "word ".repeat(2_000)))
+    fun readingTimeCalculatesFromActualWordCountOrFallsBack() {
+        assertEquals(1, estimateReadingMinutes("Short Story", "", wordCount = 200))
+        assertEquals(4, estimateReadingMinutes("Standard Report", "", wordCount = 800))
+        assertEquals(7, estimateReadingMinutes("In-depth Analysis", "", wordCount = 1400))
+        val fallback = estimateReadingMinutes("Regular Title", "A brief preview summary.")
+        assertTrue(fallback in 2..6)
     }
 
     @Test

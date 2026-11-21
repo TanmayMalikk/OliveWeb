@@ -57,7 +57,8 @@ data class NewsArticle(
     val imageUrl: String = "",
     val topic: String = "",
     val isPaywalled: Boolean? = null,
-    val publisherUrl: String = ""
+    val publisherUrl: String = "",
+    val wordCount: Int? = null
 ) {
     /**
      * News: Converts this record into JSON.
@@ -232,7 +233,8 @@ internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
 @Serializable
 internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
-    val isPaywalled: Boolean? = null, val description: String = ""
+    val isPaywalled: Boolean? = null, val description: String = "",
+    val wordCount: Int? = null
 ) {
     /**
      * Converts this article into JSON for the local news cache.
@@ -252,7 +254,8 @@ internal data class NewsArticleMetadata(
         imageUrl = imageUrl.ifBlank { article.imageUrl },
         topic = topic.ifBlank { article.topic },
         isPaywalled = isPaywalled ?: article.isPaywalled,
-        summary = description.ifBlank { article.summary })
+        summary = description.ifBlank { article.summary },
+        wordCount = wordCount ?: article.wordCount)
 
     companion object {
         /**
@@ -482,6 +485,12 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         accessible == true -> false
         else -> null
     }
+    val wordCount = article?.optInt("wordCount")?.takeIf { it > 30 }
+        ?: runCatching {
+            val body = document.select("article, [itemprop=articleBody], main, .article-body, .story-body")
+                .text().ifBlank { document.body().text() }
+            body.split(Regex("\\s+")).count { it.isNotBlank() }.takeIf { it > 30 }
+        }.getOrNull()
     return NewsArticleMetadata(
         pageUrl, responsiveArticleImage(document, imageUrl, pageUrl),
         text(article?.opt("articleSection")).ifBlank { meta("article:section", "section") }.trim()
@@ -491,7 +500,8 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
                 "og:description",
                 "description"
             ) else ""
-        }.trim().take(300)
+        }.trim().take(300),
+        wordCount
     )
 }
 
@@ -533,7 +543,9 @@ internal class NewsMetadataRepository(
                 article.publisherUrl,
                 article.imageUrl,
                 article.topic,
-                article.isPaywalled
+                article.isPaywalled,
+                article.summary,
+                article.wordCount
             )
         return articleLocks[(article.link.hashCode() and Int.MAX_VALUE) % articleLocks.size].withLock {
             cached(article.link)?.let { return@withLock it }

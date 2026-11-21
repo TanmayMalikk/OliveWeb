@@ -98,7 +98,9 @@ internal fun NewsArticleCard(
     val topic = displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) }
     val readingTime = uiText(
         R.string.news_min_read,
-        remember(displayed.title, displayed.summary) { estimateReadingMinutes(displayed.title, displayed.summary) }
+        remember(displayed.title, displayed.summary, displayed.wordCount) {
+            estimateReadingMinutes(displayed)
+        }
     )
     var imageFailed by remember(displayed.imageUrl) { mutableStateOf(false) }
     Card(
@@ -287,9 +289,18 @@ internal fun NewsArticleReader(
     var textZoom by remember(article.link) { mutableIntStateOf(100) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = runCatching { URI(currentUrl).host }.getOrNull().orEmpty()
+    val cachedMeta = remember(article.link) {
+        NewsMetadataRepository(context.applicationContext).cached(article.link)
+    }
     val readingTime = uiText(
         R.string.news_min_read,
-        remember(article.title, article.summary) { estimateReadingMinutes(article.title, article.summary) }
+        remember(article.title, article.summary, article.wordCount, cachedMeta?.wordCount) {
+            estimateReadingMinutes(
+                article.title,
+                article.summary,
+                article.wordCount ?: cachedMeta?.wordCount
+            )
+        }
     )
     val shareTitle = uiText(R.string.news_share_article)
 

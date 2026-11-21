@@ -69,7 +69,9 @@ internal fun NewsHeroCard(
     val topic = newsTopicLabel(displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) })
     val readingTime = uiText(
         R.string.news_min_read,
-        remember(displayed.title, displayed.summary) { estimateReadingMinutes(displayed.title, displayed.summary) }
+        remember(displayed.title, displayed.summary, displayed.wordCount) {
+            estimateReadingMinutes(displayed)
+        }
     )
 
     Card(
