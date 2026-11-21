@@ -24,8 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.ChatMembershipAction
@@ -81,6 +79,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
  * @param onClose Callback invoked when close changes or occurs.
  * @param onOpenMedia Callback invoked when open media changes or occurs.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatInfoDialog(
     session: SessionViewModel,
@@ -166,40 +165,35 @@ internal fun ChatInfoDialog(
         }
     }
 
-    Dialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ModalBottomSheet(
         onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        sheetState = sheetState,
+        sheetGesturesEnabled = true,
+        containerColor = ChatPageBackground,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = Modifier.fillMaxWidth().testTag("chat_info_screen")
     ) {
-        Surface(
-            Modifier.fillMaxSize().testTag("chat_info_screen"),
-            color = ChatPageBackground,
-        ) {
-            Scaffold(
-                containerColor = ChatPageBackground,
-                floatingActionButton = {
-                    if (quickExit != null) FloatingQuickExit(quickExit)
-                },
-                topBar = {
-                    Row(
-                        Modifier.fillMaxWidth().background(Color.White)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = onClose, modifier = Modifier.testTag("chat_info_back")) {
-                            Icon(Icons.Outlined.Close, stringResource(R.string.close))
-                        }
-                        Text(
-                            stringResource(R.string.chat_info),
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f),
-                        )
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onClose, modifier = Modifier.testTag("chat_info_back")) {
+                        Icon(Icons.Outlined.Close, stringResource(R.string.close))
                     }
-                },
-            ) { padding ->
+                    Text(
+                        stringResource(R.string.chat_info),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 LazyColumn(
-                    Modifier.fillMaxSize().padding(padding),
+                    Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(
-                        start = 20.dp, top = 20.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 20.dp,
+                        start = 20.dp, top = 16.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 24.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -449,6 +443,12 @@ internal fun ChatInfoDialog(
                         }
                     }
                 }
+            }
+            if (quickExit != null) {
+                FloatingQuickExit(
+                    onClick = quickExit,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                )
             }
         }
     }

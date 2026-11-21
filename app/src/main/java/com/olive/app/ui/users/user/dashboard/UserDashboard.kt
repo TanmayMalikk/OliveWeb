@@ -66,7 +66,18 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
     val profile = session.profile ?: return
-    LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
+    val uid = session.coverAccountId ?: return
+    val context = LocalContext.current
+    LaunchedEffect(uid) {
+        val username = session.coverUsername
+        val localMode = session.localMode
+        session.messages.ensureMessagingObservation()
+        launch { session.documents.load(uid, username, localMode) }
+        launch { session.runtime.history.refreshHistory(uid) }
+        val defaults = safetyDefaults(context, !profile.affectedNames.isNullOrBlank())
+        launch { session.safetyPlans.open(uid, profile.fullName.ifBlank { profile.username }, defaults, "safe_area_warmup") }
+        launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { com.olive.app.data.safety.HotlineDirectory.readBundled(context) } }
+    }
     AnimatedContent(
         targetState = session.page, label = "safe page",
         transitionSpec = {

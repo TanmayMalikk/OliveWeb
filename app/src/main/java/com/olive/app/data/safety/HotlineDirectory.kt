@@ -139,18 +139,23 @@ class HotlineDirectory private constructor(
             Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
                 .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
+        @Volatile
+        private var cached: HotlineDirectory? = null
+
         /**
          * Reads province files from saved text.
          *
          * @param context Android context used to access system services, resources, or storage.
          * @return The resulting [HotlineDirectory] for read bundled.
          */
-        fun readBundled(context: Context): HotlineDirectory = parseProvinceFiles(
-            context.assets.list("hotlines/provinces").orEmpty().associate { name ->
-                name.removePrefix("Resources").removeSuffix(".json") to
-                    context.assets.open("hotlines/provinces/$name").bufferedReader().use { it.readText() }
-            }
-        )
+        fun readBundled(context: Context): HotlineDirectory = cached ?: synchronized(this) {
+            cached ?: parseProvinceFiles(
+                context.assets.list("hotlines/provinces").orEmpty().associate { name ->
+                    name.removePrefix("Resources").removeSuffix(".json") to
+                        context.assets.open("hotlines/provinces/$name").bufferedReader().use { it.readText() }
+                }
+            ).also { cached = it }
+        }
 
         /**
          * Parses province files.

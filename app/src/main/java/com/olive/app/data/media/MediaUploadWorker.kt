@@ -4,12 +4,15 @@ package com.olive.app.data.media
 import android.content.Context
 import android.util.Log
 import android.util.Base64
+import androidx.core.app.NotificationCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -245,6 +248,30 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return Result.retry()
     }
 
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val channelId = "olive_upload_channel"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val manager = applicationContext.getSystemService(android.app.NotificationManager::class.java)
+            if (manager?.getNotificationChannel(channelId) == null) {
+                val channel = android.app.NotificationChannel(
+                    channelId,
+                    "Media Upload",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    setShowBadge(false)
+                }
+                manager?.createNotificationChannel(channel)
+            }
+        }
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setContentTitle("Uploading encrypted file")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        return ForegroundInfo(7001, notification)
+    }
+
     companion object {
         private const val JOB_ID = "jobId"
         const val MEDIA_ID = "mediaId"
@@ -271,6 +298,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
          */
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,

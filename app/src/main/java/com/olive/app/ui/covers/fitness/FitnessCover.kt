@@ -118,7 +118,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     val accountId = session.coverAccountId ?: "guest"
     val store = remember(context, accountId) { FitnessStore(context, accountId) }
     val foodLibrary = remember(store) { FitnessFoodLibrary(store.preferences) }
-    var loaded by remember(store) { mutableStateOf<Pair<FitnessSnapshot, List<FitnessHistoryDay>>?>(null) }
+    var loaded by remember(store) { mutableStateOf<Pair<FitnessSnapshot, List<FitnessHistoryDay>>?>(store.snapshot() to emptyList()) }
     var pendingSnapshot by remember(store) { mutableStateOf<FitnessSnapshot?>(null) }
     val snapshot = pendingSnapshot ?: loaded?.first
     val history = loaded?.second.orEmpty()

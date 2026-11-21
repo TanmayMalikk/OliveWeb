@@ -147,8 +147,32 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     try {
                         val secure = checkNotNull(secureChatRepository)
                         var establishedKey = false
+                        val cachedAccess = withContext(Dispatchers.IO) {
+                            runCatching {
+                                chatCache.open(
+                                    uid,
+                                    conversation.id,
+                                    KeyManager.deviceId(),
+                                    System.currentTimeMillis(),
+                                )
+                            }.getOrNull()
+                        }
+                        if (cachedAccess != null && epoch == token && activeConversation?.id == conversation.id) {
+                            val cachedKey = runCatching { KeyManager.unwrapKey(cachedAccess.wrappedRoomKey) }.getOrNull()
+                            if (cachedKey != null) {
+                                val cachedMessages = withContext(Dispatchers.Default) {
+                                    secure.decryptMessages(cachedAccess.messages, cachedKey)
+                                }
+                                if (epoch == token && activeConversation?.id == conversation.id) {
+                                    remoteChatMessages = cachedMessages
+                                    activeRoomKey = cachedKey
+                                    loadingConversation = false
+                                    publishMessages(conversation.id, uid, cachedKey, null, token)
+                                }
+                            }
+                        }
                         val key = try {
-                            withTimeoutOrNull(8_000.milliseconds) {
+                            withTimeoutOrNull(if (cachedAccess != null) 3_000.milliseconds else 8_000.milliseconds) {
                                 val onlineKey = secureSharing.roomKey(conversation)
                                 val wrapped = secure.wrappedRoomKey(conversation.id, uid)
                                     ?: error("Wrapped room key unavailable")
@@ -167,7 +191,10 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             if (onlineFailure is CancellationException) throw onlineFailure
                             if (onlineFailure is FirebaseFirestoreException &&
                                 onlineFailure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
-                            ) throw onlineFailure
+                            ) {
+                                withContext(Dispatchers.IO) { chatCache.remove(uid, conversation.id) }
+                                throw onlineFailure
+                            }
                             val cached = withContext(Dispatchers.IO) {
                                 chatCache.open(
                                     uid,
@@ -201,7 +228,12 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) { // Do not expose key details; show the safe conversation error when encrypted room setup fails.
-                        if (epoch == token && activeConversation?.id == conversation.id) finishLoadingConversation()
+                        if (epoch == token && activeConversation?.id == conversation.id) {
+                            finishLoadingConversation()
+                            activeRoomKey = null
+                            remoteChatMessages = emptyList()
+                            chatMessages = emptyList()
+                        }
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {

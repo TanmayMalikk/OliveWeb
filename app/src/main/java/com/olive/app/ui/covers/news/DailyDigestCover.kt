@@ -143,6 +143,13 @@ internal fun NewsCover(
         newsError = false
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
+        if (articles.isEmpty()) {
+            val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
+                ?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
+            val instant = cached.ifEmpty { curatedOfflineArticles(currentPlace) }
+                .filter { category == "All" || it.topic.equals(category, true) }
+            if (instant.isNotEmpty()) articles = instant
+        }
         // Use the fallback when news cover is unavailable.
         try {
             GoogleNewsRepository().latest(session.language, scope, currentPlace, category).also {

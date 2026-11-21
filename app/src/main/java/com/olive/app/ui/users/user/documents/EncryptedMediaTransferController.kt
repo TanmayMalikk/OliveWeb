@@ -161,6 +161,7 @@ internal class MediaTransferController(
     private val observationJobs=mutableMapOf<String,Job>()
     private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
     private val downloadGate=DocumentDownloadGate()
+    private val sessionDecryptedCache = java.util.concurrent.ConcurrentHashMap<String, File>()
     private val uiStateFlow = MutableStateFlow(MediaTransferUiState())
     val uiState: StateFlow<MediaTransferUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
@@ -379,10 +380,12 @@ internal class MediaTransferController(
      */
     override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
+        sessionDecryptedCache[document.id]?.takeIf { it.isFile && it.length() > 0 }?.let { return it }
         state=MediaTransferState.Preparing("downloading")
         return try {
             val opened=withContext(Dispatchers.IO) {
                 downloadGate.withDocumentLock(document.id) {
+                    sessionDecryptedCache[document.id]?.takeIf { it.isFile && it.length() > 0 }?.let { return@withDocumentLock it }
                     downloadEncrypted(document,viewerUid)
                 }
             }
@@ -391,6 +394,7 @@ internal class MediaTransferController(
         } catch(failure:Exception) {
             if (failure is MediaAccessException && failure.reason == MediaAccessError.ACCESS_REVOKED) {
                 offlineCache.remove(viewerUid, document.id)
+                sessionDecryptedCache.remove(document.id)
             }
             val message=failure.localizedMessage ?: "Unable to download encrypted media"
             state=MediaTransferState.Failed(null,message,true)
@@ -439,6 +443,7 @@ internal class MediaTransferController(
     override suspend fun removeOfflineCopy(document:SafetyDocument,viewerUid:String) {
         withContext(Dispatchers.IO) { downloadGate.withDocumentLock(document.id) {
             offlineCache.remove(viewerUid, document.id)
+            sessionDecryptedCache.remove(document.id)
         } }
         offlineCopies = offlineCopies + (document.id to OfflineMediaAvailability.NOT_CACHED)
     }
@@ -796,6 +801,7 @@ internal class MediaTransferController(
                 MediaCipher.decrypt(input,output,key)
             } }
             check(partial.renameTo(target))
+            sessionDecryptedCache[document.id] = target
             return@withContext target
         } catch(failure:Exception) {
             partial.delete()
