@@ -345,6 +345,9 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         }
     }
 }
+private val FitnessTabBarShape = RoundedCornerShape(28.dp)
+private val FitnessTabShape = RoundedCornerShape(24.dp)
+
 /**
  * Draws the fitness title and top navigation.
  *
@@ -355,9 +358,6 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
  * @param onPage Callback invoked when page changes or occurs.
  * @param onSettings Callback invoked when settings changes or occurs.
  */
-private val FitnessTabBarShape = RoundedCornerShape(28.dp)
-private val FitnessTabShape = RoundedCornerShape(24.dp)
-
 @Composable
 private fun FitnessHeader(
     page: FitnessPage,

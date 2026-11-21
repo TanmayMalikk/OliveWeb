@@ -165,6 +165,11 @@ internal class MediaTransferController(
     val uiState: StateFlow<MediaTransferUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
     private inline fun updateUiState(transform: (MediaTransferUiState) -> MediaTransferUiState) {
         uiStateSnapshot = uiStateFlow.updateAndGet(transform)
     }

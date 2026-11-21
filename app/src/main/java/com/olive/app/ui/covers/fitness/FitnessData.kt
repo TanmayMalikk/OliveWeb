@@ -947,6 +947,11 @@ internal data class FitnessSnapshot(
     val nutrition = foodsToday.nutritionTotals()
 }
 
+/**
+ * Calculates aggregated nutrition totals across a list of food log entries.
+ *
+ * @return The sum of calories and macros for all entries.
+ */
 private fun List<FoodLogEntry>.nutritionTotals() = fold(NutritionTotals()) { total, entry ->
     val servings = entry.servings
     val food = entry.food

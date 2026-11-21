@@ -369,6 +369,13 @@ internal fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() ->
     }
 }
 
+/**
+ * Determines whether a message or reply discusses workouts, exercises, or meal plans.
+ *
+ * @param query The user's query text.
+ * @param reply The coach's response text.
+ * @return True if workout or meal advice keywords are detected.
+ */
 private fun isWorkoutOrMealAdvice(query: String, reply: String): Boolean {
     val keywords = listOf(
         "workout", "exercise", "routine", "gym", "training", "squat", "push-up", "lifting", "cardio",

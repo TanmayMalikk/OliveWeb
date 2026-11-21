@@ -88,6 +88,12 @@ private fun rememberOlivePressFeedback(source: MutableInteractionSource): State<
     return pressed
 }
 
+/**
+ * Remembers a mutable interaction source or falls back to an existing instance.
+ *
+ * @param source Optional supplied interaction source.
+ * @return The resolved mutable interaction source.
+ */
 @Composable
 internal fun rememberOliveInteraction(source: MutableInteractionSource? = null): MutableInteractionSource =
     source ?: remember { MutableInteractionSource() }

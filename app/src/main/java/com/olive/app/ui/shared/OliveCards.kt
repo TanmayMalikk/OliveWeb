@@ -29,6 +29,9 @@ private val OliveOutlinedElevation: CardElevation
         defaultElevation = 1.dp, pressedElevation = 0.dp, focusedElevation = 1.dp, hoveredElevation = 2.dp,
     )
 
+/**
+ * Renders a static elevated card.
+ */
 @Composable
 internal fun OliveCard(
     modifier: Modifier = Modifier,
@@ -41,6 +44,9 @@ internal fun OliveCard(
     androidx.compose.material3.Card(modifier, shape, colors, elevation, border, content)
 }
 
+/**
+ * Renders a clickable elevated card with themed press animations.
+ */
 @Composable
 internal fun OliveCard(
     onClick: () -> Unit,
@@ -60,6 +66,9 @@ internal fun OliveCard(
     )
 }
 
+/**
+ * Renders a static outlined card.
+ */
 @Composable
 internal fun OliveOutlinedCard(
     modifier: Modifier = Modifier,
@@ -72,6 +81,9 @@ internal fun OliveOutlinedCard(
     androidx.compose.material3.OutlinedCard(modifier, shape, colors, elevation, border, content)
 }
 
+/**
+ * Renders a clickable outlined card with themed press animations.
+ */
 @Composable
 internal fun OliveOutlinedCard(
     onClick: () -> Unit,

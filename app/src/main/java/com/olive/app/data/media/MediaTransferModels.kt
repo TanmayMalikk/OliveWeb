@@ -185,6 +185,11 @@ private data class StoredMediaUploadJob(
     val voiceDraft: PendingVoiceMessage? = null,
     val voiceMessage: OutgoingMessage? = null,
 ) {
+    /**
+     * Converts this stored upload job into an active [MediaUploadJob] model instance.
+     *
+     * @return The active [MediaUploadJob].
+     */
     fun toModel(): MediaUploadJob {
         val source = PreparedEncryptedMedia(
             filePath = filePath,
@@ -218,6 +223,12 @@ private data class StoredMediaUploadJob(
     }
 
     companion object {
+        /**
+         * Creates a [StoredMediaUploadJob] representation from an active [MediaUploadJob].
+         *
+         * @param job The active upload job to persist.
+         * @return The persisted upload job representation.
+         */
         fun from(job: MediaUploadJob) = StoredMediaUploadJob(
             id = job.id,
             ownerUid = job.ownerUid,

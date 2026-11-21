@@ -22,6 +22,9 @@ private class OliveCorners(
     bottomEnd: CornerSize,
     bottomStart: CornerSize,
 ) : CornerBasedShape(topStart, topEnd, bottomEnd, bottomStart) {
+    /**
+     * Creates a copy of this shape with the specified corner sizes.
+     */
     override fun copy(
         topStart: CornerSize,
         topEnd: CornerSize,
@@ -29,6 +32,9 @@ private class OliveCorners(
         bottomStart: CornerSize,
     ): CornerBasedShape = OliveCorners(topStart, topEnd, bottomEnd, bottomStart)
 
+    /**
+     * Creates an [Outline] of this shape for the given size and corner radii.
+     */
     override fun createOutline(
         size: Size,
         topStart: Float,

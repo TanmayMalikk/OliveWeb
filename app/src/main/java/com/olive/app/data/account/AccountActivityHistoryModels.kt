@@ -45,9 +45,11 @@ object PrivateEntryKindSerializer : KSerializer<PrivateEntryKind> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("PrivateEntryKind", PrimitiveKind.STRING)
 
+    /** Serializes the entry kind by name. */
     override fun serialize(encoder: Encoder, value: PrivateEntryKind) =
         encoder.encodeString(value.name)
 
+    /** Deserializes the entry kind, falling back to [PrivateEntryKind.Note]. */
     override fun deserialize(decoder: Decoder): PrivateEntryKind =
         runCatching { PrivateEntryKind.valueOf(decoder.decodeString()) }.getOrDefault(PrivateEntryKind.Note)
 }

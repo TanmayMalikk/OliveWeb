@@ -89,6 +89,11 @@ internal class SessionSafetyPlans(
     val uiState: StateFlow<SafetyPlansUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
     private inline fun updateUiState(transform: (SafetyPlansUiState) -> SafetyPlansUiState) {
         uiStateSnapshot = uiStateFlow.updateAndGet(transform)
     }

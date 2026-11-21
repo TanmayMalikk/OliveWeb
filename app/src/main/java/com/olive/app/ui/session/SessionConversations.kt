@@ -548,6 +548,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             val operation = uid to id
             if (wasArchived == archived || !pendingArchiveWrites.add(operation)) return
             val archiveEpoch = epoch
+            /** Updates local state to reflect archived visibility. */
             fun showArchived(value: Boolean) {
                 if (closed) {
                     val restored = state.restoredClosedConversationIds

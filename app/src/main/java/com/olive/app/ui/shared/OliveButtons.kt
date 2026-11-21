@@ -28,6 +28,9 @@ private val OliveTonalElevation: ButtonElevation
         defaultElevation = 2.dp, pressedElevation = 0.dp, focusedElevation = 2.dp, hoveredElevation = 4.dp,
     )
 
+/**
+ * Renders an elevated Olive button with themed press animations.
+ */
 @Composable
 internal fun OliveButton(
     onClick: () -> Unit,
@@ -48,6 +51,9 @@ internal fun OliveButton(
     )
 }
 
+/**
+ * Renders a filled tonal Olive button with themed press animations.
+ */
 @Composable
 internal fun OliveFilledTonalButton(
     onClick: () -> Unit,
@@ -68,6 +74,9 @@ internal fun OliveFilledTonalButton(
     )
 }
 
+/**
+ * Renders an outlined Olive button with themed press animations.
+ */
 @Composable
 internal fun OliveOutlinedButton(
     onClick: () -> Unit,
@@ -88,6 +97,9 @@ internal fun OliveOutlinedButton(
     )
 }
 
+/**
+ * Renders a text-only Olive button with themed press animations.
+ */
 @Composable
 internal fun OliveTextButton(
     onClick: () -> Unit,
@@ -108,6 +120,9 @@ internal fun OliveTextButton(
     )
 }
 
+/**
+ * Renders a standard icon button with themed press animations.
+ */
 @Composable
 internal fun OliveIconButton(
     onClick: () -> Unit,
@@ -125,6 +140,9 @@ internal fun OliveIconButton(
     )
 }
 
+/**
+ * Renders a filled icon button with themed press animations.
+ */
 @Composable
 internal fun OliveFilledIconButton(
     onClick: () -> Unit,
@@ -142,6 +160,9 @@ internal fun OliveFilledIconButton(
     )
 }
 
+/**
+ * Renders a filled tonal icon button with themed press animations.
+ */
 @Composable
 internal fun OliveFilledTonalIconButton(
     onClick: () -> Unit,
@@ -159,6 +180,9 @@ internal fun OliveFilledTonalIconButton(
     )
 }
 
+/**
+ * Renders an outlined icon button with themed press animations.
+ */
 @Composable
 internal fun OliveOutlinedIconButton(
     onClick: () -> Unit,
@@ -177,6 +201,9 @@ internal fun OliveOutlinedIconButton(
     )
 }
 
+/**
+ * Renders a floating action button with themed press animations.
+ */
 @Composable
 internal fun OliveFloatingActionButton(
     onClick: () -> Unit,
@@ -196,6 +223,9 @@ internal fun OliveFloatingActionButton(
     )
 }
 
+/**
+ * Renders a small floating action button with themed press animations.
+ */
 @Composable
 internal fun OliveSmallFloatingActionButton(
     onClick: () -> Unit,

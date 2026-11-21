@@ -32,6 +32,11 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
     val uiState: StateFlow<AdminPreloaderUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
     private inline fun updateUiState(transform: (AdminPreloaderUiState) -> AdminPreloaderUiState) {
         uiStateSnapshot = uiStateFlow.updateAndGet(transform)
     }

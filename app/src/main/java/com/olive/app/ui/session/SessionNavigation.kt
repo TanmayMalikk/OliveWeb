@@ -269,6 +269,11 @@ internal class StaffSupportController(
     val uiState: StateFlow<StaffSupportUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
     private inline fun updateUiState(transform: (StaffSupportUiState) -> StaffSupportUiState) {
         uiStateSnapshot = uiStateFlow.updateAndGet(transform)
     }
