@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -61,25 +62,29 @@ internal fun NewsCategoryChips(
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth().testTag("news_category_chips"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         contentPadding = PaddingValues(horizontal = 2.dp)
     ) {
         items(NEWS_TOPIC_CATEGORIES, key = { it }) { category ->
             val isSelected = selectedCategory == category
             Surface(
                 onClick = { onSelectCategory(category) },
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = if (isSelected) OliveGreen else WarmWhite,
                 contentColor = if (isSelected) Cream else DarkOlive,
-                border = BorderStroke(1.dp, if (isSelected) OliveGreen else SoftGray),
-                modifier = Modifier.heightIn(min = 40.dp).testTag("news_category_$category")
+                border = BorderStroke(0.8.dp, if (isSelected) OliveGreen else SoftGray),
+                modifier = Modifier.height(30.dp).testTag("news_category_$category")
             ) {
-                Text(
-                    text = newsTopicLabel(category),
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                    fontSize = 13.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = 11.dp)
+                ) {
+                    Text(
+                        text = newsTopicLabel(category),
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
             }
         }
     }

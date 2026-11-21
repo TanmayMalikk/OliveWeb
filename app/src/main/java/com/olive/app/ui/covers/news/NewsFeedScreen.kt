@@ -1,7 +1,6 @@
 // News cover users: lists headlines and opens saved articles.
 package com.olive.app.ui.covers.news
 
-import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
@@ -23,14 +22,17 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsScope
 import com.olive.app.R
@@ -101,12 +103,12 @@ internal fun NewsFeed(
                 Modifier.fillMaxSize().oliveScrollbar(listState).testTag("news_cover"),
                 state = listState,
                 contentPadding = PaddingValues(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = 12.dp,
+                    start = 18.dp,
+                    end = 18.dp,
+                    top = 8.dp,
                     bottom = 28.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Shows loading, articles, or an error for the current news request.
                 when (tab) {
@@ -139,71 +141,63 @@ internal fun NewsFeed(
 
                     else -> {
                         item {
-                            OutlinedTextField(
-                                query,
-                                { value ->
-                                    actions.search(value)
-                                },
-                                placeholder = {
-                                    Text(
-                                        if (tab == "Saved") uiText(R.string.search_saved_stories) else uiText(
-                                            R.string.search_headlines
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedTextField(
+                                    query,
+                                    { value ->
+                                        actions.search(value)
+                                    },
+                                    placeholder = {
+                                        Text(
+                                            if (tab == "Saved") uiText(R.string.search_saved_stories) else uiText(
+                                                R.string.search_headlines
+                                            ),
+                                            fontSize = 13.sp
                                         )
-                                    )
-                                },
-                                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                                trailingIcon = if (query.isNotBlank()) {
-                                    {
-                                        IconButton(onClick = { actions.search("") }) {
-                                            Icon(
-                                                Icons.Outlined.Close,
-                                                uiText(R.string.clear_search)
-                                            )
+                                    },
+                                    leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
+                                    trailingIcon = if (query.isNotBlank()) {
+                                        {
+                                            IconButton(onClick = { actions.search("") }, modifier = Modifier.size(24.dp)) {
+                                                Icon(
+                                                    Icons.Outlined.Close,
+                                                    uiText(R.string.clear_search),
+                                                    Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
-                                    }
-                                } else null,
-                                singleLine = true,
-                                shape = RoundedCornerShape(18.dp),
-                                modifier = Modifier.fillMaxWidth().testTag("news_search")
-                                    .keepVisibleWhileTyping())
-                        }
-                        // Skip the next action unless tab is today.
-                        if (tab == "Today") item {
-                            NewsDateHeader(
-                                edition = if (scope == NewsScope.LOCAL) currentPlace else uiText(R.string.global),
-                                isOffline = offline && !loading,
-                                onEditLocation = if (scope == NewsScope.LOCAL) actions.editLocation else null,
-                                loading = loading && scope == NewsScope.LOCAL
-                            )
-                        }
-                        if (tab == "Today") item {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                NewsScopeButton(
-                                    uiText(R.string.local),
-                                    Icons.Outlined.LocationOn,
-                                    scope == NewsScope.LOCAL,
-                                    Modifier.weight(1f)
-                                ) { actions.changeScope(NewsScope.LOCAL) }
-                                NewsScopeButton(
-                                    uiText(R.string.global),
-                                    Icons.Outlined.Public,
-                                    scope == NewsScope.GLOBAL,
-                                    Modifier.weight(1f)
-                                ) { actions.changeScope(NewsScope.GLOBAL) }
+                                    } else null,
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().testTag("news_search")
+                                        .keepVisibleWhileTyping(),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        focusedBorderColor = OliveGreen,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                    )
+                                )
+                                if (tab == "Today") {
+                                    NewsDateHeader(
+                                        scope = scope,
+                                        onScopeChange = actions.changeScope,
+                                        edition = if (scope == NewsScope.LOCAL) currentPlace else uiText(R.string.global),
+                                        isOffline = offline && !loading,
+                                        onEditLocation = if (scope == NewsScope.LOCAL) actions.editLocation else null,
+                                        loading = loading && scope == NewsScope.LOCAL
+                                    )
+                                    NewsCategoryChips(category, actions.changeCategory)
+                                }
+                                if (tab == "Saved") {
+                                    NewsSavedToggle(showHistory, history.isNotEmpty(), actions.toggleHistory, actions.clearHistory)
+                                }
                             }
-                        }
-                        if (tab == "Today") item {
-                            NewsCategoryChips(category, actions.changeCategory)
-                        }
-                        if (tab == "Saved") item {
-                            NewsSavedToggle(showHistory, history.isNotEmpty(), actions.toggleHistory, actions.clearHistory)
                         }
                         item {
                             Row(
-                                Modifier.fillMaxWidth(),
+                                Modifier.fillMaxWidth().padding(top = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -212,7 +206,8 @@ internal fun NewsFeed(
                                         tab == "Saved" -> uiText(R.string.saved_stories)
                                         else -> uiText(R.string.latest_stories)
                                     },
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Serif,
                                     modifier = (Modifier.weight(1f)).semantics { heading() })
                                 if (tab == "Saved" && visibleArticles.isNotEmpty()) Text(
@@ -306,41 +301,7 @@ internal fun newsBookmarkAction(session: SessionViewModel, article: NewsArticle)
 }
 
 /**
- * UI sizing: Local/Global buttons stay 48dp tall with 18dp icons and 15dp corners.
- *
- * @param label Accessible label or display caption.
- * @param icon Icon supplied to [NewsScopeButton].
- * @param selected Whether to apply selected.
- * @param modifier Compose modifier applied to the root layout.
- * @param onClick Callback invoked when the control is activated.
- */
-@Composable
-private fun NewsScopeButton(
-    label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean,
-    modifier: Modifier = Modifier, onClick: () -> Unit
-) {
-    if (selected) Button(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(15.dp)
-    ) {
-        Icon(icon, null, Modifier.size(18.dp))
-        Spacer(Modifier.width(7.dp))
-        Text(label)
-    } else OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(15.dp)
-    ) {
-        Icon(icon, null, Modifier.size(18.dp))
-        Spacer(Modifier.width(7.dp))
-        Text(label)
-    }
-}
-
-
-/**
- * Switches the Saved tab between bookmarks and on-device reading history.
+ * Switches the Saved tab between bookmarks and on-device reading history using a compact segmented toggle.
  *
  * @param showHistory Whether reading history is currently shown.
  * @param hasHistory Whether any reading history exists, enabling the clear action.
@@ -357,13 +318,68 @@ private fun NewsSavedToggle(
     val uiText = rememberResourceText()
     Row(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NewsScopeButton(uiText(R.string.news_bookmarks), Icons.Outlined.Bookmark, !showHistory, Modifier.weight(1f)) { onToggle(false) }
-        NewsScopeButton(uiText(R.string.news_history), Icons.Outlined.History, showHistory, Modifier.weight(1f)) { onToggle(true) }
-        if (showHistory && hasHistory) IconButton(onClick = onClear, modifier = Modifier.testTag("news_clear_history")) {
-            Icon(Icons.Outlined.DeleteOutline, uiText(R.string.news_clear_history), tint = Muted)
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = WarmWhite,
+            border = BorderStroke(0.8.dp, SoftGray),
+            modifier = Modifier.weight(1f)
+        ) {
+            Row(
+                modifier = Modifier.padding(2.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = { onToggle(false) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (!showHistory) OliveGreen else Color.Transparent,
+                    contentColor = if (!showHistory) Cream else DarkOlive,
+                    modifier = Modifier.weight(1f).height(28.dp).testTag("news_saved_bookmarks")
+                ) {
+                    Row(
+                        Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Outlined.Bookmark, null, Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            uiText(R.string.news_bookmarks),
+                            fontSize = 11.sp,
+                            fontWeight = if (!showHistory) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { onToggle(true) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (showHistory) OliveGreen else Color.Transparent,
+                    contentColor = if (showHistory) Cream else DarkOlive,
+                    modifier = Modifier.weight(1f).height(28.dp).testTag("news_saved_history")
+                ) {
+                    Row(
+                        Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Outlined.History, null, Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            uiText(R.string.news_history),
+                            fontSize = 11.sp,
+                            fontWeight = if (showHistory) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+        if (showHistory && hasHistory) IconButton(
+            onClick = onClear,
+            modifier = Modifier.size(28.dp).testTag("news_clear_history")
+        ) {
+            Icon(Icons.Outlined.DeleteOutline, uiText(R.string.news_clear_history), tint = Muted, modifier = Modifier.size(16.dp))
         }
     }
 }
