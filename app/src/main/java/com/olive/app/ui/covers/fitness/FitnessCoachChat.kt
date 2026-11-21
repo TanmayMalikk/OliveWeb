@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.olive.app.R
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
@@ -132,10 +133,11 @@ internal fun FitnessCoachChat(
         if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(
             stringResource(R.string.fitness_coach_disclaimer),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.error,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+            color = colors.error.copy(alpha = 0.8f),
+            maxLines = 1,
         )
         LazyColumn(
             state = list,
@@ -335,7 +337,7 @@ private fun CoachComposer(
  */
 internal fun formatCoachReply(rawText: String): String {
     var text = rawText.trim()
-    val disclaimerRegex = Regex("(?:Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.?|AI can make mistakes[.\\s·\\-]+(?:Not fitness or nutrition advice|Always stay within your body[’']s limits and consult a professional before starting something new\\.?))\\s*", RegexOption.IGNORE_CASE)
+    val disclaimerRegex = Regex("(?:Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.?|AI can make mistakes[.\\s·\\-]+(?:Not fitness or nutrition advice|Always stay within your body[’']s limits and consult a professional before starting something new|Stay within your body[’']s limits)\\.?)\\s*", RegexOption.IGNORE_CASE)
     text = disclaimerRegex.replace(text, "").trim()
 
     val dayWords = "(?:Day\\s+\\d+|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"

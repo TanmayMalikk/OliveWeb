@@ -11,7 +11,7 @@
     <string name="fitness_coach_review">Suggested daily goals</string>
     <string name="fitness_coach_apply">Apply suggested goals</string>
     <string name="fitness_coach_question">Ask for a workout plan, meal ideas, or help with your goals</string>
-    <string name="fitness_coach_disclaimer">AI can make mistakes. Always stay within your body’s limits and consult a professional before starting something new.</string>
+    <string name="fitness_coach_disclaimer">AI can make mistakes · Stay within your body’s limits</string>
     <string name="fitness_coach_thinking">Thinking…</string>
     <string name="fitness_coach_send">Send</string>
     <string name="fitness_coach_offer">CAD $5.99 per week. Renews weekly until canceled. Pay securely with Stripe.</string>
