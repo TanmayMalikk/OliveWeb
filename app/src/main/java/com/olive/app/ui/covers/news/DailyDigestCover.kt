@@ -37,7 +37,9 @@ import com.olive.app.data.location.CoverLocation
 import com.olive.app.data.news.GoogleNewsRepository
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsFeedCacheStore
+import com.olive.app.data.news.NewsReadingHistoryStore
 import com.olive.app.data.news.NewsScope
+import com.olive.app.data.news.curatedOfflineArticles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -95,6 +97,14 @@ internal fun NewsCover(
     var currentPlace by rememberSaveable(locationPreferenceKey) { mutableStateOf(customPlace.ifBlank { fallbackPlace }) }
     var locationEditorOpen by remember { mutableStateOf(false) }
     var locationDraft by remember { mutableStateOf("") }
+    var category by rememberSaveable(session.coverAccountId) { mutableStateOf("All") }
+    var showHistory by rememberSaveable(session.coverAccountId) { mutableStateOf(false) }
+    val historyStore = remember(context) { NewsReadingHistoryStore(context.applicationContext) }
+    var readingHistory by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
+    // Reload history whenever the user returns from an article or opens the Saved tab.
+    LaunchedEffect(selected, tab) {
+        if (selected == null) readingHistory = withContext(Dispatchers.IO) { historyStore.load() }
+    }
     // Back closes an article first, then returns through the previous news tabs.
     val back = rememberOliveBack(interactive, preview = tab != "Today" || tabHistory.isNotEmpty()) {
         // Opens the selected news section or saved-article view.
@@ -120,6 +130,7 @@ internal fun NewsCover(
         locationPermissionVersion,
         customPlace,
         locationPreferenceKey,
+        category,
     )
     val loading = request != completedRequest
     LaunchedEffect(request) {
@@ -128,10 +139,11 @@ internal fun NewsCover(
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
         // Use the fallback when news cover is unavailable.
         try {
-            GoogleNewsRepository().latest(session.language, scope, currentPlace).also {
+            GoogleNewsRepository().latest(session.language, scope, currentPlace, category).also {
                 articles = it
                 newsError = it.isEmpty()
-                withContext(Dispatchers.IO) {
+                // Only the unfiltered edition is cached so category feeds never overwrite it.
+                if (category == "All") withContext(Dispatchers.IO) {
                     feedCache.save(
                         session.language,
                         scope,
@@ -144,7 +156,10 @@ internal fun NewsCover(
             throw e
         } catch (_: Exception) {
             val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
-            articles = cached?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
+                ?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
+            // Offline: show the cached edition, else evergreen stories so the cover never looks empty.
+            articles = cached.ifEmpty { curatedOfflineArticles(currentPlace) }
+                .filter { category == "All" || it.topic.equals(category, true) }
             newsError = true
         }
         completedRequest = request
@@ -278,7 +293,13 @@ internal fun NewsCover(
                     } else {
                         NewsFeed(
                             session,
-                            NewsFeedState(tab, scope, query, articles, saved, loading, newsError, currentPlace),
+                            NewsFeedState(
+                                tab, scope, query, articles, saved, loading, newsError, currentPlace,
+                                category = category,
+                                history = readingHistory,
+                                showHistory = showHistory,
+                                offline = newsError && articles.isNotEmpty(),
+                            ),
                             NewsFeedActions(
                                 search = { value ->
                                     query = value
@@ -290,6 +311,12 @@ internal fun NewsCover(
                                 },
                                 refresh = { refresh++ },
                                 openArticle = { selected = it },
+                                changeCategory = { category = it },
+                                toggleHistory = { showHistory = it },
+                                clearHistory = {
+                                    historyStore.clear()
+                                    readingHistory = emptyList()
+                                },
                             ), Modifier.fillMaxSize()
                         )
                     }

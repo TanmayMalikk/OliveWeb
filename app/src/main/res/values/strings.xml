@@ -534,4 +534,22 @@
     <string name="incident_clear_date">Clear date</string>
     <string name="incident_body_required">Incident details (required)</string>
     <string name="note_content_required">Note (required)</string>
+    <string name="news_top_story">TOP STORY</string>
+    <string name="news_offline_reader">OFFLINE READER</string>
+    <string name="news_offline">Offline</string>
+    <string name="news_daily_edition" formatted="true">Daily Edition · %1$s</string>
+    <string name="news_min_read" formatted="true">%1$d min read</string>
+    <string name="news_recently_read">Recently read</string>
+    <string name="news_no_recent_stories">No recently read stories.</string>
+    <string name="news_bookmarks">Bookmarks</string>
+    <string name="news_history">History</string>
+    <string name="news_clear_history">Clear reading history</string>
+    <string name="news_text_size">Change text size</string>
+    <string name="news_share_article">Share article</string>
+    <string name="news_category_all">All</string>
+    <string name="news_category_world">World</string>
+    <string name="news_breaking">BREAKING</string>
+    <string name="news_swipe_bookmark">Bookmark</string>
+    <string name="news_swipe_share">Share</string>
+    <string name="news_swipe_dismiss">Dismiss</string>
 </resources>

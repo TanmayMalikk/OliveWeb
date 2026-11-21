@@ -477,4 +477,22 @@
     <string name="incident_body_required">事件详情（必填）</string>
     <string name="note_content_required">笔记（必填）</string>
     <string name="incident_clear_time">清除时间</string>
+    <string name="news_top_story">头条</string>
+    <string name="news_offline_reader">离线阅读</string>
+    <string name="news_offline">离线</string>
+    <string name="news_daily_edition" formatted="true">每日版 · %1$s</string>
+    <string name="news_min_read" formatted="true">阅读 %1$d 分钟</string>
+    <string name="news_recently_read">最近阅读</string>
+    <string name="news_no_recent_stories">暂无最近阅读的文章。</string>
+    <string name="news_bookmarks">书签</string>
+    <string name="news_history">历史记录</string>
+    <string name="news_clear_history">清除阅读记录</string>
+    <string name="news_text_size">更改文字大小</string>
+    <string name="news_share_article">分享文章</string>
+    <string name="news_category_all">全部</string>
+    <string name="news_category_world">国际</string>
+    <string name="news_breaking">快讯</string>
+    <string name="news_swipe_bookmark">收藏</string>
+    <string name="news_swipe_share">分享</string>
+    <string name="news_swipe_dismiss">关闭</string>
 </resources>

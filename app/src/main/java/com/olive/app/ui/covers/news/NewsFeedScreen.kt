@@ -23,6 +23,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -47,9 +48,17 @@ internal data class NewsFeedState(
     val loading: Boolean,
     val newsError: Boolean,
     val currentPlace: String,
+    val category: String = "All",
+    val history: List<NewsArticle> = emptyList(),
+    val showHistory: Boolean = false,
+    val offline: Boolean = false,
 ) {
     val visibleArticles
-        get() = (if (tab == "Saved") saved else articles).filter { article ->
+        get() = (when {
+            tab == "Saved" && showHistory -> history
+            tab == "Saved" -> saved
+            else -> articles
+        }).filter { article ->
             query.isBlank() || article.title.contains(query, true) || article.source.contains(
                 query,
                 true
@@ -63,6 +72,9 @@ internal data class NewsFeedActions(
     val editLocation: () -> Unit,
     val refresh: () -> Unit,
     val openArticle: (NewsArticle) -> Unit,
+    val changeCategory: (String) -> Unit = {},
+    val toggleHistory: (Boolean) -> Unit = {},
+    val clearHistory: () -> Unit = {},
 )
 /**
  * Shows loading, error, and article-list states for the Daily Digest.
@@ -80,6 +92,8 @@ internal fun NewsFeed(
     modifier: Modifier = Modifier
 ) {
     val uiText = rememberResourceText()
+    val context = LocalContext.current
+    val shareTitle = uiText(R.string.news_share_article)
     with(feed) {
         PullToRefreshBox(isRefreshing = loading, onRefresh = actions.refresh, modifier = modifier) {
             val listState = rememberLazyListState()
@@ -155,6 +169,21 @@ internal fun NewsFeed(
                         }
                         // Skip the next action unless tab is today.
                         if (tab == "Today") item {
+                            NewsDateHeader(
+                                edition = if (scope == NewsScope.LOCAL) currentPlace else uiText(R.string.global),
+                                isOffline = offline && !loading
+                            )
+                        }
+                        if (tab == "Today") {
+                            val tickerArticle = articles.firstOrNull()
+                            if (tickerArticle != null && query.isBlank() && category == "All" && !loading) item(key = "ticker_${tickerArticle.link}") {
+                                NewsBreakingTicker(
+                                    article = tickerArticle,
+                                    onOpen = { actions.openArticle(tickerArticle) }
+                                )
+                            }
+                        }
+                        if (tab == "Today") item {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -213,28 +242,36 @@ internal fun NewsFeed(
                                 }
                             }
                         }
+                        if (tab == "Today") item {
+                            NewsCategoryChips(category, actions.changeCategory)
+                        }
+                        if (tab == "Saved") item {
+                            NewsSavedToggle(showHistory, history.isNotEmpty(), actions.toggleHistory, actions.clearHistory)
+                        }
                         item {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (tab == "Saved") uiText(R.string.saved_stories) else uiText(
-                                        R.string.latest_stories
-                                    ),
+                                    when {
+                                        tab == "Saved" && showHistory -> uiText(R.string.news_recently_read)
+                                        tab == "Saved" -> uiText(R.string.saved_stories)
+                                        else -> uiText(R.string.latest_stories)
+                                    },
                                     style = MaterialTheme.typography.titleLarge,
                                     fontFamily = FontFamily.Serif,
                                     modifier = (Modifier.weight(1f)).semantics { heading() })
-                                if (tab == "Saved" && saved.isNotEmpty()) Text(
-                                    saved.size.toString(),
+                                if (tab == "Saved" && visibleArticles.isNotEmpty()) Text(
+                                    visibleArticles.size.toString(),
                                     color = Muted
                                 )
                             }
                         }
                         if (tab == "Today") {
-                            // Show a loading row while the first news stories are being fetched.
-                            if (loading) item { LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 1) }
-                            if (newsError && !loading) item {
+                            // Skeleton cards mirror the hero + standard card layout while stories load.
+                            if (loading) item { LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 3) }
+                            if (newsError && !loading && articles.isEmpty()) item {
                                 Card(
                                     modifier = Modifier.semantics(mergeDescendants = true) {},
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -259,18 +296,42 @@ internal fun NewsFeed(
                         // Show the empty-news message only after loading ends without an error.
                         if (visible.isEmpty() && !loading && !newsError) item {
                             NewsEmptyState(
-                                if (tab == "Saved") uiText(
-                                    R.string.no_saved_stories_yet
-                                ) else uiText(R.string.no_stories_found)
+                                when {
+                                    tab == "Saved" && showHistory -> uiText(R.string.news_no_recent_stories)
+                                    tab == "Saved" -> uiText(R.string.no_saved_stories_yet)
+                                    else -> uiText(R.string.no_stories_found)
+                                }
                             )
                         }
-                        items(visible, key = { it.link }) { article ->
-                            NewsArticleCard(
+                        // The first Today story is featured as a hero card when not searching.
+                        val hero = visible.firstOrNull()?.takeIf { tab == "Today" && query.isBlank() }
+                        if (hero != null) item(key = "hero_${hero.link}") {
+                            NewsHeroCard(
+                                hero,
+                                session.language,
+                                saved.any { it.link == hero.link },
+                                onOpen = { actions.openArticle(hero) },
+                                onBookmark = newsBookmarkAction(session, hero))
+                        }
+                        items(if (hero != null) visible.drop(1) else visible, key = { it.link }) { article ->
+                            SwipeableNewsArticleCard(
                                 article,
                                 session.language,
                                 saved.any { it.link == article.link },
                                 onOpen = { actions.openArticle(article) },
-                                onBookmark = newsBookmarkAction(session, article))
+                                onBookmark = newsBookmarkAction(session, article),
+                                onShare = {
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
+                                        putExtra(
+                                            android.content.Intent.EXTRA_TEXT,
+                                            "${article.title}\n\n${article.publisherUrl.ifBlank { article.link }}"
+                                        )
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, shareTitle))
+                                }
+                            )
                         }
                     }
                 }
@@ -324,6 +385,35 @@ private fun NewsScopeButton(
     }
 }
 
+
+/**
+ * Switches the Saved tab between bookmarks and on-device reading history.
+ *
+ * @param showHistory Whether reading history is currently shown.
+ * @param hasHistory Whether any reading history exists, enabling the clear action.
+ * @param onToggle Callback receiving `true` to show history or `false` for bookmarks.
+ * @param onClear Callback that clears reading history.
+ */
+@Composable
+private fun NewsSavedToggle(
+    showHistory: Boolean,
+    hasHistory: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onClear: () -> Unit
+) {
+    val uiText = rememberResourceText()
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NewsScopeButton(uiText(R.string.news_bookmarks), Icons.Outlined.Bookmark, !showHistory, Modifier.weight(1f)) { onToggle(false) }
+        NewsScopeButton(uiText(R.string.news_history), Icons.Outlined.History, showHistory, Modifier.weight(1f)) { onToggle(true) }
+        if (showHistory && hasHistory) IconButton(onClick = onClear, modifier = Modifier.testTag("news_clear_history")) {
+            Icon(Icons.Outlined.DeleteOutline, uiText(R.string.news_clear_history), tint = Muted)
+        }
+    }
+}
 
 /**
  * UI sizing/color: empty news states use 38dp vertical space, a 42dp Muted icon, and centered text.

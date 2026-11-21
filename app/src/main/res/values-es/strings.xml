@@ -483,4 +483,22 @@
     <string name="incident_body_required">Detalles del incidente (obligatorios)</string>
     <string name="note_content_required">Nota (obligatoria)</string>
     <string name="incident_clear_time">Borrar hora</string>
+    <string name="news_top_story">NOTICIA PRINCIPAL</string>
+    <string name="news_offline_reader">LECTOR SIN CONEXIÓN</string>
+    <string name="news_offline">Sin conexión</string>
+    <string name="news_daily_edition" formatted="true">Edición diaria · %1$s</string>
+    <string name="news_min_read" formatted="true">%1$d min de lectura</string>
+    <string name="news_recently_read">Leídos recientemente</string>
+    <string name="news_no_recent_stories">No hay artículos leídos recientemente.</string>
+    <string name="news_bookmarks">Marcadores</string>
+    <string name="news_history">Historial</string>
+    <string name="news_clear_history">Borrar historial de lectura</string>
+    <string name="news_text_size">Cambiar tamaño del texto</string>
+    <string name="news_share_article">Compartir artículo</string>
+    <string name="news_category_all">Todo</string>
+    <string name="news_category_world">Mundo</string>
+    <string name="news_breaking">ÚLTIMA HORA</string>
+    <string name="news_swipe_bookmark">Guardar</string>
+    <string name="news_swipe_share">Compartir</string>
+    <string name="news_swipe_dismiss">Descartar</string>
 </resources>

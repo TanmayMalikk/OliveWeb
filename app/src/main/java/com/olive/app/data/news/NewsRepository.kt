@@ -107,18 +107,31 @@ class GoogleNewsRepository(
      * @param language Language supplied to [latest].
      * @param scope Scope supplied to [latest].
      * @param place Place supplied to [latest].
+     * @param category Category chip; "All" keeps the default local search or world headlines.
      * @return List of resulting latest items.
      */
-    suspend fun latest(language: String, scope: NewsScope, place: String): List<NewsArticle> =
+    suspend fun latest(
+        language: String,
+        scope: NewsScope,
+        place: String,
+        category: String = "All"
+    ): List<NewsArticle> =
         withContext(Dispatchers.IO) {
             val locale = rssLocaleQuery(language)
+            val topicId = googleNewsTopicId(category)
+            val localQuery = place.ifBlank { "Canada" } + if (topicId != null) " $category" else ""
             val path = when (scope) {
                 NewsScope.LOCAL -> "/rss/search?q=" + URLEncoder.encode(
-                    place.ifBlank { "Canada" },
+                    localQuery,
                     StandardCharsets.UTF_8.name()
                 ) + "&$locale"
 
-                NewsScope.GLOBAL -> "/rss/headlines/section/topic/WORLD?$locale"
+                NewsScope.GLOBAL -> "/rss/headlines/section/topic/${topicId ?: "WORLD"}?$locale"
+            }
+            val defaultTopic = when {
+                topicId != null -> category
+                scope == NewsScope.LOCAL -> "Local"
+                else -> "World"
             }
             val connection =
                 openConnection(URL("https://news.google.com$path")).apply {
@@ -173,10 +186,8 @@ class GoogleNewsRepository(
                                         link,
                                         source.take(120),
                                         published.take(100),
-                                        topic = fallbackNewsTopic(
-                                            title,
-                                            if (scope == NewsScope.LOCAL) "Local" else "World"
-                                        )
+                                        topic = if (topicId != null) category
+                                        else fallbackNewsTopic(title, defaultTopic)
                                     )
                                 }
                             }

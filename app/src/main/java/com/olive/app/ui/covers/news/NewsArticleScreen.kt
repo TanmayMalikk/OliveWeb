@@ -23,14 +23,18 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,11 +55,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
+import com.olive.app.data.news.estimateReadingMinutes
 import com.olive.app.data.news.fallbackNewsTopic
 import com.olive.app.data.news.isSecureNewsUrl
 import com.olive.app.data.news.localPublishedDate
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsMetadataRepository
+import com.olive.app.data.news.NewsReadingHistoryStore
 import com.olive.app.R
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -90,6 +96,10 @@ internal fun NewsArticleCard(
         displayed = metadata.load(article).applyTo(article)
     }
     val topic = displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) }
+    val readingTime = uiText(
+        R.string.news_min_read,
+        remember(displayed.title, displayed.summary) { estimateReadingMinutes(displayed.title, displayed.summary) }
+    )
     var imageFailed by remember(displayed.imageUrl) { mutableStateOf(false) }
     Card(
         onClick = onOpen,
@@ -112,7 +122,7 @@ internal fun NewsArticleCard(
                     maxLines = 2
                 )
                 Text(
-                    displayed.localPublishedDate(language),
+                    "${displayed.localPublishedDate(language)} · $readingTime",
                     color = Muted,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 2
@@ -274,8 +284,20 @@ internal fun NewsArticleReader(
     var failed by remember(article.link) { mutableStateOf(!isNewsReaderUrlAllowed(readerUrl)) }
     var currentUrl by remember(article.link) { mutableStateOf(readerUrl) }
     var publisherReached by remember(article.link) { mutableStateOf(false) }
+    var textZoom by remember(article.link) { mutableIntStateOf(100) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = runCatching { URI(currentUrl).host }.getOrNull().orEmpty()
+    val readingTime = uiText(
+        R.string.news_min_read,
+        remember(article.title, article.summary) { estimateReadingMinutes(article.title, article.summary) }
+    )
+    val shareTitle = uiText(R.string.news_share_article)
+
+    LaunchedEffect(article.link) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            NewsReadingHistoryStore(context.applicationContext).record(article)
+        }
+    }
 
     val backProgress = rememberOliveBack(active) {
         val view = browser
@@ -303,15 +325,43 @@ internal fun NewsArticleReader(
 
     Column(modifier.oliveBackPreview(backProgress)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onBack, modifier = Modifier.testTag("news_reader_back")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, null)
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(4.dp))
                 Text(stringResource(R.string.back_to_stories))
             }
             Spacer(Modifier.weight(1f))
+            IconButton(
+                onClick = {
+                    textZoom = when (textZoom) {
+                        100 -> 125
+                        125 -> 150
+                        else -> 100
+                    }
+                    browser?.settings?.textZoom = textZoom
+                },
+                enabled = browser != null && !failed
+            ) {
+                Icon(Icons.Outlined.FormatSize, uiText(R.string.news_text_size), tint = OliveGreen)
+            }
+            IconButton(
+                onClick = {
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
+                        putExtra(
+                            android.content.Intent.EXTRA_TEXT,
+                            "${article.title}\n\n${article.publisherUrl.ifBlank { article.link }}"
+                        )
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, shareTitle))
+                }
+            ) {
+                Icon(Icons.Outlined.Share, shareTitle, tint = OliveGreen)
+            }
             IconButton(onClick = { browser?.reload() }, enabled = browser != null && !failed) {
                 Icon(Icons.Outlined.Refresh, uiText(R.string.a11y_refresh_article))
             }
@@ -328,11 +378,21 @@ internal fun NewsArticleReader(
             style = MaterialTheme.typography.titleMedium, maxLines = 2
         )
         Text(
-            host, color = Muted, style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+            if (host.isNotBlank()) "$host · $readingTime" else readingTime,
+            color = Muted, style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 5.dp)
                 .testTag("news_reader_host")
         )
-        HorizontalDivider()
+        if (progress in 1..99) {
+            LinearProgressIndicator(
+                progress = { progress / 100f },
+                modifier = Modifier.fillMaxWidth().height(2.5.dp),
+                color = OliveGreen,
+                trackColor = PaleOlive
+            )
+        } else {
+            HorizontalDivider()
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             key(article.link) {
                 AndroidView(
@@ -503,12 +563,53 @@ internal fun NewsArticleReader(
                 SkeletonLayout.NewsArticle, Modifier.fillMaxWidth().padding(16.dp), rows = 1,
             )
             if (failed) Column(
-                Modifier.fillMaxSize().background(Cream).padding(24.dp),
-                verticalArrangement = Arrangement.Center,
+                Modifier.fillMaxSize().background(Cream).padding(20.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(uiText(R.string.ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag))
-                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Paper),
+                    border = BorderStroke(1.dp, SoftGray),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Surface(
+                            color = PaleOlive,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                uiText(R.string.news_offline_reader),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkOlive
+                            )
+                        }
+                        Text(
+                            article.title,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            lineHeight = 26.sp,
+                            color = Ink
+                        )
+                        if (article.summary.isNotBlank()) {
+                            Text(
+                                article.summary,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 15.sp,
+                                lineHeight = 22.sp,
+                                color = Ink
+                            )
+                        }
+                    }
+                }
+                Text(
+                    uiText(R.string.ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted
+                )
                 Button(
                     onClick = {
                         if (isNewsReaderUrlAllowed(readerUrl)) {

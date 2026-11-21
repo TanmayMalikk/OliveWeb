@@ -492,4 +492,22 @@
     <string name="incident_body_required">تفاصيل الحادثة (مطلوبة)</string>
     <string name="note_content_required">الملاحظة (مطلوبة)</string>
     <string name="incident_clear_time">مسح الوقت</string>
+    <string name="news_top_story">أبرز خبر</string>
+    <string name="news_offline_reader">قارئ دون اتصال</string>
+    <string name="news_offline">غير متصل</string>
+    <string name="news_daily_edition" formatted="true">الإصدار اليومي · %1$s</string>
+    <string name="news_min_read" formatted="true">قراءة %1$d دقائق</string>
+    <string name="news_recently_read">قُرئت مؤخرًا</string>
+    <string name="news_no_recent_stories">لا توجد مقالات مقروءة مؤخرًا.</string>
+    <string name="news_bookmarks">الإشارات المرجعية</string>
+    <string name="news_history">السجل</string>
+    <string name="news_clear_history">مسح سجل القراءة</string>
+    <string name="news_text_size">تغيير حجم النص</string>
+    <string name="news_share_article">مشاركة المقال</string>
+    <string name="news_category_all">الكل</string>
+    <string name="news_category_world">العالم</string>
+    <string name="news_breaking">عاجل</string>
+    <string name="news_swipe_bookmark">حفظ</string>
+    <string name="news_swipe_share">مشاركة</string>
+    <string name="news_swipe_dismiss">تجاهل</string>
 </resources>
