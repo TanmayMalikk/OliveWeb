@@ -6,11 +6,14 @@ import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
 import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.content.Intent
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -211,9 +215,17 @@ internal fun FitnessCoachPage(
             try {
                 val history = withContext(Dispatchers.IO) { store.coachHistory() }
                 val response = client.send(message, previousTurns, before, history)
-                withContext(Dispatchers.IO + NonCancellable) { chatHistory.append(message, response.text) }
+                val disclaimer = context.getString(R.string.fitness_coach_disclaimer)
+                val replyText = if (isWorkoutOrMealAdvice(message, response.text) &&
+                    !response.text.contains("fitness or nutrition expert", ignoreCase = true)
+                ) {
+                    "$disclaimer\n\n${response.text}"
+                } else {
+                    response.text
+                }
+                withContext(Dispatchers.IO + NonCancellable) { chatHistory.append(message, replyText) }
                 draft = ""
-                turns = previousTurns + CoachTurn("user", message) + CoachTurn("model", response.text)
+                turns = previousTurns + CoachTurn("user", message) + CoachTurn("model", replyText)
                 val now = store.profile()
                 val today = LocalDate.now()
                 if (optedInAtSend && autoGoals && membership?.active == true) {
@@ -272,6 +284,13 @@ internal fun FitnessCoachPage(
                 onAutoGoalsChange = { enabled ->
                     autoGoals = enabled
                     store.preferences.edit { putBoolean("coach_auto_goals", enabled) }
+                },
+                onClearHistory = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { chatHistory.clear() }
+                        turns = emptyList()
+                    }
+                    showSettings = false
                 },
                 onManageBilling = if (membership?.canManage == true && !billingBusy) {
                     {
@@ -347,54 +366,114 @@ internal fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() ->
     }
 }
 
+private fun isWorkoutOrMealAdvice(query: String, reply: String): Boolean {
+    val keywords = listOf(
+        "workout", "exercise", "routine", "gym", "training", "squat", "push-up", "lifting", "cardio",
+        "meal", "diet", "recipe", "breakfast", "lunch", "dinner", "snack", "nutrition plan", "eating plan", "food plan",
+    )
+    val lowerQuery = query.lowercase()
+    val lowerReply = reply.lowercase()
+    return keywords.any { it in lowerQuery } || keywords.any { it in lowerReply }
+}
+
 /**
  * Composes the fitness coach settings UI element.
  *
  * @param autoGoals Whether to apply auto goals.
  * @param onAutoGoalsChange Callback invoked when auto goals change changes or occurs.
+ * @param onClearHistory Callback invoked when clear history is requested.
  * @param onManageBilling Callback invoked when manage billing changes or occurs.
  * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FitnessCoachSettings(
     autoGoals: Boolean,
     onAutoGoalsChange: (Boolean) -> Unit,
+    onClearHistory: () -> Unit,
     onManageBilling: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.fitness_coach_settings)) },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().toggleable(autoGoals, role = Role.Switch, onValueChange = onAutoGoalsChange)
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.fitness_coach_auto_goals))
-                        Text(
-                            stringResource(R.string.fitness_coach_auto_goals_detail),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(checked = autoGoals, onCheckedChange = null)
-                }
-                Text(stringResource(R.string.fitness_coach_privacy), style = MaterialTheme.typography.bodySmall)
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
-        dismissButton = {
-            if (onManageBilling != null) {
-                TextButton(onClick = onManageBilling) { Text(stringResource(R.string.fitness_coach_manage)) }
-            }
-        },
+    val colors = MaterialTheme.colorScheme
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = colors.surface,
+        modifier = Modifier.testTag("fitness_coach_settings_sheet"),
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.fitness_coach_settings),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            }
+            HorizontalDivider()
+            Row(
+                Modifier.fillMaxWidth()
+                    .toggleable(autoGoals, role = Role.Switch, onValueChange = onAutoGoalsChange)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.fitness_coach_auto_goals),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        stringResource(R.string.fitness_coach_auto_goals_detail),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = autoGoals, onCheckedChange = null)
+            }
+            HorizontalDivider()
+            OutlinedButton(
+                onClick = onClearHistory,
+                modifier = Modifier.fillMaxWidth().testTag("fitness_coach_clear_history"),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Icon(Icons.Outlined.DeleteOutline, contentDescription = null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.fitness_coach_clear_history))
+            }
+            if (onManageBilling != null) {
+                OutlinedButton(
+                    onClick = onManageBilling,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(Icons.Outlined.Settings, contentDescription = null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.fitness_coach_manage))
+                }
+            }
+            Text(
+                stringResource(R.string.fitness_coach_privacy),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /**

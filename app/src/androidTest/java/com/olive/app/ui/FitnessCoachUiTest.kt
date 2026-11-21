@@ -69,11 +69,12 @@ class FitnessCoachUiTest {
             "Friday · 20-minute walk at a comfortable pace\n\n" +
             "Rest between sessions. Add a few minutes next week if it feels easy."
         coach.reply.complete(CoachReply(plan, emptyMap()))
-        compose.waitUntil(10_000) { compose.onAllNodesWithText(plan).fetchSemanticsNodes().isNotEmpty() }
+        val expectedReply = "${label(R.string.fitness_coach_disclaimer)}\n\n$plan"
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(expectedReply).fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.onActivity {
             WindowInsetsControllerCompat(it.window, it.window.decorView).hide(WindowInsetsCompat.Type.ime())
         }
-        compose.onNode(hasText(plan) and hasText(label(R.string.fitness_coach_tab))).assertIsDisplayed()
+        compose.onNode(hasText(expectedReply) and hasText(label(R.string.fitness_coach_tab))).assertIsDisplayed()
         compose.onNode(hasSetTextAction()).assertIsDisplayed()
         File(compose.activity.getExternalFilesDir(null), "fitness-coach-test.png").outputStream().use { output ->
             compose.onNodeWithTag("fitness_coach_screen").captureToImage().asAndroidBitmap()
@@ -85,7 +86,6 @@ class FitnessCoachUiTest {
         val coach = Coach()
         val store = mount(coach)
         waitForLabel(R.string.fitness_coach_question)
-        compose.onNodeWithText(label(R.string.fitness_coach_disclaimer)).assertIsDisplayed()
         val send = compose.onNodeWithContentDescription(label(R.string.fitness_coach_send))
         val composer = compose.onNode(hasSetTextAction())
         send.assertIsNotEnabled()

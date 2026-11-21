@@ -30,6 +30,7 @@
     <string name="fitness_coach_auto_goals">Let AI Coach update my goals</string>
     <string name="fitness_coach_auto_goals_detail">Automatically save step targets you request or confirm, and apply small nutrition and water changes once per day.</string>
     <string name="fitness_coach_settings">Coach settings</string>
+    <string name="fitness_coach_clear_history">Clear conversation history</string>
     <string name="fitness_coach_history_error">Could not load your chat history.</string>
     <string name="fitness_coach_goals_saved">Goals saved</string>
     <string name="fitness_coach_prompt_workout">Make me a workout plan</string>

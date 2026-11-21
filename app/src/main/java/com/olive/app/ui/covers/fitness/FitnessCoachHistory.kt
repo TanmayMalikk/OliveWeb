@@ -50,6 +50,15 @@ internal class FitnessCoachHistory(context: Context, accountId: String) {
         }
     }
 
+    /**
+     * Clears all stored exchanges for this owner.
+     */
+    fun clear() {
+        HistoryDatabase(appContext).use { database ->
+            database.writableDatabase.delete("exchanges", "owner = ?", arrayOf(owner))
+        }
+    }
+
     private class HistoryDatabase(context: Context) : SQLiteOpenHelper(context, "fitness_coach.db", null, 1) {
         /**
          * Initializes the component and sets up its state or UI when created by Android.

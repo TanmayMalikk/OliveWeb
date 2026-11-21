@@ -30,6 +30,7 @@
     <string name="fitness_coach_auto_goals">Autoriser le coach IA à modifier mes objectifs</string>
     <string name="fitness_coach_auto_goals_detail">Enregistre automatiquement les objectifs de pas que vous demandez ou confirmez et ajuste légèrement les objectifs nutritionnels et d’eau une fois par jour.</string>
     <string name="fitness_coach_settings">Paramètres du coach</string>
+    <string name="fitness_coach_clear_history">Effacer l\'historique des conversations</string>
     <string name="fitness_coach_history_error">Impossible de charger votre historique de discussion.</string>
     <string name="fitness_coach_goals_saved">Objectifs enregistrés</string>
     <string name="fitness_coach_prompt_workout">Propose-moi un programme d’entraînement</string>

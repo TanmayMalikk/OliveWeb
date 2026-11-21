@@ -70,7 +70,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.ripple
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -233,16 +232,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     }
 
     OliveTheme {
-        val colors = MaterialTheme.colorScheme
-        val coachGradient = remember(colors) {
-            Brush.verticalGradient(listOf(colors.primaryContainer, FitnessBackground))
-        }
         Box(
-            Modifier.fillMaxSize()
-                .then(
-                    if (page == FitnessPage.COACH) Modifier.background(coachGradient)
-                    else Modifier.background(FitnessBackground)
-                )
+            Modifier.fillMaxSize().background(FitnessBackground)
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             Column(

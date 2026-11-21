@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 
@@ -108,7 +107,7 @@ internal fun FitnessCoachChat(
             (if (appliedGoals.isNotEmpty()) 1 else 0) + (if (proposed.isNotEmpty()) 1 else 0)
         if (count > 0) list.animateScrollToItem(count - 1)
     }
-    Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
         if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(
             state = list,
@@ -281,13 +280,6 @@ private fun CoachComposer(
                     Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.fitness_coach_send))
                 }
             }
-            Text(
-                stringResource(R.string.fitness_coach_disclaimer),
-                modifier = Modifier.fillMaxWidth(),
-                color = colors.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-            )
         }
     }
 }

@@ -30,6 +30,7 @@
     <string name="fitness_coach_auto_goals">السماح للمدرب الذكي بتحديث أهدافي</string>
     <string name="fitness_coach_auto_goals_detail">يحفظ تلقائيًا أهداف الخطوات التي تطلبها أو تؤكدها، ويطبق تغييرات بسيطة على أهداف التغذية والماء مرة واحدة يوميًا.</string>
     <string name="fitness_coach_settings">إعدادات المدرب</string>
+    <string name="fitness_coach_clear_history">مسح سجل المحادثة</string>
     <string name="fitness_coach_history_error">تعذّر تحميل سجل المحادثة.</string>
     <string name="fitness_coach_goals_saved">تم حفظ الأهداف</string>
     <string name="fitness_coach_prompt_workout">ضع لي خطة تمارين</string>

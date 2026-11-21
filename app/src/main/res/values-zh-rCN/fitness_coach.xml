@@ -30,6 +30,7 @@
     <string name="fitness_coach_auto_goals">允许 AI 教练更新我的目标</string>
     <string name="fitness_coach_auto_goals_detail">自动保存你要求或确认的步数目标，并每天小幅调整一次营养和饮水目标。</string>
     <string name="fitness_coach_settings">教练设置</string>
+    <string name="fitness_coach_clear_history">清除对话记录</string>
     <string name="fitness_coach_history_error">无法加载聊天记录。</string>
     <string name="fitness_coach_goals_saved">目标已保存</string>
     <string name="fitness_coach_prompt_workout">帮我制定训练计划</string>

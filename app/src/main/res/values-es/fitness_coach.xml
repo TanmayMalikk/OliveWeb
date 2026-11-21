@@ -30,6 +30,7 @@
     <string name="fitness_coach_auto_goals">Permitir que el entrenador IA cambie mis objetivos</string>
     <string name="fitness_coach_auto_goals_detail">Guarda los objetivos de pasos que pidas o confirmes y aplica pequeños cambios de nutrición y agua una vez al día.</string>
     <string name="fitness_coach_settings">Ajustes del entrenador</string>
+    <string name="fitness_coach_clear_history">Borrar historial de conversación</string>
     <string name="fitness_coach_history_error">No se pudo cargar el historial del chat.</string>
     <string name="fitness_coach_goals_saved">Objetivos guardados</string>
     <string name="fitness_coach_prompt_workout">Crea un plan de entrenamiento</string>
