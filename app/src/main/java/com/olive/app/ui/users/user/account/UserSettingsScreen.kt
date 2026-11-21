@@ -51,7 +51,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.security.IdlePolicy
@@ -104,7 +103,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val recoveryCredentials = session.passkeyRecoveryCredentials
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
-        if (BuildConfig.DEBUG && userRole && cacheUid != null) session.refreshPasskeyRecovery()
+        if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -338,7 +337,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
                             IdleTimeoutSetting(session)
-                            if (BuildConfig.DEBUG) {
+                            if (userRole) {
                                 HorizontalDivider()
                                 Text(
                                     stringResource(R.string.passkey_recovery_title),
