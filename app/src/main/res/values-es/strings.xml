@@ -497,8 +497,6 @@
     <string name="news_share_article">Compartir artículo</string>
     <string name="news_category_all">Todo</string>
     <string name="news_category_world">Mundo</string>
-    <string name="news_breaking">ÚLTIMA HORA</string>
     <string name="news_swipe_bookmark">Guardar</string>
     <string name="news_swipe_share">Compartir</string>
-    <string name="news_swipe_dismiss">Descartar</string>
 </resources>

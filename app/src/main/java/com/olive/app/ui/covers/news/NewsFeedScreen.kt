@@ -174,15 +174,6 @@ internal fun NewsFeed(
                                 isOffline = offline && !loading
                             )
                         }
-                        if (tab == "Today") {
-                            val tickerArticle = articles.firstOrNull()
-                            if (tickerArticle != null && query.isBlank() && category == "All" && !loading) item(key = "ticker_${tickerArticle.link}") {
-                                NewsBreakingTicker(
-                                    article = tickerArticle,
-                                    onOpen = { actions.openArticle(tickerArticle) }
-                                )
-                            }
-                        }
                         if (tab == "Today") item {
                             Row(
                                 Modifier.fillMaxWidth(),

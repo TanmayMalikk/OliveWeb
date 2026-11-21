@@ -506,8 +506,6 @@
     <string name="news_share_article">مشاركة المقال</string>
     <string name="news_category_all">الكل</string>
     <string name="news_category_world">العالم</string>
-    <string name="news_breaking">عاجل</string>
     <string name="news_swipe_bookmark">حفظ</string>
     <string name="news_swipe_share">مشاركة</string>
-    <string name="news_swipe_dismiss">تجاهل</string>
 </resources>

@@ -491,8 +491,6 @@
     <string name="news_share_article">分享文章</string>
     <string name="news_category_all">全部</string>
     <string name="news_category_world">国际</string>
-    <string name="news_breaking">快讯</string>
     <string name="news_swipe_bookmark">收藏</string>
     <string name="news_swipe_share">分享</string>
-    <string name="news_swipe_dismiss">关闭</string>
 </resources>

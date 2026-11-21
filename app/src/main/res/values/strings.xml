@@ -548,8 +548,6 @@
     <string name="news_share_article">Share article</string>
     <string name="news_category_all">All</string>
     <string name="news_category_world">World</string>
-    <string name="news_breaking">BREAKING</string>
     <string name="news_swipe_bookmark">Bookmark</string>
     <string name="news_swipe_share">Share</string>
-    <string name="news_swipe_dismiss">Dismiss</string>
 </resources>
