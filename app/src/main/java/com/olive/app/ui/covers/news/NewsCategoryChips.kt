@@ -62,26 +62,26 @@ internal fun NewsCategoryChips(
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth().testTag("news_category_chips"),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 2.dp)
     ) {
         items(NEWS_TOPIC_CATEGORIES, key = { it }) { category ->
             val isSelected = selectedCategory == category
             Surface(
                 onClick = { onSelectCategory(category) },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = if (isSelected) OliveGreen else WarmWhite,
                 contentColor = if (isSelected) Cream else DarkOlive,
-                border = BorderStroke(0.8.dp, if (isSelected) OliveGreen else SoftGray),
-                modifier = Modifier.height(30.dp).testTag("news_category_$category")
+                border = BorderStroke(1.dp, if (isSelected) OliveGreen else SoftGray),
+                modifier = Modifier.height(34.dp).testTag("news_category_$category")
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.padding(horizontal = 11.dp)
+                    modifier = Modifier.padding(horizontal = 13.dp)
                 ) {
                     Text(
                         text = newsTopicLabel(category),
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
                 }

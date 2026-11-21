@@ -141,7 +141,7 @@ internal fun NewsFeed(
 
                     else -> {
                         item {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     query,
                                     { value ->
@@ -152,26 +152,26 @@ internal fun NewsFeed(
                                             if (tab == "Saved") uiText(R.string.search_saved_stories) else uiText(
                                                 R.string.search_headlines
                                             ),
-                                            fontSize = 13.sp
+                                            fontSize = 14.sp
                                         )
                                     },
-                                    leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(20.dp)) },
                                     trailingIcon = if (query.isNotBlank()) {
                                         {
-                                            IconButton(onClick = { actions.search("") }, modifier = Modifier.size(24.dp)) {
+                                            IconButton(onClick = { actions.search("") }, modifier = Modifier.size(32.dp)) {
                                                 Icon(
                                                     Icons.Outlined.Close,
                                                     uiText(R.string.clear_search),
-                                                    Modifier.size(14.dp)
+                                                    Modifier.size(16.dp)
                                                 )
                                             }
                                         }
                                     } else null,
                                     singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier.fillMaxWidth().testTag("news_search")
                                         .keepVisibleWhileTyping(),
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -181,12 +181,11 @@ internal fun NewsFeed(
                                 )
                                 if (tab == "Today") {
                                     NewsDateHeader(
-                                        scope = scope,
-                                        onScopeChange = actions.changeScope,
                                         edition = if (scope == NewsScope.LOCAL) currentPlace else uiText(R.string.global),
                                         isOffline = offline && !loading,
                                         onEditLocation = if (scope == NewsScope.LOCAL) actions.editLocation else null,
-                                        loading = loading && scope == NewsScope.LOCAL
+                                        loading = loading && scope == NewsScope.LOCAL,
+                                        scope = scope
                                     )
                                     NewsCategoryChips(category, actions.changeCategory)
                                 }

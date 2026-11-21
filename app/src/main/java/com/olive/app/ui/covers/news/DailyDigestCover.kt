@@ -15,6 +15,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -205,19 +207,18 @@ internal fun NewsCover(
         TopAppBar(
             title = {
                 Column {
-                    // Text sizing note: 27sp is the news masthead. Keep the edition label on its own line for longer translations.
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Outlined.Newspaper,
                             null,
-                            Modifier.size(24.dp).testTag("cover_brand_news"),
+                            Modifier.size(22.dp).testTag("cover_brand_news"),
                             tint = OliveGreen
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             uiText(R.string.ui_daily_digest),
                             fontFamily = FontFamily.Serif,
-                            fontSize = 27.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = OliveGreen
                         )
@@ -232,10 +233,65 @@ internal fun NewsCover(
                 }
             },
             actions = {
-                if (tab == "Today" && selected == null) IconButton(
-                    onClick = { refresh++ },
-                    enabled = !loading
-                ) { Icon(Icons.Outlined.Refresh, uiText(R.string.refresh)) }
+                if (tab == "Today" && selected == null) {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = WarmWhite,
+                        border = BorderStroke(0.8.dp, SoftGray),
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                onClick = { scope = NewsScope.LOCAL },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (scope == NewsScope.LOCAL) OliveGreen else Color.Transparent,
+                                contentColor = if (scope == NewsScope.LOCAL) Cream else DarkOlive,
+                                modifier = Modifier.height(32.dp).testTag("news_scope_local")
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(13.dp))
+                                    Text(
+                                        uiText(R.string.local),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (scope == NewsScope.LOCAL) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                            Surface(
+                                onClick = { scope = NewsScope.GLOBAL },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (scope == NewsScope.GLOBAL) OliveGreen else Color.Transparent,
+                                contentColor = if (scope == NewsScope.GLOBAL) Cream else DarkOlive,
+                                modifier = Modifier.height(32.dp).testTag("news_scope_global")
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Outlined.Public, null, Modifier.size(13.dp))
+                                    Text(
+                                        uiText(R.string.global),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (scope == NewsScope.GLOBAL) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    IconButton(
+                        onClick = { refresh++ },
+                        enabled = !loading,
+                        modifier = Modifier.size(38.dp)
+                    ) { Icon(Icons.Outlined.Refresh, uiText(R.string.refresh), Modifier.size(20.dp)) }
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Cream),
         )
