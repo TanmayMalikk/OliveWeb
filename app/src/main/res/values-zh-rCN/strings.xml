@@ -468,7 +468,7 @@
     <string name="passkey_recovery_setup_failed">无法添加恢复通行密钥。请检查网络连接和凭据提供程序，然后重试。</string>
     <string name="passkey_recovery_remove">移除通行密钥</string>
     <string name="passkey_recovery_removed">已移除恢复通行密钥。</string>
-    <string name="passkey_recovery_remove_failed">无法移除恢复通行密钥。请检查网络连接，然后重试。</string>
+    <string name="passkey_recovery_remove_failed">无法移除恢复通行密钥。为确保安全，请重新登录后再试。</string>
     <string name="passkey_recovery_none">尚未注册恢复通行密钥。</string>
     <string name="passkey_recovery_synced_factor">同步的恢复通行密钥</string>
     <string name="passkey_recovery_device_factor">设备恢复通行密钥</string>

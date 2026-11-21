@@ -483,7 +483,7 @@
     <string name="passkey_recovery_setup_failed">تعذرت إضافة مفتاح مرور الاسترداد. تحقق من الاتصال وموفر بيانات الاعتماد ثم أعد المحاولة.</string>
     <string name="passkey_recovery_remove">إزالة مفتاح المرور</string>
     <string name="passkey_recovery_removed">تمت إزالة مفتاح مرور الاسترداد.</string>
-    <string name="passkey_recovery_remove_failed">تعذرت إزالة مفتاح مرور الاسترداد. تحقق من الاتصال ثم أعد المحاولة.</string>
+    <string name="passkey_recovery_remove_failed">تعذرت إزالة مفتاح مرور الاسترداد. للأمان، سجّل الدخول مرة أخرى ثم أعد المحاولة.</string>
     <string name="passkey_recovery_none">لا توجد مفاتيح مرور مسجلة للاسترداد.</string>
     <string name="passkey_recovery_synced_factor">مفتاح مرور استرداد متزامن</string>
     <string name="passkey_recovery_device_factor">مفتاح مرور استرداد على الجهاز</string>

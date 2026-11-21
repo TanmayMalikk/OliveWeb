@@ -474,7 +474,7 @@
     <string name="passkey_recovery_setup_failed">Impossible d’ajouter la clé d’accès de récupération. Vérifiez votre connexion et votre fournisseur d’identifiants, puis réessayez.</string>
     <string name="passkey_recovery_remove">Supprimer la clé d’accès</string>
     <string name="passkey_recovery_removed">Clé d’accès de récupération supprimée.</string>
-    <string name="passkey_recovery_remove_failed">Impossible de supprimer la clé d’accès de récupération. Vérifiez votre connexion et réessayez.</string>
+    <string name="passkey_recovery_remove_failed">Impossible de supprimer la clé d’accès de récupération. Pour votre sécurité, reconnectez-vous puis réessayez.</string>
     <string name="passkey_recovery_none">Aucune clé d’accès de récupération n’est enregistrée.</string>
     <string name="passkey_recovery_synced_factor">Clé d’accès de récupération synchronisée</string>
     <string name="passkey_recovery_device_factor">Clé d’accès de récupération de l’appareil</string>

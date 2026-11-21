@@ -519,7 +519,7 @@
     <string name="passkey_recovery_setup_failed">The recovery passkey could not be added. Check your connection and credential provider, then retry.</string>
     <string name="passkey_recovery_remove">Remove passkey</string>
     <string name="passkey_recovery_removed">Recovery passkey removed.</string>
-    <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. Check your connection and retry.</string>
+    <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. For security, sign in again and retry.</string>
     <string name="passkey_recovery_none">No recovery passkeys are enrolled.</string>
     <string name="passkey_recovery_synced_factor">Synced recovery passkey</string>
     <string name="passkey_recovery_device_factor">Device recovery passkey</string>
