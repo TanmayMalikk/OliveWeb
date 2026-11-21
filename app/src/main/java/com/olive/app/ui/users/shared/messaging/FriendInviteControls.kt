@@ -2,7 +2,9 @@ package com.olive.app.ui.users.shared.messaging
 
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.LocalizedIcon as Icon
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -12,8 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -37,20 +42,56 @@ import java.time.format.DateTimeFormatter
  * Shows the controls for sharing an invite and connecting with an existing code.
  *
  * @param session The signed-in session that creates and claims invites.
+ * @param unreadOnly Optional unread-only filter state to render alongside the invite button.
+ * @param onUnreadOnlyChange Optional callback invoked when the unread-only filter is toggled.
+ * @param modifier Compose modifier applied to the root layout.
  */
 @Composable
-internal fun FriendInviteControls(session: SessionViewModel) {
+internal fun FriendInviteControls(
+    session: SessionViewModel,
+    unreadOnly: Boolean? = null,
+    onUnreadOnlyChange: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     var opened by remember(session.coverAccountId) { mutableStateOf(false) }
-    Button(onClick = { opened = true }, enabled = !session.localMode,
-        modifier = Modifier.testTag("friend_invite")) { Text(stringResource(R.string.friend_invite)) }
-    InviteCodeEntry(messages = session.messages, enabled = !session.localMode, accountUid = session.coverAccountId,
-        onConnected = { session.messages.ensureMessagingObservation() })
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (unreadOnly != null) Arrangement.SpaceBetween else Arrangement.End,
+        ) {
+            if (unreadOnly != null && onUnreadOnlyChange != null) {
+                FilterChip(
+                    selected = unreadOnly,
+                    onClick = onUnreadOnlyChange,
+                    label = { Text(stringResource(R.string.chat_unread_only)) },
+                )
+            }
+            Button(
+                onClick = { opened = true },
+                enabled = !session.localMode,
+                modifier = Modifier.testTag("friend_invite")
+            ) {
+                Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.friend_invite))
+            }
+        }
+        InviteCodeEntry(
+            messages = session.messages,
+            enabled = !session.localMode,
+            accountUid = session.coverAccountId,
+            onConnected = { session.messages.ensureMessagingObservation() }
+        )
+    }
     if (opened) {
         val uid = session.coverAccountId.orEmpty()
         FriendInviteDialog(
             uid,
             createInvite = { refresh -> session.messages.createFriendInvite(uid, refresh) },
-            observeUnavailable = { code, onUnavailable -> session.messages.observeFriendInviteUnavailable(uid, code, onUnavailable) },
+            observeUnavailable = { code, onUnavailable ->
+                session.messages.observeFriendInviteUnavailable(uid, code, onUnavailable)
+            },
             onDismiss = { opened = false },
         )
     }
@@ -76,26 +117,68 @@ internal fun InviteCodeEntry(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var connected by remember { mutableStateOf<String?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.friend_invite_question), style = MaterialTheme.typography.titleSmall)
-        OutlinedTextField(code, { code = it.take(32); error = null },
-            label = { Text(stringResource(R.string.friend_invite_code)) }, singleLine = true,
-            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
-            enabled = enabled && !busy, isError = error != null,
-            modifier = Modifier.fillMaxWidth().testTag("friend_invite_code"))
-        Button(onClick = {
-            busy = true; error = null; connected = null
-            scope.launch {
-                try { connected = messages.claimFriendInvite(accountUid, code); code = ""; onConnected() }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { error = failure.localizedMessage }
-                finally { busy = false }
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(stringResource(R.string.friend_invite_question), style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.take(32); error = null },
+                    label = { Text(stringResource(R.string.friend_invite_code)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
+                    enabled = enabled && !busy,
+                    isError = error != null,
+                    modifier = Modifier.weight(1f).testTag("friend_invite_code")
+                )
+                Button(
+                    onClick = {
+                        busy = true; error = null; connected = null
+                        scope.launch {
+                            try {
+                                connected = messages.claimFriendInvite(accountUid, code)
+                                code = ""
+                                onConnected()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                error = failure.localizedMessage
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = enabled && !busy && code.isNotBlank(),
+                    modifier = Modifier.testTag("friend_invite_claim")
+                ) {
+                    Text(stringResource(if (busy) R.string.friend_invite_connecting else R.string.friend_invite_connect))
+                }
             }
-        }, enabled = enabled && !busy && code.isNotBlank(), modifier = Modifier.testTag("friend_invite_claim")) {
-            Text(stringResource(if (busy) R.string.friend_invite_connecting else R.string.friend_invite_connect))
+            connected?.let {
+                Text(
+                    stringResource(R.string.friend_invite_connected, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            error?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
-        connected?.let { Text(stringResource(R.string.friend_invite_connected, it)) }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 

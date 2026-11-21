@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -64,41 +65,29 @@ private data class ChecklistCompletion(val prepared: Int, val total: Int) {
 }
 
 /**
- * Composes the plan picker chip UI element.
+ * Composes the safety plan tab label UI element.
  *
- * @param selected Whether to apply selected.
- * @param complete Whether to apply complete.
- * @param onClick Callback invoked when the control is activated.
  * @param label Accessible label or display caption.
- * @param modifier Compose modifier applied to the root layout.
+ * @param complete Whether the plan checklist is fully complete.
  */
 @Composable
-private fun PlanPickerChip(
-    selected: Boolean,
-    complete: Boolean,
-    onClick: () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
+private fun SafetyPlanTabLabel(label: String, complete: Boolean) {
     val completeLabel = stringResource(R.string.safety_conflict_complete)
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = if (complete) ({
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = if (complete) Modifier.semantics { stateDescription = completeLabel } else Modifier,
+    ) {
+        Text(label)
+        if (complete) {
             Icon(
-                Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(18.dp),
-                tint = if (selected) Paper else DarkOlive,
+                Icons.Outlined.Check,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary,
             )
-        }) else null,
-        colors = if (complete) FilterChipDefaults.filterChipColors(
-            containerColor = SageGreen,
-            labelColor = DarkOlive,
-            selectedContainerColor = DarkOlive,
-            selectedLabelColor = Paper,
-        ) else FilterChipDefaults.filterChipColors(),
-        modifier = modifier.semantics { if (complete) stateDescription = completeLabel },
-    )
+        }
+    }
 }
 
 /**
@@ -272,20 +261,31 @@ internal fun SafetyPlanScreen(
                     ) { Icon(Icons.Outlined.SupportAgent, stringResource(R.string.safety_consult)) }
                 }
                 if (organizationEditor || safeContact) Text(displayOwnerName, style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PlanPickerChip(
+                PrimaryTabRow(
+                    selectedTabIndex = if (backup) 1 else 0,
+                    modifier = Modifier.fillMaxWidth().testTag("safety_plan_tabs"),
+                ) {
+                    Tab(
                         selected = !backup,
-                        complete = completionByPlan.getValue("primary").complete,
                         onClick = { leaveEditor(); backup = false },
-                        label = stringResource(R.string.safety_primary),
-                        modifier = Modifier.weight(1f).testTag("safety_primary")
+                        text = {
+                            SafetyPlanTabLabel(
+                                stringResource(R.string.safety_primary),
+                                completionByPlan.getValue("primary").complete
+                            )
+                        },
+                        modifier = Modifier.testTag("safety_primary"),
                     )
-                    PlanPickerChip(
+                    Tab(
                         selected = backup,
-                        complete = completionByPlan.getValue("backup").complete,
                         onClick = { leaveEditor(); backup = true },
-                        label = stringResource(R.string.safety_backup),
-                        modifier = Modifier.weight(1f).testTag("safety_backup")
+                        text = {
+                            SafetyPlanTabLabel(
+                                stringResource(R.string.safety_backup),
+                                completionByPlan.getValue("backup").complete
+                            )
+                        },
+                        modifier = Modifier.testTag("safety_backup"),
                     )
                 }
                 Row(

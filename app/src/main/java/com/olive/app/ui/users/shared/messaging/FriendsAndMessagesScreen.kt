@@ -312,7 +312,13 @@ private fun MessagingSidebar(
                 }
             }
         }
-        item("unread_filter") {
+        if (!organizationAccount && !ticketChats && !showingArchived) item("friend_invite_controls") {
+            FriendInviteControls(
+                session = session,
+                unreadOnly = unreadOnly,
+                onUnreadOnlyChange = { unreadOnly = !unreadOnly },
+            )
+        } else item("unread_filter") {
             FilterChip(
                 selected = unreadOnly,
                 onClick = { unreadOnly = !unreadOnly },
@@ -355,9 +361,6 @@ private fun MessagingSidebar(
                     )
                 }
             }
-        }
-        if (!organizationAccount && !ticketChats && !showingArchived) item {
-            FriendInviteControls(session)
         }
         if (session.messages.loadingIndex) item {
             val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
