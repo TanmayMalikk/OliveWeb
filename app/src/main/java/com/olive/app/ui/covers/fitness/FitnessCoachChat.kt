@@ -133,10 +133,10 @@ internal fun FitnessCoachChat(
         if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(
             stringResource(R.string.fitness_coach_disclaimer),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = colors.error.copy(alpha = 0.8f),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.error,
             maxLines = 1,
         )
         LazyColumn(
