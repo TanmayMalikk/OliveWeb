@@ -136,6 +136,10 @@ internal fun NewsCover(
     )
     val loading = request != completedRequest
     LaunchedEffect(request) {
+        if (!interactive && articles.isNotEmpty()) {
+            completedRequest = request
+            return@LaunchedEffect
+        }
         newsError = false
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }

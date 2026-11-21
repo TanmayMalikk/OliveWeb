@@ -159,10 +159,12 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     if (session.localMode || accountId == "guest" || ready) FitnessStepSensor(
         store, interactive, onPermissionSettled = { sensorPermissionSettled = true },
     ) { pendingSnapshot = it }
-    DisposableEffect(store) {
+    DisposableEffect(store, interactive) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            pendingSnapshot = store.snapshot()
-            loaded = pendingSnapshot!! to store.history(days = 14)
+            if (interactive) {
+                pendingSnapshot = store.snapshot()
+                loaded = pendingSnapshot!! to store.history(days = 14)
+            }
         }
         store.preferences.registerOnSharedPreferenceChangeListener(listener)
         onDispose { store.preferences.unregisterOnSharedPreferenceChangeListener(listener) }

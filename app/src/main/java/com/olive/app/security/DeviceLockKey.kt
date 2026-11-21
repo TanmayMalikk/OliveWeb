@@ -324,6 +324,25 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
+
+    // Decrypted memory cache for instantaneous reads within an active authenticated session.
+    @Volatile private var cachedJson: String? = null
+    @Volatile private var cachedLastModified = -1L
+
+    init {
+        registerInstance(this)
+    }
+
+    /**
+     * Purges decrypted memory cache. Called on quick exit or app backgrounding.
+     */
+    fun purge() {
+        synchronized(fileLock) {
+            cachedJson = null
+            cachedLastModified = -1L
+        }
+    }
+
     /**
      * Gets the phone-only key that locks and unlocks this private file.
      *
@@ -354,18 +373,31 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     override fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
     /**
      * Reads and parses the encrypted vault file while the caller holds the shared file lock.
+     * Reuses in-memory decrypted JSON if the underlying file on disk has not changed.
      *
      * @return JSON object representing read unlocked.
      */
     private fun readUnlocked(): JSONObject {
-        if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
+        val currentMod = if (file.baseFile.exists()) file.baseFile.lastModified() else -1L
+        val cached = cachedJson
+        if (cached != null && cachedLastModified == currentMod && currentMod != -1L) {
+            return JSONObject(cached)
+        }
+        if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) {
+            cachedJson = null
+            cachedLastModified = -1L
+            return JSONObject()
+        }
         val bytes = file.openRead().use { it.readBytes() }
         require(bytes.size > 29 && bytes[0] == 1.toByte()) { "Unsupported encrypted store" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(1, 13)))
         val plain = cipher.doFinal(bytes.copyOfRange(13, bytes.size))
         return try {
-            JSONObject(String(plain, Charsets.UTF_8))
+            val jsonStr = String(plain, Charsets.UTF_8)
+            cachedJson = jsonStr
+            cachedLastModified = file.baseFile.lastModified()
+            JSONObject(jsonStr)
         } finally {
             plain.fill(0)
         }
@@ -381,7 +413,8 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         change(root)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
-        val plain = root.toString().toByteArray(Charsets.UTF_8)
+        val jsonStr = root.toString()
+        val plain = jsonStr.toByteArray(Charsets.UTF_8)
         val bytes = try {
             byteArrayOf(1) + cipher.iv + cipher.doFinal(plain)
         } finally {
@@ -394,6 +427,8 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
             }
             // AtomicFile.finishWrite can silently keep the old file when renameTo cannot replace it.
             Files.move(stagingFile.toPath(), file.baseFile.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            cachedJson = jsonStr
+            cachedLastModified = file.baseFile.lastModified()
         } finally {
             stagingFile.delete()
         }
@@ -403,10 +438,36 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     /**
      * Deletes a disposable encrypted store without removing its Android Keystore key.
      */
-    override fun clear() = synchronized(fileLock) { file.delete() }
+    override fun clear() = synchronized(fileLock) {
+        cachedJson = null
+        cachedLastModified = -1L
+        file.delete()
+    }
 
-    private companion object {
-        val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    companion object {
+        private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+        private val activeInstances =
+            java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<EncryptedVault>>()
+
+        private fun registerInstance(vault: EncryptedVault) {
+            activeInstances.add(java.lang.ref.WeakReference(vault))
+        }
+
+        /**
+         * Purges all in-memory decrypted vault caches across the app on Quick Exit or app backgrounding.
+         */
+        fun purgeAll() {
+            val iterator = activeInstances.iterator()
+            while (iterator.hasNext()) {
+                val ref = iterator.next()
+                val vault = ref.get()
+                if (vault != null) {
+                    vault.purge()
+                } else {
+                    activeInstances.remove(ref)
+                }
+            }
+        }
     }
 }
 

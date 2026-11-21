@@ -17,6 +17,7 @@ import com.olive.app.data.messaging.FriendRelationship
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.SupportRepository
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.security.EncryptedVault
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,6 +99,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 pendingIdentity = null
                 pendingProfile = null
                 credentialFieldError = null
+                EncryptedVault.purgeAll()
             }
         }
     }
@@ -109,7 +111,10 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 // Also discard partially entered onboarding fields when leaving the app.
-                if (screen == SessionScreen.Cover || screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
+                if (screen == SessionScreen.Cover || screen == SessionScreen.Loading || screen == SessionScreen.StorageError) {
+                    EncryptedVault.purgeAll()
+                    return
+                }
                 // Without a saved enrollment, private entry must return to account setup.
                 if (enrollment == null) {
                     epoch++
@@ -124,6 +129,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     screenHistory.clear()
                     screen = SessionScreen.Cover
                     message = null
+                    EncryptedVault.purgeAll()
                 } else if (accountRole == AccountRole.USER) quickExit()
             }
         }
