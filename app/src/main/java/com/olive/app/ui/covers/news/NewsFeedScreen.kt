@@ -171,7 +171,9 @@ internal fun NewsFeed(
                         if (tab == "Today") item {
                             NewsDateHeader(
                                 edition = if (scope == NewsScope.LOCAL) currentPlace else uiText(R.string.global),
-                                isOffline = offline && !loading
+                                isOffline = offline && !loading,
+                                onEditLocation = if (scope == NewsScope.LOCAL) actions.editLocation else null,
+                                loading = loading && scope == NewsScope.LOCAL
                             )
                         }
                         if (tab == "Today") item {
@@ -191,46 +193,6 @@ internal fun NewsFeed(
                                     scope == NewsScope.GLOBAL,
                                     Modifier.weight(1f)
                                 ) { actions.changeScope(NewsScope.GLOBAL) }
-                            }
-                        }
-                        // Local news is available only from the Today tab.
-                        if (tab == "Today" && scope == NewsScope.LOCAL) item {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier.fillMaxWidth()
-                                    .semantics(mergeDescendants = true) {}) {
-                                Row(
-                                    Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(9.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.NearMe,
-                                        null,
-                                        tint = OliveGreen,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    if (loading) SkeletonBlock(Modifier.weight(1f).height(16.dp))
-                                    else Text(
-                                        uiText(R.string.news_near_location, currentPlace),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = OliveGreen,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = { actions.editLocation() },
-                                        modifier = Modifier.size(48.dp)
-                                            .testTag("change_news_location")
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Edit,
-                                            uiText(R.string.change_local_news_location),
-                                            tint = OliveGreen,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
                             }
                         }
                         if (tab == "Today") item {
