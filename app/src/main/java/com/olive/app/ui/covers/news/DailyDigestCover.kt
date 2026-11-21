@@ -1,6 +1,10 @@
 // News cover users: shows the daily digest cover.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
@@ -11,7 +15,6 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,7 +96,7 @@ internal fun NewsCover(
     var locationEditorOpen by remember { mutableStateOf(false) }
     var locationDraft by remember { mutableStateOf("") }
     // Back closes an article first, then returns through the previous news tabs.
-    BackHandler(interactive) {
+    val back = rememberOliveBack(interactive, preview = tab != "Today" || tabHistory.isNotEmpty()) {
         // Opens the selected news section or saved-article view.
         when {
             selected != null -> selected = null
@@ -183,7 +186,7 @@ internal fun NewsCover(
         locationEditorOpen = false
         refresh++
     })
-    Scaffold(containerColor = Cream, topBar = {
+    Scaffold(containerColor = Cream, contentWindowInsets = WindowInsets.safeDrawing, topBar = {
         TopAppBar(
             title = {
                 Column {
@@ -263,29 +266,35 @@ internal fun NewsCover(
         }
     }) { padding ->
         val article = selected
-        if (article != null && tab != "Account") {
-            NewsArticleReader(
-                article, saved.any { it.link == article.link }, interactive,
-                modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
-                    .imePadding().testTag("news_cover"),
-                onBack = { selected = null }, onBookmark = { session.toggleNewsBookmark(article) })
-        } else {
-            NewsFeed(
-                session,
-                NewsFeedState(tab, scope, query, articles, saved, loading, newsError, currentPlace),
-                NewsFeedActions(
-                    search = { value ->
-                        query = value
-                    },
-                    changeScope = { scope = it },
-                    editLocation = {
-                        locationDraft = currentPlace
-                        locationEditorOpen = true
-                    },
-                    refresh = { refresh++ },
-                    openArticle = { selected = it },
-                ), Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()
-            )
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+            OliveUndoOverlay(scopeKey = session.coverAccountId, enabled = interactive) {
+                OliveRouteEntrance(article?.link ?: tab, back) {
+                    if (article != null && tab != "Account") {
+                        val onBookmark = newsBookmarkAction(session, article)
+                        NewsArticleReader(
+                            article, saved.any { it.link == article.link }, interactive,
+                            modifier = Modifier.fillMaxSize().testTag("news_cover"),
+                            onBack = { selected = null }, onBookmark = onBookmark)
+                    } else {
+                        NewsFeed(
+                            session,
+                            NewsFeedState(tab, scope, query, articles, saved, loading, newsError, currentPlace),
+                            NewsFeedActions(
+                                search = { value ->
+                                    query = value
+                                },
+                                changeScope = { scope = it },
+                                editLocation = {
+                                    locationDraft = currentPlace
+                                    locationEditorOpen = true
+                                },
+                                refresh = { refresh++ },
+                                openArticle = { selected = it },
+                            ), Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
         }
     }
 }

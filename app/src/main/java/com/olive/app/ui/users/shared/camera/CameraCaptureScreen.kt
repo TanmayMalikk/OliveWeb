@@ -1,6 +1,11 @@
 // All safe-app roles: captures photos, video, and OCR documents.
 package com.olive.app.ui.users.shared.camera
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledIconButton as FilledIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.ScaleGestureDetector

@@ -1,9 +1,14 @@
 // Admins: shows admin tools, dashboard portal, and account totals.
 package com.olive.app.ui.users.admin
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import kotlin.time.Duration.Companion.milliseconds
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -87,45 +92,47 @@ internal fun AdminPortal(session: SessionViewModel) {
     }
     var trackingUid by remember { mutableStateOf<String?>(null) }
     val alert = emergencies.orEmpty().firstOrNull { it.resolvedAt == 0L && it.id !in acknowledged }
-    BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
-    // Opens the selected admin dashboard section.
-    when (page) {
-        AdminPage.Dashboard -> AdminDashboard(
-            session,
-            onAccounts = { page = AdminPage.Accounts },
-            onStaffManagement = { page = AdminPage.StaffManagement },
-            onSettings = { page = AdminPage.Settings },
-            onMap = { page = AdminPage.Map },
-            onSafetyPlans = { page = AdminPage.SafetyPlans },
-            onMessages = { page = AdminPage.Messages },
-            onEmergencies = { page = AdminPage.Emergencies },
-        )
-        AdminPage.Accounts -> AdminAccounts(
-            session,
-            onBack = { page = AdminPage.Dashboard },
-            onCreate = { createOpen = true },
-            onDelete = { deleteTarget = it },
-        )
-        AdminPage.StaffManagement -> StaffManagement(
-            session = session,
-            onBack = { page = AdminPage.Dashboard },
-        )
-        AdminPage.Settings -> OrganizationSettings(
-            session,
-            onBack = { page = AdminPage.Dashboard },
-        )
-        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard; trackingUid = null }, initialFollowUid = trackingUid)
-        AdminPage.Emergencies -> EmergencyResponseScreen(
-            session, emergencies, emergencyError,
-            onBack = { page = AdminPage.Dashboard },
-            onTrack = { trackingUid = it; page = AdminPage.Map },
-        )
-        AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
-        AdminPage.Messages -> MessagesScreen(
-            session,
-            exit = { page = AdminPage.Dashboard },
-            initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
-        )
+    val back = rememberOliveBack(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
+    OliveRouteEntrance(page, back) {
+        // Opens the selected admin dashboard section.
+        when (page) {
+            AdminPage.Dashboard -> AdminDashboard(
+                session,
+                onAccounts = { page = AdminPage.Accounts },
+                onStaffManagement = { page = AdminPage.StaffManagement },
+                onSettings = { page = AdminPage.Settings },
+                onMap = { page = AdminPage.Map },
+                onSafetyPlans = { page = AdminPage.SafetyPlans },
+                onMessages = { page = AdminPage.Messages },
+                onEmergencies = { page = AdminPage.Emergencies },
+            )
+            AdminPage.Accounts -> AdminAccounts(
+                session,
+                onBack = { page = AdminPage.Dashboard },
+                onCreate = { createOpen = true },
+                onDelete = { deleteTarget = it },
+            )
+            AdminPage.StaffManagement -> StaffManagement(
+                session = session,
+                onBack = { page = AdminPage.Dashboard },
+            )
+            AdminPage.Settings -> OrganizationSettings(
+                session,
+                onBack = { page = AdminPage.Dashboard },
+            )
+            AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard; trackingUid = null }, initialFollowUid = trackingUid)
+            AdminPage.Emergencies -> EmergencyResponseScreen(
+                session, emergencies, emergencyError,
+                onBack = { page = AdminPage.Dashboard },
+                onTrack = { trackingUid = it; page = AdminPage.Map },
+            )
+            AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
+            AdminPage.Messages -> MessagesScreen(
+                session,
+                exit = { page = AdminPage.Dashboard },
+                initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
+            )
+        }
     }
     if (alert != null) AlertDialog(
         onDismissRequest = { acknowledge(alert.id) },
@@ -472,9 +479,22 @@ internal fun EmergencyResponseScreen(
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var showResolved by remember { mutableStateOf(false) }
     var resolving by remember { mutableStateOf(emptySet<String>()) }
+    var pendingResolutions by remember { mutableStateOf(emptyMap<String, Boolean>()) }
     var resolveError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val visibleAlerts = alerts.orEmpty().filter { (it.resolvedAt > 0L) == showResolved }
+    val visibleAlerts = alerts.orEmpty().filter {
+        (pendingResolutions[it.id] ?: (it.resolvedAt > 0L)) == showResolved
+    }
+    LaunchedEffect(alerts, resolving) {
+        val syncing = pendingResolutions.filter { (id, resolved) ->
+            id !in resolving && alerts?.any { it.id == id && (it.resolvedAt > 0L) != resolved } == true
+        }
+        pendingResolutions = pendingResolutions.filterKeys { it in resolving || it in syncing }
+        if (syncing.isNotEmpty()) {
+            kotlinx.coroutines.delay(10_000.milliseconds)
+            pendingResolutions = pendingResolutions - syncing.keys
+        }
+    }
     opened?.let { (document, file) ->
         SafetyDocumentViewer(document, file) { opened = null }
         return
@@ -501,6 +521,7 @@ internal fun EmergencyResponseScreen(
         if (alerts == null && error == null) item { LoadingSkeleton(SkeletonLayout.EmergencyAlerts) }
         if (alerts != null && visibleAlerts.isEmpty() && error == null) item { Text(stringResource(R.string.emergency_response_empty)) }
         items(visibleAlerts, key = { it.id }) { alert ->
+            val completed = pendingResolutions[alert.id] ?: (alert.resolvedAt > 0L)
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(alert.ownerName, style = MaterialTheme.typography.titleMedium)
@@ -523,17 +544,19 @@ internal fun EmergencyResponseScreen(
                     session.documents.state.attachmentErrors[alert.mediaId]?.let { AccessibleMessage(it) }
                     FilledTonalButton(
                         modifier = Modifier.align(Alignment.End),
-                        enabled = alert.id !in resolving,
+                        enabled = alert.id !in pendingResolutions,
                         onClick = {
+                            pendingResolutions = pendingResolutions + (alert.id to !completed)
                             resolving = resolving + alert.id
                             resolveError = null
                             scope.launch {
                                 try {
                                     session.emergencyResponses.setResolved(
-                                        session.coverAccountId, alert.id, alert.resolvedAt == 0L,
+                                        session.coverAccountId, alert.id, !completed,
                                     )
                                 } catch (failure: Exception) {
                                     if (failure is kotlinx.coroutines.CancellationException) throw failure
+                                    pendingResolutions = pendingResolutions - alert.id
                                     resolveError = failure.localizedMessage
                                 } finally {
                                     resolving = resolving - alert.id
@@ -541,9 +564,9 @@ internal fun EmergencyResponseScreen(
                             }
                         },
                     ) {
-                        androidx.compose.material3.Icon(if (alert.resolvedAt == 0L) Icons.Outlined.CheckCircle else Icons.Outlined.Replay, null)
+                        androidx.compose.material3.Icon(if (!completed) Icons.Outlined.CheckCircle else Icons.Outlined.Replay, null)
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (alert.resolvedAt == 0L) R.string.emergency_response_resolve else R.string.emergency_response_reopen))
+                        Text(stringResource(if (!completed) R.string.emergency_response_resolve else R.string.emergency_response_reopen))
                     }
                 }
             }

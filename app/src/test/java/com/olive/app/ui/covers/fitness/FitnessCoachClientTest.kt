@@ -12,12 +12,30 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class FitnessCoachClientTest {
+    @Test fun coachReadsFourteenDaysOfLoggedMealsAndLeavesUnloggedValuesMissing() {
+        val store = FitnessStore(RuntimeEnvironment.getApplication(), "guest")
+        val today = LocalDate.of(2026, 11, 20)
+        val oldest = today.minusDays(13)
+        val food = NutritionFood("fixture-oats", "Oats", "", "1 bowl", 150f, 5f, 27f, 3f, FoodDataSource.MANUAL)
+        store.addFood(food, 1f, MealType.BREAKFAST, oldest.minusDays(1))
+        store.addFood(food, 2f, MealType.BREAKFAST, oldest)
+        store.addFood(food, 1f, MealType.LUNCH, oldest)
+
+        val history = store.coachHistory(today)
+        assertEquals(listOf(oldest, today), history.map { it.date })
+        assertEquals(450f, history.first().nutrition?.calories)
+        assertEquals(listOf("Oats"), history.first().foodNames)
+        assertNull(history.first().steps)
+        assertNull(history.last().nutrition)
+    }
+
     @Test fun callableRequestsAreAccountScopedAndLimitFitnessContext() = runBlocking<Unit> {
         val auth = mock(FirebaseAuth::class.java)
         val user = mock(FirebaseUser::class.java)
@@ -44,7 +62,9 @@ class FitnessCoachClientTest {
             assertEquals(setOf("message", "conversation", "goals", "history"), payload.keys)
             assertEquals("How am I doing?", payload["message"])
             assertEquals(4, (payload["conversation"] as List<*>).size)
-            assertEquals(14, (payload["history"] as List<*>).size)
+            val history = payload["history"] as List<*>
+            assertEquals(14, history.size)
+            assertEquals(mapOf("date" to "2026-01-03", "foodNames" to listOf("Oats")), history.first())
             result(mapOf("reply" to "Try 2000 steps.", "goals" to mapOf("steps" to 2000, "extra" to 5, "fat" to "bad")))
         }
         mockStatic(FirebaseAuth::class.java).use { authSdk ->
@@ -56,8 +76,8 @@ class FitnessCoachClientTest {
             assertEquals("pi_fixture_secret_fixture", client.paymentSheet().clientSecret)
             assertTrue(runCatching { client.paymentSheet() }.isFailure)
             val turns = List(10) { CoachTurn("user", "Turn $it") }
-            val days = List(20) {
-                FitnessHistoryDay(LocalDate.of(2026, 1, 1).plusDays(it.toLong()), 1000, 1f, 50f, 2000f, 80f, 300f, 60f)
+            val days = List(16) {
+                FitnessCoachDay(LocalDate.of(2026, 1, 1).plusDays(it.toLong()), null, null, listOf("Oats"))
             }
             assertEquals(CoachReply("Try 2000 steps.", mapOf("steps" to 2000)),
                 client.send("How am I doing?", turns, FitnessProfile(), days))

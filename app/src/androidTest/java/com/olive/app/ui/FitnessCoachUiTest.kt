@@ -2,9 +2,11 @@ package com.olive.app.ui
 
 import android.net.Uri
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.*
 import com.olive.app.ui.shared.OliveTheme
@@ -12,6 +14,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.util.UUID
 
 class FitnessCoachUiTest {
@@ -34,7 +37,7 @@ class FitnessCoachUiTest {
             text: String,
             turns: List<CoachTurn>,
             profile: FitnessProfile,
-            history: List<FitnessHistoryDay>,
+            history: List<FitnessCoachDay>,
         ): CoachReply {
             lastPrompt = text
             return reply.await()
@@ -44,7 +47,7 @@ class FitnessCoachUiTest {
     private fun mount(coach: Coach): FitnessStore {
         val store = FitnessStore(compose.activity, account)
         compose.setContent { OliveTheme {
-            FitnessCoachPage(account, true, store, emptyList(), false, coach) {}
+            FitnessCoachPage(account, true, store, false, coach) {}
         } }
         return store
     }
@@ -53,13 +56,43 @@ class FitnessCoachUiTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText(label(id)).fetchSemanticsNodes().isNotEmpty() }
     }
 
+    @Test fun coachLabelsItsWorkoutPlanAndKeepsTheComposerVisible() {
+        val coach = Coach()
+        mount(coach)
+        waitForLabel(R.string.fitness_coach_question)
+        compose.onNodeWithText(label(R.string.fitness_coach_prompt_workout)).performClick()
+        compose.onNodeWithContentDescription(label(R.string.fitness_coach_send)).performClick()
+        waitForLabel(R.string.fitness_coach_thinking)
+        val plan = "Try this three-day starter plan.\n\n" +
+            "Monday · 15-minute easy walk\n" +
+            "Wednesday · 2 sets of chair squats and wall push-ups\n" +
+            "Friday · 20-minute walk at a comfortable pace\n\n" +
+            "Rest between sessions. Add a few minutes next week if it feels easy."
+        coach.reply.complete(CoachReply(plan, emptyMap()))
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(plan).fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.onActivity {
+            WindowInsetsControllerCompat(it.window, it.window.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
+        compose.onNode(hasText(plan) and hasText(label(R.string.fitness_coach_tab))).assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assertIsDisplayed()
+        File(compose.activity.getExternalFilesDir(null), "fitness-coach-test.png").outputStream().use { output ->
+            compose.onNodeWithTag("fitness_coach_screen").captureToImage().asAndroidBitmap()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)
+        }
+    }
+
     @Test fun subscribedCoachSavesManualAndAutomaticStepTargetsAndKeepsFailedDraft() {
         val coach = Coach()
         val store = mount(coach)
         waitForLabel(R.string.fitness_coach_question)
+        compose.onNodeWithText(label(R.string.fitness_coach_disclaimer)).assertIsDisplayed()
         val send = compose.onNodeWithContentDescription(label(R.string.fitness_coach_send))
         val composer = compose.onNode(hasSetTextAction())
         send.assertIsNotEnabled()
+        compose.onNodeWithText(label(R.string.fitness_coach_prompt_workout)).performClick()
+        composer.assertTextContains(label(R.string.fitness_coach_prompt_workout))
+        assertEquals("", coach.lastPrompt)
+        composer.performTextClearance()
         composer.performTextInput("Set my step goal to 2000")
         send.performClick()
         waitForLabel(R.string.fitness_coach_thinking)

@@ -81,6 +81,9 @@ internal class SessionSafetyPlans(
     private var consultationsSession: Pair<String, Long>? = null
     private var consultationsRefreshedAt = 0L
     private var accessRevision = 0
+    private var availabilityRevision = 0
+    private var availabilityWrite by mutableStateOf<Pair<String, Long>?>(null)
+    val savingAvailability get() = availabilityWrite?.second == runtime.epoch
 
     private val uiStateFlow = MutableStateFlow(SafetyPlansUiState())
     val uiState: StateFlow<SafetyPlansUiState> = uiStateFlow.asStateFlow()
@@ -148,9 +151,10 @@ internal class SessionSafetyPlans(
      * @param actor Actor supplied to [loadCachedAccessLists].
      */
     private suspend fun loadCachedAccessLists(actor: String) {
+        val revision = availabilityRevision.takeUnless { savingAvailability }
         val cached = withContext(Dispatchers.IO) { accessIndex.read(actor) }
         if (!authorized() || actor != runtime.coverAccountId) return
-        available = cached.available
+        if (revision == availabilityRevision) available = cached.available
         consultations = cached.consultations
         sharedPlans = cached.sharedPlans
     }
@@ -844,7 +848,7 @@ internal class SessionSafetyPlans(
             if (authorized() && actor == runtime.coverAccountId && runtime.epoch == session.second && accessRevision == revision) {
                 consultationsSession = session
                 consultationsRefreshedAt = android.os.SystemClock.elapsedRealtime()
-                available = result.first
+                if (!savingAvailability) available = result.first
                 consultations = result.second
                 error = null
             }
@@ -864,15 +868,32 @@ internal class SessionSafetyPlans(
      */
     fun changeAvailability(value: Boolean) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
-        val actor = runtime.coverAccountId
+        val actor = runtime.coverAccountId ?: return
+        if (savingAvailability || available == value) return
+        val previous = available
+        val operation = actor to runtime.epoch
+        availabilityWrite = operation
+        availabilityRevision++
+        available = value
         runtime.scope.launch {
-            try {
-                repository.available(value)
-                if (authorized() && actor == runtime.coverAccountId) available = value
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+            consultationRefreshMutex.withLock {
+                try {
+                    if (operation != (runtime.coverAccountId to runtime.epoch)) return@withLock
+                    repository.available(value)
+                    withContext(Dispatchers.IO) {
+                        // A local cache failure cannot undo a confirmed server write.
+                        runCatching { accessIndex.setAvailability(actor, value) }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (authorized() && operation == (runtime.coverAccountId to runtime.epoch)) {
+                        available = previous
+                        error = R.string.safety_sync_error
+                    }
+                } finally {
+                    if (availabilityWrite == operation) availabilityWrite = null
+                }
             }
         }
     }

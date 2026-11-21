@@ -1,5 +1,12 @@
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -25,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -33,8 +41,6 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
 import kotlin.math.PI
 import kotlin.math.sin
@@ -64,7 +70,7 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
         WaterGlass(fraction, Modifier.size(42.dp, 56.dp))
         Column(Modifier.padding(start = 4.dp).clearAndSetSemantics { }) {
             Text(stringResource(R.string.nutrition_water), style = MaterialTheme.typography.labelLarge)
-            Text(stringResource(R.string.fitness_diary_volume, totalMl), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.fitness_diary_volume, totalMl), style = MaterialTheme.typography.bodySmall.tabularDigits)
         }
     }
     if (open) WaterLogDialog(totalMl, goalMl, enabled, onDismiss = { open = false }) { amount, goal ->
@@ -83,6 +89,7 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
  * @param onSave Callback invoked when save changes or occurs.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun WaterLogDialog(
     totalMl: Int,
     goalMl: Int,
@@ -104,84 +111,93 @@ private fun WaterLogDialog(
     fun adjust(amount: Int) {
         adjustment = (adjustment + amount).coerceIn(-minOf(totalMl, 10_000), 10_000)
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.safeDrawingPadding().imePadding().padding(horizontal = 18.dp)) {
-                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, stringResource(R.string.close)) }
-                    Text(stringResource(R.string.nutrition_add_water), style = MaterialTheme.typography.titleLarge)
-                }
-                Column(
-                    Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+    val sheet = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheet,
+        modifier = Modifier.testTag("fitness_water_sheet"),
+    ) {
+        Column(Modifier.fillMaxHeight(.86f).imePadding().padding(horizontal = 18.dp)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, stringResource(R.string.close)) }
+                Text(stringResource(R.string.nutrition_add_water), style = MaterialTheme.typography.titleLarge.balancedHeadline)
+            }
+            Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Card(
+                    shape = FitnessContinuousCorners,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 ) {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(stringResource(R.string.fitness_diary_water_total), style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(R.string.fitness_diary_volume, total), style = MaterialTheme.typography.headlineMedium)
-                            WaterGlass(total.toFloat() / (updatedGoal?.coerceAtLeast(1) ?: goalMl), Modifier.size(60.dp, 80.dp))
-                        }
-                    }
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        FilledTonalIconButton(onClick = { adjust(-250) }, enabled = enabled && total > 0 && adjustment > -10_000) {
-                            Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
-                        }
-                        listOf(250, 500, 1000).forEach { amount ->
-                            val actionLabel = stringResource(R.string.fitness_diary_add_volume, amount)
-                            FilledTonalButton(
-                                modifier = Modifier.weight(1f).semantics {
-                                    contentDescription = actionLabel
-                                },
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                                onClick = { adjust(amount) },
-                                enabled = enabled && adjustment <= 10_000 - amount,
-                            ) {
-                                Text(stringResource(R.string.fitness_diary_volume, amount), Modifier.clearAndSetSemantics { })
-                            }
-                        }
+                        Text(stringResource(R.string.fitness_diary_water_total), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.fitness_diary_volume, total), style = MaterialTheme.typography.headlineMedium.tabularDigits)
+                        WaterGlass(total.toFloat() / (updatedGoal?.coerceAtLeast(1) ?: goalMl), Modifier.size(60.dp, 80.dp))
                     }
-                    OutlinedButton(onClick = { customVisible = !customVisible }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.fitness_diary_custom_water))
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilledTonalIconButton(onClick = { adjust(-250) }, enabled = enabled && total > 0 && adjustment > -10_000) {
+                        Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
                     }
-                    if (customVisible) {
-                        val amount = customAmount.toIntOrNull()
-                        OutlinedTextField(
-                            customAmount, { customAmount = it.filter(Char::isDigit).take(5) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true,
-                            label = { Text(stringResource(R.string.nutrition_water_amount)) },
-                            suffix = { Text(stringResource(R.string.nutrition_volume_unit)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = { amount?.let { adjust(it); customAmount = ""; customVisible = false } },
-                                    enabled = enabled && amount != null && amount in 1..minOf(10_000, 10_000 - adjustment),
-                                ) { Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_add_water)) }
+                    listOf(250, 500, 1000).forEach { amount ->
+                        val actionLabel = stringResource(R.string.fitness_diary_add_volume, amount)
+                        FilledTonalButton(
+                            modifier = Modifier.weight(1f).semantics {
+                                contentDescription = actionLabel
                             },
-                        )
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            onClick = { adjust(amount) },
+                            enabled = enabled && adjustment <= 10_000 - amount,
+                        ) {
+                            Text(stringResource(R.string.fitness_diary_volume, amount), Modifier.clearAndSetSemantics { })
+                        }
                     }
+                }
+                OutlinedButton(onClick = { customVisible = !customVisible }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.fitness_diary_custom_water))
+                }
+                if (customVisible) {
+                    val amount = customAmount.toIntOrNull()
                     OutlinedTextField(
-                        goal, { goal = it.filter(Char::isDigit).take(5) },
+                        customAmount, { customAmount = it.filter(Char::isDigit).take(5) },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text(stringResource(R.string.nutrition_water_goal)) },
+                        label = { Text(stringResource(R.string.nutrition_water_amount)) },
                         suffix = { Text(stringResource(R.string.nutrition_volume_unit)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = updatedGoal == null || updatedGoal !in 250..10_000,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { amount?.let { adjust(it); customAmount = ""; customVisible = false } },
+                                enabled = enabled && amount != null && amount in 1..minOf(10_000, 10_000 - adjustment),
+                            ) { Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_add_water)) }
+                        },
                     )
                 }
-                Button(
-                    onClick = { updatedGoal?.let { onSave(adjustment, it) } },
-                    enabled = enabled && adjustment != 0 && updatedGoal != null && updatedGoal in 250..10_000,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                ) { Text(stringResource(R.string.save)) }
+                OutlinedTextField(
+                    goal, { goal = it.filter(Char::isDigit).take(5) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(stringResource(R.string.nutrition_water_goal)) },
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = updatedGoal == null || updatedGoal !in 250..10_000,
+                )
             }
+            Button(
+                onClick = { updatedGoal?.let { onSave(adjustment, it) } },
+                enabled = enabled && adjustment != 0 && updatedGoal != null && updatedGoal in 250..10_000,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            ) { Text(stringResource(R.string.save)) }
         }
     }
 }

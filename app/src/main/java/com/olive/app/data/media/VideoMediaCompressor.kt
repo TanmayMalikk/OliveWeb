@@ -243,7 +243,7 @@ internal class VideoMediaCompressor(private val context:Context) {
                         }.build()
                 transformer=Transformer.Builder(context)
                     .setAssetLoaderFactory(DefaultAssetLoaderFactory(
-                        context,decoder,Clock.DEFAULT,null,DataSourceBitmapLoader(context)))
+                        context,decoder,Clock.DEFAULT,null,DataSourceBitmapLoader.Builder(context).build()))
                     .setEncoderFactory(encoder)
                     .setVideoMimeType(MimeTypes.VIDEO_H264)
                     .setAudioMimeType(MimeTypes.AUDIO_AAC)

@@ -6,11 +6,12 @@
     <string name="fitness_coach_reply_error">تعذر الحصول على رد. حاول مجددًا.</string>
     <string name="fitness_coach_limit">بلغ المدرب حد الاستخدام. حاول لاحقًا.</string>
     <string name="fitness_coach_subscription_required">يلزم اشتراك نشط في مدرب اللياقة.</string>
-    <string name="fitness_coach_privacy">عند إرسال رسالة، يستخدم المدرب هذه المحادثة وأهدافك وإجماليات لياقتك لما يصل إلى 14 يومًا.</string>
+    <string name="fitness_coach_privacy">عند إرسال رسالة، يتلقى الذكاء الاصطناعي المحادثة الأخيرة وأهداف لياقتك وما يصل إلى 14 يومًا من بيانات الخطوات وإجماليات التغذية وأسماء بعض الأطعمة المسجلة.</string>
     <string name="fitness_coach_you">أنت</string>
     <string name="fitness_coach_review">الأهداف اليومية المقترحة</string>
     <string name="fitness_coach_apply">تطبيق الأهداف المقترحة</string>
-    <string name="fitness_coach_question">اسأل عن اتجاهات اللياقة أو أهدافك</string>
+    <string name="fitness_coach_question">اطلب خطة تمارين أو أفكارًا للوجبات أو مساعدة في تحقيق أهدافك</string>
+    <string name="fitness_coach_disclaimer">مدرب اللياقة يعمل بالذكاء الاصطناعي وقد يخطئ. لا يغني عن اختصاصي اللياقة أو التغذية.</string>
     <string name="fitness_coach_thinking">جارٍ التفكير…</string>
     <string name="fitness_coach_send">إرسال</string>
     <string name="fitness_coach_offer">5.99 دولار كندي أسبوعيًا. يتجدد أسبوعيًا حتى الإلغاء. ادفع بأمان عبر Stripe.</string>
@@ -31,4 +32,6 @@
     <string name="fitness_coach_settings">إعدادات المدرب</string>
     <string name="fitness_coach_history_error">تعذّر تحميل سجل المحادثة.</string>
     <string name="fitness_coach_goals_saved">تم حفظ الأهداف</string>
+    <string name="fitness_coach_prompt_workout">ضع لي خطة تمارين</string>
+    <string name="fitness_coach_prompt_meals">اقترح عليّ وجبات</string>
 </resources>

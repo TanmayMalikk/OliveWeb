@@ -1,6 +1,10 @@
 // News cover users: opens an article in the app reader.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 
 import android.graphics.Bitmap
@@ -15,7 +19,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -274,7 +277,7 @@ internal fun NewsArticleReader(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = runCatching { URI(currentUrl).host }.getOrNull().orEmpty()
 
-    BackHandler(active) {
+    val backProgress = rememberOliveBack(active) {
         val view = browser
         if (view != null && view.canGoBack()) view.goBack() else onBack()
     }
@@ -298,7 +301,7 @@ internal fun NewsArticleReader(
         }
     }
 
-    Column(modifier) {
+    Column(modifier.oliveBackPreview(backProgress)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically

@@ -243,11 +243,13 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * @param incidentLatitude Optional incident latitude supplied to [savePrivateEntry].
      * @param incidentLongitude Optional incident longitude supplied to [savePrivateEntry].
      * @param attachmentIds Collection of attachment IDs values to process.
+     * @param newEntryId Stable identity for a new note across repeated save attempts.
      */
     fun savePrivateEntry(
         id: String?, kind: PrivateEntryKind, title: String, body: String,
         incidentDate: String, incidentTime: String, incidentLocation: String,
         incidentLatitude: Double?, incidentLongitude: Double?, attachmentIds: List<String>,
+        newEntryId: String = UUID.randomUUID().toString(),
     ) {
         with(runtime) {
             with(state) {
@@ -270,6 +272,8 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 val uid = enrollment?.uid ?: return
                 val existing =
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }
+                if (id != null && existing == null) return
+                if (id == null && privateEntries.any { it.id == newEntryId }) return
                 val changes = existing?.let { old ->
                     buildList {
                         /**
@@ -297,7 +301,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 }
                 val now = System.currentTimeMillis()
                 val entry = PrivateEntry(
-                    id = existing?.id ?: UUID.randomUUID().toString(),
+                    id = existing?.id ?: newEntryId,
                     timestamp = existing?.timestamp ?: now,
                     updatedAt = now,
                     kind = kind,
@@ -361,16 +365,22 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      *
      * @param id ID supplied to [trashPrivateEntry].
      */
-    fun trashPrivateEntry(id: String) {
+    fun trashPrivateEntry(id: String, onTrashed: (() -> Unit)? = null) {
         with(runtime) {
             with(state) {
                 val existing =
                     privateEntries.firstOrNull { it.id == id && it.deletedAt == null } ?: return
+                if (busy) return
                 val now = System.currentTimeMillis()
                 updatePrivateEntry(
                     existing.copy(updatedAt = now, pinned = false, deletedAt = now),
                     "Unable to move this entry to Trash. Please retry.",
-                    if (PRIVATE_ENTRY_TRASH_RETENTION_MS < 60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days."
+                    when {
+                        onTrashed != null -> null
+                        PRIVATE_ENTRY_TRASH_RETENTION_MS < 60_000L -> "Moved to Trash for 10 seconds."
+                        else -> "Moved to Trash for 30 days."
+                    },
+                    onTrashed,
                 )
                 val uid = enrollment?.uid ?: return
                 scope.launch {
@@ -411,16 +421,26 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * @param failure Exception or failure reason encountered during execution.
      * @param success Success supplied to [updatePrivateEntry].
      */
-    fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
+    private fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String?, onSaved: (() -> Unit)? = null) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe || page != SafePage.Notes || busy) return
                 val uid = enrollment?.uid ?: return
+                val previous = privateEntries.firstOrNull { it.id == entry.id } ?: return
+                privateEntries = privateEntries.map { if (it.id == entry.id) entry else it }
                 operations.runOperation(failure) { token ->
-                    withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    try {
+                        withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    } catch (failure: Exception) {
+                        if (epoch == token && enrollment?.uid == uid) {
+                            privateEntries = privateEntries.map { if (it == entry) previous else it }
+                        }
+                        throw failure
+                    }
                     if (epoch == token && screen == SessionScreen.Safe && page == SafePage.Notes) {
                         privateEntries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
                         message = success
+                        onSaved?.invoke()
                     }
                     history.queueHistorySync()
                 }

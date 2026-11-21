@@ -1,6 +1,8 @@
 // Fitness cover users: tracks meals, macros, calories, and daily steps.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.hardware.Sensor
@@ -8,7 +10,9 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.background
@@ -37,11 +41,13 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.collectAsState
@@ -52,6 +58,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -61,7 +68,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.material3.ripple
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -91,6 +101,7 @@ import androidx.core.content.edit
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlin.time.Duration.Companion.milliseconds
+import java.time.LocalDate
 
 
 private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, COACH, FOOD_SEARCH, GOALS, ACCOUNT }
@@ -114,6 +125,22 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     var page by rememberSaveable(accountId) { mutableStateOf(FitnessPage.HOME) }
     var foodSection by rememberSaveable(accountId) { mutableStateOf(FoodLibrarySection.Search) }
     var foodMeal by rememberSaveable(accountId) { mutableStateOf<MealType?>(null) }
+    val snackbars = remember(store) { SnackbarHostState() }
+    var removedFood by remember(store) { mutableStateOf<Pair<LocalDate, FoodLogEntry>?>(null) }
+    val removedMessage = stringResource(R.string.fitness_diary_food_removed)
+    val undoLabel = stringResource(R.string.fitness_diary_undo)
+    LaunchedEffect(store, removedFood, interactive, page) {
+        val removal = removedFood ?: return@LaunchedEffect
+        if (interactive && page == FitnessPage.NUTRITION && snackbars.showSnackbar(
+                removedMessage, actionLabel = undoLabel, withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            ) == SnackbarResult.ActionPerformed
+        ) {
+            store.restoreFood(removal.second, removal.first)
+            pendingSnapshot = store.snapshot()
+        }
+        removedFood = null
+    }
     val pageFocus = remember { FocusRequester() }
     val pageLabel = when (page) {
         FitnessPage.HOME -> stringResource(R.string.home)
@@ -173,11 +200,19 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         }
     }
     // Back returns from a fitness submenu or section before it is allowed to leave the cover app.
-    BackHandler(enabled = interactive) {
-        page = when (page) {
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(enabled = interactive) { progress ->
+        val currentPage = page
+        val destination = when (currentPage) {
             FitnessPage.FOOD_SEARCH -> FitnessPage.NUTRITION
             FitnessPage.HOME -> FitnessPage.HOME
             else -> FitnessPage.HOME
+        }
+        try {
+            progress.collect { if (destination != currentPage) backProgress = it.progress }
+            if (page == currentPage) page = destination
+        } finally {
+            backProgress = 0f
         }
     }
     // Announce the new fitness page from its heading after a navigation tab is selected.
@@ -197,91 +232,115 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     }
 
     OliveTheme {
-        Column(
+        Box(
             Modifier.fillMaxSize().background(FitnessBackground)
-                .windowInsetsPadding(WindowInsets.statusBars).padding(top = 8.dp),
+                .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            FitnessHeader(
-                page = page,
-                pageLabel = pageLabel,
-                pageFocus = pageFocus,
-                enabled = interactive,
-                onPage = { page = it },
-                onSettings = { page = FitnessPage.ACCOUNT },
-            )
-            // Opens the selected fitness overview, activity, nutrition, or vitals page.
-            FitnessHealthConnection(accountId, interactive && sensorPermissionSettled)
-            if (cloudFailed) Text(stringResource(R.string.fitness_sync_pending), Modifier.padding(horizontal = 16.dp))
-            val dataLoading = snapshot == null || loaded == null ||
-                (!session.localMode && accountId != "guest" && !ready)
-            if (page == FitnessPage.COACH) {
-                if (interactive) androidx.compose.runtime.key(accountId) {
-                    FitnessCoachPage(accountId, !session.localMode && accountId != "guest", store, history, dataLoading) {
-                        pendingSnapshot = it
+            Column(
+                Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = 1f - backProgress * 0.045f
+                    scaleY = scaleX
+                }.padding(top = 8.dp),
+            ) {
+                FitnessHeader(
+                    page = page,
+                    pageLabel = pageLabel,
+                    pageFocus = pageFocus,
+                    enabled = interactive,
+                    onPage = { page = it },
+                    onSettings = { page = FitnessPage.ACCOUNT },
+                )
+                // Opens the selected fitness overview, activity, nutrition, or vitals page.
+                FitnessHealthConnection(accountId, interactive && sensorPermissionSettled)
+                if (cloudFailed) Text(stringResource(R.string.fitness_sync_pending), Modifier.padding(horizontal = 16.dp))
+                val dataLoading = snapshot == null || loaded == null ||
+                    (!session.localMode && accountId != "guest" && !ready)
+                if (page == FitnessPage.COACH) {
+                    if (interactive) androidx.compose.runtime.key(accountId) {
+                        FitnessCoachPage(
+                            accountId, !session.localMode && accountId != "guest", store, dataLoading,
+                        ) {
+                            pendingSnapshot = it
+                        }
+                    }
+                } else if (dataLoading) {
+                    val skeleton = when (page) {
+                        FitnessPage.HOME -> SkeletonLayout.FitnessSummary
+                        FitnessPage.ACTIVITY -> SkeletonLayout.FitnessActivity
+                        FitnessPage.VITALS -> SkeletonLayout.FitnessVitals
+                        FitnessPage.NUTRITION -> SkeletonLayout.FitnessNutrition
+                        FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
+                        FitnessPage.GOALS, FitnessPage.ACCOUNT, FitnessPage.COACH -> SkeletonLayout.Form
+                    }
+                    LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
+                } else Crossfade(
+                    targetState = page, animationSpec = tween(180), label = "Fitness view",
+                ) { visiblePage ->
+                    val pageEnabled = interactive && page == visiblePage
+                    when (visiblePage) {
+                        FitnessPage.HOME -> FitnessHomePage(snapshot, onGoals = { page = FitnessPage.GOALS })
+                        FitnessPage.ACTIVITY -> FitnessActivityPage(
+                            snapshot = snapshot,
+                            history = history,
+                            accountId = accountId,
+                            enabled = pageEnabled,
+                        )
+                        FitnessPage.VITALS -> FitnessVitalsPage(snapshot)
+                        FitnessPage.NUTRITION -> TodayPage(
+                            snapshot = snapshot,
+                            enabled = pageEnabled,
+                            padding = PaddingValues(0.dp),
+                            onAddFood = {
+                                foodMeal = null
+                                foodSection = FoodLibrarySection.Search
+                                page = FitnessPage.FOOD_SEARCH
+                            },
+                            onRemoveFood = { logId ->
+                                val date = LocalDate.now()
+                                val entry = store.snapshot(date).foodsToday.firstOrNull { it.logId == logId }
+                                if (entry != null) {
+                                    pendingSnapshot = store.removeFood(logId, date)
+                                    removedFood = date to entry
+                                }
+                            },
+                            onAddWater = { amount, goal -> pendingSnapshot = store.addWater(amount, goal) },
+                            onUpdateFood = { pendingSnapshot = store.updateFood(it) },
+                            library = foodLibrary,
+                            onOpenLibrary = { foodMeal = null; foodSection = it; page = FitnessPage.FOOD_SEARCH },
+                            onLogMeal = {
+                                foodMeal = it
+                                foodSection = FoodLibrarySection.Search
+                                page = FitnessPage.FOOD_SEARCH
+                            },
+                        )
+                        FitnessPage.FOOD_SEARCH -> FoodSearchPage(
+                            enabled = pageEnabled,
+                            padding = PaddingValues(0.dp),
+                            library = foodLibrary,
+                            initialSection = foodSection,
+                            initialMeal = foodMeal,
+                            recentFoods = store.recentFoods(),
+                            onFoodAdded = { food, servings, meal, logId ->
+                                pendingSnapshot = store.addFood(food, servings, meal, logId = logId)
+                                page = FitnessPage.NUTRITION
+                            },
+                        )
+                        FitnessPage.GOALS -> FitnessGoalsPage(
+                            profile = snapshot.profile,
+                            enabled = pageEnabled,
+                            padding = PaddingValues(0.dp),
+                            onSave = {
+                                store.saveProfile(it)
+                                pendingSnapshot = store.snapshot()
+                                page = FitnessPage.HOME
+                            },
+                        )
+                        FitnessPage.ACCOUNT, FitnessPage.COACH -> Unit
                     }
                 }
-            } else if (dataLoading || snapshot == null) {
-                val skeleton = when (page) {
-                    FitnessPage.HOME -> SkeletonLayout.FitnessSummary
-                    FitnessPage.ACTIVITY -> SkeletonLayout.FitnessActivity
-                    FitnessPage.VITALS -> SkeletonLayout.FitnessVitals
-                    FitnessPage.NUTRITION -> SkeletonLayout.FitnessNutrition
-                    FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
-                    FitnessPage.GOALS, FitnessPage.ACCOUNT, FitnessPage.COACH -> SkeletonLayout.Form
-                }
-                LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
-            } else when (page) {
-                FitnessPage.HOME -> FitnessHomePage(snapshot, onGoals = { page = FitnessPage.GOALS })
-                FitnessPage.ACTIVITY -> FitnessActivityPage(
-                    snapshot = snapshot,
-                    history = history,
-                    accountId = accountId,
-                    enabled = interactive,
-                )
-                FitnessPage.VITALS -> FitnessVitalsPage(snapshot)
-                FitnessPage.NUTRITION -> TodayPage(
-                    snapshot = snapshot,
-                    enabled = interactive,
-                    padding = PaddingValues(0.dp),
-                    onAddFood = {
-                        foodMeal = null
-                        foodSection = FoodLibrarySection.Search
-                        page = FitnessPage.FOOD_SEARCH
-                    },
-                    onRemoveFood = { pendingSnapshot = store.removeFood(it) },
-                    onAddWater = { amount, goal -> pendingSnapshot = store.addWater(amount, goal) },
-                    onUpdateFood = { pendingSnapshot = store.updateFood(it) },
-                    library = foodLibrary,
-                    onOpenLibrary = { foodMeal = null; foodSection = it; page = FitnessPage.FOOD_SEARCH },
-                    onLogMeal = {
-                        foodMeal = it
-                        foodSection = FoodLibrarySection.Search
-                        page = FitnessPage.FOOD_SEARCH
-                    },
-                )
-                FitnessPage.FOOD_SEARCH -> FoodSearchPage(
-                    enabled = interactive,
-                    padding = PaddingValues(0.dp),
-                    library = foodLibrary,
-                    initialSection = foodSection,
-                    initialMeal = foodMeal,
-                    recentFoods = store.recentFoods(),
-                    onFoodAdded = { food, servings, meal ->
-                        pendingSnapshot = store.addFood(food, servings, meal)
-                        page = FitnessPage.NUTRITION
-                    },
-                )
-                FitnessPage.GOALS -> FitnessGoalsPage(
-                    profile = snapshot.profile,
-                    enabled = interactive,
-                    padding = PaddingValues(0.dp),
-                    onSave = {
-                        store.saveProfile(it)
-                        pendingSnapshot = store.snapshot()
-                        page = FitnessPage.HOME
-                    },
-                )
-                FitnessPage.ACCOUNT, FitnessPage.COACH -> Unit
+            }
+            if (interactive && page == FitnessPage.NUTRITION) {
+                SnackbarHost(snackbars, Modifier.align(Alignment.BottomCenter).padding(12.dp))
             }
         }
     }
@@ -396,11 +455,16 @@ private fun FitnessTab(
     onClick: () -> Unit,
     icon: @Composable () -> Unit,
 ) {
+    val source = rememberOliveInteraction()
     Column(
-        modifier.clip(RoundedCornerShape(24.dp))
+        modifier.olivePress(source, enabled)
+            .shadow(if (selected && enabled) 2.dp else 0.dp, OlivePill)
+            .clip(OlivePill)
             .background(if (selected) Paper else Color.Transparent)
             .selectable(
                 selected = selected,
+                interactionSource = source,
+                indication = ripple(),
                 enabled = enabled,
                 role = Role.Tab,
                 onClick = onClick,

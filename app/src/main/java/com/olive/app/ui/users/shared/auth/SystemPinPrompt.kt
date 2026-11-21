@@ -1,5 +1,6 @@
 package com.olive.app.ui.users.shared.auth
 
+import com.olive.app.ui.shared.OliveButton as Button
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions

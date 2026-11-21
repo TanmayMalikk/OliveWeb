@@ -1,6 +1,12 @@
 // Fitness cover users: shows nutrition totals, logged meals, and food search.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import kotlin.time.Duration.Companion.milliseconds
 
 import androidx.compose.foundation.clickable
@@ -34,18 +40,13 @@ import androidx.compose.material.icons.outlined.LunchDining
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -122,7 +123,7 @@ internal fun TodayPage(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.nutrition),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.balancedHeadline,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
                 )
@@ -261,7 +262,7 @@ private fun CaloriesOverview(snapshot: FitnessSnapshot) {
     val remaining = (profile.calorieGoal - totals.calories).coerceAtLeast(0f)
     val remainingLabel = stringResource(R.string.fitness_diary_remaining, remaining.displayAmount())
     Card(
-        shape = RoundedCornerShape(28.dp),
+        shape = FitnessContinuousCorners,
         colors = CardDefaults.cardColors(containerColor = FitnessWarmCard),
     ) {
         Column(
@@ -278,18 +279,18 @@ private fun CaloriesOverview(snapshot: FitnessSnapshot) {
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.calories), color = FitnessSubtle)
-                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.headlineMedium.tabularDigits, fontWeight = FontWeight.Bold)
                     Text(
                         stringResource(R.string.calorie_goal) + " · " +
                             stringResource(R.string.fitness_diary_energy, profile.calorieGoal.toString()),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.tabularDigits,
                         color = FitnessSubtle,
                     )
                 }
                 Text(
                     remainingLabel, Modifier.weight(1f).padding(start = 8.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.tabularDigits,
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
@@ -376,7 +377,7 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label)
-        Text("${value.displayAmount()} $unit")
+        Text("${value.displayAmount()} $unit", style = MaterialTheme.typography.bodyMedium.tabularDigits)
     }
 }
 /**
@@ -397,7 +398,7 @@ private fun NutritionProgress(label: String, value: Float, goal: Int, modifier: 
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge)
-        Text("${value.displayAmount()} / $goal g", style = MaterialTheme.typography.bodySmall, color = FitnessSubtle)
+        Text("${value.displayAmount()} / $goal g", style = MaterialTheme.typography.bodySmall.tabularDigits, color = FitnessSubtle)
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
@@ -435,10 +436,10 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> U
                     color = FitnessSubtle,
                 )
             }
-            IconButton(onClick = onEdit, enabled = enabled) {
+            IconButton(onClick = onEdit, enabled = enabled, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) {
                 Icon(Icons.Outlined.Edit, stringResource(R.string.nutrition_edit_food))
             }
-            IconButton(onClick = onRemove, enabled = enabled) {
+            IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) {
                 Icon(Icons.Outlined.Delete, stringResource(R.string.remove))
             }
         }
@@ -460,7 +461,7 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> U
 internal fun FoodSearchPage(
     enabled: Boolean,
     padding: PaddingValues,
-    onFoodAdded: (NutritionFood, Float, MealType) -> Unit,
+    onFoodAdded: (NutritionFood, Float, MealType, String) -> Unit,
     foodSource: FoodNutritionDataSource? = null,
     library: FitnessFoodLibrary? = null,
     initialSection: FoodLibrarySection = FoodLibrarySection.Search,
@@ -675,13 +676,14 @@ internal fun FoodSearchPage(
         onContinue = { food -> manualEntry = false; selectedFood = food },
     )
     selectedFood?.let { food ->
+        val logId = rememberSaveable(food.id) { java.util.UUID.randomUUID().toString() }
         AddFoodDialog(
             food = food,
             onDismiss = { selectedFood = null; previousEntry = null },
             onAdd = { choice, servings, meal ->
                 selectedFood = null
                 previousEntry = null
-                onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal)
+                onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal, logId)
             },
             initialServings = previousEntry?.servings ?: 1f,
             initialMeal = initialMeal ?: previousEntry?.meal ?: MealType.BREAKFAST,

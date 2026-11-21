@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="undo_action">撤消</string>
+    <string name="undo_bookmark_removed">已移除书签。</string>
+    <string name="undo_note_trashed">笔记已移至回收站。</string>
+    <string name="undo_chat_archived">聊天已归档。</string>
+    <string name="undo_chat_restored">聊天已恢复。</string>
+</resources>

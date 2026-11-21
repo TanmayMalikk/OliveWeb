@@ -13,8 +13,7 @@ const SUPPORT = "SUPPORT";
 const NEEDS_ADMIN = "NEEDS_ADMIN";
 
 // Creates a unique conversation ID so every new support ticket gets a separate chat.
-function supportConversationId(ownerUid, origin = SUPPORT) {
-  const ticketId = crypto.randomUUID();
+function supportConversationId(ownerUid, origin = SUPPORT, ticketId = crypto.randomUUID()) {
   return `${origin === PLAN_CONSULT ? "plan-consult" : "support"}-${ownerUid}-${ticketId}`;
 }
 

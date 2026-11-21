@@ -6,11 +6,12 @@
     <string name="fitness_coach_reply_error">No se pudo obtener una respuesta. Inténtalo de nuevo.</string>
     <string name="fitness_coach_limit">El entrenador alcanzó un límite. Inténtalo más tarde.</string>
     <string name="fitness_coach_subscription_required">Necesitas una suscripción activa al entrenador.</string>
-    <string name="fitness_coach_privacy">Al enviar un mensaje, el entrenador usa este chat, tus objetivos y hasta 14 días de datos de actividad y nutrición.</string>
+    <string name="fitness_coach_privacy">Al enviar un mensaje, la IA recibe la conversación reciente, tus objetivos y hasta 14 días de pasos, totales nutricionales y nombres de algunos alimentos registrados.</string>
     <string name="fitness_coach_you">Tú</string>
     <string name="fitness_coach_review">Objetivos diarios sugeridos</string>
     <string name="fitness_coach_apply">Aplicar objetivos sugeridos</string>
-    <string name="fitness_coach_question">Pregunta por tus tendencias u objetivos</string>
+    <string name="fitness_coach_question">Pide un plan de entrenamiento, ideas para comidas o ayuda con tus objetivos</string>
+    <string name="fitness_coach_disclaimer">El entrenador usa IA y puede equivocarse. No sustituye a un profesional del ejercicio o la nutrición.</string>
     <string name="fitness_coach_thinking">Pensando…</string>
     <string name="fitness_coach_send">Enviar</string>
     <string name="fitness_coach_offer">5,99 CAD por semana. Se renueva semanalmente hasta que canceles. Pago seguro con Stripe.</string>
@@ -31,4 +32,6 @@
     <string name="fitness_coach_settings">Ajustes del entrenador</string>
     <string name="fitness_coach_history_error">No se pudo cargar el historial del chat.</string>
     <string name="fitness_coach_goals_saved">Objetivos guardados</string>
+    <string name="fitness_coach_prompt_workout">Crea un plan de entrenamiento</string>
+    <string name="fitness_coach_prompt_meals">Dame ideas para mis comidas</string>
 </resources>

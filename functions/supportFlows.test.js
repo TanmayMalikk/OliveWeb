@@ -133,3 +133,22 @@ test("support closing rejects personal and unrelated organization accounts", asy
   await assert.rejects(f.api.staffSupportClose({data: {conversationId: id}}), {code: "permission-denied"});
   await assert.rejects(f.api.staffSupportClose({data: {conversationId: "invalid"}}), {code: "invalid-argument"});
 });
+
+test("replaying a support request reuses its ticket and never reopens a canceled chat", async () => {
+  const f = prepared(), api = f.load("supportTickets");
+  Object.assign(f.profiles.get("staff"), {email: "staff@example.invalid", dob: "1990-01-01"});
+  const requestKey = "240e6184-6365-443c-beb9-1912a94ef8ab";
+  const request = {data: {action: "request", requestKey}};
+  const first = (await api.staffSupportRequest(request)).ticket;
+  const replay = (await api.staffSupportRequest(request)).ticket;
+  assert.equal(replay.conversationId, first.conversationId);
+  assert.equal(replay.ticketNumber, first.ticketNumber);
+  assert.equal(f.records.get("safetyStaff/staff").activeCount, 1);
+  await api.staffSupportRequest({data: {action: "stop", conversationId: first.conversationId}});
+  const closed = (await api.staffSupportRequest(request)).ticket;
+  assert.equal(closed.requested, false);
+  assert.equal(f.records.get("safetyStaff/staff").activeCount, 0);
+  const next = (await api.staffSupportRequest({data: {action: "request"}})).ticket;
+  assert.notEqual(next.conversationId, first.conversationId);
+  assert.equal(next.ticketNumber, first.ticketNumber + 1);
+});

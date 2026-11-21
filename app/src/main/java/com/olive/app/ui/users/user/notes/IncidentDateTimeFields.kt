@@ -1,5 +1,7 @@
 package com.olive.app.ui.users.user.notes
 
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

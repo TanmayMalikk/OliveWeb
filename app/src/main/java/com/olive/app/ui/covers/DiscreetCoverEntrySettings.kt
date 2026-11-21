@@ -1,6 +1,9 @@
 // Cover users: shows cover settings and handles discreet entry into the safe app.
 package com.olive.app.ui.covers
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedIconButton as OutlinedIconButton
 import com.olive.app.ui.shared.*
 import android.content.ComponentName
 import android.content.Context
@@ -136,9 +139,11 @@ internal fun DiscreetCoverEntry(
 @Composable
 internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
     val scrollState = rememberScrollState()
-    BackHandler(onBack = onBack)
+    val back = rememberOliveBack(onBack = onBack)
     Scaffold(
         containerColor = Cream,
+        modifier = Modifier.oliveBackPreview(back),
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -152,7 +157,7 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).oliveScrollbar(scrollState)
+            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).oliveScrollbar(scrollState)
                 .verticalScroll(scrollState).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -334,6 +339,7 @@ internal fun GameCover(
                     stringResource(R.string.game_cover_title),
                     modifier = Modifier.weight(1f, fill = false).semantics { heading() },
                     fontFamily = FontFamily.Serif,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = OliveGreen,
@@ -378,6 +384,7 @@ internal fun GameCover(
                     modifier = Modifier.testTag("game_score").padding(horizontal = 18.dp, vertical = 8.dp)
                         .semantics { liveRegion = LiveRegionMode.Polite },
                     fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
         }

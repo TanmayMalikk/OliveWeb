@@ -52,6 +52,16 @@ class FitnessStoreTest {
         }
         assertEquals(1f, store.snapshot(date).foodsToday.single().servings, 0f)
     }
+
+    @Test fun duplicateSaveAndUndoUseTheOriginalLogId() {
+        val store = store()
+        val key = "same-save"
+        val entry = store.addFood(food, 1f, MealType.LUNCH, date, logId = key).foodsToday.single()
+        assertEquals(listOf(entry), store.addFood(food, 1f, MealType.LUNCH, date, logId = key).foodsToday)
+        assertTrue(store.removeFood(key, date).foodsToday.isEmpty())
+        assertEquals(listOf(entry), store.restoreFood(entry, date).foodsToday)
+        assertEquals(listOf(entry), store.restoreFood(entry, date).foodsToday)
+    }
     @Test fun hydrationAdjustmentsCannotGoNegativeAndAreSeparatedByDay() {
         val store = store()
         assertEquals(250, store.addWater(250, 2000, date).waterTodayMl)

@@ -1,6 +1,7 @@
 // Fitness cover users: shows today's summary, step progress, and the goals shortcut.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveCard as Card
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator

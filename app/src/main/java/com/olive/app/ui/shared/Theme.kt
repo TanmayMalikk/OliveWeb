@@ -1,8 +1,19 @@
 package com.olive.app.ui.shared
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.dp
+
+private val oliveShapes = Shapes(
+    small = oliveCorners(12.dp),
+    medium = oliveCorners(16.dp),
+    large = oliveCorners(22.dp),
+    extraLarge = oliveCorners(32.dp),
+)
 
 private val oliveLightColors = lightColorScheme(
     primary = OliveGreen, onPrimary = Paper,
@@ -33,5 +44,7 @@ private val oliveLightColors = lightColorScheme(
  */
 @Composable
 internal fun OliveTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = oliveLightColors, typography = OliveTypography, content = content)
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 48.dp) {
+        MaterialTheme(colorScheme = oliveLightColors, typography = OliveTypography, shapes = oliveShapes, content = content)
+    }
 }

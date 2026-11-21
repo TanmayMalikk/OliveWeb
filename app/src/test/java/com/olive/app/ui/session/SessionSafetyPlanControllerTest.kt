@@ -181,11 +181,12 @@ class SessionSafetyPlanControllerTest {
             val repository = mock(SafetyPlanRepository::class.java)
             val controller = SessionSafetyPlans(fixture.runtime) { repository }
             controller.changeAvailability(false)
-            fixture.await { !controller.available }
+            assertFalse(controller.available)
+            fixture.await { !controller.savingAvailability }
             verify(repository).available(false)
             `when`(repository.available(true)).thenAnswer { throw IllegalStateException("Service unavailable") }
             controller.changeAvailability(true)
-            fixture.await { controller.error != null }
+            fixture.await { !controller.savingAvailability && controller.error != null }
             assertFalse(controller.available)
             assertEquals(R.string.safety_sync_error, controller.error)
             controller.close()

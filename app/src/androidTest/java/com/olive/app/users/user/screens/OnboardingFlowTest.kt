@@ -277,22 +277,42 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("incident_time_apply")
         fill("incident_location", "Edmonton")
         fill("private_entry_body", "Details that must stay inside Olive Branch")
-        click("save_private_entry")
-        compose.waitUntil(30_000) {
-            compose.onAllNodesWithTag("private_editor_title").fetchSemanticsNodes().isEmpty() &&
-                compose.onAllNodesWithText("Details that must stay inside Olive Branch")
-                    .fetchSemanticsNodes().isNotEmpty()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        val owner = requireNotNull(session.coverAccountId)
+        hideKeyboard()
+        compose.onNodeWithTag("private_editor_list").performScrollToNode(hasTestTag("save_private_entry"))
+        compose.onNodeWithTag("save_private_entry").assertIsEnabled().performClick()
+        compose.waitUntil(15_000) {
+            !session.busy && (session.message != null || session.privateEntries.isNotEmpty())
+        }
+        compose.runOnIdle {
+            assertTrue("Saving the incident failed. message=${session.message}",
+                session.privateEntries.any { it.body == "Details that must stay inside Olive Branch" })
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
         compose.onNodeWithText("Details that must stay inside Olive Branch").assertDoesNotExist()
+        assertEquals("The committed incident must survive Quick Exit in encrypted storage",
+            1, session.runtime.store.privateEntries(owner).size)
         unlock()
         click("safe_notes")
-        compose.onNodeWithText("Details that must stay inside Olive Branch").assertExists()
+        assertEquals(owner, session.coverAccountId)
+        assertEquals(SafePage.Notes, session.page)
+        compose.waitUntil(15_000) { !session.loadingHistory }
+
+        compose.runOnIdle {
+            assertTrue("historyLoadFailed=${session.historyLoadFailed}, incidents=${session.privateEntries.size}",
+                !session.historyLoadFailed && session.privateEntries.any {
+                    it.body == "Details that must stay inside Olive Branch"
+                })
+        }
         fill("private_notes_search", "Private incident")
-        compose.onNodeWithTag("private_entry_row").assertExists()
+        hideKeyboard()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("private_entry_row"))
+        compose.onNodeWithText("Details that must stay inside Olive Branch").assertExists()
         fill("private_notes_search", "")
-        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        hideKeyboard()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("private_entry_row"))
         compose.onNodeWithTag("private_pin").performClick()
         compose.waitUntil(30_000) {
             !session.busy && session.privateEntries.any { it.pinned }
@@ -335,8 +355,17 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("private_entry_row").performClick()
         click("delete_private_entry")
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Moved to Trash for 10 seconds.").fetchSemanticsNodes()
+            compose.onAllNodesWithText("Note moved to Trash.").fetchSemanticsNodes()
                 .isNotEmpty()
+        }
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("private_entry_row").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("private_entry_row").performClick()
+        click("delete_private_entry")
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithText("Note moved to Trash.").fetchSemanticsNodes().isNotEmpty()
         }
         click("open_scratchpad")
         compose.waitUntil(30_000) {

@@ -601,9 +601,11 @@ internal class SupportRepository(
     /**
      * Creates a new support ticket without sharing the safety plan.
      *
-     * @return The resulting [StaffSupportTicket] for request help.
+     * @param requestKey The same UUID for each retry of this request.
+     * @return The assigned or waiting support ticket.
      */
-    suspend fun requestHelp(): StaffSupportTicket = updateRequest("request")
+    suspend fun requestHelp(requestKey: String): StaffSupportTicket =
+        updateRequest("request", requestKey = requestKey)
 
     /**
      * Returns true when the user still has a staff request that can be cancelled.
@@ -619,13 +621,20 @@ internal class SupportRepository(
      *
      * @param action Action supplied to [updateRequest].
      * @param conversationId Unique identifier of the conversation or support ticket.
-     * @return The resulting [StaffSupportTicket] for update request.
+     * @param requestKey Stable request UUID for a newly opened ticket.
+     * @return The assigned or waiting support ticket.
      */
-    private suspend fun updateRequest(action: String, conversationId: String = ""): StaffSupportTicket {
-        val ticket = functions.callJsonObject(
-            "staffSupportRequest",
-            mapOf("action" to action, "conversationId" to conversationId),
-        ).getJSONObject("ticket")
+    private suspend fun updateRequest(
+        action: String,
+        conversationId: String = "",
+        requestKey: String = "",
+    ): StaffSupportTicket {
+        val payload = buildMap {
+            put("action", action)
+            put("conversationId", conversationId)
+            if (requestKey.isNotEmpty()) put("requestKey", requestKey)
+        }
+        val ticket = functions.callJsonObject("staffSupportRequest", payload).getJSONObject("ticket")
         return StaffSupportTicket(
             requested = ticket.optBoolean("requested"),
             staffUid = ticket.optString("staffUid"),

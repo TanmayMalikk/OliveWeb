@@ -33,6 +33,7 @@ import com.olive.app.data.safety.SafetyConsultation
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.shared.OliveUndoOverlay
 import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.ui.users.admin.AdminAccounts
 import com.olive.app.ui.users.admin.AdminPortal
@@ -200,7 +201,11 @@ class OrganizationAndChatUiTest {
                 type = "GROUP",
             ))
         }
-        compose.setContent { OliveTheme { MessagesScreen(session) } }
+        compose.setContent {
+            OliveTheme {
+                OliveUndoOverlay(scopeKey = owner, enabled = true) { MessagesScreen(session) }
+            }
+        }
         val list = compose.onNode(hasScrollToIndexAction())
         val row = hasTestTag("conversation_action-chat")
         list.performScrollToNode(row)
@@ -215,6 +220,12 @@ class OrganizationAndChatUiTest {
         compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
         compose.onNodeWithText(text(R.string.archive_chat)).performClick()
         compose.onNode(row).assertDoesNotExist()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.undo_action)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.undo_action)).performClick()
+        list.performScrollToNode(row)
+        compose.onNode(row).assertIsDisplayed()
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.archive_chat)).performClick()
         val archive = hasTestTag("archived_chats")
         list.performScrollToNode(archive)
         compose.onNode(archive).performClick()
@@ -271,8 +282,9 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithTag("safety_staff_available").assertHasClickAction()
         compose.onNodeWithTag("safety_consultation_owner").performClick()
         compose.onNodeWithText("Private owner").assertDoesNotExist()
+        compose.waitUntil(5_000) { !session.safetyPlans.loadingPlan && session.safetyPlans.plan?.ownerUid == "owner" }
         val complete = hasTestTag("complete_safety_consultation")
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(complete)
+        compose.onNodeWithTag("safety_plan_page").performScrollToNode(complete)
         compose.onNode(complete).performClick()
         compose.onNodeWithText(text(R.string.safety_complete_consultation_title)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.cancel)).performClick()

@@ -1,7 +1,11 @@
 // Safe-app users: shows the user’s private notes.
 package com.olive.app.ui.users.user.notes
 
-import androidx.activity.compose.BackHandler
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -77,8 +81,11 @@ private fun validIncidentTime(value: String, saved: String?) =
 @Composable
 internal fun PrivateNotes(session: SessionViewModel) {
     val uiText = rememberResourceText()
+    val offerUndo = LocalOliveUndo.current
+    val noteTrashed = stringResource(R.string.undo_note_trashed)
     var editorOpen by remember { mutableStateOf(false) }
     var editorVersion by remember { mutableIntStateOf(0) }
+    val newEntryId = remember(editorVersion) { java.util.UUID.randomUUID().toString() }
     var editingId by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf(PrivateEntryKind.Note) }
     var title by remember { mutableStateOf("") }
@@ -215,7 +222,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
             } while (editorOpen && incidentMapOpen && !locationLookupFailed)
         }
     }
-    BackHandler(editorOpen || logEntryId != null || trashOpen) {
+    val backProgress = rememberOliveBack(editorOpen || logEntryId != null || trashOpen, preview = editorOpen) {
         when {
             logEntryId != null -> logEntryId = null
             incidentMapOpen -> incidentMapOpen = false
@@ -233,7 +240,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
         val editorListState = rememberLazyListState()
         LazyColumn(
-            Modifier.fillMaxSize().testTag("private_editor_list").oliveScrollbar(editorListState),
+            Modifier.fillMaxSize().oliveBackPreview(backProgress).testTag("private_editor_list").oliveScrollbar(editorListState),
             state = editorListState,
             contentPadding = PaddingValues(
                 start = 24.dp,
@@ -272,7 +279,9 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     }
                     if (entry != null) IconButton(
                         onClick = {
-                            session.trashPrivateEntry(entry.id)
+                            session.trashPrivateEntry(entry.id) {
+                                offerUndo(noteTrashed) { session.restorePrivateEntry(entry.id) }
+                            }
                             editorOpen = false
                         },
                         enabled = !session.busy,
@@ -459,7 +468,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         session.savePrivateEntry(
                             editingId, kind, title, body, incidentDate, incidentTime,
                             incidentLocation, incidentLatitude, incidentLongitude,
-                            selectedAttachments.toList(),
+                            selectedAttachments.toList(), newEntryId = newEntryId,
                         )
                         if (body.isNotBlank()) editorOpen = false
                     },

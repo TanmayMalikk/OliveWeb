@@ -1,6 +1,11 @@
 // Safe contacts: shows the user’s shared safety information to a safe contact.
 package com.olive.app.ui.users.safecontact
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.camera.CameraScreen
@@ -375,10 +380,10 @@ private fun SharedIncidentField(label: String, value: String, minLines: Int = 1)
  */
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("safe_contact_identity"),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -441,10 +446,10 @@ internal fun SafeContactActionCard(
     label: String, description: String, icon: ImageVector, tag: String, badgeCount: Int,
     onClick: () -> Unit, modifier: Modifier = Modifier
 ) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 104.dp).testTag(tag),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

@@ -484,9 +484,13 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
      *
      * @param conversation Conversation metadata including participants and ticket status.
      * @param archived Whether to apply archived.
+     * @param onSaved Runs when the device has saved the change.
      */
-    fun setConversationArchived(conversation: ChatConversation, archived: Boolean) =
-        runtime.conversationActions.setArchived(conversation, archived)
+    fun setConversationArchived(
+        conversation: ChatConversation,
+        archived: Boolean,
+        onSaved: () -> Unit = {},
+    ) = runtime.conversationActions.setArchived(conversation, archived, onSaved)
 
     /**
      * Saves a private note about this friend or supported user.
@@ -768,7 +772,12 @@ internal interface SessionCoverNotesActivityActions {
      * @param article Article supplied to [toggleNewsBookmark].
      * @return The resulting toggle news bookmark.
      */
-    fun toggleNewsBookmark(article: NewsArticle) = runtime.covers.toggleNewsBookmark(article)
+    fun toggleNewsBookmark(article: NewsArticle) =
+        setNewsBookmark(article, runtime.state.savedNews.none { it.link == article.link })
+
+    /** Sets a bookmark to the requested state, so a repeated Undo does not toggle it off. */
+    fun setNewsBookmark(article: NewsArticle, bookmarked: Boolean) =
+        runtime.covers.setNewsBookmark(article, bookmarked)
 
     /**
      * Opens one category in the private activity-history screen.
@@ -804,9 +813,10 @@ internal interface SessionCoverNotesActivityActions {
         incidentDate: String = "", incidentTime: String = "", incidentLocation: String = "",
         incidentLatitude: Double? = null, incidentLongitude: Double? = null,
         attachmentIds: List<String> = emptyList(),
+        newEntryId: String = java.util.UUID.randomUUID().toString(),
     ) = runtime.notes.savePrivateEntry(
         id, kind, title, body, incidentDate, incidentTime, incidentLocation,
-        incidentLatitude, incidentLongitude, attachmentIds,
+        incidentLatitude, incidentLongitude, attachmentIds, newEntryId,
     )
 
     /**
@@ -821,7 +831,7 @@ internal interface SessionCoverNotesActivityActions {
      *
      * @param id ID supplied to [trashPrivateEntry].
      */
-    fun trashPrivateEntry(id: String) = runtime.notes.trashPrivateEntry(id)
+    fun trashPrivateEntry(id: String, onTrashed: (() -> Unit)? = null) = runtime.notes.trashPrivateEntry(id, onTrashed)
     /**
      * Restores a private note from the note trash.
      *

@@ -1,6 +1,10 @@
 // News cover users: lists headlines and opens saved articles.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
@@ -266,12 +270,24 @@ internal fun NewsFeed(
                                 session.language,
                                 saved.any { it.link == article.link },
                                 onOpen = { actions.openArticle(article) },
-                                onBookmark = { session.toggleNewsBookmark(article) })
+                                onBookmark = newsBookmarkAction(session, article))
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Applies a bookmark change immediately and offers to restore a removed article. */
+@Composable
+internal fun newsBookmarkAction(session: SessionViewModel, article: NewsArticle): () -> Unit {
+    val undo = LocalOliveUndo.current
+    val removed = stringResource(R.string.undo_bookmark_removed)
+    return {
+        val wasSaved = session.savedNews.any { it.link == article.link }
+        session.setNewsBookmark(article, !wasSaved)
+        if (wasSaved) undo(removed) { session.setNewsBookmark(article, true) }
     }
 }
 

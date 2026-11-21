@@ -6,11 +6,12 @@
     <string name="fitness_coach_reply_error">未能获得回复。请重试。</string>
     <string name="fitness_coach_limit">教练已达到使用上限。请稍后重试。</string>
     <string name="fitness_coach_subscription_required">需要有效的健身教练订阅。</string>
-    <string name="fitness_coach_privacy">发送消息时，教练会使用本次对话、你的目标以及最多 14 天的健身汇总数据。</string>
+    <string name="fitness_coach_privacy">发送消息时，AI 会收到近期对话、你的健身目标，以及最多 14 天的步数、营养总量和部分已记录的食物名称。</string>
     <string name="fitness_coach_you">你</string>
     <string name="fitness_coach_review">建议的每日目标</string>
     <string name="fitness_coach_apply">应用建议目标</string>
-    <string name="fitness_coach_question">询问健身趋势或目标</string>
+    <string name="fitness_coach_question">获取训练计划、餐食建议或目标指导</string>
+    <string name="fitness_coach_disclaimer">健身教练由 AI 提供，可能出错，无法替代健身或营养专业人士。</string>
     <string name="fitness_coach_thinking">正在思考…</string>
     <string name="fitness_coach_send">发送</string>
     <string name="fitness_coach_offer">每周 5.99 加元。每周自动续订，直至取消。通过 Stripe 安全付款。</string>
@@ -31,4 +32,6 @@
     <string name="fitness_coach_settings">教练设置</string>
     <string name="fitness_coach_history_error">无法加载聊天记录。</string>
     <string name="fitness_coach_goals_saved">目标已保存</string>
+    <string name="fitness_coach_prompt_workout">帮我制定训练计划</string>
+    <string name="fitness_coach_prompt_meals">给我一些餐食建议</string>
 </resources>

@@ -1,18 +1,15 @@
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.content.Intent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,13 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -51,7 +43,6 @@ import java.time.LocalDate
  * @param accountId Account ID supplied to [FitnessCoachPage].
  * @param cloudAvailable Whether to apply cloud available.
  * @param store Store supplied to [FitnessCoachPage].
- * @param history Collection of history values to process.
  * @param dataLoading Whether to apply data loading.
  * @param onGoalsSaved Callback invoked when goals saved changes or occurs.
  */
@@ -60,12 +51,11 @@ internal fun FitnessCoachPage(
     accountId: String,
     cloudAvailable: Boolean,
     store: FitnessStore,
-    history: List<FitnessHistoryDay>,
     dataLoading: Boolean,
     onGoalsSaved: (FitnessSnapshot) -> Unit,
 ) {
     val coachClient = remember(accountId) { FitnessCoachClient(accountId) }
-    FitnessCoachPage(accountId, cloudAvailable, store, history, dataLoading, coachClient, onGoalsSaved)
+    FitnessCoachPage(accountId, cloudAvailable, store, dataLoading, coachClient, onGoalsSaved)
 }
 
 /**
@@ -74,7 +64,6 @@ internal fun FitnessCoachPage(
  * @param accountId Account ID supplied to [FitnessCoachPage].
  * @param cloudAvailable Whether to apply cloud available.
  * @param store Store supplied to [FitnessCoachPage].
- * @param history Collection of history values to process.
  * @param dataLoading Whether to apply data loading.
  * @param client Client supplied to [FitnessCoachPage].
  * @param onGoalsSaved Callback invoked when goals saved changes or occurs.
@@ -84,7 +73,6 @@ internal fun FitnessCoachPage(
     accountId: String,
     cloudAvailable: Boolean,
     store: FitnessStore,
-    history: List<FitnessHistoryDay>,
     dataLoading: Boolean,
     client: FitnessCoachService,
     onGoalsSaved: (FitnessSnapshot) -> Unit,
@@ -221,6 +209,7 @@ internal fun FitnessCoachPage(
         proposed = emptyMap()
         scope.launch {
             try {
+                val history = withContext(Dispatchers.IO) { store.coachHistory() }
                 val response = client.send(message, previousTurns, before, history)
                 withContext(Dispatchers.IO + NonCancellable) { chatHistory.append(message, response.text) }
                 draft = ""
@@ -258,24 +247,25 @@ internal fun FitnessCoachPage(
 
     val savedTurns = turns
     if (active && savedTurns != null && !dataLoading) {
-        FitnessCoachChat(
-            turns = savedTurns,
-            pendingMessage = pendingMessage,
-            draft = if (pendingMessage == null) draft else "",
-            onDraftChange = { draft = it.take(1200) },
-            onSend = ::send,
-            onSettings = { showSettings = true },
-            billingBusy = billingBusy,
-            error = error,
-            appliedGoals = appliedGoals,
-            proposed = proposed,
-            onApplyGoals = {
-                if (membership?.active == true && !billingBusy) {
-                    appliedGoals = appliedGoals + saveGoals(proposed)
-                    proposed = emptyMap()
-                }
-            },
-        )
+        FitnessCoachFrame(onSettings = { showSettings = true }) {
+            FitnessCoachChat(
+                turns = savedTurns,
+                pendingMessage = pendingMessage,
+                draft = if (pendingMessage == null) draft else "",
+                onDraftChange = { draft = it.take(1200) },
+                onSend = ::send,
+                billingBusy = billingBusy,
+                error = error,
+                appliedGoals = appliedGoals,
+                proposed = proposed,
+                onApplyGoals = {
+                    if (membership?.active == true && !billingBusy) {
+                        appliedGoals = appliedGoals + saveGoals(proposed)
+                        proposed = emptyMap()
+                    }
+                },
+            )
+        }
         if (showSettings) {
             FitnessCoachSettings(
                 autoGoals = autoGoals,
@@ -295,219 +285,41 @@ internal fun FitnessCoachPage(
         return
     }
 
-    Column(
-        Modifier.fillMaxSize().navigationBarsPadding().imePadding()
-            .verticalScroll(rememberScrollState()).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.fitness_coach_title),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        when {
-            !cloudAvailable -> FitnessCoachLocked(
-                message = stringResource(R.string.fitness_coach_sign_in),
-            )
-            billingBusy && membership == null -> LoadingSkeleton(SkeletonLayout.Form)
-            active && historyFailed -> {
-                Text(stringResource(R.string.fitness_coach_history_error), color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { historyAttempt++ }) { Text(stringResource(R.string.retry)) }
-            }
-            active -> LoadingSkeleton(SkeletonLayout.Form)
-            else -> FitnessCoachLocked(message = stringResource(R.string.fitness_coach_offer)) {
-                if (membership != null) Button(
-                    onClick = { runBilling("paymentSheet") },
-                    enabled = !billingBusy && !paymentOpen,
-                ) {
-                    Text(stringResource(R.string.fitness_coach_subscribe))
-                }
-            }
-        }
-        if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (membership?.canManage == true) TextButton(onClick = { runBilling("portal") }, enabled = !billingBusy) {
-            Text(stringResource(R.string.fitness_coach_manage))
-        }
-        if (cloudAvailable && membership?.active != true) {
-            TextButton(onClick = { runBilling("status") }, enabled = !billingBusy) {
-                Text(stringResource(R.string.fitness_coach_refresh))
-            }
-        }
-        error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-    }
-}
-
-/**
- * Composes the fitness coach chat UI element.
- *
- * @param turns Collection of turns values to process.
- * @param pendingMessage Optional pending message supplied to [FitnessCoachChat].
- * @param draft Draft supplied to [FitnessCoachChat].
- * @param onDraftChange Callback invoked when draft change changes or occurs.
- * @param onSend Callback invoked when send changes or occurs.
- * @param onSettings Callback invoked when settings changes or occurs.
- * @param billingBusy Whether to apply billing busy.
- * @param error Throwable or error message describing a failure, or null when not provided.
- * @param appliedGoals Key-value mapping of applied goals entries.
- * @param proposed Key-value mapping of proposed entries.
- * @param onApplyGoals Callback invoked when apply goals changes or occurs.
- */
-@Composable
-private fun FitnessCoachChat(
-    turns: List<CoachTurn>,
-    pendingMessage: String?,
-    draft: String,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onSettings: () -> Unit,
-    billingBusy: Boolean,
-    error: Int?,
-    appliedGoals: Map<String, Int>,
-    proposed: Map<String, Int>,
-    onApplyGoals: () -> Unit,
-) {
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = turns.lastIndex.coerceAtLeast(0))
-    val empty = turns.isEmpty() && pendingMessage == null
-    val colors = MaterialTheme.colorScheme
-    LaunchedEffect(turns, pendingMessage, proposed, appliedGoals) {
-        val last = turns.size + (if (pendingMessage != null) 2 else 0) +
-            (if (appliedGoals.isNotEmpty()) 1 else 0) + (if (proposed.isNotEmpty()) 1 else 0) - 1
-        if (last >= 0) list.animateScrollToItem(last)
-    }
-    Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    FitnessCoachFrame {
+        Column(
+            Modifier.fillMaxSize().navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.fitness_coach_title),
-                modifier = Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.titleLarge,
-            )
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Outlined.Settings, stringResource(R.string.fitness_coach_settings))
-            }
-        }
-        if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (empty) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(
-                    Modifier.padding(horizontal = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = colors.primaryContainer) {
-                        Icon(Icons.Outlined.AutoAwesome, null, Modifier.padding(16.dp), tint = colors.primary)
-                    }
-                    Text(
-                        stringResource(R.string.fitness_coach_question),
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                state = list,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(turns) { turn ->
-                    CoachBubble(turn.role == "user") { Text(turn.text) }
-                }
-                if (pendingMessage != null) {
-                    item { CoachBubble(fromUser = true) { Text(pendingMessage) } }
-                    item {
-                        CoachBubble(fromUser = false) {
-                            Row(
-                                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Text(stringResource(R.string.fitness_coach_thinking))
-                            }
-                        }
-                    }
-                }
-                if (appliedGoals.isNotEmpty()) {
-                    item { CoachGoalsCard(R.string.fitness_coach_goals_saved, appliedGoals) }
-                }
-                if (proposed.isNotEmpty()) {
-                    item { CoachGoalsCard(R.string.fitness_coach_review, proposed, onApplyGoals, enabled = !billingBusy) }
-                }
-            }
-        }
-        HorizontalDivider(color = colors.outlineVariant)
-        Surface(color = colors.surfaceContainerLowest) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                error?.let {
-                    Text(
-                        stringResource(it),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                        color = colors.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        modifier = Modifier.weight(1f),
-                        label = { Text(stringResource(R.string.message)) },
-                        shape = RoundedCornerShape(24.dp),
-                        readOnly = pendingMessage != null,
-                        maxLines = 4,
-                    )
-                    FilledIconButton(
-                        onClick = onSend,
-                        enabled = pendingMessage == null && !billingBusy && draft.isNotBlank(),
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.fitness_coach_send))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Composes the coach bubble UI element.
- *
- * @param fromUser Whether to apply from user.
- * @param content Composable content lambda rendered inside this container.
- */
-@Composable
-private fun CoachBubble(fromUser: Boolean, content: @Composable () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth(if (fromUser) 0.82f else 0.94f),
-            shape = RoundedCornerShape(
-                topStart = 20.dp, topEnd = 20.dp,
-                bottomStart = if (fromUser) 20.dp else 6.dp,
-                bottomEnd = if (fromUser) 6.dp else 20.dp,
-            ),
-            color = if (fromUser) colors.primary else colors.surfaceContainerHigh,
-            contentColor = if (fromUser) colors.onPrimary else colors.onSurface,
-        ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Text(
-                    stringResource(if (fromUser) R.string.fitness_coach_you else R.string.fitness_coach_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(bottom = 4.dp),
+            when {
+                !cloudAvailable -> FitnessCoachLocked(
+                    message = stringResource(R.string.fitness_coach_sign_in),
                 )
-                ProvideTextStyle(MaterialTheme.typography.bodyMedium, content)
+                billingBusy && membership == null -> LoadingSkeleton(SkeletonLayout.Form)
+                active && historyFailed -> {
+                    Text(stringResource(R.string.fitness_coach_history_error), color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { historyAttempt++ }) { Text(stringResource(R.string.retry)) }
+                }
+                active -> LoadingSkeleton(SkeletonLayout.Form)
+                else -> FitnessCoachLocked(message = stringResource(R.string.fitness_coach_offer)) {
+                    if (membership != null) Button(
+                        onClick = { runBilling("paymentSheet") },
+                        enabled = !billingBusy && !paymentOpen,
+                    ) {
+                        Text(stringResource(R.string.fitness_coach_subscribe))
+                    }
+                }
             }
+            if (billingBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (membership?.canManage == true) TextButton(onClick = { runBilling("portal") }, enabled = !billingBusy) {
+                Text(stringResource(R.string.fitness_coach_manage))
+            }
+            if (cloudAvailable && membership?.active != true) {
+                TextButton(onClick = { runBilling("status") }, enabled = !billingBusy) {
+                    Text(stringResource(R.string.fitness_coach_refresh))
+                }
+            }
+            error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         }
     }
 }
@@ -521,7 +333,7 @@ private fun CoachBubble(fromUser: Boolean, content: @Composable () -> Unit) {
  * @param enabled Whether this feature or control is currently enabled.
  */
 @Composable
-private fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() -> Unit)? = null, enabled: Boolean = true) {
+internal fun CoachGoalsCard(title: Int, goals: Map<String, Int>, onApply: (() -> Unit)? = null, enabled: Boolean = true) {
     OutlinedCard(Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(stringResource(title), style = MaterialTheme.typography.titleSmall)

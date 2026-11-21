@@ -13,6 +13,15 @@ internal data class CoachReply(val text: String, val goals: Map<String, Int>)
 internal data class CoachMembership(val active: Boolean, val canManage: Boolean)
 internal data class CoachPayment(val publishableKey: String, val clientSecret: String)
 
+internal const val FITNESS_COACH_HISTORY_DAYS = 14
+
+internal data class FitnessCoachDay(
+    val date: LocalDate,
+    val steps: Int?,
+    val nutrition: NutritionTotals?,
+    val foodNames: List<String>,
+)
+
 internal interface FitnessCoachService {
     /**
      * Returns the membership.
@@ -45,7 +54,7 @@ internal interface FitnessCoachService {
         text: String,
         turns: List<CoachTurn>,
         profile: FitnessProfile,
-        history: List<FitnessHistoryDay>,
+        history: List<FitnessCoachDay>,
     ): CoachReply
 }
 
@@ -119,15 +128,24 @@ internal class FitnessCoachClient(
         text: String,
         turns: List<CoachTurn>,
         profile: FitnessProfile,
-        history: List<FitnessHistoryDay>,
+        history: List<FitnessCoachDay>,
     ): CoachReply {
         val data = call("fitnessAiCoach", mapOf(
             "message" to text,
             "conversation" to turns.takeLast(4).map { mapOf("role" to it.role, "text" to it.text) },
             "goals" to coachGoals(profile),
-            "history" to history.takeLast(14).map {
-                mapOf("date" to it.date.toString(), "steps" to it.steps, "calories" to it.caloriesEaten,
-                    "protein" to it.proteinGrams, "carbohydrates" to it.carbohydrateGrams, "fat" to it.fatGrams)
+            "history" to history.takeLast(FITNESS_COACH_HISTORY_DAYS).map { day ->
+                buildMap {
+                    put("date", day.date.toString())
+                    day.steps?.let { put("steps", it) }
+                    day.nutrition?.let {
+                        put("calories", it.calories)
+                        put("protein", it.proteinGrams)
+                        put("carbohydrates", it.carbohydrateGrams)
+                        put("fat", it.fatGrams)
+                    }
+                    if (day.foodNames.isNotEmpty()) put("foodNames", day.foodNames)
+                }
             },
         ))
         val goals = (data["goals"] as? Map<*, *>)?.entries.orEmpty().mapNotNull { (key, value) ->

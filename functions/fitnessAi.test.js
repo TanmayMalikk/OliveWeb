@@ -10,9 +10,10 @@ test("coach payload accepts only cover aggregate fields and bounds conversation 
     emergencyContacts: ["fixture"],
     profile: {name: "Fixture Account"},
     goals: {steps: 7500, calories: 2200, waterMl: -10, weightKg: 80},
-    history: Array.from({length: 18}, (_, n) => ({
-      date: "2026-11-" + (n + 1).toString().padStart(2, "0"),
+    history: Array.from({length: 16}, (_, n) => ({
+      date: new Date(Date.UTC(2026, 0, n + 1)).toISOString().slice(0, 10),
       steps: 5000, calories: 1900, location: "fixture", heartRate: 60,
+      foodNames: n === 2 ? [" Oats ", "Oats", "", {note: "private"}] : undefined,
     })),
     conversation: Array.from({length: 10}, (_, index) => ({
       role: "user", text: index === 9 ? "x".repeat(599) + "🌿" : `Turn ${index}`, private: true,
@@ -21,13 +22,14 @@ test("coach payload accepts only cover aggregate fields and bounds conversation 
   assert.deepEqual(Object.keys(input), ["message", "conversation", "history", "goals"]);
   assert.deepEqual(input.goals, {steps: 7500, calories: 2200});
   assert.equal(input.history.length, 14);
-  assert.deepEqual(input.history[0], {date: "2026-11-05", steps: 5000, calories: 1900});
+  assert.deepEqual(input.history[0], {date: "2026-01-03", steps: 5000, calories: 1900, foodNames: ["Oats"]});
   assert.equal(input.conversation.length, 4);
   assert.deepEqual(input.conversation[0], {role: "user", text: "Turn 6"});
   assert.equal(input.conversation.at(-1).text, "x".repeat(599));
   const compact = modelInput(input);
-  assert.deepEqual(compact.historyColumns, ["date", "steps", "calories", "protein", "carbohydrates", "fat"]);
-  assert.deepEqual(compact.history[0], ["2026-11-05", 5000, 1900, null, null, null]);
+  assert.deepEqual(compact.historyColumns, ["date", "steps", "calories", "protein", "carbohydrates", "fat", "foodNames"]);
+  assert.deepEqual(compact.history[0], ["2026-01-03", 5000, 1900, null, null, null, ["Oats"]]);
+  assert.equal(compact.history[1].at(-1), null);
   assert.ok(JSON.stringify(compact).length < JSON.stringify(input).length);
 });
 

@@ -291,6 +291,12 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
             })) }
     }
 
+    /** Stores the server-confirmed availability without replacing the consultation list. */
+    fun setAvailability(uid: String, available: Boolean) {
+        requireUid(uid)
+        vault.update { root -> root.child(ACCOUNTS).child(uid).put(AVAILABLE, available) }
+    }
+
     /**
      * Computes replace shared.
      *

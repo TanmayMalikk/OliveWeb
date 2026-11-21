@@ -37,6 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
+    private val pendingArchiveWrites = mutableSetOf<Pair<String, String>>()
     private var keySubscription: ChatSubscription? = null
     private val observedKeys = mutableMapOf<String, String>()
     private var keyParticipants = emptyMap<String, String>()
@@ -534,46 +535,47 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
      *
      * @param conversation The chat to move between the active and archived lists.
      * @param archived True to archive the chat, or false to restore it to the active list.
+     * @param onSaved Runs after the device saves the requested state for the active account.
      */
-    fun setArchived(conversation: ChatConversation, archived: Boolean) {
+    fun setArchived(conversation: ChatConversation, archived: Boolean, onSaved: () -> Unit = {}) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
             if (uid !in conversation.participantIds) return
-            if (conversation.closedAt > 0L) {
-                val previous = state.restoredClosedConversationIds
-                state.restoredClosedConversationIds = if (archived) {
-                    previous - conversation.id
+            val id = conversation.id
+            val closed = conversation.closedAt > 0L
+            val wasArchived = if (closed) id !in state.restoredClosedConversationIds
+                else id in state.archivedConversationIds
+            val operation = uid to id
+            if (wasArchived == archived || !pendingArchiveWrites.add(operation)) return
+            val archiveEpoch = epoch
+            fun showArchived(value: Boolean) {
+                if (closed) {
+                    val restored = state.restoredClosedConversationIds
+                    state.restoredClosedConversationIds = if (value) restored - id else restored + id
                 } else {
-                    previous + conversation.id
+                    val archivedIds = state.archivedConversationIds
+                    state.archivedConversationIds = if (value) archivedIds + id else archivedIds - id
                 }
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            store.setClosedConversationRestored(uid, conversation.id, !archived)
-                        }
-                    } catch (_: Exception) { // Put the completed chat back where it was if this phone could not save the choice.
-                        state.restoredClosedConversationIds = previous
-                        state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
-                    }
-                }
-                return
             }
-            val previous = state.archivedConversationIds
-            state.archivedConversationIds = if (archived) {
-                previous + conversation.id
-            } else {
-                previous - conversation.id
-            }
+            showArchived(archived)
             scope.launch {
-                // Turn an unexpected set archived failure into a readable message.
                 try {
                     withContext(Dispatchers.IO) {
-                        store.setConversationArchived(uid, conversation.id, archived)
+                        if (closed) store.setClosedConversationRestored(uid, id, !archived)
+                        else store.setConversationArchived(uid, id, archived)
                     }
-                } catch (_: Exception) { // Restore the local archive state because the device could not persist the requested change.
-                    state.archivedConversationIds = previous
-                    state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (epoch == archiveEpoch && enrollment?.uid == uid) {
+                        showArchived(wasArchived)
+                        state.message = application.getString(R.string.unable_to_update_archived_chat)
+                    }
+                    return@launch
+                } finally {
+                    pendingArchiveWrites.remove(operation)
                 }
+                if (epoch == archiveEpoch && enrollment?.uid == uid) onSaved()
             }
         }
     }

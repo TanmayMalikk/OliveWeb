@@ -1,6 +1,5 @@
 package com.olive.app.ui.shared
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
@@ -10,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -23,7 +23,7 @@ import com.olive.app.R
 internal object OlivePrivateLayout {
     val ScreenPadding = 20.dp
     val SectionSpacing = 24.dp
-    val GroupShape = RoundedCornerShape(28.dp)
+    val GroupShape = oliveCorners(32.dp)
     val HeaderActionSize = 50.dp
     val FloatingActionClearance = 88.dp
 }
@@ -76,13 +76,16 @@ internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
 @Composable
 internal fun FloatingQuickExit(onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     val label = stringResource(R.string.a11y_quick_exit)
-    val shape = MaterialTheme.shapes.large
+    val shape = OlivePill
+    val source = rememberOliveInteraction()
     ExtendedFloatingActionButton(
         onClick = onClick,
-        modifier = modifier.border(1.dp, SageGreen, shape)
+        modifier = modifier.olivePress(source).border(1.dp, SageGreen, shape)
             .testTag("quick_exit").semantics { contentDescription = label },
         expanded = !compact,
         shape = shape,
+        interactionSource = source,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp, pressedElevation = 1.dp),
         containerColor = OliveGreen,
         contentColor = Paper,
         icon = { Icon(Icons.Outlined.Close, contentDescription = null) },

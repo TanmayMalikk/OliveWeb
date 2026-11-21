@@ -70,7 +70,7 @@ class AccessibilityReviewUiTest {
             override suspend fun lookupBarcode(barcode: String) = FoodSearchResult()
         }
         compose.setContent { OliveTheme {
-            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _ -> }, source, FitnessFoodLibrary(store.preferences))
+            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _, _ -> }, source, FitnessFoodLibrary(store.preferences))
         } }
         compose.onNodeWithTag("food_library_Search").assertIsDisplayed().assertIsFocused().assertHasClickAction()
     }

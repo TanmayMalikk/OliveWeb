@@ -27,17 +27,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class SessionHistoryRefreshTest {
     @Test
-    fun newsBookmarksAreRestoredForOnlyTheEnrolledAccountAndToggleByLink() = runBlocking<Unit> {
+    fun newsBookmarksAreRestoredForOnlyTheEnrolledAccountAndSetByLink() = runBlocking<Unit> {
         SessionRuntimeFixture().use { fixture ->
             val runtime = fixture.runtime
             val cover = SessionCoverState(runtime)
             val story = NewsArticle("Synthetic news", "Fixture summary", "https://example.invalid/story", "Fixture", "")
             val existing = story.copy(title = "Another account", link = "https://example.invalid/another")
             runtime.coverStore.saveNews("other", listOf(existing))
-            cover.toggleNewsBookmark(story)
+            cover.setNewsBookmark(story, bookmarked = true)
+            cover.setNewsBookmark(story, bookmarked = true)
             assertEquals(listOf(story), runtime.state.savedNews)
             fixture.await { runtime.coverStore.restore("owner") == listOf(story) }
-            cover.toggleNewsBookmark(story.copy(title = "An updated headline"))
+            cover.setNewsBookmark(story.copy(title = "An updated headline"), bookmarked = false)
             assertTrue(runtime.state.savedNews.isEmpty())
             fixture.await { runtime.coverStore.restore("owner").isEmpty() }
 
@@ -46,7 +47,7 @@ class SessionHistoryRefreshTest {
             assertEquals(listOf(existing), runtime.state.savedNews)
             assertTrue(runtime.coverStore.restore("owner").isEmpty())
             runtime.enrollment = null
-            cover.toggleNewsBookmark(story)
+            cover.setNewsBookmark(story, bookmarked = true)
             assertEquals(listOf(existing), runtime.state.savedNews)
         }
     }

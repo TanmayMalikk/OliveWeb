@@ -2,6 +2,9 @@
 package com.olive.app.ui.users.user.location
 
 
+import com.olive.app.ui.shared.OliveSmallFloatingActionButton as SmallFloatingActionButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.annotation.SuppressLint
 import android.webkit.JavascriptInterface
 import android.graphics.Color
@@ -38,11 +41,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

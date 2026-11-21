@@ -1,6 +1,11 @@
 // All safe-app roles: shows friends, direct messages, and staff support chats.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import androidx.compose.ui.semantics.heading
@@ -8,7 +13,6 @@ import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -139,8 +143,10 @@ internal fun MessagesScreen(
             modifier = Modifier.fillMaxSize(),
         )
         else {
-            BackHandler { session.messages.closeConversation() }
-            ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
+            val back = rememberOliveBack(onBack = session.messages::closeConversation)
+            OliveRouteEntrance(active.id, back) {
+                ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -197,6 +203,7 @@ private fun MessagingSidebar(
     modifier: Modifier = Modifier,
 ) {
     val uiText = rememberResourceText()
+    val offerUndo = LocalOliveUndo.current
     val messaging by session.messages.state.collectAsState()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
@@ -429,14 +436,17 @@ private fun MessagingSidebar(
                     // Staff closing a ticket archives the same chat for every participant.
                     session.messages.closeSupportChat(conversation.id)
                 } else {
-                    session.messages.setConversationArchived(
+                    val archive = !isConversationArchived(
                         conversation,
-                        !isConversationArchived(
-                            conversation,
-                            session.messages.archivedConversationIds,
-                            session.messages.restoredClosedConversationIds,
-                        ),
+                        session.messages.archivedConversationIds,
+                        session.messages.restoredClosedConversationIds,
                     )
+                    session.messages.setConversationArchived(conversation, archive) {
+                        val message = if (archive) R.string.undo_chat_archived else R.string.undo_chat_restored
+                        offerUndo(uiText(message)) {
+                            session.messages.setConversationArchived(conversation, !archive)
+                        }
+                    }
                 }
                 conversationActions = null
             },

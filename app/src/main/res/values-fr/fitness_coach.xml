@@ -6,11 +6,12 @@
     <string name="fitness_coach_reply_error">Impossible d’obtenir une réponse. Réessayez.</string>
     <string name="fitness_coach_limit">Le coach a atteint une limite. Réessayez plus tard.</string>
     <string name="fitness_coach_subscription_required">Un abonnement actif au coach fitness est requis.</string>
-    <string name="fitness_coach_privacy">Lorsque vous envoyez un message, le coach utilise cette discussion, vos objectifs et jusqu’à 14 jours de données d’activité et de nutrition.</string>
+    <string name="fitness_coach_privacy">Lorsque vous envoyez un message, l’IA reçoit les échanges récents, vos objectifs et jusqu’à 14 jours de pas, de totaux nutritionnels et de noms d’aliments enregistrés.</string>
     <string name="fitness_coach_you">Vous</string>
     <string name="fitness_coach_review">Objectifs quotidiens suggérés</string>
     <string name="fitness_coach_apply">Appliquer les objectifs suggérés</string>
-    <string name="fitness_coach_question">Posez une question sur vos tendances ou objectifs</string>
+    <string name="fitness_coach_question">Demandez un programme d’entraînement, des idées de repas ou de l’aide pour vos objectifs</string>
+    <string name="fitness_coach_disclaimer">Le coach utilise une IA qui peut se tromper. Il ne remplace pas un spécialiste de la forme physique ou de la nutrition.</string>
     <string name="fitness_coach_thinking">Réflexion…</string>
     <string name="fitness_coach_send">Envoyer</string>
     <string name="fitness_coach_offer">5,99 $ CA par semaine. Renouvellement hebdomadaire jusqu’à résiliation. Paiement sécurisé avec Stripe.</string>
@@ -31,4 +32,6 @@
     <string name="fitness_coach_settings">Paramètres du coach</string>
     <string name="fitness_coach_history_error">Impossible de charger votre historique de discussion.</string>
     <string name="fitness_coach_goals_saved">Objectifs enregistrés</string>
+    <string name="fitness_coach_prompt_workout">Propose-moi un programme d’entraînement</string>
+    <string name="fitness_coach_prompt_meals">Donne-moi des idées de repas</string>
 </resources>

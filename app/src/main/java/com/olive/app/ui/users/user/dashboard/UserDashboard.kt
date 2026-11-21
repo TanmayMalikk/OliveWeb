@@ -1,6 +1,11 @@
 // Safe-app users: shows the user’s main safe-app actions.
 package com.olive.app.ui.users.user.dashboard
 
+import com.olive.app.ui.shared.OliveFloatingActionButton as FloatingActionButton
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -110,7 +115,6 @@ private fun StaffHelpScreen(session: SessionViewModel) {
         session.navigation.openSafePage(SafePage.Messages)
         session.messages.openConversation(chat)
     }
-    BackHandler { session.navigation.back() }
     FormColumn {
         IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("staff_help_back")) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ui_previous_safe_page))
@@ -630,7 +634,7 @@ private fun SafeFeatureCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.testTag(feature.tag).semantics { role = Role.Button },

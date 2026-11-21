@@ -6,11 +6,12 @@
     <string name="fitness_coach_reply_error">Could not get a reply. Try again.</string>
     <string name="fitness_coach_limit">The coach reached a usage limit. Try again later.</string>
     <string name="fitness_coach_subscription_required">An active Fitness Coach subscription is required.</string>
-    <string name="fitness_coach_privacy">When you send a message, the coach uses this chat, your goals, and up to 14 days of fitness totals.</string>
+    <string name="fitness_coach_privacy">When you send a message, the AI receives recent chat, your fitness goals, and up to 14 days of steps, nutrition totals, and selected logged food names.</string>
     <string name="fitness_coach_you">You</string>
     <string name="fitness_coach_review">Suggested daily goals</string>
     <string name="fitness_coach_apply">Apply suggested goals</string>
-    <string name="fitness_coach_question">Ask about your fitness trends or goals</string>
+    <string name="fitness_coach_question">Ask for a workout plan, meal ideas, or help with your goals</string>
+    <string name="fitness_coach_disclaimer">Fitness Coach is AI, can make mistakes, and isn’t a fitness or nutrition expert.</string>
     <string name="fitness_coach_thinking">Thinking…</string>
     <string name="fitness_coach_send">Send</string>
     <string name="fitness_coach_offer">CAD $5.99 per week. Renews weekly until canceled. Pay securely with Stripe.</string>
@@ -31,4 +32,6 @@
     <string name="fitness_coach_settings">Coach settings</string>
     <string name="fitness_coach_history_error">Could not load your chat history.</string>
     <string name="fitness_coach_goals_saved">Goals saved</string>
+    <string name="fitness_coach_prompt_workout">Make me a workout plan</string>
+    <string name="fitness_coach_prompt_meals">Give me meal ideas</string>
 </resources>

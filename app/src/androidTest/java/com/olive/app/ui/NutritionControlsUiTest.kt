@@ -17,7 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityOptionsCompat
 import androidx.test.platform.app.InstrumentationRegistry
@@ -121,7 +121,7 @@ class NutritionControlsUiTest {
     }
 
     @Test fun foodEntryModesShareOneRowAndBarcodeHasCamera() {
-        compose.setContent { OliveTheme { FoodSearchPage(true, PaddingValues(0.dp), { _, _, _ -> }) } }
+        compose.setContent { OliveTheme { FoodSearchPage(true, PaddingValues(0.dp), { _, _, _, _ -> }) } }
         compose.onNodeWithTag("nutrition_manual_entry").assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.nutrition_all_foods)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.nutrition_generic)).assertDoesNotExist()
@@ -188,6 +188,16 @@ class NutritionControlsUiTest {
         compose.onNodeWithContentDescription(context.getString(R.string.fitness_diary_add_volume, 500)).performClick()
         compose.onNodeWithText(context.getString(R.string.save)).performClick()
         compose.runOnIdle { assertEquals(500, amount) }
+    }
+
+    @Test fun swipingDownClosesWaterSheetWithoutSaving() {
+        var saved = false
+        compose.setContent { OliveTheme { WaterTracker(500, 2000, true, { _, _ -> saved = true }) } }
+        compose.onNodeWithContentDescription(context.getString(R.string.nutrition_water_progress, 500, 2000)).performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.fitness_diary_add_volume, 500)).performClick()
+        compose.onNodeWithTag("fitness_water_sheet").performTouchInput { swipeDown(startY = 4.dp.toPx()) }
+        compose.onNodeWithTag("fitness_water_sheet").assertDoesNotExist()
+        compose.runOnIdle { assertFalse(saved) }
     }
 
     @Test fun labelPhotoOcrReadsSyntheticNutritionValues() = runBlocking {

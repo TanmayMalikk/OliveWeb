@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.withTimeout
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -213,24 +214,32 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Switches news bookmark on or off.
+     * Sets the bookmark state for one news article.
      *
-     * @param article Article supplied to [toggleNewsBookmark].
+     * @param article The article to bookmark or remove.
+     * @param bookmarked The requested bookmark state.
      */
-    fun toggleNewsBookmark(article: NewsArticle) {
+    fun setNewsBookmark(article: NewsArticle, bookmarked: Boolean) {
         with(runtime) {
             with(state) {
                 val uid = enrollment?.uid ?: return
-                savedNews =
-                    if (savedNews.any { it.link == article.link }) savedNews.filterNot { it.link == article.link }
-                    else (listOf(article) + savedNews).take(100)
+                val previous = savedNews
+                if (previous.any { it.link == article.link } == bookmarked) return
+                savedNews = if (bookmarked) (listOf(article) + previous).take(100)
+                    else previous.filterNot { it.link == article.link }
                 val latest = savedNews
                 val revision = (newsRevisions[uid] ?: 0L) + 1L
                 newsRevisions[uid] = revision
                 scope.launch {
                     coverSaveMutex.withLock {
                         if (newsRevisions[uid] != revision) return@withLock
-                        withContext(Dispatchers.IO) { coverStore.saveNews(uid, latest) }
+                        try {
+                            withContext(Dispatchers.IO) { coverStore.saveNews(uid, latest) }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            if (enrollment?.uid == uid && newsRevisions[uid] == revision) savedNews = previous
+                        }
                     }
                 }
             }
@@ -255,6 +264,7 @@ internal class StaffSupportController(
     repositoryFactory: () -> SupportRepository = { SupportRepository() },
 ) {
     private val repository by lazy(repositoryFactory)
+    private var pendingRequest: Pair<String, String>? = null
     private val uiStateFlow = MutableStateFlow(StaffSupportUiState())
     val uiState: StateFlow<StaffSupportUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
@@ -308,8 +318,13 @@ internal class StaffSupportController(
         }
         if (runtime.state.accountRole != AccountRole.USER) return
         val actor = runtime.coverAccountId ?: return
+        val requestEpoch = runtime.epoch
         val ticketToCancel = conversationId
+        val requestKey = if (cancel) "" else {
+            pendingRequest?.takeIf { it.first == actor }?.second ?: UUID.randomUUID().toString()
+        }
         if (!cancel) {
+            pendingRequest = actor to requestKey
             // Clear the last ticket before searching so this screen cannot reopen an older chat.
             requested = false
             staffUid = ""
@@ -322,10 +337,11 @@ internal class StaffSupportController(
             try {
                 val ticket = withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
-                        if (cancel) repository.cancelRequest(ticketToCancel) else repository.requestHelp()
+                        if (cancel) repository.cancelRequest(ticketToCancel) else repository.requestHelp(requestKey)
                     }
                 }
-                if (runtime.coverAccountId == actor) {
+                if (!cancel && pendingRequest == (actor to requestKey)) pendingRequest = null
+                if (runtime.coverAccountId == actor && runtime.epoch == requestEpoch) {
                     requested = ticket.requested
                     staffUid = ticket.staffUid
                     conversationId = ticket.conversationId

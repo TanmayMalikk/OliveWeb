@@ -1,6 +1,11 @@
 // Staff: shows assigned users and support tickets.
 package com.olive.app.ui.users.staff
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.organization.OrganizationSettings
@@ -8,7 +13,6 @@ import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.shared.organization.OrganizationMap
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -52,29 +56,31 @@ private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 internal fun StaffPortal(session: SessionViewModel) {
     LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
     var page by remember { mutableStateOf(StaffPage.Dashboard) }
-    BackHandler(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
-    // Opens the selected staff dashboard section.
-    when (page) {
-        StaffPage.Dashboard -> StaffDashboard(
-            session,
-            onSettings = { page = StaffPage.Settings },
-            onSafetyPlans = { page = StaffPage.SafetyPlans },
-            onMessages = { page = StaffPage.Messages },
-            onMap = { page = StaffPage.Map },
-        )
-        StaffPage.Settings -> OrganizationSettings(
-            session,
-            onBack = { page = StaffPage.Dashboard },
-        )
-        StaffPage.SafetyPlans -> SafetyConsultations(
-            session,
-            onBack = { page = StaffPage.Dashboard },
-        )
-        StaffPage.Messages -> {
-            LaunchedEffect(Unit) { session.messages.ensureMessagingObservation() }
-            MessagesScreen(session, exit = { page = StaffPage.Dashboard })
+    val back = rememberOliveBack(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
+    OliveRouteEntrance(page, back) {
+        // Opens the selected staff dashboard section.
+        when (page) {
+            StaffPage.Dashboard -> StaffDashboard(
+                session,
+                onSettings = { page = StaffPage.Settings },
+                onSafetyPlans = { page = StaffPage.SafetyPlans },
+                onMessages = { page = StaffPage.Messages },
+                onMap = { page = StaffPage.Map },
+            )
+            StaffPage.Settings -> OrganizationSettings(
+                session,
+                onBack = { page = StaffPage.Dashboard },
+            )
+            StaffPage.SafetyPlans -> SafetyConsultations(
+                session,
+                onBack = { page = StaffPage.Dashboard },
+            )
+            StaffPage.Messages -> {
+                LaunchedEffect(Unit) { session.messages.ensureMessagingObservation() }
+                MessagesScreen(session, exit = { page = StaffPage.Dashboard })
+            }
+            StaffPage.Map -> OrganizationMap(session, onBack = { page = StaffPage.Dashboard })
         }
-        StaffPage.Map -> OrganizationMap(session, onBack = { page = StaffPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
@@ -169,21 +175,23 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     DisposableEffect(session.coverAccountId) {
         onDispose { controller.close(preserveAdminIndex = session.accountRole == AccountRole.ADMIN) }
     }
-    BackHandler { if (selected != null) selected = null else onBack() }
+    val back = rememberOliveBack(enabled = selected != null) { selected = null }
     val plan = selected
     if (plan != null) {
         val ticketLabel = if (plan.ticketNumber >= 0L) "Consult Ticket #${plan.ticketNumber}" else "Consult Ticket"
-        SafetyPlanScreen(
-            session = session,
-            ownerUid = plan.ownerUid,
-            ownerName = plan.ownerName,
-            displayOwnerName = ticketLabel,
-            onCompleteConsultation = if (
-                session.accountRole == AccountRole.STAFF &&
-                plan.conversationId.isNotBlank()
-            ) ({ completionTarget = plan }) else null,
-            onBack = { selected = null },
-        )
+        OliveRouteEntrance(plan.ownerUid, back) {
+            SafetyPlanScreen(
+                session = session,
+                ownerUid = plan.ownerUid,
+                ownerName = plan.ownerName,
+                displayOwnerName = ticketLabel,
+                onCompleteConsultation = if (
+                    session.accountRole == AccountRole.STAFF &&
+                    plan.conversationId.isNotBlank()
+                ) ({ completionTarget = plan }) else null,
+                onBack = { selected = null },
+            )
+        }
         completionTarget?.let { target ->
             AlertDialog(
                 onDismissRequest = { completionTarget = null },
@@ -229,7 +237,12 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         if (session.accountRole == AccountRole.STAFF) {
             val availabilityLabel = stringResource(R.string.safety_available)
             Row(Modifier.fillMaxWidth().testTag("safety_staff_available")
-                .toggleable(value = controller.available, role = Role.Switch, onValueChange = controller::changeAvailability)
+                .toggleable(
+                    value = controller.available,
+                    enabled = !controller.savingAvailability,
+                    role = Role.Switch,
+                    onValueChange = controller::changeAvailability,
+                )
                 .semantics(mergeDescendants = true) { contentDescription = availabilityLabel },
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(availabilityLabel, Modifier.weight(1f).clearAndSetSemantics { })
