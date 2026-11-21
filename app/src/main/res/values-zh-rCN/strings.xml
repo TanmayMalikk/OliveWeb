@@ -475,6 +475,8 @@
     <string name="passkey_recovery_list_unavailable">无法检查恢复通行密钥。请连接互联网并重新打开设置。</string>
     <string name="passkey_recovery_remove_confirm_title">要移除此恢复通行密钥吗？</string>
     <string name="passkey_recovery_remove_confirm_help">此通行密钥将无法再恢复您的加密密钥。其他已注册的恢复通行密钥不会更改。</string>
+    <string name="passkey_recovery_remove_last_title">保留此恢复通行密钥</string>
+    <string name="passkey_recovery_remove_last_help">这是您最后一个恢复通行密钥。请先添加另一个恢复通行密钥再移除它，否则您可能会永久失去在新设备上访问加密数据的权限。</string>
     <string name="voice_message">语音消息</string>
     <string name="voice_record">录制语音消息</string>
     <string name="voice_recording">正在录音</string>

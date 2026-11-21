@@ -490,6 +490,8 @@
     <string name="passkey_recovery_list_unavailable">تعذر التحقق من مفاتيح مرور الاسترداد. اتصل بالإنترنت ثم أعد فتح الإعدادات.</string>
     <string name="passkey_recovery_remove_confirm_title">هل تريد إزالة مفتاح مرور الاسترداد هذا؟</string>
     <string name="passkey_recovery_remove_confirm_help">لن يتمكن مفتاح المرور هذا من استعادة مفتاح التشفير بعد الآن. لن تتغير مفاتيح مرور الاسترداد الأخرى المسجلة.</string>
+    <string name="passkey_recovery_remove_last_title">احتفظ بمفتاح مرور الاسترداد هذا</string>
+    <string name="passkey_recovery_remove_last_help">هذا هو مفتاح مرور الاسترداد الأخير لديك. أضف مفتاح مرور استرداد آخر قبل إزالته، وإلا فقد تفقد بشكل دائم الوصول إلى البيانات المشفرة على جهاز جديد.</string>
     <string name="voice_message">رسالة صوتية</string>
     <string name="voice_record">تسجيل رسالة صوتية</string>
     <string name="voice_recording">جارٍ التسجيل</string>

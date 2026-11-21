@@ -481,6 +481,8 @@
     <string name="passkey_recovery_list_unavailable">Impossible de vérifier les clés d’accès de récupération. Connectez-vous à Internet et rouvrez les paramètres.</string>
     <string name="passkey_recovery_remove_confirm_title">Supprimer cette clé d’accès de récupération ?</string>
     <string name="passkey_recovery_remove_confirm_help">Cette clé d’accès ne pourra plus restaurer votre clé de chiffrement. Les autres clés d’accès de récupération enregistrées ne sont pas modifiées.</string>
+    <string name="passkey_recovery_remove_last_title">Conservez cette clé de récupération</string>
+    <string name="passkey_recovery_remove_last_help">C’est votre dernière clé de récupération. Ajoutez-en une autre avant de la supprimer, sinon vous pourriez perdre définitivement l’accès aux données chiffrées sur un nouvel appareil.</string>
     <string name="voice_message">Message vocal</string>
     <string name="voice_record">Enregistrer un message vocal</string>
     <string name="voice_recording">Enregistrement</string>
