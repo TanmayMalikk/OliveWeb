@@ -60,7 +60,7 @@ function coachInput(data) {
   if (!message || message.length > 1200) {
     throw new HttpsError("invalid-argument", "Enter a fitness question under 1,200 characters.");
   }
-  const conversation = (Array.isArray(data.conversation) ? data.conversation : []).slice(-4)
+  const conversation = (Array.isArray(data.conversation) ? data.conversation : []).slice(-5)
     .filter((turn) => ["user", "model"].includes(turn?.role) && typeof turn.text === "string")
     .map(({role, text}) => ({role, text: text.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "")}));
   const history = (Array.isArray(data.history) ? data.history : []).slice(-historyDays)

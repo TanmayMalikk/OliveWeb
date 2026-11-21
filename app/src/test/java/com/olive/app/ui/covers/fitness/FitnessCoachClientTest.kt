@@ -61,7 +61,7 @@ class FitnessCoachClientTest {
             val payload = it.getArgument<Map<String, Any>>(0)
             assertEquals(setOf("message", "conversation", "goals", "history"), payload.keys)
             assertEquals("How am I doing?", payload["message"])
-            assertEquals(4, (payload["conversation"] as List<*>).size)
+            assertEquals(5, (payload["conversation"] as List<*>).size)
             val history = payload["history"] as List<*>
             assertEquals(14, history.size)
             assertEquals(mapOf("date" to "2026-01-03", "foodNames" to listOf("Oats")), history.first())

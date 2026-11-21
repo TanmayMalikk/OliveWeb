@@ -132,7 +132,7 @@ internal class FitnessCoachClient(
     ): CoachReply {
         val data = call("fitnessAiCoach", mapOf(
             "message" to text,
-            "conversation" to turns.takeLast(4).map { mapOf("role" to it.role, "text" to it.text) },
+            "conversation" to turns.takeLast(5).map { mapOf("role" to it.role, "text" to it.text) },
             "goals" to coachGoals(profile),
             "history" to history.takeLast(FITNESS_COACH_HISTORY_DAYS).map { day ->
                 buildMap {

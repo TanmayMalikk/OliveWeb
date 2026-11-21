@@ -136,7 +136,6 @@ internal fun FitnessCoachChat(
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
             color = colors.error,
-            maxLines = 1,
         )
         LazyColumn(
             state = list,
@@ -336,7 +335,7 @@ private fun CoachComposer(
  */
 internal fun formatCoachReply(rawText: String): String {
     var text = rawText.trim()
-    val disclaimerRegex = Regex("(?:Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.?|AI can make mistakes[·\\s\\-–]+Not fitness or nutrition advice\\.?)\\s*", RegexOption.IGNORE_CASE)
+    val disclaimerRegex = Regex("(?:Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.?|AI can make mistakes[.\\s·\\-]+(?:Not fitness or nutrition advice|Always stay within your body[’']s limits and consult a professional before starting something new\\.?))\\s*", RegexOption.IGNORE_CASE)
     text = disclaimerRegex.replace(text, "").trim()
 
     val dayWords = "(?:Day\\s+\\d+|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"

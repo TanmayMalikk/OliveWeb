@@ -23,8 +23,8 @@ test("coach payload accepts only cover aggregate fields and bounds conversation 
   assert.deepEqual(input.goals, {steps: 7500, calories: 2200});
   assert.equal(input.history.length, 14);
   assert.deepEqual(input.history[0], {date: "2026-01-03", steps: 5000, calories: 1900, foodNames: ["Oats"]});
-  assert.equal(input.conversation.length, 4);
-  assert.deepEqual(input.conversation[0], {role: "user", text: "Turn 6"});
+  assert.equal(input.conversation.length, 5);
+  assert.deepEqual(input.conversation[0], {role: "user", text: "Turn 5"});
   assert.equal(input.conversation.at(-1).text, "x".repeat(599));
   const compact = modelInput(input);
   assert.deepEqual(compact.historyColumns, ["date", "steps", "calories", "protein", "carbohydrates", "fat", "foodNames"]);
