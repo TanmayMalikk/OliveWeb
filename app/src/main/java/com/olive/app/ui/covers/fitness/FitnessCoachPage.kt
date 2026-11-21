@@ -214,7 +214,7 @@ internal fun FitnessCoachPage(
         scope.launch {
             try {
                 val history = withContext(Dispatchers.IO) { store.coachHistory() }
-                val hint = "\n(Provide specific exercises and routine details or food ideas, not step count suggestions.)"
+                val hint = "\n(Format with each day/meal section separated by blank lines and each exercise/food as a bulleted item starting with • on its own line. Provide specific exercises, sets, and reps or food ideas, not step count suggestions.)"
                 val outgoingMessage = if (isWorkoutOrMealAdvice(message, "") && message.length + hint.length <= 1200) {
                     "$message$hint"
                 } else {

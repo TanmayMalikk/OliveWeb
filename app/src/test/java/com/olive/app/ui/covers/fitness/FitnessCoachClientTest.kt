@@ -86,4 +86,29 @@ class FitnessCoachClientTest {
             verify(billing, times(1)).call(mapOf("action" to "status"))
         }
     }
+
+    @Test fun formatCoachReplyStructuresWeekdaysAndExercisesIntoBullets() {
+        val raw = "Fitness Coach is AI, can make mistakes, and isn’t a fitness or nutrition expert. Here is your structured 3-day routine: Monday: Barbell Squats (3x10), Bench Press (3x10), Lat Pull-downs (3x12), Plank (3x60s). Wednesday: Romanian Deadlifts (3x10), Overhead Dumbbell Press (3x10), Seated Cable Rows (3x12), Glute Bridges (3x15). Friday Leg Press (3x12), Incline Dumbbell Press (3x10), Face Pulls (3x15), Russian Twists (3x20). Rest 60-90s between sets."
+        val formatted = formatCoachReply(raw)
+        assertTrue(formatted.startsWith("Fitness Coach is AI, can make mistakes, and isn’t a fitness or nutrition expert.\n\nHere is your structured 3-day routine:\n\nMonday:"))
+        assertTrue(formatted.contains("Monday:\n• Barbell Squats (3x10)\n• Bench Press (3x10)\n• Lat Pull-downs (3x12)\n• Plank (3x60s)"))
+        assertTrue(formatted.contains("Wednesday:\n• Romanian Deadlifts (3x10)\n• Overhead Dumbbell Press (3x10)\n• Seated Cable Rows (3x12)\n• Glute Bridges (3x15)"))
+        assertTrue(formatted.contains("Friday:\n• Leg Press (3x12)\n• Incline Dumbbell Press (3x10)\n• Face Pulls (3x15)\n• Russian Twists (3x20)"))
+        assertTrue(formatted.endsWith("\n\nRest 60-90s between sets."))
+    }
+
+    @Test fun formatCoachReplyHandlesDayNumbersAndMeals() {
+        val rawWorkout = "Day 1: 3 sets of 12 bodyweight squats, 3 sets of 10 push-ups, 3 sets of 15-second planks. Day 2: 3 sets of 10 alternating lunges, 3 sets of 10 dumbbell rows. Repeat this cycle."
+        val formattedWorkout = formatCoachReply(rawWorkout)
+        assertTrue(formattedWorkout.contains("Day 1:\n• 3 sets of 12 bodyweight squats\n• 3 sets of 10 push-ups\n• 3 sets of 15-second planks"))
+        assertTrue(formattedWorkout.contains("Day 2:\n• 3 sets of 10 alternating lunges\n• 3 sets of 10 dumbbell rows"))
+        assertTrue(formattedWorkout.endsWith("\n\nRepeat this cycle."))
+
+        val rawMeals = "Breakfast: Oatmeal with protein. Lunch: Chicken with rice. Dinner: Salmon with veggies. Snacks: Almonds."
+        val formattedMeals = formatCoachReply(rawMeals)
+        assertTrue(formattedMeals.contains("• Breakfast: Oatmeal with protein."))
+        assertTrue(formattedMeals.contains("• Lunch: Chicken with rice."))
+        assertTrue(formattedMeals.contains("• Dinner: Salmon with veggies."))
+        assertTrue(formattedMeals.contains("• Snacks: Almonds."))
+    }
 }

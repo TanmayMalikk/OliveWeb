@@ -296,28 +296,41 @@ internal fun formatCoachReply(rawText: String): String {
     val disclaimerRegex = Regex("(Fitness Coach is AI, can make mistakes, and isn[’']t a fitness or nutrition expert\\.)\\s*", RegexOption.IGNORE_CASE)
     text = disclaimerRegex.replace(text) { "${it.groupValues[1]}\n\n" }
 
-    val dayHeaderRegex = Regex("(?<!\\n)\\s*(Day\\s+\\d+[:·\\-])", RegexOption.IGNORE_CASE)
+    val dayWords = "(?:Day\\s+\\d+|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
+
+    val missingColonRegex = Regex("(?:^|([.!?\\n]))\\s*($dayWords)(?!\\s*[:·\\-])\\s+", RegexOption.IGNORE_CASE)
+    text = missingColonRegex.replace(text) { match ->
+        val prefix = match.groupValues[1]
+        "$prefix\n\n${match.groupValues[2]}: "
+    }
+
+    val restPattern = "(?:Rest\\s+[\\d\\-]+[a-z]*|Focus on\\s+[^\\n]+|Repeat this cycle|Take rest days|Remember to rest|Stay hydrated|Drink plenty of water[^\\n]*)"
+    val restRegex = Regex("(?<!\\n)\\s*($restPattern)", RegexOption.IGNORE_CASE)
+    text = restRegex.replace(text) { "\n\n${it.groupValues[1]}" }
+
+    val dayHeaderRegex = Regex("(?<!\\n)\\s*($dayWords\\s*[:·\\-])", RegexOption.IGNORE_CASE)
     text = dayHeaderRegex.replace(text) { "\n\n${it.groupValues[1]}" }
 
-    val dayBlockRegex = Regex("(Day\\s+\\d+[:·\\-])\\s*([^\\n]+?)(?=(?:\\n\\nDay\\s+\\d+|\\n\\nRepeat|\\n\\nTake|\\n\\nRemember|$))", RegexOption.IGNORE_CASE)
+    val dayBlockRegex = Regex("($dayWords\\s*[:·\\-])\\s*([^\\n]+?)(?=(?:\\n\\n$dayWords|\\n\\n|$))", RegexOption.IGNORE_CASE)
     text = dayBlockRegex.replace(text) { match ->
-        val header = match.groupValues[1]
+        val header = match.groupValues[1].trim().let { if (it.endsWith(":")) it else "$it:" }
         val exercises = match.groupValues[2].trim()
-        val parts = exercises.split(Regex("[,;]\\s*(?=\\d+\\s*sets|\\d+\\s*reps|\\d+\\s*sec|\\d+\\s*min)", RegexOption.IGNORE_CASE))
-            .map { it.trim().trimEnd('.') }.filter { it.isNotEmpty() }
-        if (parts.size > 1) {
-            val bullets = parts.joinToString("\n") { "• $it" }
-            "$header\n$bullets"
-        } else {
+        if ('•' in exercises || '\n' in exercises) {
             match.value
+        } else {
+            val items = exercises.split(Regex("[,;]\\s*(?=[A-Za-z0-9])"))
+                .map { it.trim().trimEnd('.') }.filter { it.isNotEmpty() }
+            if (items.size > 1) {
+                val bullets = items.joinToString("\n") { "• $it" }
+                "$header\n$bullets"
+            } else {
+                match.value
+            }
         }
     }
 
     val mealRegex = Regex("(?<!\\n)\\s*((?:Breakfast|Lunch|Dinner|Snack(?:s)?)\\s*[:·\\-])", RegexOption.IGNORE_CASE)
     text = mealRegex.replace(text) { "\n\n• ${it.groupValues[1]}" }
-
-    val restRegex = Regex("(?<!\\n)\\s*(Repeat this cycle|Take rest days|Remember to rest|Stay hydrated|Drink plenty of water)", RegexOption.IGNORE_CASE)
-    text = restRegex.replace(text) { "\n\n${it.groupValues[1]}" }
 
     return text.replace(Regex("\\n{3,}"), "\n\n").trim()
 }
