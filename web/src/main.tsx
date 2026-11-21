@@ -125,6 +125,23 @@ function Cover() {
   const s = useSession();
   return <PublicCoverPage onPrivateEntry={() => { void s.perform(s.beginEntry); }} />;
 }
+
+// All roles use the same zero-knowledge, tab-scoped recovery action.
+function EncryptedAccessRecovery() {
+  const s = useSession();
+  if (!s.cloudMode || (s.phase !== "safe" && s.phase !== "portal") || s.hasEncryptedAccess) return null;
+  return (
+    <section className="account-recovery-notice" aria-labelledby="encrypted-access-heading">
+      <div>
+        <h2 id="encrypted-access-heading">Unlock encrypted access</h2>
+        <p>Use a recovery passkey to open encrypted documents and messages on this browser.</p>
+      </div>
+      <Button disabled={s.busy} onClick={() => void s.perform(s.recoverEncryptedAccess)}>
+        {s.busy ? "Unlocking…" : "Use recovery passkey"}
+      </Button>
+    </section>
+  );
+}
 // Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
@@ -155,6 +172,7 @@ function Routes({ mode }: { mode: SiteMode }) {
           </div>
         }
       >
+        <EncryptedAccessRecovery />
         {content}
       </Suspense>
     </>
