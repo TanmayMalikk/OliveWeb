@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.safety.SAFETY_CHECKLIST_SECTIONS
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyPlan
@@ -49,6 +50,7 @@ import com.olive.app.data.safety.safetyChecklistAttachmentTag
 import com.olive.app.data.safety.safetyChecklistConflictPreview
 import com.olive.app.data.safety.safetyChecklistPreview
 import com.olive.app.data.safety.writeSafetyChecklist
+import com.olive.app.ui.users.shared.onboarding.SafetyPlanQuestionnaireDialog
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import java.io.File
@@ -126,7 +128,9 @@ internal fun SafetyPlanScreen(
 
     val lease = remember(ownerUid) { Any() }
     val hasAffectedPeople = ownerUid == session.coverAccountId && !session.profile?.affectedNames.isNullOrBlank()
-    val defaults = remember(context, hasAffectedPeople) { safetyDefaults(context, hasAffectedPeople) }
+    val intake = if (ownerUid == session.coverAccountId) session.profile?.safetyIntake ?: SafetyPlanIntake() else SafetyPlanIntake()
+    val defaults = remember(context, hasAffectedPeople, intake) { safetyDefaults(context, hasAffectedPeople, intake) }
+    var questionnaireOpen by rememberSaveable(ownerUid) { mutableStateOf(false) }
     // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
     // Open once; its Firestore listener and durable reconciliation worker deliver later changes.
@@ -464,6 +468,11 @@ internal fun SafetyPlanScreen(
                                 onClick = { session.navigation.openSafePage(SafePage.Documents) },
                                 modifier = Modifier.fillMaxWidth().testTag("safety_documents")
                             ) { Text(stringResource(R.string.support_documents)) }
+                            if (!organizationEditor && !safeContact && ownerUid == viewerUid) OutlinedButton(
+                                onClick = { questionnaireOpen = true },
+                                enabled = plan != null && !session.busy,
+                                modifier = Modifier.fillMaxWidth().testTag("safety_tailor_questionnaire"),
+                            ) { Text(stringResource(R.string.safety_intake_update_plan)) }
                             if (session.accountRole == AccountRole.STAFF && onCompleteConsultation != null) {
                                 OutlinedButton(
                                     onClick = onCompleteConsultation,
@@ -499,6 +508,18 @@ internal fun SafetyPlanScreen(
             controller.edit(target.fieldKey, writeSafetyChecklist(changed))
         },
     )
+    if (questionnaireOpen) {
+        SafetyPlanQuestionnaireDialog(
+            initialIntake = intake,
+            enabled = !session.busy && controller.saving == 0,
+            onDismiss = { questionnaireOpen = false },
+            onSave = { updated ->
+                session.saveSafetyIntake(updated)
+                applySafetyIntakeToPlan(context, controller, updated, hasAffectedPeople)
+                questionnaireOpen = false
+            },
+        )
+    }
 }
 
 /**

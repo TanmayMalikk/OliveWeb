@@ -57,4 +57,148 @@
         <item>安排最初几天的住处、食物和药物。</item>
         <item>确定您可能想联系的支持服务。</item>
     </string-array>
+
+    <string name="onboarding_safety_questionnaire">安全计划问卷</string>
+    <string name="safety_intake_intro">这些可选问题将定制你初始安全计划的文件清单与各分项内容。所有回答均加密保存在你的私人资料中，可随时更新。</string>
+    <string name="safety_intake_prefer_not_to_say">不愿透露</string>
+    <string name="safety_intake_update_plan">通过问卷更新安全计划</string>
+    <string name="safety_intake_dialog_apply">保存并更新计划</string>
+
+    <string name="safety_intake_immigration_title">移民或居留身份</string>
+    <string name="safety_intake_immigration_subtitle">帮助列出与你情况匹配的身份证件、许可文件及法律支持信息。</string>
+    <string name="safety_intake_immigration_citizen">公民</string>
+    <string name="safety_intake_immigration_pr">永久居民</string>
+    <string name="safety_intake_immigration_temporary">工作、学习、访客或担保许可</string>
+    <string name="safety_intake_immigration_refugee">难民或庇护申请人</string>
+    <string name="safety_intake_immigration_uncertain">无身份或不确定当前身份</string>
+
+    <string name="safety_intake_dependants_title">随你一同离开的受抚养人</string>
+    <string name="safety_intake_dependants_subtitle">选择所有需要与你一同安全离开的对象。</string>
+    <string name="safety_intake_dependant_children">子女／未成年人</string>
+    <string name="safety_intake_dependant_adult">年长或成年受照护者</string>
+    <string name="safety_intake_dependant_pets">宠物或辅助动物</string>
+
+    <string name="safety_intake_financial_title">财务独立性与资金渠道</string>
+    <string name="safety_intake_financial_subtitle">定制应急资金、银行记录和紧急经济援助步骤。</string>
+    <string name="safety_intake_financial_independent">我有自己的资金或个人账户</string>
+    <string name="safety_intake_financial_shared">账户为联名或受到监控</string>
+    <string name="safety_intake_financial_none">无法独立支配资金</string>
+
+    <string name="safety_intake_transport_title">离开时的交通方式</string>
+    <string name="safety_intake_transport_subtitle">定制随身必备物品和出行路线计划。</string>
+    <string name="safety_intake_transport_vehicle">自有或主要使用车辆</string>
+    <string name="safety_intake_transport_transit">公共交通或步行</string>
+    <string name="safety_intake_transport_ride_support">需要可信赖的联系人或服务提供乘车协助</string>
+
+    <string name="safety_intake_circumstances_title">法律、医疗与住房情况</string>
+    <string name="safety_intake_circumstances_subtitle">勾选所有适用项，以在计划中添加对应文件和后续安排。</string>
+    <string name="safety_intake_circumstance_legal">现有法院命令、监护令或保护令</string>
+    <string name="safety_intake_circumstance_marriage">需要婚姻、分居或育儿协议记录</string>
+    <string name="safety_intake_circumstance_medical">需要长期处方药或持续医疗照护</string>
+    <string name="safety_intake_circumstance_housing">有共同租约、租赁或按揭贷款责任</string>
+
+    <string name="safety_doc_photo_id">驾照／政府签发的带照片身份证件</string>
+    <string name="safety_doc_birth_certificate">出生证明</string>
+    <string name="safety_doc_health_card">健康卡</string>
+    <string name="safety_doc_sin">社会保险号码（SIN）或税务编号</string>
+    <string name="safety_doc_citizen_passport">护照或公民身份证明</string>
+    <string name="safety_doc_pr_card">永久居民卡（枫叶卡）、登陆纸（COPR）和护照</string>
+    <string name="safety_doc_permit_sponsorship">护照、工作／学习／访客许可及相关担保文件</string>
+    <string name="safety_doc_immigration_support">签证申请副本、UCI／档案编号及移民局通信记录</string>
+    <string name="safety_doc_refugee_papers">难民申请人证件、听证通知、法律援助／IRB 文件和旅行证件</string>
+    <string name="safety_doc_any_id_copies">任何政府身份证件、护照、过期许可或证件照片／扫描件</string>
+    <string name="safety_doc_immigration_clinic">可信赖的移民法律援助机构联系方式（分享身份细节前先确认安全）</string>
+    <string name="safety_doc_passport_generic">护照／公民身份或移民文件</string>
+    <string name="safety_doc_children_records">孩子的身份证件、出生证明、健康卡、学校记录和照护说明</string>
+    <string name="safety_doc_adult_dependant_records">受照护者的身份证件、健康卡、用药清单及授权书／照护文件</string>
+    <string name="safety_doc_pet_records">宠物疫苗接种记录、芯片／登记信息及航空箱紧急说明</string>
+    <string name="safety_doc_independent_banking">个人银行卡、账户信息及保险文件</string>
+    <string name="safety_doc_shared_banking">单独账户记录、近期银行对账单及密码（避开共享设备存放）</string>
+    <string name="safety_doc_financial_proof">收入、福利金或家庭开支证明（在安全条件下收集）</string>
+    <string name="safety_doc_banking_generic">银行／保险／财务记录（如需要）</string>
+    <string name="safety_doc_court_orders">法院命令、保释条件或限制／保护令</string>
+    <string name="safety_doc_marriage_custody">结婚证及育儿或监护权协议</string>
+    <string name="safety_doc_medical_records">处方、免疫接种记录及专科／病历摘要</string>
+    <string name="safety_doc_housing_records">租赁合同、按揭对账单或你名下的水电账单</string>
+
+    <string name="safety_grab_house_and_car_keys">住所和车辆钥匙（包括备用钥匙）</string>
+    <string name="safety_grab_house_keys">住所钥匙和门禁卡</string>
+    <string name="safety_grab_phone">手机、充电器和移动电源</string>
+    <string name="safety_grab_cash_cards">现金和个人银行卡／信用卡</string>
+    <string name="safety_grab_separate_cash">妥善隐藏的应急现金及非联名银行卡</string>
+    <string name="safety_grab_emergency_cash">可安全留存的应急现金、公交卡或礼品卡</string>
+    <string name="safety_grab_medicines">必需药物及书面处方清单</string>
+    <string name="safety_grab_clothes">几天的换洗衣物和基本洗漱用品</string>
+    <string name="safety_grab_children">孩子的衣物、尿布／安抚物品及所需药物</string>
+    <string name="safety_grab_adult_dependant">受照护者的药物、助行器具及日常护理用品</string>
+    <string name="safety_grab_pets">宠物食物、牵引绳或航空箱以及食盆</string>
+
+    <string name="safety_fin_indep_passwords">确认只有你自己知道个人银行账户的密码和 PIN。</string>
+    <string name="safety_fin_indep_bills">检查关联共享地址或共享设备的定期扣款与订阅。</string>
+    <string name="safety_fin_shared_private_account">安全留存应急资金（独立银行账户或交由信任的人保管），避开受监控的对账单。</string>
+    <string name="safety_fin_shared_cash">保留少量方便取用的现金，并留意哪些卡消费会暴露行踪。</string>
+    <string name="safety_fin_shared_document">在不引起注意的情况下安全拍摄或记录联名账户余额与债务。</string>
+    <string name="safety_fin_emergency_aid">查找当地庇护资金、紧急财务援助和危机补助项目。</string>
+    <string name="safety_fin_trusted_money_help">规划谁能安全地为你借出或代管应急现金、交通卡或生活必需品。</string>
+    <string name="safety_fin_crisis_benefits">向当地支持社工咨询可单独申请的紧急补助或费用减免。</string>
+    <string name="safety_fin_children_benefits">记录儿童福利金账户及托儿补贴等支持项目。</string>
+    <string name="safety_fin_lease_rights">咨询住房社工或法律诊所因家庭暴力无责解除联名租约的权利。</string>
+    <string name="safety_fin_newcomer_support">向新移民服务或法律援助机构咨询你当前身份可获得的紧急财务支持。</string>
+
+    <string name="safety_dest_choose">选择一个安全的去处。</string>
+    <string name="safety_dest_address">记下地址和前往路线。</string>
+    <string name="safety_dest_when">确认您可以安全到达的时间。</string>
+    <string name="safety_dest_children">确认目的地有适合孩子的安全空间和睡眠用品。</string>
+    <string name="safety_dest_adult_dependant">确认目的地的无障碍通道以及照护支持条件。</string>
+    <string name="safety_dest_pets">确认目的地允许携带宠物，或提前安排宠物安全寄养。</string>
+
+    <string name="safety_travel_vehicle_fuel">在安全前提下保持油箱或电池电量高于一半。</string>
+    <string name="safety_travel_spare_key">安全藏好备用车钥匙，并检查车辆是否开启了定位共享或追踪。</string>
+    <string name="safety_travel_vehicle_backup">如果车辆被阻挡或无法使用，准备好备用公交或乘车方案。</string>
+    <string name="safety_travel_transit_routes">查看日间和夜间的公交路线及安全换乘点。</string>
+    <string name="safety_travel_transit_fare">将公交卡或零钱放在随手可拿的安全位置。</string>
+    <string name="safety_travel_pickup_spot">在离家一段距离处选择安全、照明良好的候车点。</string>
+    <string name="safety_travel_confirm_driver">与可信赖的司机或危机接送服务确认联系人及出发信号。</string>
+    <string name="safety_travel_meeting_spot">在离住所不远处约定安全的上车会合点。</string>
+    <string name="safety_travel_backup_ride">安全保存备用乘车电话或紧急出租车方案。</string>
+    <string name="safety_travel_decide">决定如何到达目的地。</string>
+    <string name="safety_travel_confirm_help">如有需要，确认谁能帮助安排交通。</string>
+    <string name="safety_travel_prepare_fare">在安全的情况下准备钥匙、车费或燃油。</string>
+    <string name="safety_travel_children">若带孩子离开，提前安排婴儿车、安全座椅或安全步行路线。</string>
+    <string name="safety_travel_adult_dependant">为受照护者安排无障碍交通工具或行动协助。</string>
+    <string name="safety_travel_pets">确认交通工具的宠物规定或车辆内航空箱空间。</string>
+
+    <string name="safety_after_checkin">在安全的情况下向可信赖的人报平安。</string>
+    <string name="safety_after_essentials">安排最初几天的住处、食物和基本生活用品。</string>
+    <string name="safety_after_immigration_legal">联系移民法律援助机构或安置顾问，了解身份保护方案。</string>
+    <string name="safety_after_children_school">保密通知孩子的学校或托儿所关于安全接送的规定。</string>
+    <string name="safety_after_adult_dependant">安排受照护者的持续居家照护或安全转交药房处方。</string>
+    <string name="safety_after_legal_aid">联系法律援助处理保护令、监护权或使用安全地址更新法院文件。</string>
+    <string name="safety_after_medical">安全安排处方续配，并转接诊所和药房联系信息。</string>
+    <string name="safety_after_housing">了解过渡性住房支持、水电账户变更或租户保护权益。</string>
+    <string name="safety_after_support_services">确定您可能想联系的支持服务。</string>
+
+    <string name="safety_intake_abuse_title">经历的虐待类型</string>
+    <string name="safety_intake_abuse_subtitle">勾选所有适用项，以定制数字安全、证据留存和专项支持步骤。</string>
+    <string name="safety_intake_abuse_physical">身体虐待</string>
+    <string name="safety_intake_abuse_emotional">情感、言语或心理虐待</string>
+    <string name="safety_intake_abuse_financial">财务或经济控制</string>
+    <string name="safety_intake_abuse_digital">数字监控、骚扰或跟踪</string>
+    <string name="safety_intake_abuse_sexual">性虐待或性胁迫</string>
+    <string name="safety_intake_abuse_cultural">文化、精神或移民身份胁迫</string>
+
+    <string name="safety_doc_abuse_physical_evidence">带日期的伤情照片、就医或急诊记录以及报警回执编号</string>
+    <string name="safety_doc_abuse_emotional_records">威胁、恐吓或骚扰的带日期记录或截图</string>
+    <string name="safety_doc_abuse_financial_records">工资单、信用报告以及他人以你名义所开债务或账户记录</string>
+    <string name="safety_doc_abuse_sexual_records">专科医疗或法医检查记录及危机支持中心联系方式</string>
+    <string name="safety_doc_abuse_immigration_coercion">被扣留护照或签证许可的副本、担保信及威胁相关证据</string>
+    <string name="safety_grab_abuse_digital_check">关闭位置共享，并检查随身包袋或钥匙是否藏有陌生追踪器</string>
+    <string name="safety_fin_abuse_credit_check">设置信用欺诈提醒，并保护你独立的税务与福利账户登录</string>
+    <string name="safety_dest_abuse_physical_exit">确认住处安全出口，并提前记下紧急庇护所备用电话</string>
+    <string name="safety_travel_abuse_digital_tracking">使用安全设备，选择不易被家庭共享定位追踪的出行路线</string>
+    <string name="safety_after_abuse_physical_care">及时治疗任何伤情，并向工作人员咨询紧急庇护安全规划</string>
+    <string name="safety_after_abuse_emotional_support">联系具备创伤知情经验的心理咨询师或互助支持小组</string>
+    <string name="safety_after_abuse_digital_security">在安全设备上更改主要密码，并检查双重验证备用邮箱与应用权限</string>
+    <string name="safety_after_abuse_sexual_support">在安全时联系性侵害危机干预与专门支持热线</string>
+    <string name="safety_after_abuse_cultural_support">联系文化社区或新移民倡导机构，了解不依赖担保人的合法权益</string>
 </resources>

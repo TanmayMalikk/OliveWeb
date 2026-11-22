@@ -26,6 +26,7 @@ import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.messaging.*
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.safety.SafetyDocument
@@ -256,6 +257,16 @@ internal class SessionViewModel @JvmOverloads constructor(
      */
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
+
+    /**
+     * Saves updated safety-plan questionnaire answers to the encrypted profile.
+     *
+     * @param intake Completed questionnaire selections supplied by the user.
+     */
+    fun saveSafetyIntake(intake: SafetyPlanIntake) {
+        val current = profile ?: return
+        runtime.settings.saveSafeProfile(current.copy(safetyIntake = intake.copy(completed = true)))
+    }
 
     /**
      * Computes quick exit.

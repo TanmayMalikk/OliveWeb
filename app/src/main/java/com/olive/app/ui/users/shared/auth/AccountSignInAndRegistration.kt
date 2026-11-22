@@ -144,7 +144,7 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
         listOf(usernameValid, passwordValid, confirmationValid).take(if (create) 3 else 2)
             .count { it }
     val stages = when {
-        create && session.account.role == AccountRole.USER -> 5
+        create && session.account.role == AccountRole.USER -> 6
         create && session.account.role == AccountRole.SAFE_CONTACT -> 4
         !create && session.account.role == AccountRole.USER -> 2
         else -> 1
@@ -334,7 +334,7 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     var showErrors by rememberSaveable { mutableStateOf(false) }
     val pinValid = InputPolicy.validPin(pin)
     val confirmationValid = confirm.isNotEmpty() && confirm == pin
-    val stages = if (session.account.creatingAccount) 6 else 2
+    val stages = if (session.account.creatingAccount) 7 else 2
     val page = stages - 1
     val completedBeforePin = if (session.account.creatingAccount) 7 else 2
     val totalRequired = completedBeforePin + 2

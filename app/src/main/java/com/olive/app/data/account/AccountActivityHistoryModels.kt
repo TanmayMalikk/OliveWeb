@@ -314,6 +314,13 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
             "Changed"
         )
     )
+    if (before.safetyIntake != after.safetyIntake) add(
+        FieldChange(
+            "Safety plan questionnaire",
+            "",
+            "Updated",
+        ),
+    )
     if (before.contacts != after.contacts) {
         /**
          * Formats the summary shown by account storage.

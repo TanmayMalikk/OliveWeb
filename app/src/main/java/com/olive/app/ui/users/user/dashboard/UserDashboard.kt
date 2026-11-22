@@ -74,7 +74,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
         session.messages.ensureMessagingObservation()
         launch { session.documents.load(uid, username, localMode) }
         launch { session.runtime.history.refreshHistory(uid) }
-        val defaults = safetyDefaults(context, !profile.affectedNames.isNullOrBlank())
+        val defaults = safetyDefaults(context, !profile.affectedNames.isNullOrBlank(), profile.safetyIntake)
         launch { session.safetyPlans.open(uid, profile.fullName.ifBlank { profile.username }, defaults, "safe_area_warmup") }
         launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { com.olive.app.data.safety.HotlineDirectory.readBundled(context) } }
         launch { runCatching { android.webkit.WebView(context).destroy() } }

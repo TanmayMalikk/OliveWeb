@@ -131,7 +131,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Invalid password").assertExists()
         compose.onNodeWithText("Passwords differ").assertExists()
         compose.onNodeWithText("0 of 9 required", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 5")
+        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 6")
     }
 
     // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
@@ -196,8 +196,8 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("credentials_submit")
         waitFor("full_name")
         compose.onNodeWithTag("language").assertDoesNotExist()
-        compose.onNodeWithText("Step 2 of 5", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("onboarding_step_5", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Step 2 of 6", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("onboarding_step_6", useUnmergedTree = true).assertExists()
         fill("full_name", "City Test")
         chooseBirthday()
         nextOnboarding()
@@ -216,11 +216,12 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
         compose.onNodeWithTag("cover_choice_news").assertIsSelected()
         compose.onNodeWithTag("cover_choice_fitness").assertIsNotSelected()
-        advanceOnboarding("trigger", "profile_submit")
-        compose.onNodeWithText("Step 5 of 5", useUnmergedTree = true).assertExists()
+        advanceOnboarding("trigger", "friend_invite_code")
+        advanceOnboarding("friend_invite_code", "profile_submit")
+        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
         click("profile_submit")
         chooseAppPin()
-        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Step 7 of 7", useUnmergedTree = true).assertExists()
         fill("new_pin", "1234")
         fill("confirm_pin", "1234")
         click("pin_setup_submit")

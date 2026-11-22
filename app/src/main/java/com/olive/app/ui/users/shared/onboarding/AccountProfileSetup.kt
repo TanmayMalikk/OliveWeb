@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.shared.AddressFields
@@ -118,6 +119,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val contacts =
         remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FITNESS) }
+    var safetyIntake by remember(existing) { mutableStateOf(existing?.safetyIntake ?: SafetyPlanIntake()) }
     val pages = if (safeContact) listOf(
         uiText(R.string.ui_personal_details),
         uiText(R.string.location),
@@ -127,7 +129,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
             uiText(R.string.ui_personal_details),
             uiText(R.string.location),
             uiText(R.string.ui_safe_entry_cover),
-            uiText(R.string.friend_invite_code)
+            uiText(R.string.friend_invite_code),
+            uiText(R.string.onboarding_safety_questionnaire),
         )
     var page by rememberSaveable(existing?.username, safeContact) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
@@ -144,12 +147,13 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val completed = required.count { it }
     val supportValid = validation.supportValid
     val localCompletion = validation.pageCompletion
-    val stages = if (safeContact) 4 else 5
+    val stages = if (safeContact) 4 else 6
     val progressPage = page + 1
     val credentialCount = if (session.account.creatingAccount) 3 else 2
     val totalRequired = credentialCount + required.size + if (safeContact) 0 else 2
     val progressCompleted = credentialCount + completed
-    val pageCompletion = listOf(true) + localCompletion + true
+    val pageCompletion = if (safeContact) listOf(true) + localCompletion + true
+    else listOf(true) + localCompletion + listOf(true, true)
     /**
      * Gives account storage the collected contacts it needs.
      *
@@ -187,7 +191,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
             contacts = if (safeContact) emptyList() else collectedContacts(),
             address = address,
             coverType = coverType,
-            role = session.account.role
+            role = session.account.role,
+            safetyIntake = if (safeContact) SafetyPlanIntake() else safetyIntake.copy(completed = true),
         )
         preparingProfile = true
         saveScope.launch {
@@ -374,9 +379,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         )
                     }
                 }
+
+                uiText(R.string.onboarding_safety_questionnaire) ->
+                    SafetyPlanQuestionnaireForm(safetyIntake, !session.account.busy) { safetyIntake = it }
             }
         }
-        if (page == pages.lastIndex) {
+        if (pages[page] == uiText(R.string.friend_invite_code)) {
             com.olive.app.ui.users.shared.messaging.InviteCodeEntry(messages = session.messages, enabled = !session.localMode,
                 accountUid = session.runtime.pendingIdentity?.uid)
         }
@@ -436,6 +444,7 @@ internal class ProfileSetupValidation(
         0 -> personalValid
         1 -> address.locationValid
         2 -> InputPolicy.validTrigger(trigger) && supportValid
+        3 -> !safeContact
         else -> false
     }
 }

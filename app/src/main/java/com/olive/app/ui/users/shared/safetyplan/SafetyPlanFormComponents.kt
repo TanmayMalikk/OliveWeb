@@ -28,16 +28,21 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.safety.SAFETY_SECTIONS
+import com.olive.app.data.safety.SAFETY_CHECKLIST_SECTIONS
 import com.olive.app.data.safety.SafetyChecklistItem
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.mergeTailoredChecklistItems
 import com.olive.app.data.safety.readSafetyChecklist
 import com.olive.app.data.safety.readSafetyPlanContact
 import com.olive.app.data.safety.safetyChecklistAttachments
 import com.olive.app.data.safety.safetyPlanContactItem
+import com.olive.app.data.safety.safetyPlanDefaultsFromIntake
+import com.olive.app.data.safety.safetyPlanSectionPrompts
 import com.olive.app.data.safety.writeSafetyChecklist
+import com.olive.app.ui.session.SessionSafetyPlans
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
@@ -504,60 +509,51 @@ private fun SafetyPlanContactPicker(
 
 
 /**
- * Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable. https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html.
+ * Adaptable prompts informed by PHAC safety-planning guidance and the user's onboarding questionnaire;
+ * all starting text remains editable. https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html.
  *
  * @param context Android context used to access system services, resources, or storage.
- * @param hasAffectedPeople Whether has affected people.
+ * @param hasAffectedPeople Whether affected family members were listed during personal setup.
+ * @param intake Onboarding questionnaire selections used to tailor documents and subsections.
  * @return Map containing the resulting safety defaults entries.
  */
-internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false): Map<String, String> = buildMap {
-    listOf("primary", "backup").forEach { plan ->
-        SAFETY_SECTIONS.forEach { section ->
-            val prompts = when (section) {
-                "documents" -> safetyDocumentSuggestions(context) + if (hasAffectedPeople) {
-                    listOf(context.getString(R.string.safety_documents_dependants))
-                } else emptyList()
-                "finances" -> listOf(
-                    context.getString(R.string.safety_finances_access),
-                    context.getString(R.string.safety_finances_costs),
-                    context.getString(R.string.safety_finances_support),
-                )
-                "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()
-                "destination" -> context.resources.getStringArray(R.array.safety_destination_checklist)
-                    .toList()
-
-                "travel" -> context.resources.getStringArray(R.array.safety_travel_checklist)
-                    .toList()
-
-                "contacts" -> context.resources.getStringArray(R.array.safety_contacts_checklist)
-                    .toList()
-
-                "aftercare" -> context.resources.getStringArray(R.array.safety_aftercare_checklist)
-                    .toList()
-
-                else -> emptyList()
-            }
-            put(
-                "${plan}_$section",
-                writeSafetyChecklist(prompts.map {
-                    SafetyChecklistItem(
-                        UUID.randomUUID().toString(),
-                        it
-                    )
-                })
-            )
-        }
-    }
-}
+internal fun safetyDefaults(
+    context: Context,
+    hasAffectedPeople: Boolean = false,
+    intake: SafetyPlanIntake = SafetyPlanIntake(),
+): Map<String, String> = safetyPlanDefaultsFromIntake(context, intake, hasAffectedPeople)
 
 /**
- * Loads the safety document suggestions needed by the safety plan.
+ * Adds newly relevant tailored checklist items to both primary and backup plans without altering
+ * or removing the user's existing items, checkmarks, or attachments.
  *
- * @param context Android context used to access system services, resources, or storage.
- * @return The resulting safety document suggestions.
+ * @param context Android context used to resolve localized checklist strings.
+ * @param controller Active safety-plan controller managing edits and sync.
+ * @param intake Updated questionnaire selections.
+ * @param hasAffectedPeople Whether affected family members were listed in the user's profile.
  */
-private fun safetyDocumentSuggestions(context: Context) =
-    context.resources.getStringArray(R.array.safety_document_checklist).toList()
+internal fun applySafetyIntakeToPlan(
+    context: Context,
+    controller: SessionSafetyPlans,
+    intake: SafetyPlanIntake,
+    hasAffectedPeople: Boolean,
+) {
+    val activePlan = controller.plan ?: return
+    var changed = false
+    listOf("primary", "backup").forEach { planPrefix ->
+        SAFETY_CHECKLIST_SECTIONS.filterNot { it == "contacts" }.forEach { section ->
+            val key = "${planPrefix}_$section"
+            val existing = activePlan.fields[key]?.value ?: return@forEach
+            val tailored = safetyPlanSectionPrompts(context, section, intake, hasAffectedPeople)
+            val updated = mergeTailoredChecklistItems(existing, tailored)
+            if (updated != existing) {
+                controller.edit(key, updated)
+                changed = true
+            }
+        }
+    }
+    if (changed) controller.flushEdits()
+}
 
 /**
  * Formats the safety section label shown by the safety plan.

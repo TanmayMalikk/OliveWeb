@@ -50,6 +50,61 @@ internal class FitnessStore(private val context: Context, private val accountId:
     }
 
     /**
+     * Checks whether initial fitness or nutrition goals have been set on this phone or synced from the cloud.
+     *
+     * @return `true` when the user completed setup or has saved goal keys, or `false` for fresh defaults.
+     */
+    fun hasConfiguredGoals(): Boolean =
+        preferences.getBoolean(GOALS_QUESTIONNAIRE_COMPLETED_KEY, false) ||
+            CONFIGURED_PROFILE_KEYS.any { preferences.contains(it) }
+
+    /**
+     * Checks whether the initial goal questionnaire card should be shown on the fitness home tab.
+     *
+     * @return `true` if goals are still unconfigured and the prompt has not been dismissed.
+     */
+    fun shouldPromptGoalQuestionnaire(): Boolean =
+        !hasConfiguredGoals() && !preferences.getBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, false)
+
+    /**
+     * Hides the home-screen initial goal questionnaire prompt without overwriting default goals.
+     */
+    fun dismissGoalQuestionnaire() = preferences.edit {
+        putBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, true)
+    }
+
+    /**
+     * Loads previously saved questionnaire answers paired with the current height and weight.
+     *
+     * @return The saved [FitnessGoalQuestionnaireInput] for pre-filling the questionnaire.
+     */
+    fun savedQuestionnaireInput(): FitnessGoalQuestionnaireInput =
+        FitnessGoalCalculator.fromJson(
+            preferences.getString(GOALS_QUESTIONNAIRE_ANSWERS_KEY, null),
+            profile(),
+        )
+
+    /**
+     * Saves goals produced by the initial questionnaire and marks onboarding complete locally.
+     *
+     * @param input Questionnaire selections chosen by the user.
+     * @param profile Resulting [FitnessProfile] targets to persist and sync.
+     * @return The updated [FitnessSnapshot] after saving the profile.
+     */
+    fun saveQuestionnaireGoals(
+        input: FitnessGoalQuestionnaireInput,
+        profile: FitnessProfile,
+    ): FitnessSnapshot {
+        saveProfile(profile)
+        preferences.edit {
+            putBoolean(GOALS_QUESTIONNAIRE_COMPLETED_KEY, true)
+            putBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, false)
+            putString(GOALS_QUESTIONNAIRE_ANSWERS_KEY, FitnessGoalCalculator.toJson(input))
+        }
+        return snapshot()
+    }
+
+    /**
      * Loads the snapshot needed by the fitness cover.
      *
      * @param today Today supplied to [snapshot].
@@ -683,6 +738,18 @@ internal class FitnessStore(private val context: Context, private val accountId:
 
     private companion object {
         const val MAX_DAILY_STEPS = 500_000
+        const val GOALS_QUESTIONNAIRE_COMPLETED_KEY = "goals_questionnaire_completed"
+        const val GOALS_QUESTIONNAIRE_DISMISSED_KEY = "goals_questionnaire_dismissed"
+        const val GOALS_QUESTIONNAIRE_ANSWERS_KEY = "goals_questionnaire_answers"
+        val CONFIGURED_PROFILE_KEYS = listOf(
+            "weight_kg",
+            "height_cm",
+            "step_goal",
+            "calorie_goal",
+            "protein_goal",
+            "carbohydrate_goal",
+            "fat_goal",
+        )
     }
 }
 

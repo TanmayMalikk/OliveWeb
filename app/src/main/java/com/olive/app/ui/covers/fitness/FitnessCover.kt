@@ -1,7 +1,6 @@
 // Fitness cover users: tracks meals, macros, calories, and daily steps.
 package com.olive.app.ui.covers.fitness
 
-import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import android.Manifest
 import android.content.pm.PackageManager
@@ -33,7 +32,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -41,9 +39,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -87,7 +83,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -106,7 +101,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import java.time.LocalDate
 
 
-private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, COACH, FOOD_SEARCH, GOALS, ACCOUNT }
+private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, COACH, FOOD_SEARCH, GOALS, GOAL_QUESTIONNAIRE, ACCOUNT }
 
 /**
  * Shows the fitness cover and keeps its selected page and saved health data in sync.
@@ -134,6 +129,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         )
     }
     var page by rememberSaveable(accountId, stateSaver = pageSaver) { mutableStateOf(FitnessPage.HOME) }
+    var questionnaireReturnPage by rememberSaveable(accountId, stateSaver = pageSaver) { mutableStateOf(FitnessPage.HOME) }
+    var promptVersion by remember(store) { mutableIntStateOf(0) }
     var foodSection by rememberSaveable(accountId) { mutableStateOf(FoodLibrarySection.Search) }
     var foodMeal by rememberSaveable(accountId) { mutableStateOf<MealType?>(null) }
     val snackbars = remember(store) { SnackbarHostState() }
@@ -161,6 +158,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         FitnessPage.COACH -> stringResource(R.string.fitness_coach_tab)
         FitnessPage.FOOD_SEARCH -> stringResource(R.string.find_food)
         FitnessPage.GOALS -> stringResource(R.string.fitness_goals)
+        FitnessPage.GOAL_QUESTIONNAIRE -> stringResource(R.string.fitness_questionnaire_title)
         FitnessPage.ACCOUNT -> stringResource(R.string.settings)
     }
 
@@ -218,6 +216,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         val currentPage = page
         val destination = when (currentPage) {
             FitnessPage.FOOD_SEARCH -> FitnessPage.NUTRITION
+            FitnessPage.GOAL_QUESTIONNAIRE -> questionnaireReturnPage
             FitnessPage.HOME -> FitnessPage.HOME
             else -> FitnessPage.HOME
         }
@@ -233,7 +232,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     // Include it so HOME receives focus even when its page enum was already HOME and therefore
     // would not restart a page-only effect.
     LaunchedEffect(page, session.coverReset) {
-        if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.FOOD_SEARCH)) {
+        if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.GOAL_QUESTIONNAIRE, FitnessPage.FOOD_SEARCH)) {
             withFrameNanos { }
             pageFocus.requestFocus()
         }
@@ -277,6 +276,10 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                 if (cloudFailed) Text(stringResource(R.string.fitness_sync_pending), Modifier.padding(horizontal = 16.dp))
                 val dataLoading = snapshot == null || loaded == null ||
                     (!session.localMode && accountId != "guest" && !ready)
+                val showGoalQuestionnairePrompt = !dataLoading &&
+                    remember(store, snapshot, loaded, ready, promptVersion) {
+                        store.shouldPromptGoalQuestionnaire()
+                    }
                 if (page == FitnessPage.COACH) {
                     if (interactive) androidx.compose.runtime.key(accountId) {
                         FitnessCoachPage(
@@ -292,7 +295,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                         FitnessPage.VITALS -> SkeletonLayout.FitnessVitals
                         FitnessPage.NUTRITION -> SkeletonLayout.FitnessNutrition
                         FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
-                        FitnessPage.GOALS, FitnessPage.ACCOUNT, FitnessPage.COACH -> SkeletonLayout.Form
+                        FitnessPage.GOALS, FitnessPage.GOAL_QUESTIONNAIRE, FitnessPage.ACCOUNT, FitnessPage.COACH -> SkeletonLayout.Form
                     }
                     LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
                 } else Crossfade(
@@ -300,7 +303,19 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                 ) { visiblePage ->
                     val pageEnabled = interactive && page == visiblePage
                     when (visiblePage) {
-                        FitnessPage.HOME -> FitnessHomePage(snapshot, onGoals = { page = FitnessPage.GOALS })
+                        FitnessPage.HOME -> FitnessHomePage(
+                            snapshot = snapshot,
+                            onGoals = { page = FitnessPage.GOALS },
+                            showGoalQuestionnairePrompt = showGoalQuestionnairePrompt,
+                            onStartQuestionnaire = {
+                                questionnaireReturnPage = FitnessPage.HOME
+                                page = FitnessPage.GOAL_QUESTIONNAIRE
+                            },
+                            onDismissQuestionnaire = {
+                                store.dismissGoalQuestionnaire()
+                                promptVersion++
+                            },
+                        )
                         FitnessPage.ACTIVITY -> FitnessActivityPage(
                             snapshot = snapshot,
                             history = history,
@@ -354,8 +369,29 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                             onSave = {
                                 store.saveProfile(it)
                                 pendingSnapshot = store.snapshot()
+                                promptVersion++
                                 page = FitnessPage.HOME
                             },
+                            onOpenQuestionnaire = {
+                                questionnaireReturnPage = FitnessPage.GOALS
+                                page = FitnessPage.GOAL_QUESTIONNAIRE
+                            },
+                        )
+                        FitnessPage.GOAL_QUESTIONNAIRE -> FitnessGoalQuestionnairePage(
+                            initialInput = remember(store, visiblePage) { store.savedQuestionnaireInput() },
+                            enabled = pageEnabled,
+                            padding = PaddingValues(0.dp),
+                            onSaveGoals = { input, profile ->
+                                pendingSnapshot = store.saveQuestionnaireGoals(input, profile)
+                                promptVersion++
+                                page = questionnaireReturnPage
+                            },
+                            onCustomizeGoals = { input, profile ->
+                                pendingSnapshot = store.saveQuestionnaireGoals(input, profile)
+                                promptVersion++
+                                page = FitnessPage.GOALS
+                            },
+                            onCancel = { page = questionnaireReturnPage },
                         )
                         FitnessPage.ACCOUNT, FitnessPage.COACH -> Unit
                     }
@@ -617,108 +653,6 @@ private fun FitnessActivityPage(
         item { FitnessOutdoorWorkoutCard(accountId, enabled) }
         item { FitnessHistoryCharts(history) }
     }
-}
-
-/**
- * Fitness cover shows this fitness goals page view so the user can view its details and use its actions.
- *
- * @param profile Account profile details.
- * @param enabled Whether this feature or control is currently enabled.
- * @param padding Padding supplied to [FitnessGoalsPage].
- * @param onSave Callback invoked when save changes or occurs.
- */
-@Composable
-private fun FitnessGoalsPage(
-    profile: FitnessProfile,
-    enabled: Boolean,
-    padding: PaddingValues,
-    onSave: (FitnessProfile) -> Unit,
-) {
-    val headingFocus = remember { FocusRequester() }
-    var weight by remember(profile) { mutableStateOf(profile.weightKg.roundToInt().toString()) }
-    var height by remember(profile) { mutableStateOf(profile.heightCm.roundToInt().toString()) }
-    var steps by remember(profile) { mutableStateOf(profile.stepGoal.toString()) }
-    var calories by remember(profile) { mutableStateOf(profile.calorieGoal.toString()) }
-    var protein by remember(profile) { mutableStateOf(profile.proteinGoal.toString()) }
-    var carbohydrates by remember(profile) { mutableStateOf(profile.carbohydrateGoal.toString()) }
-    var fat by remember(profile) { mutableStateOf(profile.fatGoal.toString()) }
-    // Move TalkBack to the goals heading after the submenu opens.
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        headingFocus.requestFocus()
-    }
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    LazyColumn(
-        Modifier.fillMaxSize().padding(padding).oliveScrollbar(listState),
-        state = listState,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Text(
-                stringResource(R.string.fitness_goals),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
-            )
-        }
-        item { GoalField(weight, { weight = it }, stringResource(R.string.weight_kg), enabled) }
-        item { GoalField(height, { height = it }, stringResource(R.string.height_cm), enabled) }
-        item { GoalField(steps, { steps = it }, stringResource(R.string.daily_step_goal), enabled) }
-        item { HorizontalDivider() }
-        item { GoalField(calories, { calories = it }, stringResource(R.string.calorie_goal), enabled) }
-        item { GoalField(protein, { protein = it }, stringResource(R.string.protein_goal), enabled) }
-        item {
-            GoalField(
-                carbohydrates,
-                { carbohydrates = it },
-                stringResource(R.string.carbohydrate_goal),
-                enabled,
-            )
-        }
-        item { GoalField(fat, { fat = it }, stringResource(R.string.fat_goal), enabled) }
-        item {
-            Button(
-                onClick = {
-                    onSave(
-                        FitnessProfile(
-                            weightKg = weight.toFloatOrNull() ?: profile.weightKg,
-                            heightCm = height.toFloatOrNull() ?: profile.heightCm,
-                            stepGoal = steps.toIntOrNull() ?: profile.stepGoal,
-                            calorieGoal = calories.toIntOrNull() ?: profile.calorieGoal,
-                            proteinGoal = protein.toIntOrNull() ?: profile.proteinGoal,
-                            carbohydrateGoal = carbohydrates.toIntOrNull()
-                                ?: profile.carbohydrateGoal,
-                            fatGoal = fat.toIntOrNull() ?: profile.fatGoal,
-                            waterGoalMl = profile.waterGoalMl,
-                        )
-                    )
-                },
-                enabled = enabled,
-                modifier = Modifier.fillMaxWidth().testTag("save_fitness_goals"),
-            ) { Text(stringResource(R.string.save)) }
-        }
-    }
-}
-
-/**
- * Draws the goal field for the fitness cover.
- *
- * @param value Input value to store, parse, or format.
- * @param onChange Callback invoked when the value or observed state changes.
- * @param label Accessible label or display caption.
- * @param enabled Whether this feature or control is currently enabled.
- */
-@Composable
-private fun GoalField(value: String, onChange: (String) -> Unit, label: String, enabled: Boolean) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { onChange(it.filter(Char::isDigit).take(6)) },
-        label = { Text(label) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 // Fitness cover users: sends today's goals and nutrition totals to a paired Wear OS watch.

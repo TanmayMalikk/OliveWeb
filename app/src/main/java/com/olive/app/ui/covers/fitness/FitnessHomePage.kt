@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Remove
@@ -69,9 +70,18 @@ import kotlin.math.sin
  *
  * @param snapshot Firestore or data snapshot containing the latest state.
  * @param onGoals Callback invoked when goals changes or occurs.
+ * @param showGoalQuestionnairePrompt Whether to show the guided initial goal questionnaire card.
+ * @param onStartQuestionnaire Callback invoked to open the initial goal setup questionnaire.
+ * @param onDismissQuestionnaire Callback invoked when the user dismisses the setup prompt.
  */
 @Composable
-internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
+internal fun FitnessHomePage(
+    snapshot: FitnessSnapshot,
+    onGoals: () -> Unit,
+    showGoalQuestionnairePrompt: Boolean = false,
+    onStartQuestionnaire: () -> Unit = {},
+    onDismissQuestionnaire: () -> Unit = {},
+) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val summaryDescription = buildString {
         append(stringResource(R.string.today_summary))
@@ -91,6 +101,15 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
                 color = FitnessSubtle,
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+        if (showGoalQuestionnairePrompt) {
+            item {
+                FitnessGoalSetupCard(
+                    onStartQuestionnaire = onStartQuestionnaire,
+                    onManualGoals = onGoals,
+                    onDismiss = onDismissQuestionnaire,
+                )
+            }
         }
         item {
             Card(
@@ -117,27 +136,89 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
             }
         }
         item { StepSummaryCard(snapshot) }
-        item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = FitnessWarmCard,
-                    contentColor = FitnessText,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onGoals,
+        if (!showGoalQuestionnairePrompt) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = FitnessWarmCard,
+                        contentColor = FitnessText,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGoals,
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.goals), style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.edit_fitness_goals), color = FitnessSubtle)
+                        }
+                        Icon(Icons.Outlined.Settings, null, tint = FitnessAccent)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FitnessGoalSetupCard(
+    onStartQuestionnaire: () -> Unit,
+    onManualGoals: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = FitnessWarmCard, contentColor = FitnessText),
+        modifier = Modifier.fillMaxWidth().testTag("fitness_goal_setup_card"),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.goals), style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.edit_fitness_goals), color = FitnessSubtle)
-                    }
-                    Icon(Icons.Outlined.Settings, null, tint = FitnessAccent)
+                    Icon(Icons.Outlined.AutoAwesome, null, tint = FitnessAccent)
+                    Text(
+                        stringResource(R.string.fitness_questionnaire_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag("fitness_dismiss_questionnaire"),
+                ) {
+                    Icon(Icons.Outlined.Close, stringResource(R.string.fitness_questionnaire_dismiss))
+                }
+            }
+            Text(
+                stringResource(R.string.fitness_questionnaire_card_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FitnessSubtle,
+            )
+            Button(
+                onClick = onStartQuestionnaire,
+                modifier = Modifier.fillMaxWidth().testTag("fitness_start_questionnaire"),
+            ) {
+                Text(stringResource(R.string.fitness_questionnaire_start))
+            }
+            OutlinedButton(
+                onClick = onManualGoals,
+                modifier = Modifier.fillMaxWidth().testTag("fitness_edit_goals_manual"),
+            ) {
+                Text(stringResource(R.string.edit_fitness_goals))
             }
         }
     }

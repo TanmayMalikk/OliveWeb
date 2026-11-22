@@ -164,6 +164,7 @@ data class UserProfile(
     val role: AccountRole = AccountRole.USER,
     val email: String = "",
     val phone: String = "",
+    val safetyIntake: SafetyPlanIntake = SafetyPlanIntake(),
 ) {
     /**
      * Converts this account record into fields that Firebase can store.
@@ -195,6 +196,7 @@ data class UserProfile(
         "role" to role.name,
         "email" to email,
         "phone" to phone,
+        "safetyIntake" to safetyIntake.toMap(),
     )
 
     /**

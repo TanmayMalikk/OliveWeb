@@ -58,4 +58,148 @@
         <item>Plan essentials for the first few days: shelter, food and medication.</item>
         <item>Identify support services you may want to contact.</item>
     </string-array>
+
+    <string name="onboarding_safety_questionnaire">Safety plan questionnaire</string>
+    <string name="safety_intake_intro">These optional questions tailor your starting safety-plan documents and checklist items. Everything stays encrypted in your private profile and can be updated anytime.</string>
+    <string name="safety_intake_prefer_not_to_say">Prefer not to say</string>
+    <string name="safety_intake_update_plan">Tailor plan from questionnaire</string>
+    <string name="safety_intake_dialog_apply">Save and update plan</string>
+
+    <string name="safety_intake_immigration_title">Immigration or residency status</string>
+    <string name="safety_intake_immigration_subtitle">Helps list the identification, permit, and legal support documents relevant to you.</string>
+    <string name="safety_intake_immigration_citizen">Citizen</string>
+    <string name="safety_intake_immigration_pr">Permanent resident</string>
+    <string name="safety_intake_immigration_temporary">Work, study, visitor, or sponsored permit</string>
+    <string name="safety_intake_immigration_refugee">Refugee or claimant</string>
+    <string name="safety_intake_immigration_uncertain">Undocumented or unsure of status</string>
+
+    <string name="safety_intake_dependants_title">Dependants leaving with you</string>
+    <string name="safety_intake_dependants_subtitle">Select everyone who needs to leave safely with you.</string>
+    <string name="safety_intake_dependant_children">Children</string>
+    <string name="safety_intake_dependant_adult">Elderly or adult dependant</string>
+    <string name="safety_intake_dependant_pets">Pets or assistance animals</string>
+
+    <string name="safety_intake_financial_title">Financial access &amp; independence</string>
+    <string name="safety_intake_financial_subtitle">Tailors money access, banking records, and emergency financial aid steps.</string>
+    <string name="safety_intake_financial_independent">I have my own money or account</string>
+    <string name="safety_intake_financial_shared">Accounts are shared or monitored</string>
+    <string name="safety_intake_financial_none">No independent access to money</string>
+
+    <string name="safety_intake_transport_title">Transportation when leaving</string>
+    <string name="safety_intake_transport_subtitle">Shapes your quick-grab and travel planning checklists.</string>
+    <string name="safety_intake_transport_vehicle">Own or primary vehicle</string>
+    <string name="safety_intake_transport_transit">Public transit or walking</string>
+    <string name="safety_intake_transport_ride_support">Need a ride from a trusted contact or service</string>
+
+    <string name="safety_intake_circumstances_title">Legal, health &amp; housing needs</string>
+    <string name="safety_intake_circumstances_subtitle">Select any that apply so those documents and follow-up steps appear in your plan.</string>
+    <string name="safety_intake_circumstance_legal">Active court, custody, or protection orders</string>
+    <string name="safety_intake_circumstance_marriage">Marriage, separation, or parenting records needed</string>
+    <string name="safety_intake_circumstance_medical">Regular prescriptions or ongoing medical care</string>
+    <string name="safety_intake_circumstance_housing">Shared lease, rental, or mortgage obligations</string>
+
+    <string name="safety_doc_photo_id">Driver’s licence / government-issued photo ID</string>
+    <string name="safety_doc_birth_certificate">Birth certificate</string>
+    <string name="safety_doc_health_card">Health card</string>
+    <string name="safety_doc_sin">Social Insurance Number (SIN) or tax ID</string>
+    <string name="safety_doc_citizen_passport">Passport or citizenship certificate</string>
+    <string name="safety_doc_pr_card">Permanent Resident (PR) card, COPR, and passport</string>
+    <string name="safety_doc_permit_sponsorship">Passport, work/study/visitor permit, and any sponsorship papers</string>
+    <string name="safety_doc_immigration_support">Copies of visa applications, UCI/file numbers, and immigration communications</string>
+    <string name="safety_doc_refugee_papers">Refugee claimant ID, hearing notices, Legal Aid or IRB documents, and travel papers</string>
+    <string name="safety_doc_any_id_copies">Any government ID, passport, expired permits, or photos/scans of identity records</string>
+    <string name="safety_doc_immigration_clinic">Trusted immigration legal clinic contact and safety notes before sharing status details</string>
+    <string name="safety_doc_passport_generic">Passport / citizenship / immigration documents</string>
+    <string name="safety_doc_children_records">Children’s IDs, birth certificates, health cards, school records, and care instructions</string>
+    <string name="safety_doc_adult_dependant_records">Dependant’s ID, health card, medication list, and power-of-attorney or care documents</string>
+    <string name="safety_doc_pet_records">Pet vaccination records, microchip/registration info, and emergency carrier note</string>
+    <string name="safety_doc_independent_banking">Personal bank cards, account details, and insurance documents</string>
+    <string name="safety_doc_shared_banking">Separate account records, recent bank statements, and PINs kept private from shared devices</string>
+    <string name="safety_doc_financial_proof">Proof of income, benefits, or household expenses (or safe notes on shared finances)</string>
+    <string name="safety_doc_banking_generic">Banking / insurance / financial records, if needed</string>
+    <string name="safety_doc_court_orders">Court orders, bail conditions, or restraining/protection orders</string>
+    <string name="safety_doc_marriage_custody">Marriage certificate and parenting or custody agreements</string>
+    <string name="safety_doc_medical_records">Prescriptions, immunization records, and specialist or medical history summaries</string>
+    <string name="safety_doc_housing_records">Lease agreement, mortgage statements, or utility bills in your name</string>
+
+    <string name="safety_grab_house_and_car_keys">House and vehicle keys (including a spare key)</string>
+    <string name="safety_grab_house_keys">House keys and building access fobs</string>
+    <string name="safety_grab_phone">Phone, charger, and power bank</string>
+    <string name="safety_grab_cash_cards">Cash and personal bank/credit cards</string>
+    <string name="safety_grab_separate_cash">Hidden emergency cash and any non-shared bank cards</string>
+    <string name="safety_grab_emergency_cash">Any emergency cash, transit card, or gift cards you can set aside safely</string>
+    <string name="safety_grab_medicines">Essential medications and written prescription list</string>
+    <string name="safety_grab_clothes">Basic clothes and toiletries for a few days</string>
+    <string name="safety_grab_children">Children’s clothes, diapers/comfort items, and needed medications</string>
+    <string name="safety_grab_adult_dependant">Dependant’s medications, mobility aids, and daily care items</string>
+    <string name="safety_grab_pets">Pet food, leash or carrier, and bowls</string>
+
+    <string name="safety_fin_indep_passwords">Confirm only you have passwords and PINs to your personal bank accounts.</string>
+    <string name="safety_fin_indep_bills">Review recurring bills or subscriptions tied to shared addresses or devices.</string>
+    <string name="safety_fin_shared_private_account">Set aside emergency funds safely (a separate bank account or trusted person), away from monitored statements.</string>
+    <string name="safety_fin_shared_cash">Keep small amounts of accessible cash and review which cards could reveal your location.</string>
+    <string name="safety_fin_shared_document">Safely photograph or note balances and debts on joint accounts without alerting others.</string>
+    <string name="safety_fin_emergency_aid">Identify shelter funds, emergency financial assistance, and crisis grants in your area.</string>
+    <string name="safety_fin_trusted_money_help">Plan who could safely lend or hold emergency cash, transit passes, or essentials for you.</string>
+    <string name="safety_fin_crisis_benefits">Ask a local support worker about emergency benefits or fee waivers you qualify for independently.</string>
+    <string name="safety_fin_children_benefits">Note child benefit accounts, childcare subsidies, and emergency support for children.</string>
+    <string name="safety_fin_lease_rights">Ask a housing worker or legal clinic about breaking a joint lease without penalty due to family violence.</string>
+    <string name="safety_fin_newcomer_support">Ask a settlement or legal-aid organization about emergency financial support available under your immigration status.</string>
+
+    <string name="safety_dest_choose">Choose a safe place to go.</string>
+    <string name="safety_dest_address">Write down the address and how to find it.</string>
+    <string name="safety_dest_when">Check when you can arrive safely.</string>
+    <string name="safety_dest_children">Confirm space and sleeping essentials for your children at the destination.</string>
+    <string name="safety_dest_adult_dependant">Confirm accessibility, stairs/elevator access, and care support for your dependant.</string>
+    <string name="safety_dest_pets">Verify pets are welcome or arrange temporary pet safekeeping near your destination.</string>
+
+    <string name="safety_travel_vehicle_fuel">Keep the fuel tank or battery charged above half when safe to do so.</string>
+    <string name="safety_travel_spare_key">Hide a spare vehicle key safely and know whether location sharing or vehicle tracking is enabled.</string>
+    <string name="safety_travel_vehicle_backup">Plan a backup transit or ride option if the vehicle is blocked or unavailable.</string>
+    <string name="safety_travel_transit_routes">Check daytime and overnight transit routes and safe transfer points.</string>
+    <string name="safety_travel_transit_fare">Keep transit card or exact fare ready where you can reach it quickly.</string>
+    <string name="safety_travel_pickup_spot">Pick a safe, well-lit stop or waiting area away from home.</string>
+    <string name="safety_travel_confirm_driver">Confirm a trusted driver or crisis transport service and how you will signal when to leave.</string>
+    <string name="safety_travel_meeting_spot">Agree on a safe pickup point a short distance away from the home.</string>
+    <string name="safety_travel_backup_ride">Have a backup ride number or emergency taxi plan saved safely.</string>
+    <string name="safety_travel_decide">Decide how you will get there.</string>
+    <string name="safety_travel_confirm_help">Confirm who can help with transport, if needed.</string>
+    <string name="safety_travel_prepare_fare">Prepare keys, fare or fuel when it is safe to do so.</string>
+    <string name="safety_travel_children">Plan strollers, car seats, or safe walking routes if leaving with children.</string>
+    <string name="safety_travel_adult_dependant">Plan accessible transport or mobility assistance needed for your dependant.</string>
+    <string name="safety_travel_pets">Check pet-friendly transit rules or confirm carrier space with your ride.</string>
+
+    <string name="safety_after_checkin">Let a trusted person know you arrived, when safe.</string>
+    <string name="safety_after_essentials">Plan essentials for the first few days: shelter, food and basic supplies.</string>
+    <string name="safety_after_immigration_legal">Contact an immigration legal clinic or settlement advocate about status protection options.</string>
+    <string name="safety_after_children_school">Notify your children’s school or daycare confidentially about safe pickup rules.</string>
+    <string name="safety_after_adult_dependant">Set up continuous home care, pharmacy transfers, or support services for your dependant.</string>
+    <string name="safety_after_legal_aid">Contact legal aid about protection orders, custody, or updating court filings with a safe address.</string>
+    <string name="safety_after_medical">Arrange prescription refills or transfer pharmacy and clinic contacts safely.</string>
+    <string name="safety_after_housing">Explore transitional housing support, utility changes, or tenant protection options.</string>
+    <string name="safety_after_support_services">Identify support services you may want to contact.</string>
+
+    <string name="safety_intake_abuse_title">Type of abuse experienced</string>
+    <string name="safety_intake_abuse_subtitle">Select any that apply to tailor safety, digital security, evidence, and support steps.</string>
+    <string name="safety_intake_abuse_physical">Physical abuse</string>
+    <string name="safety_intake_abuse_emotional">Emotional, verbal, or psychological abuse</string>
+    <string name="safety_intake_abuse_financial">Financial or economic abuse</string>
+    <string name="safety_intake_abuse_digital">Digital abuse, monitoring, or stalking</string>
+    <string name="safety_intake_abuse_sexual">Sexual abuse or coercion</string>
+    <string name="safety_intake_abuse_cultural">Cultural, spiritual, or immigration-status abuse</string>
+
+    <string name="safety_doc_abuse_physical_evidence">Dated injury photos, hospital or clinic visits, and police incident numbers</string>
+    <string name="safety_doc_abuse_emotional_records">Dated log or screenshots of threats, intimidation, or harassment</string>
+    <string name="safety_doc_abuse_financial_records">Pay stubs, credit report, and records of debts or accounts opened in your name</string>
+    <string name="safety_doc_abuse_sexual_records">Clinic or SANE examination records and crisis-centre support contacts</string>
+    <string name="safety_doc_abuse_immigration_coercion">Copies of withheld passports or permits, sponsorship letters, and threat evidence</string>
+    <string name="safety_grab_abuse_digital_check">Disable shared location services and inspect bags or keys for unfamiliar trackers</string>
+    <string name="safety_fin_abuse_credit_check">Place a fraud alert or credit check and secure independent benefit or tax logins</string>
+    <string name="safety_dest_abuse_physical_exit">Identify exits from the home and keep a backup emergency shelter number ready</string>
+    <string name="safety_travel_abuse_digital_tracking">Use a safe device or route less likely to appear on shared family tracking apps</string>
+    <string name="safety_after_abuse_physical_care">Seek medical attention for any injuries and ask about emergency shelter safety planning</string>
+    <string name="safety_after_abuse_emotional_support">Connect with a trauma-informed counsellor or peer support group</string>
+    <string name="safety_after_abuse_digital_security">Change key passwords from a safe device, review 2FA recovery emails, and check app permissions</string>
+    <string name="safety_after_abuse_sexual_support">Reach out to a specialized sexual assault crisis or support line when safe</string>
+    <string name="safety_after_abuse_cultural_support">Connect with culturally specific or settlement advocates regarding rights without sponsorship</string>
 </resources>
