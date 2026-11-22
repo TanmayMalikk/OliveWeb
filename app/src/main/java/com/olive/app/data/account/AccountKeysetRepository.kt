@@ -1,6 +1,7 @@
 package com.olive.app.data.account
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
@@ -72,6 +73,26 @@ internal fun interface AccountRecoveryCallable {
     suspend fun call(name: String, data: Map<String, Any?>): Any?
 }
 
+/** Confirms a sensitive recovery-factor action with Firebase without exposing a password to a callable. */
+internal fun interface PasskeyRecoveryAuthenticator {
+    suspend fun reauthenticate(accountId: String, password: String)
+}
+
+private class FirebasePasskeyRecoveryAuthenticator(
+    private val authProvider: () -> FirebaseAuth = FirebaseAuth::getInstance,
+) : PasskeyRecoveryAuthenticator {
+    override suspend fun reauthenticate(accountId: String, password: String) {
+        require(password.isNotEmpty()) { "Enter your account password" }
+        val auth = authProvider()
+        val user = auth.currentUser ?: error("Sign in again before removing a recovery passkey")
+        check(user.uid == accountId) { "Sign in again before removing a recovery passkey" }
+        val email = user.email ?: error("This account has no sign-in email")
+        user.reauthenticate(EmailAuthProvider.getCredential(email, password)).await()
+        // Force the newly-issued auth_time claim into the callable's token.
+        user.getIdToken(true).await()
+    }
+}
+
 private class FirebaseAccountRecoveryCallable(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
 ) : AccountRecoveryCallable {
@@ -85,6 +106,7 @@ private class FirebaseAccountRecoveryCallable(
  */
 internal class PasskeyRecoveryRepository(
     private val callable: AccountRecoveryCallable = FirebaseAccountRecoveryCallable(),
+    private val authenticator: PasskeyRecoveryAuthenticator = FirebasePasskeyRecoveryAuthenticator(),
 ) {
     internal data class RegistrationStart(
         val options: Map<String, Any?>,
@@ -177,6 +199,11 @@ internal class PasskeyRecoveryRepository(
         check(value["removed"] == true && value["credentialId"] == id) {
             "Passkey recovery credential was not removed"
         }
+    }
+
+    /** Refreshes Firebase recent-auth state before a server-protected factor removal. */
+    suspend fun reauthenticate(accountId: String, password: String) {
+        authenticator.reauthenticate(accountId, password)
     }
 
     private fun assertionStart(value: Map<*, *>): AssertionStart {

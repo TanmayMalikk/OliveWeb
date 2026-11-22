@@ -19,6 +19,8 @@ import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.security.*
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -487,12 +489,16 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    fun removePasskeyRecovery(credentialId: String) = with(runtime) {
+    fun removePasskeyRecovery(credentialId: String, password: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
             val recovery = passkeyRecoveryRepository ?: return@with
             if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
-            operations.runOperation(application.getString(R.string.passkey_recovery_remove_failed)) { token ->
+            operations.runOperation(
+                application.getString(R.string.passkey_recovery_remove_failed),
+                failureFor = ::passkeyRecoveryRemovalFailure,
+            ) { token ->
+                recovery.reauthenticate(uid, password)
                 recovery.removeCredential(credentialId)
                 val credentials = recovery.listCredentials()
                 if (currentRecoverySession(uid, token)) {
@@ -500,6 +506,16 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                     message = application.getString(R.string.passkey_recovery_removed)
                 }
             }
+        }
+    }
+
+    private fun passkeyRecoveryRemovalFailure(failure: Exception): String = with(runtime.application) {
+        when (failure) {
+            is FirebaseAuthInvalidCredentialsException ->
+                getString(R.string.passkey_recovery_reauth_incorrect_password)
+            is FirebaseAuthInvalidUserException ->
+                getString(R.string.passkey_recovery_reauth_session_expired)
+            else -> getString(R.string.passkey_recovery_remove_failed)
         }
     }
 

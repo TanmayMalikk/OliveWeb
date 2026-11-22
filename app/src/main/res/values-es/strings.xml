@@ -489,6 +489,9 @@
     <string name="passkey_recovery_remove">Eliminar llave</string>
     <string name="passkey_recovery_removed">Se eliminó la llave de recuperación.</string>
     <string name="passkey_recovery_remove_failed">No se pudo eliminar la llave de recuperación. Por seguridad, vuelve a iniciar sesión e inténtalo de nuevo.</string>
+    <string name="passkey_recovery_reauth_password">Contraseña de la cuenta</string>
+    <string name="passkey_recovery_reauth_incorrect_password">Esa contraseña de cuenta es incorrecta. Tu llave de recuperación no se eliminó. Código: RPK-16.</string>
+    <string name="passkey_recovery_reauth_session_expired">Tu sesión de inicio de sesión venció. Vuelve a iniciar sesión antes de eliminar una llave de recuperación. Código: RPK-17.</string>
     <string name="passkey_recovery_none">No hay llaves de recuperación registradas.</string>
     <string name="passkey_recovery_synced_factor">Llave de recuperación sincronizada</string>
     <string name="passkey_recovery_device_factor">Llave de recuperación del dispositivo</string>

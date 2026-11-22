@@ -483,6 +483,9 @@
     <string name="passkey_recovery_remove">移除通行密钥</string>
     <string name="passkey_recovery_removed">已移除恢复通行密钥。</string>
     <string name="passkey_recovery_remove_failed">无法移除恢复通行密钥。为确保安全，请重新登录后再试。</string>
+    <string name="passkey_recovery_reauth_password">账户密码</string>
+    <string name="passkey_recovery_reauth_incorrect_password">账户密码不正确。恢复通行密钥未被移除。代码：RPK-16。</string>
+    <string name="passkey_recovery_reauth_session_expired">您的登录会话已过期。请重新登录后再移除恢复通行密钥。代码：RPK-17。</string>
     <string name="passkey_recovery_none">尚未注册恢复通行密钥。</string>
     <string name="passkey_recovery_synced_factor">同步的恢复通行密钥</string>
     <string name="passkey_recovery_device_factor">设备恢复通行密钥</string>

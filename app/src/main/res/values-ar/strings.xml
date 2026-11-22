@@ -498,6 +498,9 @@
     <string name="passkey_recovery_remove">إزالة مفتاح المرور</string>
     <string name="passkey_recovery_removed">تمت إزالة مفتاح مرور الاسترداد.</string>
     <string name="passkey_recovery_remove_failed">تعذرت إزالة مفتاح مرور الاسترداد. للأمان، سجّل الدخول مرة أخرى ثم أعد المحاولة.</string>
+    <string name="passkey_recovery_reauth_password">كلمة مرور الحساب</string>
+    <string name="passkey_recovery_reauth_incorrect_password">كلمة مرور الحساب غير صحيحة. لم تتم إزالة مفتاح مرور الاسترداد. الرمز: RPK-16.</string>
+    <string name="passkey_recovery_reauth_session_expired">انتهت جلسة تسجيل الدخول. سجّل الدخول مرة أخرى قبل إزالة مفتاح مرور الاسترداد. الرمز: RPK-17.</string>
     <string name="passkey_recovery_none">لا توجد مفاتيح مرور مسجلة للاسترداد.</string>
     <string name="passkey_recovery_synced_factor">مفتاح مرور استرداد متزامن</string>
     <string name="passkey_recovery_device_factor">مفتاح مرور استرداد على الجهاز</string>

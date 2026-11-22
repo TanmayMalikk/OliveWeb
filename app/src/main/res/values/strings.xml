@@ -534,6 +534,9 @@
     <string name="passkey_recovery_remove">Remove passkey</string>
     <string name="passkey_recovery_removed">Recovery passkey removed.</string>
     <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. For security, sign in again and retry.</string>
+    <string name="passkey_recovery_reauth_password">Account password</string>
+    <string name="passkey_recovery_reauth_incorrect_password">That account password is incorrect. Your recovery passkey was not removed. Code: RPK-16.</string>
+    <string name="passkey_recovery_reauth_session_expired">Your sign-in session has expired. Sign in again before removing a recovery passkey. Code: RPK-17.</string>
     <string name="passkey_recovery_none">No recovery passkeys are enrolled.</string>
     <string name="passkey_recovery_synced_factor">Synced recovery passkey</string>
     <string name="passkey_recovery_device_factor">Device recovery passkey</string>

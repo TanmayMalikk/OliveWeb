@@ -1,6 +1,7 @@
 package com.olive.app.security
 
 import com.olive.app.data.account.AccountRecoveryCallable
+import com.olive.app.data.account.PasskeyRecoveryAuthenticator
 import com.olive.app.data.account.PasskeyRecoveryRepository
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -136,9 +137,31 @@ class PasskeyRecoveryRepositoryTest {
             start.challengeId,
             """{"id":"credential_abcdefghijklmnop","clientExtensionResults":{"prf":{"enabled":true}}}""",
         ).envelope)
-        assertEquals(true, repository.listCredentials().single().backedUp)
-        assertEquals(1_795_000_000_000L, repository.listCredentials().single().createdAtEpochMillis)
+        val credentials = repository.listCredentials()
+        assertEquals(true, credentials.single().backedUp)
+        assertEquals(1_795_000_000_000L, credentials.single().createdAtEpochMillis)
         repository.removeCredential("credential_abcdefghijklmnop")
+    }
+
+    @Test
+    fun `reauthentication stays local before sensitive factor removal`() = runBlocking {
+        var authenticated: Pair<String, String>? = null
+        val calls = mutableListOf<String>()
+        val repository = PasskeyRecoveryRepository(
+            callable = AccountRecoveryCallable { name, _ ->
+                calls += name
+                mapOf("removed" to true, "credentialId" to "credential_abcdefghijklmnop")
+            },
+            authenticator = PasskeyRecoveryAuthenticator { accountId, password ->
+                authenticated = accountId to password
+            },
+        )
+
+        repository.reauthenticate("account-a", "correct-password")
+        repository.removeCredential("credential_abcdefghijklmnop")
+
+        assertEquals("account-a" to "correct-password", authenticated)
+        assertEquals(listOf("passkeyRecoveryRemoveCredential"), calls)
     }
 
     @Test

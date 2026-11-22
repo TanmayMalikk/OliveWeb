@@ -391,8 +391,8 @@ internal interface SessionAccountManagementActions {
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
     fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
     fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
-    fun removePasskeyRecovery(credentialId: String) =
-        runtime.settings.removePasskeyRecovery(credentialId)
+    fun removePasskeyRecovery(credentialId: String, password: String) =
+        runtime.settings.removePasskeyRecovery(credentialId, password)
 }
 
 // Connects cover, private note, activity, and privacy screens to their workflows.

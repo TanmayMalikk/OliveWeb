@@ -489,6 +489,9 @@
     <string name="passkey_recovery_remove">Supprimer la clé d’accès</string>
     <string name="passkey_recovery_removed">Clé d’accès de récupération supprimée.</string>
     <string name="passkey_recovery_remove_failed">Impossible de supprimer la clé d’accès de récupération. Pour votre sécurité, reconnectez-vous puis réessayez.</string>
+    <string name="passkey_recovery_reauth_password">Mot de passe du compte</string>
+    <string name="passkey_recovery_reauth_incorrect_password">Ce mot de passe est incorrect. Votre clé d’accès de récupération n’a pas été supprimée. Code: RPK-16.</string>
+    <string name="passkey_recovery_reauth_session_expired">Votre session de connexion a expiré. Reconnectez-vous avant de supprimer une clé d’accès de récupération. Code: RPK-17.</string>
     <string name="passkey_recovery_none">Aucune clé d’accès de récupération n’est enregistrée.</string>
     <string name="passkey_recovery_synced_factor">Clé d’accès de récupération synchronisée</string>
     <string name="passkey_recovery_device_factor">Clé d’accès de récupération de l’appareil</string>
