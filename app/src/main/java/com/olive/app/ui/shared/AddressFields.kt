@@ -141,17 +141,21 @@ private fun AddressAutocomplete(
     var focused by remember { mutableStateOf(false) }
     val query = if (cityOnly) current.city else current.line1
     LaunchedEffect(query, focused) {
-        suggestions = emptyList()
         if (selectedText == query) {
             selectedText = null
+            suggestions = emptyList()
             return@LaunchedEffect
         }
-        if (!focused || query.trim().length < 3 || !GeoapifyClient.configured) return@LaunchedEffect
-        delay(200.milliseconds)
-        runCatching { GeoapifyClient.autocomplete(query, cityOnly) }
+        if (!focused || query.trim().length < 2 || !GeoapifyClient.configured) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(50.milliseconds)
+        runCatching { GeoapifyClient.autocomplete(query, cityOnly, minLength = 2) }
             .onSuccess { suggestions = it }
             .onFailure {
                 if (it is CancellationException) throw it
+                suggestions = emptyList()
                 error = text(R.string.address_suggestions_are_unavailable_continue_entering_your_address)
             }
     }

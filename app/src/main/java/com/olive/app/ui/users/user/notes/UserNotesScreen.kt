@@ -32,11 +32,14 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.location.AddressSuggestion
+import com.olive.app.data.location.DestinationAutocompleteClient
 import com.olive.app.data.location.DeviceLocation
 import com.olive.app.data.location.GeoapifyClient
 import com.olive.app.data.location.MapLocationPoint
@@ -189,18 +192,37 @@ internal fun PrivateNotes(session: SessionViewModel) {
         if (uid != null) session.documents.load(uid, session.coverUsername, session.localMode)
     }
     LaunchedEffect(incidentLocation, kind, locationSearchRetry) {
-        locationSuggestions = emptyList()
         locationSearchFailed = false
+        val trimmed = incidentLocation.trim()
         if (kind != PrivateEntryKind.Incident || incidentLatitude != null ||
-            incidentLocation.trim().length < 3 || !GeoapifyClient.configured
-        ) return@LaunchedEffect
-        delay(300.milliseconds)
-        val results = try {
-            GeoapifyClient.autocomplete(incidentLocation, false)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
+            trimmed.length < 2 || (!GeoapifyClient.configured && BuildConfig.MAPBOX_ACCESS_TOKEN.isBlank())
+        ) {
+            locationSuggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(50.milliseconds)
+        val geoResults = if (GeoapifyClient.configured) {
+            try {
+                GeoapifyClient.autocomplete(trimmed, false, minLength = 2)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
             emptyList()
+        }
+        val results = if (geoResults.isNotEmpty() || BuildConfig.MAPBOX_ACCESS_TOKEN.isBlank()) {
+            geoResults
+        } else {
+            DestinationAutocompleteClient.suggest(trimmed).map { item ->
+                AddressSuggestion(
+                    item.id,
+                    item.title,
+                    item.subtitle,
+                    DeliveryAddress(line1 = item.title, latitude = item.latitude, longitude = item.longitude),
+                )
+            }
         }
         locationSuggestions = results
         locationSearchFailed = results.isEmpty()

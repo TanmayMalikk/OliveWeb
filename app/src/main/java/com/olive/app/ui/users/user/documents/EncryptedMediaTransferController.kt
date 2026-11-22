@@ -907,12 +907,14 @@ internal class MediaTransferController(
     private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File = withContext(Dispatchers.IO) {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
+        var recoveredViaAccountKeyset = false
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
             .getOrElse { deviceFailure ->
                 val accountWrapper=document.accountWrappedKeys[viewerUid]
                     ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
                 val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrNull()
                     ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                recoveredViaAccountKeyset = true
                 runCatching { accountWrapper.unwrap(keyset) }
                     .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
             }
@@ -926,6 +928,18 @@ internal class MediaTransferController(
             } }
             check(partial.renameTo(target))
             sessionDecryptedCache[document.id] = target
+            if (recoveredViaAccountKeyset) {
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        val publicKey = KeyManager.getOrCreatePublicKey()
+                        val rewrapped = KeyManager.wrapKey(key, publicKey)
+                        repository.updateDeviceKeys(
+                            document.id,
+                            mapOf("$viewerUid--${KeyManager.deviceId(publicKey)}" to rewrapped),
+                        )
+                    }.onFailure { if (it is CancellationException) throw it }
+                }
+            }
             return@withContext target
         } catch(failure:Exception) {
             partial.delete()

@@ -84,4 +84,55 @@ class GeoapifyClientTest {
         assertEquals("Edmonton, Alberta", result.id)
         assertEquals("Canada", result.address.country)
     }
+
+    @Test
+    fun autocompleteSupportsTwoCharactersCachesValidResponsesAndRetriesErrors() = kotlinx.coroutines.runBlocking {
+        GeoapifyClient.clearCache()
+        var calls = 0
+        fun fakeConnection(code: Int, body: String): javax.net.ssl.HttpsURLConnection {
+            val stream = java.io.ByteArrayInputStream(body.toByteArray())
+            return object : javax.net.ssl.HttpsURLConnection(java.net.URL("https://api.geoapify.com/test")) {
+                override fun disconnect() {}
+                override fun usingProxy() = false
+                override fun connect() {}
+                override fun getCipherSuite() = ""
+                override fun getLocalCertificates(): Array<java.security.cert.Certificate>? = null
+                override fun getServerCertificates(): Array<java.security.cert.Certificate>? = null
+                override fun getResponseCode() = code
+                override fun getInputStream() = stream
+            }
+        }
+
+        // Single-character queries do not trigger remote lookups.
+        val short = GeoapifyClient.autocomplete("e", cityOnly = false, apiKey = "geo-test") {
+            calls++
+            fakeConnection(200, "{}")
+        }
+        assertTrue(short.isEmpty())
+        assertEquals(0, calls)
+
+        // Two-character queries work, and 500 errors are never cached.
+        val failed = GeoapifyClient.autocomplete("ed", cityOnly = false, apiKey = "geo-test") {
+            calls++
+            fakeConnection(500, "{}")
+        }
+        assertTrue(failed.isEmpty())
+        assertEquals(1, calls)
+
+        // Valid 200 responses (normalized) are cached for repeat lookups.
+        val json = """{"results":[{"place_id":"ed-1","lat":53.5461,"lon":-113.4938,"address_line1":"101 St","city":"Edmonton","state_code":"AB"}]}"""
+        val ok = GeoapifyClient.autocomplete("  ED  ", cityOnly = false, apiKey = "geo-test") {
+            calls++
+            fakeConnection(200, json)
+        }
+        assertEquals(1, ok.size)
+        assertEquals(2, calls)
+
+        val cached = GeoapifyClient.autocomplete("ed", cityOnly = false, apiKey = "geo-test") {
+            calls++
+            fakeConnection(200, json)
+        }
+        assertEquals("ed-1", cached.single().id)
+        assertEquals(2, calls)
+    }
 }

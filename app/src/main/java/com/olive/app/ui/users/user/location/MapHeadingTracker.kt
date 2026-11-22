@@ -14,11 +14,12 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.olive.app.data.location.applyMagneticDeclination
 import com.olive.app.data.location.computeTiltInvariantAzimuthDegrees
@@ -30,21 +31,35 @@ import kotlin.math.roundToInt
 
 /**
  * Observes tilt-invariant true-north compass orientation and GPS movement bearing while [enabled] is true,
- * returning a circularly smoothed heading in `[0f, 360f)`.
+ * returning a [State] holding a circularly smoothed heading in `[0f, 360f)` without forcing caller recomposition.
  */
 @Composable
-internal fun rememberDeviceHeading(
+internal fun rememberDeviceHeadingState(
     enabled: Boolean,
     latitude: Double? = null,
     longitude: Double? = null,
     gpsBearing: Float? = null,
     gpsSpeedMetersPerSecond: Float? = null,
-): Float? {
+): State<Float?> {
     val context = LocalContext.current
-    var heading by remember { mutableStateOf<Float?>(null) }
-    var compassAzimuth by remember { mutableStateOf<Float?>(null) }
+    val configuration = LocalConfiguration.current
+    val headingState = remember { mutableStateOf<Float?>(null) }
+    val compassAzimuth = remember { arrayOfNulls<Float>(1) }
     val latestGpsBearing by rememberUpdatedState(gpsBearing)
     val latestGpsSpeed by rememberUpdatedState(gpsSpeedMetersPerSecond)
+
+    // Cache display rotation per configuration change so sensor events do not query system display services at 20 Hz.
+    val cachedDisplayRotation = remember(context, configuration) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 30) {
+                context.display.rotation
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(WindowManager::class.java)?.defaultDisplay?.rotation
+            }
+        }.getOrNull() ?: Surface.ROTATION_0
+    }
+    val latestDisplayRotation by rememberUpdatedState(cachedDisplayRotation)
 
     // Cache magnetic declination per ~55 km grid cell so GeomagneticField runs only when location shifts significantly.
     val declinationDegrees = remember(
@@ -64,18 +79,19 @@ internal fun rememberDeviceHeading(
 
     fun publishIfChanged(rawCompass: Float?) {
         val candidate = selectPreferredHeading(latestGpsBearing, latestGpsSpeed, rawCompass) ?: return
-        val next = smoothHeading(heading, candidate, alpha = 0.28f)
-        if (heading == null || abs(shortestAngleDelta(heading!!, next)) >= 1.5f) {
-            heading = next
+        val current = headingState.value
+        val next = smoothHeading(current, candidate, alpha = 0.28f)
+        if (current == null || abs(shortestAngleDelta(current, next)) >= 1.5f) {
+            headingState.value = next
         }
     }
 
     LaunchedEffect(enabled, gpsBearing, gpsSpeedMetersPerSecond, declinationDegrees) {
         if (!enabled) {
-            heading = null
-            compassAzimuth = null
+            headingState.value = null
+            compassAzimuth[0] = null
         } else {
-            publishIfChanged(compassAzimuth)
+            publishIfChanged(compassAzimuth[0])
         }
     }
 
@@ -99,16 +115,7 @@ internal fun rememberDeviceHeading(
                 val remappedMatrix = FloatArray(9)
                 var lastEmitElapsedMs = 0L
 
-                fun currentDisplayRotation(): Int = runCatching {
-                    if (Build.VERSION.SDK_INT >= 30) {
-                        context.display.rotation
-                    } else {
-                        @Suppress("DEPRECATION")
-                        context.getSystemService(WindowManager::class.java)?.defaultDisplay?.rotation
-                    }
-                }.getOrNull() ?: Surface.ROTATION_0
-
-                fun remapForDisplay(input: FloatArray): FloatArray = when (currentDisplayRotation()) {
+                fun remapForDisplay(input: FloatArray): FloatArray = when (latestDisplayRotation) {
                     Surface.ROTATION_90 -> {
                         SensorManager.remapCoordinateSystem(input, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix)
                         remappedMatrix
@@ -153,7 +160,7 @@ internal fun rememberDeviceHeading(
                         val matrix = remapForDisplay(rawRotationMatrix)
                         val magneticAzimuth = computeTiltInvariantAzimuthDegrees(matrix) ?: return
                         val trueAzimuth = applyMagneticDeclination(magneticAzimuth, latestDeclination)
-                        compassAzimuth = trueAzimuth
+                        compassAzimuth[0] = trueAzimuth
                         publishIfChanged(trueAzimuth)
                     }
 
@@ -174,5 +181,26 @@ internal fun rememberDeviceHeading(
         }
     }
 
-    return if (enabled) heading else null
+    return remember(enabled, headingState) {
+        androidx.compose.runtime.derivedStateOf { if (enabled) headingState.value else null }
+    }
 }
+
+/**
+ * Observes tilt-invariant true-north compass orientation and GPS movement bearing while [enabled] is true,
+ * returning a circularly smoothed heading in `[0f, 360f)`.
+ */
+@Composable
+internal fun rememberDeviceHeading(
+    enabled: Boolean,
+    latitude: Double? = null,
+    longitude: Double? = null,
+    gpsBearing: Float? = null,
+    gpsSpeedMetersPerSecond: Float? = null,
+): Float? = rememberDeviceHeadingState(
+    enabled = enabled,
+    latitude = latitude,
+    longitude = longitude,
+    gpsBearing = gpsBearing,
+    gpsSpeedMetersPerSecond = gpsSpeedMetersPerSecond,
+).value

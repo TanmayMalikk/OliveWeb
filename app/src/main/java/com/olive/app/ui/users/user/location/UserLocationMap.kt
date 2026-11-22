@@ -48,6 +48,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -56,9 +58,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -80,6 +83,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -105,6 +109,7 @@ internal fun InteractiveLocationMap(
     onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
     headingUp: Boolean = false,
     headingDegrees: Float? = null,
+    headingState: State<Float?>? = null,
     onToggleHeadingUp: (() -> Unit)? = null,
     compassEnabled: Boolean = true,
     fitSupportServices: Boolean = false,
@@ -122,26 +127,29 @@ internal fun InteractiveLocationMap(
     var searchQuery by remember { mutableStateOf("") }
     var routeWasShown by remember { mutableStateOf(false) }
     var supportWereFitted by remember { mutableStateOf(false) }
-    var mapBearing by remember { mutableFloatStateOf(0f) }
+    val mapBearingState = remember { mutableFloatStateOf(0f) }
+    val hasRotatedBearing by remember { derivedStateOf { abs(mapBearingState.floatValue) >= 2f } }
     val lastCssSize = remember { intArrayOf(0, 0) }
 
     val usesInternalCompass = onToggleHeadingUp == null && compassEnabled
     var internalHeadingUp by remember { mutableStateOf(false) }
     val headingReference = points.firstOrNull { it.uid == ownPointUid } ?: points.firstOrNull()
-    val internalHeadingDegrees = rememberDeviceHeading(
+    val internalHeadingState = rememberDeviceHeadingState(
         enabled = usesInternalCompass && (internalHeadingUp || ownPointUid != null),
         latitude = headingReference?.latitude,
         longitude = headingReference?.longitude,
     )
+    val fallbackHeadingState = rememberUpdatedState(headingDegrees)
+    val activeHeadingState: State<Float?> =
+        if (usesInternalCompass) internalHeadingState else (headingState ?: fallbackHeadingState)
     val effectiveHeadingUp = if (usesInternalCompass) internalHeadingUp else headingUp
-    val effectiveHeadingDegrees = if (usesInternalCompass) internalHeadingDegrees else headingDegrees
 
     val currentSupportServices by rememberUpdatedState(supportServices)
     val currentSupportSelection by rememberUpdatedState(onSupportSelected)
     val currentViewportCallback by rememberUpdatedState(onViewportCenterChanged)
     val currentUserGestureCallback by rememberUpdatedState(onUserGesture)
     val currentHeadingUp by rememberUpdatedState(effectiveHeadingUp)
-    val currentHeadingDegrees by rememberUpdatedState(effectiveHeadingDegrees)
+    val currentHeadingState by rememberUpdatedState(activeHeadingState)
     val currentNavigationActive by rememberUpdatedState(navigationActive)
     val currentUsesInternalCompass by rememberUpdatedState(usesInternalCompass)
 
@@ -287,37 +295,40 @@ internal fun InteractiveLocationMap(
         }
     }
 
-    LaunchedEffect(effectiveHeadingUp, effectiveHeadingDegrees, navigationActive, loadState, attempt) {
-        if (loadState == MapLoadState.Ready) {
-            val degArg = effectiveHeadingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
-            webView[0]?.evaluateJavascript(
-                "window.oliveSetHeading($degArg,$effectiveHeadingUp,$navigationActive);",
-                null,
-            )
-            if (effectiveHeadingUp && effectiveHeadingDegrees != null && effectiveHeadingDegrees.isFinite()) {
-                mapBearing = effectiveHeadingDegrees
+    LaunchedEffect(loadState, attempt, effectiveHeadingUp, navigationActive, activeHeadingState) {
+        if (loadState != MapLoadState.Ready) return@LaunchedEffect
+        snapshotFlow { activeHeadingState.value }
+            .distinctUntilChanged()
+            .collect { degrees ->
+                val degArg = degrees?.takeIf { it.isFinite() }?.toString() ?: "null"
+                webView[0]?.evaluateJavascript(
+                    "window.oliveSetHeading($degArg,$effectiveHeadingUp,$navigationActive);",
+                    null,
+                )
+                if (effectiveHeadingUp && degrees != null && degrees.isFinite()) {
+                    mapBearingState.floatValue = degrees
+                }
             }
-        }
     }
 
-    val showCompassControl = compassEnabled || onToggleHeadingUp != null || abs(mapBearing) >= 2f
+    val showCompassControl = compassEnabled || onToggleHeadingUp != null || hasRotatedBearing
 
     @Composable
     fun CompassFab() {
         SmallFloatingActionButton(
             onClick = {
-                if (!effectiveHeadingUp && abs(mapBearing) >= 2f) {
-                    mapBearing = 0f
+                if (!effectiveHeadingUp && abs(mapBearingState.floatValue) >= 2f) {
+                    mapBearingState.floatValue = 0f
                     webView[0]?.evaluateJavascript("window.oliveResetNorth();", null)
                 } else {
                     if (!effectiveHeadingUp && !userSearchEnabled && followTargetUid != null) {
                         following = true
                     }
                     if (usesInternalCompass) {
-                        if (internalHeadingUp) mapBearing = 0f
+                        if (internalHeadingUp) mapBearingState.floatValue = 0f
                         internalHeadingUp = !internalHeadingUp
                     } else {
-                        if (effectiveHeadingUp) mapBearing = 0f
+                        if (effectiveHeadingUp) mapBearingState.floatValue = 0f
                         onToggleHeadingUp?.invoke()
                     }
                 }
@@ -332,7 +343,7 @@ internal fun InteractiveLocationMap(
                     if (effectiveHeadingUp) R.string.location_compass_toggle_heading_desc
                     else R.string.location_compass_toggle_north_desc
                 ),
-                modifier = Modifier.rotate(-mapBearing),
+                modifier = Modifier.graphicsLayer { rotationZ = -mapBearingState.floatValue },
             )
         }
     }
@@ -407,7 +418,7 @@ internal fun InteractiveLocationMap(
                                     currentUserGestureCallback?.invoke()
                                 },
                                 onBearing = { bearing ->
-                                    mapBearing = bearing
+                                    mapBearingState.floatValue = bearing
                                 },
                             ),
                             "OliveMapCamera",
@@ -422,7 +433,7 @@ internal fun InteractiveLocationMap(
                                     updateSupportServices(view)
                                     updateRoute(view, route != null)
                                     updateSelection(view)
-                                    val degArg = currentHeadingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
+                                    val degArg = currentHeadingState.value?.takeIf { it.isFinite() }?.toString() ?: "null"
                                     view.evaluateJavascript(
                                         "window.oliveSetHeading($degArg,$currentHeadingUp,$currentNavigationActive);",
                                         null,

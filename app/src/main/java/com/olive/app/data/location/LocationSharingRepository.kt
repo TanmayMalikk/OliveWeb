@@ -15,15 +15,29 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import java.io.IOException
 import java.net.URLEncoder
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
 import javax.net.ssl.HttpsURLConnection
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.net.URL
 
@@ -660,6 +674,20 @@ data class AddressSuggestion(
 
 // Builds an address-suggestion request for Geoapify.
 internal object GeoapifyClient {
+    private const val MAX_CACHE_ENTRIES = 64
+    private val cache = object : LinkedHashMap<String, List<AddressSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<AddressSuggestion>>): Boolean =
+            size > MAX_CACHE_ENTRIES
+    }
+    private val cacheLock = Any()
+    private val sharedHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
+    }
+
     val configured get() = BuildConfig.GEOAPIFY_API_KEY.isNotBlank()
 
     /**
@@ -672,37 +700,85 @@ internal object GeoapifyClient {
     suspend fun autocomplete(
         query: String,
         cityOnly: Boolean,
-        minLength: Int = 3,
-    ): List<AddressSuggestion> =
-        withContext(Dispatchers.IO) {
-            if (!configured || query.trim().length < minLength) return@withContext emptyList()
-            val parameters = buildList {
-                add("text=${encode(query.trim())}")
-                add("format=json")
-                add("filter=countrycode:ca")
-                add(
-                    "limit=5"
-                )
-                if (cityOnly) add("type=city")
-                add("apiKey=${encode(BuildConfig.GEOAPIFY_API_KEY)}")
-            }.joinToString("&")
-            val connection =
-                (URL("https://api.geoapify.com/v1/geocode/autocomplete?$parameters")
-                    .openConnection() as HttpsURLConnection).apply {
-                    connectTimeout = 5_000
-                    readTimeout = 5_000
-                    requestMethod =
-                        "GET"
-                    setRequestProperty("Accept", "application/json")
-                }
-            // Turn an unexpected autocomplete failure into a readable message.
-            try {
-                if (connection.responseCode !in 200..299) return@withContext emptyList()
-                parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
-            } finally {
-                connection.disconnect()
-            }
+        minLength: Int = 2,
+        apiKey: String = BuildConfig.GEOAPIFY_API_KEY,
+        openConnection: ((URL) -> HttpsURLConnection)? = null,
+    ): List<AddressSuggestion> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (apiKey.isBlank() || trimmed.length < minLength) return@withContext emptyList()
+        val key = "${trimmed.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")}|$cityOnly"
+        synchronized(cacheLock) { cache[key] }?.let { return@withContext it }
+
+        val parameters = buildList {
+            add("text=${encode(trimmed)}")
+            add("format=json")
+            add("filter=countrycode:ca")
+            add("limit=5")
+            if (cityOnly) add("type=city")
+            add("apiKey=${encode(apiKey)}")
+        }.joinToString("&")
+        val url = "https://api.geoapify.com/v1/geocode/autocomplete?$parameters"
+        val (succeeded, results) = if (openConnection == null) {
+            fetchWithOkHttp(url)
+        } else {
+            fetchWithConnection(url, openConnection)
         }
+        if (succeeded) {
+            synchronized(cacheLock) { cache[key] = results }
+        }
+        results
+    }
+
+    private suspend fun fetchWithOkHttp(url: String): Pair<Boolean, List<AddressSuggestion>> {
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .build()
+        val call = sharedHttpClient.newCall(request)
+        return suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val outcome = response.use { res ->
+                            if (!res.isSuccessful) false to emptyList()
+                            else true to parseGeoapifySuggestions(res.body.string())
+                        }
+                        if (continuation.isActive) continuation.resume(outcome)
+                    } catch (failure: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(failure)
+                    }
+                }
+            })
+        }
+    }
+
+    private suspend fun fetchWithConnection(
+        url: String,
+        openConnection: (URL) -> HttpsURLConnection,
+    ): Pair<Boolean, List<AddressSuggestion>> {
+        currentCoroutineContext().ensureActive()
+        val connection = openConnection(URL(url)).apply {
+            connectTimeout = 5_000
+            readTimeout = 5_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/json")
+        }
+        return try {
+            if (connection.responseCode !in 200..299) false to emptyList()
+            else true to parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    internal fun clearCache() {
+        synchronized(cacheLock) { cache.clear() }
+    }
 
     /**
      * Converts Geoapify result fields into map coordinates.

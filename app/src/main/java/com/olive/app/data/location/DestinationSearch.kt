@@ -5,13 +5,25 @@ import android.content.Context
 import com.olive.app.BuildConfig
 import com.olive.app.data.safety.HotlineDirectory
 import com.olive.app.data.safety.HotlineResource
+import java.io.IOException
 import java.net.URL
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
+import kotlin.coroutines.resume
 import kotlin.math.roundToLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 
 internal enum class DestinationSuggestionKind {
@@ -125,6 +137,13 @@ internal object DestinationAutocompleteClient {
             size > MAX_CACHE_ENTRIES
     }
     private val cacheLock = Any()
+    private val sharedHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
+            .callTimeout(4, TimeUnit.SECONDS)
+            .build()
+    }
 
     /**
      * Fetches address autocomplete suggestions using Mapbox Geocoding v6 with Geoapify fallback.
@@ -134,25 +153,28 @@ internal object DestinationAutocompleteClient {
         proximityLatitude: Double? = null,
         proximityLongitude: Double? = null,
         mapboxToken: String = BuildConfig.MAPBOX_ACCESS_TOKEN,
-        openConnection: (URL) -> HttpsURLConnection = { it.openConnection() as HttpsURLConnection },
+        openConnection: ((URL) -> HttpsURLConnection)? = null,
     ): List<DestinationSuggestion> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.length < 2 || parseCoordinates(trimmed) != null) return@withContext emptyList()
         val key = cacheKey(trimmed, proximityLatitude, proximityLongitude)
         synchronized(cacheLock) { cache[key] }?.let { return@withContext it }
 
-        val mapboxResults = if (mapboxToken.isNotBlank()) {
-            runCatching {
-                fetchMapboxSuggestions(trimmed, proximityLatitude, proximityLongitude, mapboxToken, openConnection)
-            }.getOrDefault(emptyList())
+        val mapboxResult = if (mapboxToken.isNotBlank()) {
+            val url = buildMapboxUrl(trimmed, proximityLatitude, proximityLongitude, mapboxToken)
+            if (openConnection == null) fetchMapboxSuggestionsOkHttp(url)
+            else fetchMapboxSuggestionsLegacy(url, openConnection)
         } else {
             emptyList()
         }
-        val resolved = if (mapboxResults.isNotEmpty() || !GeoapifyClient.configured) {
-            mapboxResults
+        val mapboxSucceeded = mapboxResult != null
+        val mapboxItems = mapboxResult.orEmpty()
+        var geoSucceeded = !GeoapifyClient.configured
+        val resolved = if (mapboxItems.isNotEmpty() || !GeoapifyClient.configured) {
+            mapboxItems
         } else {
-            runCatching {
-                GeoapifyClient.autocomplete(trimmed, cityOnly = false, minLength = 2).mapNotNull { item ->
+            try {
+                val items = GeoapifyClient.autocomplete(trimmed, cityOnly = false, minLength = 2).mapNotNull { item ->
                     val lat = item.address.latitude ?: return@mapNotNull null
                     val lon = item.address.longitude ?: return@mapNotNull null
                     DestinationSuggestion(
@@ -164,9 +186,15 @@ internal object DestinationAutocompleteClient {
                         kind = DestinationSuggestionKind.Address,
                     )
                 }
-            }.getOrDefault(emptyList())
+                geoSucceeded = true
+                items
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
         }
-        if (resolved.isNotEmpty()) {
+        if (resolved.isNotEmpty() || (mapboxSucceeded && geoSucceeded)) {
             synchronized(cacheLock) { cache[key] = resolved }
         }
         resolved
@@ -195,13 +223,12 @@ internal object DestinationAutocompleteClient {
         }
     }
 
-    private fun fetchMapboxSuggestions(
+    private fun buildMapboxUrl(
         query: String,
         proximityLatitude: Double?,
         proximityLongitude: Double?,
         mapboxToken: String,
-        openConnection: (URL) -> HttpsURLConnection,
-    ): List<DestinationSuggestion> {
+    ): String {
         val params = buildList {
             add("q=${encode(query)}")
             add("autocomplete=true")
@@ -213,16 +240,56 @@ internal object DestinationAutocompleteClient {
             }
             add("access_token=${encode(mapboxToken)}")
         }.joinToString("&")
-        val connection = openConnection(URL("https://api.mapbox.com/search/geocode/v6/forward?$params"))
+        return "https://api.mapbox.com/search/geocode/v6/forward?$params"
+    }
+
+    private suspend fun fetchMapboxSuggestionsOkHttp(url: String): List<DestinationSuggestion>? {
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .build()
+        val call = sharedHttpClient.newCall(request)
+        return suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val result = runCatching {
+                        response.use { res ->
+                            if (!res.isSuccessful) null
+                            else parseMapboxGeocodeV6(res.body.string())
+                        }
+                    }.getOrNull()
+                    if (continuation.isActive) continuation.resume(result)
+                }
+            })
+        }
+    }
+
+    private suspend fun fetchMapboxSuggestionsLegacy(
+        url: String,
+        openConnection: (URL) -> HttpsURLConnection,
+    ): List<DestinationSuggestion>? {
+        currentCoroutineContext().ensureActive()
         return try {
-            connection.connectTimeout = 4_000
-            connection.readTimeout = 4_000
-            connection.requestMethod = "GET"
-            connection.setRequestProperty("Accept", "application/json")
-            if (connection.responseCode !in 200..299) emptyList()
-            else parseMapboxGeocodeV6(connection.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            connection.disconnect()
+            val connection = openConnection(URL(url))
+            try {
+                connection.connectTimeout = 4_000
+                connection.readTimeout = 4_000
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/json")
+                if (connection.responseCode !in 200..299) null
+                else parseMapboxGeocodeV6(connection.inputStream.bufferedReader().use { it.readText() })
+            } finally {
+                connection.disconnect()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
         }
     }
 

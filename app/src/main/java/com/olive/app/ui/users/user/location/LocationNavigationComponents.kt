@@ -54,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -122,6 +123,7 @@ internal fun FullScreenLocationMap(
     loadingMoreSupport: Boolean = false,
     headingUp: Boolean = false,
     headingDegrees: Float? = null,
+    headingState: State<Float?>? = null,
     onToggleHeadingUp: (() -> Unit)? = null,
     showSavedOnly: Boolean = false,
     savedCount: Int = 0,
@@ -159,6 +161,7 @@ internal fun FullScreenLocationMap(
             onViewportCenterChanged = onViewportCenterChanged,
             headingUp = headingUp,
             headingDegrees = headingDegrees,
+            headingState = headingState,
             onToggleHeadingUp = onToggleHeadingUp,
             fitSupportServices = (onLoadMoreSupport == null && ownPoint == null) || (showSavedOnly && savedCount > 0),
             bottomControlsPadding = if (showBottomCard) (bottomOverlayHeight + 8.dp)

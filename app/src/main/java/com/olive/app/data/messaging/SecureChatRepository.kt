@@ -255,43 +255,50 @@ class SecureChatRepository(
     suspend fun shareWithRegisteredDevices(
         conversation: ChatConversation,
         roomKey: SecretKey
-    ) {
+    ): Unit = coroutineScope {
+        val participantDevices = conversation.participantIds.mapNotNull { uid ->
+            val username = conversation.participantUsernames[uid] ?: return@mapNotNull null
+            async {
+                authorizePeer(username)
+                uid to firestore.collection("messageDirectory").document(username.trim().lowercase())
+                    .collection("devices").get().await()
+            }
+        }.awaitAll()
         val conversationRef = firestore.collection("conversations").document(conversation.id)
-        var batch = firestore.batch()
-        var writes = 0
-        conversation.participantIds.forEach { uid ->
-            val username = conversation.participantUsernames[uid] ?: return@forEach
-            authorizePeer(username)
-            val devices = firestore.collection("messageDirectory").document(username.trim().lowercase())
-                .collection("devices").get().await()
-            devices.documents.forEach { device ->
-                if (device.getString("uid") != uid) return@forEach
-                val deviceId = device.getString("deviceId") ?: return@forEach
-                val encoded = device.getString("publicKey") ?: return@forEach
-                val publicKey = runCatching { KeyManager.decodePublicKey(encoded) }.getOrNull()
-                    ?: return@forEach
-                val digest = if (device.getString("mgf1Digest") == "SHA-256")
-                    MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
-                batch.set(
-                    conversationRef.collection("deviceKeys").document("$uid--$deviceId"),
-                    mapOf(
-                        "uid" to uid,
-                        "deviceId" to deviceId,
-                        "publicKey" to encoded,
-                        "wrappedKey" to KeyManager.wrapKey(roomKey, publicKey, digest),
-                        "updatedAt" to FieldValue.serverTimestamp(),
+        val deviceCommitTask = async {
+            var batch = firestore.batch()
+            var writes = 0
+            participantDevices.forEach { (uid, devices) ->
+                devices.documents.forEach { device ->
+                    if (device.getString("uid") != uid) return@forEach
+                    val deviceId = device.getString("deviceId") ?: return@forEach
+                    val encoded = device.getString("publicKey") ?: return@forEach
+                    val publicKey = runCatching { KeyManager.decodePublicKey(encoded) }.getOrNull()
+                        ?: return@forEach
+                    val digest = if (device.getString("mgf1Digest") == "SHA-256")
+                        MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
+                    batch.set(
+                        conversationRef.collection("deviceKeys").document("$uid--$deviceId"),
+                        mapOf(
+                            "uid" to uid,
+                            "deviceId" to deviceId,
+                            "publicKey" to encoded,
+                            "wrappedKey" to KeyManager.wrapKey(roomKey, publicKey, digest),
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        )
                     )
-                )
-                writes++
-                if (writes == 10) {
-                    batch.commit().await()
-                    batch = firestore.batch()
-                    writes = 0
+                    writes++
+                    if (writes == 10) {
+                        batch.commit().await()
+                        batch = firestore.batch()
+                        writes = 0
+                    }
                 }
             }
+            if (writes > 0) batch.commit().await()
         }
-        if (writes > 0) batch.commit().await()
         shareWithRecoverableAccounts(conversation, roomKey)
+        deviceCommitTask.await()
     }
 
     /** Publishes optional account-recovery copies without requiring every chat role to enroll first. */

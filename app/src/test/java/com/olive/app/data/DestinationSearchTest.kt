@@ -101,4 +101,46 @@ class DestinationSearchTest {
         assertEquals(53.5461, parsed.single().latitude, 0.00001)
         assertEquals(-113.4938, parsed.single().longitude, 0.00001)
     }
+
+    @Test
+    fun autocompleteCachesValidEmptyResponsesAndRetriesAfterErrors() = kotlinx.coroutines.runBlocking {
+        DestinationAutocompleteClient.clearCache()
+        var calls = 0
+        fun fakeConnection(code: Int, body: String): javax.net.ssl.HttpsURLConnection {
+            val stream = java.io.ByteArrayInputStream(body.toByteArray())
+            return object : javax.net.ssl.HttpsURLConnection(java.net.URL("https://api.mapbox.com/test")) {
+                override fun disconnect() {}
+                override fun usingProxy() = false
+                override fun connect() {}
+                override fun getCipherSuite() = ""
+                override fun getLocalCertificates(): Array<java.security.cert.Certificate>? = null
+                override fun getServerCertificates(): Array<java.security.cert.Certificate>? = null
+                override fun getResponseCode() = code
+                override fun getInputStream() = stream
+            }
+        }
+
+        // Transient 500 error must not be cached so the next request retries.
+        val first = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test") {
+            calls++
+            fakeConnection(500, "{}")
+        }
+        assertTrue(first.isEmpty())
+        assertEquals(1, calls)
+
+        // Valid 200 empty response should be cached for repeat normalized queries.
+        val second = DestinationAutocompleteClient.suggest("  jasper   ave ", 53.5, -113.5, "pk.test") {
+            calls++
+            fakeConnection(200, """{"type":"FeatureCollection","features":[]}""")
+        }
+        assertTrue(second.isEmpty())
+        assertEquals(2, calls)
+
+        val third = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test") {
+            calls++
+            fakeConnection(200, """{"type":"FeatureCollection","features":[]}""")
+        }
+        assertTrue(third.isEmpty())
+        assertEquals(2, calls)
+    }
 }

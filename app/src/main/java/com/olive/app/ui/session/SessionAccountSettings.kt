@@ -29,6 +29,7 @@ import kotlinx.coroutines.sync.withLock
 
 // Saves private profile, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime: SessionRuntime) {
+    private val publishedKeysets = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     /**
      * Saves the user's cover choice and other general account settings.
      *
@@ -484,42 +485,22 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 application.getString(R.string.passkey_recovery_setup_failed),
                 timeoutMillis = 180_000,
             ) { token ->
-                val ark = accountRecoveryKey(uid, token)
+                val ark = accountRecoveryKey(uid, token, ensureRemotePublished = true)
                 val registration = recovery.beginEnrollment()
                 val registrationResult = requestPasskey(
-                    PasskeyPrfProtocol.registrationRequest(registration.options),
-                    assertion = false,
-                    uid = uid,
-                    token = token,
-                ) as? PasskeyCredentialResult.Registration
-                    ?: error("Passkey registration was cancelled")
-                val proof = recovery.continueEnrollment(
-                    registration.challengeId,
-                    registrationResult.serverResponseJson,
-                )
+                    PasskeyPrfProtocol.registrationRequest(registration.options), false, uid, token,
+                ) as? PasskeyCredentialResult.Registration ?: error("Passkey registration was cancelled")
+                val proof = recovery.continueEnrollment(registration.challengeId, registrationResult.serverResponseJson)
                 val assertion = requestPasskey(
-                    PasskeyPrfProtocol.assertionRequest(proof.options, proof.prfInputs),
-                    assertion = true,
-                    uid = uid,
-                    token = token,
-                ) as? PasskeyCredentialResult.Assertion
-                    ?: error("Passkey verification was cancelled")
+                    PasskeyPrfProtocol.assertionRequest(proof.options, proof.prfInputs), true, uid, token,
+                ) as? PasskeyCredentialResult.Assertion ?: error("Passkey verification was cancelled")
                 val result = assertion.value
                 try {
                     check(proof.prfInputs.containsKey(result.credentialId)) {
                         "Passkey proof selected an unexpected credential"
                     }
-                    val envelope = PasskeyRecoveryEnvelope.create(
-                        uid,
-                        result.credentialId,
-                        result.prfOutput,
-                        ark,
-                    )
-                    recovery.completeEnrollment(
-                        proof.challengeId,
-                        result.serverResponseJson,
-                        envelope,
-                    )
+                    val envelope = PasskeyRecoveryEnvelope.create(uid, result.credentialId, result.prfOutput, ark)
+                    recovery.completeEnrollment(proof.challengeId, result.serverResponseJson, envelope)
                 } finally {
                     result.prfOutput.fill(0)
                 }
@@ -548,15 +529,22 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    private suspend fun accountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
+    private suspend fun publishKeyset(e: AccountKeysetEnvelope) {
+        val m = "${e.accountId}:${e.keyId}:${e.epoch}"
+        if (m !in publishedKeysets) { runtime.accountKeysetRepository?.publish(e); publishedKeysets.add(m) }
+    }
+
+    private suspend fun accountRecoveryKey(
+        uid: String, token: Long, ensureRemotePublished: Boolean = false,
+    ): AccountRecoveryKey {
         val local = withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid) }
         if (local != null) {
             val key = unlockDeviceRecoveryKey(uid, local.deviceRecord, token)
-            runtime.accountKeysetRepository?.publish(local.envelope)
+            if (ensureRemotePublished) publishKeyset(local.envelope)
+            else runtime.scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local.envelope) } }
             return key
         }
-        val remote = runtime.accountKeysetRepository?.fetch(uid)
-            ?: return createAccountRecoveryKey(uid, token)
+        val remote = runtime.accountKeysetRepository?.fetch(uid) ?: return createAccountRecoveryKey(uid, token)
         return recoverAccountRecoveryKey(uid, remote, token)
     }
 
@@ -566,7 +554,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         val envelope = withContext(Dispatchers.IO) { AccountKeysetEnvelope.create(uid, recoveryKey) }
         protectDeviceRecoveryKey(uid, recoveryKey, envelope, token)
         try {
-            repository.publish(envelope)
+            publishKeyset(envelope)
         } catch (failure: Exception) {
             val authoritative = runCatching { repository.fetch(uid) }.getOrNull()
             if (authoritative != null && authoritative.keyId != envelope.keyId) {
@@ -683,33 +671,37 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /** Ensures media encryption has a stable account public key without unlocking private material. */
-    internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope {
-        with(runtime) {
-            withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
-                runCatching { accountKeysetRepository?.publish(local) }
-                return local
-            }
-            accountKeysetRepository?.fetch(uid)?.let { remote ->
-                runCatching { accountKeysetRepository?.publish(remote) }
-                return remote
-            }
-            val token = epoch
-            check(currentRecoverySession(uid, token)) { "Account session changed" }
-            accountRecoveryKey(uid, token)
-            return withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
-                ?: error("Account recovery keyset was not stored")
+    internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope = with(runtime) {
+        withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
+            scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local) } }
+            return@with local
         }
+        accountKeysetRepository?.fetch(uid)?.let { remote ->
+            scope.launch(Dispatchers.IO) { runCatching { publishKeyset(remote) } }
+            return@with remote
+        }
+        val token = epoch
+        check(currentRecoverySession(uid, token)) { "Account session changed" }
+        accountRecoveryKey(uid, token)
+        withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope } ?: error("Account recovery keyset was not stored")
     }
 
     /** Unlocks account private material only in client memory for one media-key operation. */
-    internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset {
-        with(runtime) {
-            val token = epoch
-            check(currentRecoverySession(uid, token)) { "Account session changed" }
-            val envelope = ensureAccountKeysetForMedia(uid)
-            val recoveryKey = accountRecoveryKey(uid, token)
-            return withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
+    internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset = with(runtime) {
+        val token = epoch
+        check(currentRecoverySession(uid, token)) { "Account session changed" }
+        val local = withContext(Dispatchers.IO) { accountKeysets.read(uid) }
+        val (envelope, recoveryKey) = if (local != null) {
+            val key = unlockDeviceRecoveryKey(uid, local.deviceRecord, token)
+            scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local.envelope) } }
+            local.envelope to key
+        } else {
+            val key = accountRecoveryKey(uid, token)
+            val stored = withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
+                ?: error("Account recovery keyset was not stored")
+            stored to key
         }
+        withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
     }
 
 }

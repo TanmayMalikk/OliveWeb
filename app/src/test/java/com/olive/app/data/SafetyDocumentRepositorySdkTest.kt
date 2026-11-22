@@ -149,7 +149,7 @@ class SafetyDocumentRepositorySdkTest {
     }
 
     @Test
-    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = withDeviceKey {
+    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = TestAndroidKeyStore.install().use {
         val files = mock(CollectionReference::class.java)
         val query = mock(Query::class.java)
         val registration = mock(ListenerRegistration::class.java)
@@ -166,10 +166,16 @@ class SafetyDocumentRepositorySdkTest {
         `when`(snapshot.metadata).thenReturn(metadata)
         `when`(metadata.isFromCache).thenReturn(true)
         val legacy = row("legacy", mapOf("owner_id" to "owner", "file_name" to "Legacy.txt", "file_type" to "text/plain", "allowed_users" to listOf("owner")))
-        `when`(snapshot.documents).thenReturn(listOf(legacy))
+        val encrypted = row("encrypted", encryptedFields())
+        `when`(snapshot.documents).thenReturn(listOf(legacy, encrypted))
         capture.value.onEvent(snapshot, null)
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals("Legacy.txt", updates.single().documents.single().name)
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (updates.isEmpty() && System.nanoTime() < deadline) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        val names = updates.single().documents.map(SafetyDocument::name).toSet()
+        assertEquals(setOf("Legacy.txt", "Private sample.pdf"), names)
         assertEquals(DocumentListSource.FIRESTORE_CACHE, updates.single().source)
         capture.value.onEvent(null, FirebaseFirestoreException("No access", FirebaseFirestoreException.Code.PERMISSION_DENIED))
         assertEquals(listOf("No access"), errors)

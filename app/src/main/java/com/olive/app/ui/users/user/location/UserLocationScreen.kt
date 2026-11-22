@@ -228,7 +228,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
         }
     }
 
-    val liveHeading = rememberDeviceHeading(
+    val liveHeadingState = rememberDeviceHeadingState(
         enabled = true,
         latitude = origin?.latitude,
         longitude = origin?.longitude,
@@ -332,7 +332,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
             supportServices = supportServices,
             onSupportSelected = selectSupportMarker,
             headingUp = headingUp,
-            headingDegrees = liveHeading,
+            headingState = liveHeadingState,
             onToggleHeadingUp = { headingUp = !headingUp },
             showSavedOnly = showSavedOnly,
             savedCount = savedMappedCount,
@@ -402,7 +402,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                     supportServices = supportServices,
                     onSupportSelected = selectSupportMarker,
                     headingUp = headingUp,
-                    headingDegrees = liveHeading,
+                    headingState = liveHeadingState,
                     onToggleHeadingUp = { headingUp = !headingUp },
                     fitSupportServices = showSavedOnly && savedMappedCount > 0,
                     onUserGesture = { if (headingUp) headingUp = false },
