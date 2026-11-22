@@ -280,9 +280,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 history.refreshHistory(device.uid)
                 screenHistory.clear()
                 safePageHistory.clear()
-                page = SafePage.Home
-                screen = SessionScreen.Safe
-                unlockAnimationVersion++
+                enterSafeWithAnimation()
                 privacy.startIdleTimer()
                 scope.launch(Dispatchers.IO) {
                     runCatching { dataSources.safetyDocuments?.upgradeOwnedRecoveryKeys(device.uid) }

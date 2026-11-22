@@ -108,6 +108,23 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         navigationSnapshot = navigationFlow.updateAndGet(transform)
     }
 
+    /**
+     * Enters Safe Home and advances the unlock animation version atomically so Compose never observes
+     * [SessionScreen.Safe] before the reveal overlay is armed.
+     */
+    fun enterSafeWithAnimation() = updateNavigation {
+        val nextScreen = if (canEnterSafe()) SessionScreen.Safe else SessionScreen.Cover
+        it.copy(
+            page = SafePage.Home,
+            screen = nextScreen,
+            unlockAnimationVersion = if (nextScreen == SessionScreen.Safe) {
+                it.unlockAnimationVersion + 1
+            } else {
+                it.unlockAnimationVersion
+            },
+        )
+    }
+
     var screen: SessionScreen
         get() = navigationSnapshot.screen
         set(value) = updateNavigation { it.copy(screen = if (value == SessionScreen.Safe && !canEnterSafe()) SessionScreen.Cover else value) }

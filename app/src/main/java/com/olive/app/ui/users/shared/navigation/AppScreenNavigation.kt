@@ -178,9 +178,20 @@ internal fun OliveRoot(
         }
     }
     val coverTitle = session.coverType.localizedTitle(uiText)
+    var completedUnlockAnimation by remember { mutableIntStateOf(navigation.unlockAnimationVersion) }
+    val showPinAnimation = shouldShowPinSafeAnimation(
+        navigation.screen,
+        navigation.unlockAnimationVersion,
+        completedUnlockAnimation,
+    )
+    LaunchedEffect(navigation.screen, navigation.unlockAnimationVersion) {
+        if (navigation.screen != SessionScreen.Safe) {
+            completedUnlockAnimation = navigation.unlockAnimationVersion
+        }
+    }
     val inActiveChat = navigation.page == SafePage.Messages && session.messages.activeConversation != null
     val safeUser = navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
-    val showSupport = safeUser && !inActiveChat && navigation.page != SafePage.Camera
+    val showSupport = safeUser && !inActiveChat && navigation.page != SafePage.Camera && !showPinAnimation
     val chatHasQuickExit = navigation.screen == SessionScreen.Safe && inActiveChat
     val userQuickExit = session.accountRole == AccountRole.USER
     val showQuickExit = userQuickExit && !isCover && !chatHasQuickExit
@@ -189,19 +200,6 @@ internal fun OliveRoot(
         navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    var observedUnlock by remember { mutableIntStateOf(navigation.unlockAnimationVersion) }
-    var pinAnimationRunning by remember { mutableStateOf(false) }
-    // Start the olive reveal only after a new successful private entry.
-    LaunchedEffect(navigation.unlockAnimationVersion, navigation.screen) {
-        val currentUnlock = navigation.unlockAnimationVersion
-        if (currentUnlock > observedUnlock && navigation.screen == SessionScreen.Safe) {
-            pinAnimationRunning = true
-        } else if (navigation.screen != SessionScreen.Safe) {
-            pinAnimationRunning = false
-        }
-        observedUnlock = currentUnlock
-    }
-    val showPinAnimation = pinAnimationRunning
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
@@ -408,16 +406,18 @@ internal fun OliveRoot(
                         if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
                             SafeAppUpdateBanner(update, Modifier.align(Alignment.TopCenter))
                         }
-                        if (showPinAnimation) PinSafeOliveTransition(
-                            backgroundColor = screenBackground,
-                            modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) awaitPointerEvent().changes.forEach { it.consume() }
-                                    }
-                                },
-                            onAnimationEnd = { pinAnimationRunning = false },
-                        )
+                        if (showPinAnimation) key(navigation.unlockAnimationVersion) {
+                            PinSafeOliveTransition(
+                                backgroundColor = screenBackground,
+                                modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
+                                    .pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                                        }
+                                    },
+                                onAnimationEnd = { completedUnlockAnimation = navigation.unlockAnimationVersion },
+                            )
+                        }
                         SafeSupportControls(
                             session,
                             exit,
@@ -512,6 +512,12 @@ internal fun OliveRoot(
         }
     }
 }
+
+internal fun shouldShowPinSafeAnimation(
+    screen: SessionScreen,
+    unlockAnimationVersion: Int,
+    completedUnlockAnimation: Int,
+): Boolean = screen == SessionScreen.Safe && unlockAnimationVersion > completedUnlockAnimation
 
 internal enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
 internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location }
