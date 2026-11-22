@@ -478,6 +478,8 @@
     <string name="passkey_recovery_sign_in_again">您的安全会话已过期。请重新登录后再设置账户恢复。代码：RPK-10。</string>
     <string name="passkey_recovery_server_rejected">Olive Branch 拒绝了此恢复设置。请更新应用后重试。如果问题持续，请向支持人员提供：RPK-12。</string>
     <string name="passkey_recovery_storage_denied">Olive Branch 无法保存加密恢复设置。应用的数据库访问规则可能已过期。请向支持人员提供：RPK-13。</string>
+    <string name="passkey_recovery_created_not_verified">通行密钥已创建，但 Olive Branch 无法完成验证。请从密码管理器中删除未完成的 Olive Branch 通行密钥，然后重试。请向支持人员提供：RPK-14。</string>
+    <string name="passkey_recovery_verified_not_saved">通行密钥已验证，但 Olive Branch 无法完成恢复设置保存。请重新打开这些设置。如果没有显示恢复通行密钥，请从密码管理器中删除未完成的通行密钥并重试。请向支持人员提供：RPK-15。</string>
     <string name="passkey_recovery_remove">移除通行密钥</string>
     <string name="passkey_recovery_removed">已移除恢复通行密钥。</string>
     <string name="passkey_recovery_remove_failed">无法移除恢复通行密钥。为确保安全，请重新登录后再试。</string>

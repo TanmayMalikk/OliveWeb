@@ -148,13 +148,20 @@ function consumeChallenge(transaction, reference) {
   transaction.delete(reference);
 }
 
-function registrationOptions(uid, credentials) {
+function accountDisplayName(token) {
+  const email = token?.email;
+  return typeof email === "string" && email.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ?
+    email : "Olive Branch account";
+}
+
+function registrationOptions(uid, displayName, credentials) {
   const {rpId} = webAuthnConfig();
   return generateRegistrationOptions({
     rpName: "Olive Branch",
     rpID: rpId,
     userID: new Uint8Array(Buffer.from(uid, "utf8")),
-    userName: uid,
+    userName: displayName,
+    userDisplayName: "Olive Branch recovery",
     attestationType: "none",
     timeout: CHALLENGE_LIFETIME_MS,
     excludeCredentials: credentials.map((credential) => ({id: credential.credentialId, transports: credential.transports})),
@@ -196,7 +203,11 @@ exports.passkeyRecoveryRemoveCredential = onCall(callableOptions, async (request
 
 exports.passkeyRecoveryBeginEnrollment = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
-  const options = await registrationOptions(uid, await existingCredentials(uid));
+  const options = await registrationOptions(
+      uid,
+      accountDisplayName(request.auth?.token),
+      await existingCredentials(uid),
+  );
   const challengeId = crypto.randomBytes(24).toString("base64url");
   const prfInput = crypto.randomBytes(PRF_INPUT_BYTES).toString("base64");
   const expiresAt = new Date(Date.now() + CHALLENGE_LIFETIME_MS);
@@ -410,6 +421,7 @@ exports.passkeyRecoveryCompleteUnlock = onCall(callableOptions, async (request) 
 });
 
 exports._test = {
+  accountDisplayName,
   recoveryEnvelope,
   credentialRecord,
   rejectPrfResult,

@@ -34,6 +34,7 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.AccountRole
 import com.olive.app.notification.OliveNotificationManager
 import com.olive.app.notification.LocalNotificationEventHandler
+import com.olive.app.security.trustedSystemHandoffActive
 import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
@@ -219,9 +220,7 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // The Safe App stays on its current page until the system permission result arrives.
-        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
-        ) session.navigation.background()
+        if (!systemHandoffActive()) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
     }
@@ -230,9 +229,7 @@ class OliveActivity : FragmentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
-        ) session.navigation.background()
+        if (!systemHandoffActive()) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
     }
@@ -245,6 +242,7 @@ class OliveActivity : FragmentActivity() {
         session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
+        passkeyCredentials.resume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         removeRecentPrivacyCoverAfterRedraw()
@@ -297,8 +295,7 @@ class OliveActivity : FragmentActivity() {
 
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
-            !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
+        if (!systemHandoffActive() && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,
@@ -333,6 +330,15 @@ class OliveActivity : FragmentActivity() {
             runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
         }
     }
+
+    private fun systemHandoffActive() = trustedSystemHandoffActive(
+        deviceCredential = deviceLock.awaitingCredential,
+        passkeyCredential = passkeyCredentials.awaitingCredential,
+        runtimePermission = permissions.awaitingResult,
+        externalFilePicker = session.externalFilePickerOpen,
+        callPermission = session.callPermissionRequestOpen,
+        safeSystemActivity = session.safeSystemActivityOpen,
+    )
 
     private fun closeAfterQuickExit() {
         // The task can be snapshotted before Compose redraws the cover or dashboard.

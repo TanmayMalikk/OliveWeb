@@ -572,7 +572,15 @@ internal class AndroidDeviceLock(
 
 /** Runs Credential Manager only while an Activity is present and sanitizes results immediately. */
 internal class AndroidPasskeyCredentials(private val activity: FragmentActivity) {
+    private data class Completion(
+        val request: PasskeyCredentialRequest,
+        val result: PasskeyCredentialResult?,
+    )
+
     private val credentials = CredentialManager.create(activity)
+    private val completionGate = LifecycleResultGate<Completion> { completion ->
+        (completion.result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)
+    }
     private var request: PasskeyCredentialRequest? = null
     private var job: Job? = null
     var awaitingCredential: Boolean = false
@@ -609,19 +617,30 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
             } catch (failure: Exception) {
                 PasskeyCredentialResult.Failure(classifyPasskeyCredentialFailure(failure))
             }
-            finish(value, result)
+            val completion = Completion(value, result)
+            completionGate.offer(
+                completion,
+                resumed = activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+            )?.let(::finish)
         }
+    }
+
+    /** Delivers a system credential result only after the private activity is visible again. */
+    fun resume() {
+        completionGate.resume()?.let(::finish)
     }
 
     fun cancel() {
         job?.cancel()
         job = null
+        completionGate.cancel()
         request?.complete(null)
         request = null
         awaitingCredential = false
     }
 
-    private fun finish(value: PasskeyCredentialRequest, result: PasskeyCredentialResult?) {
+    private fun finish(completion: Completion) {
+        val (value, result) = completion
         if (request !== value) {
             (result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)
             return

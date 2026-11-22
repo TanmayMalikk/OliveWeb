@@ -484,6 +484,8 @@
     <string name="passkey_recovery_sign_in_again">Tu sesión segura venció. Vuelve a iniciar sesión antes de configurar la recuperación. Código: RPK-10.</string>
     <string name="passkey_recovery_server_rejected">Olive Branch rechazó esta configuración. Actualiza la aplicación e inténtalo de nuevo. Si continúa, informa a soporte: RPK-12.</string>
     <string name="passkey_recovery_storage_denied">Olive Branch no pudo guardar la recuperación cifrada. El acceso de la aplicación a la base de datos puede estar desactualizado. Informa a soporte: RPK-13.</string>
+    <string name="passkey_recovery_created_not_verified">Tu llave de acceso se creó, pero Olive Branch no pudo verificarla. Elimina la llave incompleta de Olive Branch de tu gestor de contraseñas y vuelve a intentarlo. Informa a soporte: RPK-14.</string>
+    <string name="passkey_recovery_verified_not_saved">Tu llave de acceso se verificó, pero Olive Branch no pudo terminar de guardar la recuperación. Abre estos ajustes de nuevo. Si no aparece ninguna llave, elimina la llave incompleta del gestor de contraseñas y vuelve a intentarlo. Informa a soporte: RPK-15.</string>
     <string name="passkey_recovery_remove">Eliminar llave</string>
     <string name="passkey_recovery_removed">Se eliminó la llave de recuperación.</string>
     <string name="passkey_recovery_remove_failed">No se pudo eliminar la llave de recuperación. Por seguridad, vuelve a iniciar sesión e inténtalo de nuevo.</string>

@@ -529,6 +529,8 @@
     <string name="passkey_recovery_sign_in_again">Your secure session has expired. Sign in again before setting up account recovery. Code: RPK-10.</string>
     <string name="passkey_recovery_server_rejected">Olive Branch rejected this recovery setup. Make sure the app is up to date and try again. If it continues, tell support: RPK-12.</string>
     <string name="passkey_recovery_storage_denied">Olive Branch could not save your encrypted recovery setup. The app’s database access may be out of date. Tell support: RPK-13.</string>
+    <string name="passkey_recovery_created_not_verified">Your passkey was created, but Olive Branch could not verify it. Remove the unfinished Olive Branch passkey from your password manager, then try again. Tell support: RPK-14.</string>
+    <string name="passkey_recovery_verified_not_saved">Your passkey was verified, but Olive Branch could not finish saving account recovery. Open these settings again. If no recovery passkey appears, remove the unfinished passkey from your password manager and retry. Tell support: RPK-15.</string>
     <string name="passkey_recovery_remove">Remove passkey</string>
     <string name="passkey_recovery_removed">Recovery passkey removed.</string>
     <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. For security, sign in again and retry.</string>

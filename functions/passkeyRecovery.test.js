@@ -9,6 +9,13 @@ const { _test: recovery } = require("./src/passkeyRecovery");
 
 const b64 = (size, value = 5) => Buffer.alloc(size, value).toString("base64");
 
+test("passkey recovery uses a recognizable account label without changing the stable user ID", () => {
+  assert.equal(recovery.accountDisplayName({email: "person@example.com"}), "person@example.com");
+  for (const token of [null, {}, {email: ""}, {email: "not-an-email"}, {email: "a".repeat(255)}]) {
+    assert.equal(recovery.accountDisplayName(token), "Olive Branch account");
+  }
+});
+
 test("passkey recovery accepts only a complete opaque ARK envelope for its owner and credential", () => {
   const envelope = {
     version: 1,

@@ -484,6 +484,8 @@
     <string name="passkey_recovery_sign_in_again">Votre session sécurisée a expiré. Reconnectez-vous avant de configurer la récupération. Code: RPK-10.</string>
     <string name="passkey_recovery_server_rejected">Olive Branch a refusé cette configuration. Mettez l’application à jour et réessayez. Si le problème persiste, indiquez au soutien: RPK-12.</string>
     <string name="passkey_recovery_storage_denied">Olive Branch n’a pas pu enregistrer la récupération chiffrée. L’accès de l’application à la base de données est peut-être désuet. Indiquez au soutien: RPK-13.</string>
+    <string name="passkey_recovery_created_not_verified">Votre clé d’accès a été créée, mais Olive Branch n’a pas pu la vérifier. Supprimez la clé Olive Branch inachevée de votre gestionnaire de mots de passe, puis réessayez. Indiquez au soutien: RPK-14.</string>
+    <string name="passkey_recovery_verified_not_saved">Votre clé d’accès a été vérifiée, mais Olive Branch n’a pas pu terminer l’enregistrement de la récupération. Rouvrez ces paramètres. Si aucune clé n’apparaît, supprimez la clé inachevée de votre gestionnaire de mots de passe et réessayez. Indiquez au soutien: RPK-15.</string>
     <string name="passkey_recovery_remove">Supprimer la clé d’accès</string>
     <string name="passkey_recovery_removed">Clé d’accès de récupération supprimée.</string>
     <string name="passkey_recovery_remove_failed">Impossible de supprimer la clé d’accès de récupération. Pour votre sécurité, reconnectez-vous puis réessayez.</string>

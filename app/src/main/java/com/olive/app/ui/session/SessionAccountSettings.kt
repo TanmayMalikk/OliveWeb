@@ -444,10 +444,12 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                     token = token,
                 ) as? PasskeyCredentialResult.Registration
                     ?: error("Passkey registration was cancelled")
-                val proof = recovery.continueEnrollment(
-                    registration.challengeId,
-                    registrationResult.serverResponseJson,
-                )
+                val proof = atPasskeyRecoveryStage(PasskeyRecoveryStage.VERIFY_CREATED_PASSKEY) {
+                    recovery.continueEnrollment(
+                        registration.challengeId,
+                        registrationResult.serverResponseJson,
+                    )
+                }
                 val assertion = requestPasskey(
                     PasskeyPrfProtocol.assertionRequest(proof.options, proof.prfInputs),
                     assertion = true,
@@ -466,15 +468,17 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         result.prfOutput,
                         ark,
                     )
-                    recovery.completeEnrollment(
-                        proof.challengeId,
-                        result.serverResponseJson,
-                        envelope,
-                    )
+                    atPasskeyRecoveryStage(PasskeyRecoveryStage.SAVE) {
+                        recovery.completeEnrollment(
+                            proof.challengeId,
+                            result.serverResponseJson,
+                            envelope,
+                        )
+                    }
                 } finally {
                     result.prfOutput.fill(0)
                 }
-                val credentials = recovery.listCredentials()
+                val credentials = runCatching { recovery.listCredentials() }.getOrNull()
                 if (currentRecoverySession(uid, token)) {
                     passkeyRecoveryCredentials = credentials
                     message = application.getString(R.string.passkey_recovery_enabled)
@@ -634,10 +638,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
 
     private fun passkeyRecoveryFailureMessage(failure: Exception): String {
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
+        val stage = causes.filterIsInstance<PasskeyRecoveryStageException>().firstOrNull()
         val credential = causes.filterIsInstance<PasskeyCredentialFailureException>().firstOrNull()
         val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()
         val firestore = causes.filterIsInstance<FirebaseFirestoreException>().firstOrNull()
         val message = when {
+            stage?.stage == PasskeyRecoveryStage.VERIFY_CREATED_PASSKEY ->
+                R.string.passkey_recovery_created_not_verified
+            stage?.stage == PasskeyRecoveryStage.SAVE -> R.string.passkey_recovery_verified_not_saved
             credential != null -> when (credential.reason) {
                 PasskeyCredentialFailure.CANCELLED -> R.string.passkey_recovery_setup_cancelled
                 PasskeyCredentialFailure.INTERRUPTED -> R.string.passkey_recovery_setup_interrupted
