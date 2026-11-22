@@ -24,8 +24,45 @@
       "Alice House": {
         "Desc": "Safe second-stage housing and recovery programs for women and children leaving intimate partner abuse.",
         "Phone": "902-466-8459",
-        "hours": "Monday to Friday, 9:00 AM – 4:00 PM",
+        "hours": "Monday to Friday, 9:00 AM - 4:00 PM AT",
         "url": "https://alicehouse.ca/"
+      }
+    },
+    "LegalAid": {
+      "Nova Scotia Legal Aid (Halifax Office)": {
+        "Desc": "Free family and criminal legal aid representation and summary advice for Nova Scotians.",
+        "Phone": "902-420-6578",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "address": "Suite 710, 1701 Hollis St, Halifax, NS B3J 3M8",
+        "lat": 44.6487,
+        "lng": -63.5733,
+        "url": "https://www.nslegalaid.ca/"
+      }
+    },
+    "Counseling": {
+      "Avalon Sexual Assault Centre": {
+        "Desc": "Trauma therapy, sexual assault response navigation, and advocacy in Halifax Regional Municipality.",
+        "Phone": "902-422-4240",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "address": "Suite 401, 1526 Dresden Row, Halifax, NS B3J 3K3",
+        "lat": 44.6433,
+        "lng": -63.5778,
+        "url": "https://avaloncentre.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Mental Health Mobile Crisis Team (MHMCT)": {
+        "Desc": "24/7 telephone crisis line and daily mobile crisis response team for Halifax Regional Municipality.",
+        "Phone": "902-429-8167",
+        "hours": "24/7 phone; Mobile team daily 1:00 PM - 1:00 AM AT",
+        "url": "https://mha.nshealth.ca/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   },
@@ -46,6 +83,33 @@
         "Text": "902-919-5952",
         "hours": "24/7",
         "url": "https://www.cbtha.com/"
+      }
+    },
+    "LegalAid": {
+      "Nova Scotia Legal Aid (Toll-Free)": {
+        "Desc": "Provincial legal aid intake and family law assistance for Cape Breton.",
+        "Phone": "1-877-420-6578",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "url": "https://www.nslegalaid.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service of Eastern Nova Scotia": {
+        "Desc": "Community counselling and family support programs across Cape Breton.",
+        "Phone": "902-539-6868",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "address": "Suite 100, 66 Wentworth St, Sydney, NS B1P 6T4",
+        "lat": 46.1369,
+        "lng": -60.1931,
+        "url": "https://fsens.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Nova Scotia Mental Health Crisis Line (Cape Breton)": {
+        "Desc": "24/7 provincial mental health crisis response and urgent referrals.",
+        "Phone": "1-888-429-8167",
+        "hours": "24/7",
+        "url": "https://mha.nshealth.ca/"
       }
     }
   }

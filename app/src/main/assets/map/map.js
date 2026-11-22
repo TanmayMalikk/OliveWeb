@@ -1,9 +1,90 @@
-// Safe-app users and safe contacts: draws the interactive location map and route.
+// Safe-app users and safe contacts: draws the interactive location map, heading rotation, and route.
 const map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:1,maxZoom:19}).setView([53.5461,-113.4938],12);
-window.oliveResizeTo=function(height){
-  document.getElementById('map').style.height=height+'px';
+const mapViewport=document.getElementById('map-viewport');
+const mapEl=document.getElementById('map');
+if(map.attributionControl&&mapViewport){
+  mapViewport.appendChild(map.attributionControl.getContainer());
+}
+let viewportWidth=Math.max(1,window.innerWidth||360);
+let viewportHeight=Math.max(1,window.innerHeight||300);
+let headingUp=false;
+let headingRotationDeg=0;
+let continuousRotationDeg=0;
+let userHeadingDeg=null;
+
+function applyMapGeometry(){
+  const vw=Math.max(1,mapViewport?.clientWidth||window.innerWidth||viewportWidth);
+  const vh=Math.max(1,viewportHeight||mapViewport?.clientHeight||window.innerHeight||300);
+  if(mapViewport) mapViewport.style.height=vh+'px';
+  const prevCenter=map.getCenter();
+  if(headingUp){
+    const side=Math.ceil(Math.hypot(vw,vh))+24;
+    const left=Math.round((vw-side)/2);
+    const top=Math.round((vh-side)/2);
+    mapEl.style.width=side+'px';
+    mapEl.style.height=side+'px';
+    mapEl.style.left=left+'px';
+    mapEl.style.top=top+'px';
+  }else{
+    mapEl.style.width='100%';
+    mapEl.style.height=vh+'px';
+    mapEl.style.left='0px';
+    mapEl.style.top='0px';
+  }
   map.invalidateSize(false);
+  map.setView(prevCenter,map.getZoom(),{animate:false});
+}
+
+// Keep single-finger map dragging aligned when the viewport is rotated to walking direction.
+if(L.Draggable&&L.Draggable.prototype&&L.Draggable.prototype._onMove){
+  const origDragMove=L.Draggable.prototype._onMove;
+  L.Draggable.prototype._onMove=function(e){
+    if(headingUp&&headingRotationDeg!==0&&this._startPoint&&(!e.touches||e.touches.length===1)){
+      const first=(e.touches&&e.touches.length===1)?e.touches[0]:e;
+      const dx=first.clientX-this._startPoint.x;
+      const dy=first.clientY-this._startPoint.y;
+      const rad=headingRotationDeg*Math.PI/180;
+      const cosA=Math.cos(rad);
+      const sinA=Math.sin(rad);
+      const rx=this._startPoint.x+(dx*cosA-dy*sinA);
+      const ry=this._startPoint.y+(dx*sinA+dy*cosA);
+      const patched={
+        clientX:rx,clientY:ry,target:e.target,
+        preventDefault:e.preventDefault?e.preventDefault.bind(e):function(){},
+        stopPropagation:e.stopPropagation?e.stopPropagation.bind(e):function(){}
+      };
+      return origDragMove.call(this,patched);
+    }
+    return origDragMove.call(this,e);
+  };
+}
+
+window.oliveResizeTo=function(height){
+  viewportWidth=Math.max(1,window.innerWidth||viewportWidth);
+  viewportHeight=Math.max(1,height||viewportHeight);
+  applyMapGeometry();
 };
+
+window.oliveSetHeading=function(degrees,enabled){
+  const nextEnabled=!!enabled;
+  const normalized=Number.isFinite(degrees)?((degrees%360)+360)%360:0;
+  userHeadingDeg=Number.isFinite(degrees)?normalized:null;
+  const modeChanged=headingUp!==nextEnabled;
+  headingUp=nextEnabled;
+  const targetAngle=nextEnabled?normalized:0;
+  let delta=(targetAngle-headingRotationDeg)%360;
+  if(delta>180) delta-=360;
+  if(delta<=-180) delta+=360;
+  continuousRotationDeg=nextEnabled?(continuousRotationDeg+delta):0;
+  headingRotationDeg=targetAngle;
+  if(modeChanged) applyMapGeometry();
+  mapEl.style.transform=nextEnabled?('rotate('+(-continuousRotationDeg).toFixed(2)+'deg)'):'';
+  document.documentElement.style.setProperty('--olive-counter-rot',(nextEnabled?continuousRotationDeg:0).toFixed(2)+'deg');
+  Object.values(markers).forEach(marker=>{
+    if(marker._olivePoint&&marker._olivePoint.own) marker.setIcon(markerIcon(marker._olivePoint));
+  });
+};
+
 window.oliveLoadBasemap?.(map);
 const markers={};
 const markerAnimations={};
@@ -21,6 +102,7 @@ let selectionEnabled=false;
 let detailsOnlyForSelectedPoint=false;
 let selectedPointUid=null;
 const supportMarkers=Object.create(null);
+
 window.oliveReportMapCenter=function(){
   if(!window.OliveMapViewport) return;
   const center=map.getCenter().wrap();
@@ -37,21 +119,32 @@ function showMapboxAttribution(){
   map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');
   mapboxAttributionAdded=true;
 }
+function serviceMarkerIcon(saved){
+  const cls=saved?'olive-service-dot olive-service-saved':'olive-service-dot';
+  return L.divIcon({
+    className:'olive-service-marker',
+    html:'<div class="'+cls+'"></div>',
+    iconSize:[30,30],
+    iconAnchor:[15,15]
+  });
+}
 window.oliveSetServices=function(services,fit){
   const active=Object.create(null);
   if(services?.length) showMapboxAttribution();
   (services||[]).forEach(service=>{
     active[service.id]=true;
-    if(!supportMarkers[service.id]){
-      const icon=L.divIcon({
-        className:'olive-service-marker',html:'<div class="olive-service-dot"></div>',
-        iconSize:[30,30],iconAnchor:[15,15]
-      });
-      const marker=L.marker([service.latitude,service.longitude],{icon:icon}).addTo(map);
+    const isSaved=!!service.saved;
+    const existing=supportMarkers[service.id];
+    if(!existing){
+      const marker=L.marker([service.latitude,service.longitude],{icon:serviceMarkerIcon(isSaved)}).addTo(map);
+      marker._oliveSaved=isSaved;
       const label=document.createElement('span');label.textContent=service.name;
       marker.bindTooltip(label,{direction:'top'});
       marker.on('click',function(){if(window.OliveSupportSelection)OliveSupportSelection.selected(service.id);});
       supportMarkers[service.id]=marker;
+    }else if(existing._oliveSaved!==isSaved){
+      existing.setIcon(serviceMarkerIcon(isSaved));
+      existing._oliveSaved=isSaved;
     }
   });
   Object.keys(supportMarkers).forEach(id=>{if(!active[id]){map.removeLayer(supportMarkers[id]);delete supportMarkers[id];}});
@@ -61,29 +154,35 @@ window.oliveSetServices=function(services,fit){
     map.fitBounds(L.latLngBounds(locations),{padding:[36,36],maxZoom:14});
   }
 };
-// Keeps distant markers small enough to separate while leaving them visible in an Alberta-wide view.
 function markerSize(point){
   const closeSize=(point.live||point.lastKnown)?28:26;
   const zoomProgress=Math.max(0,Math.min(1,(map.getZoom()-4)/10));
   return Math.round(16+(closeSize-16)*zoomProgress);
 }
-// Map: Builds a marker at the size needed for the current zoom level.
 function markerIcon(point){
   const className=point.blue?'olive-own-live-dot':(point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot'));
   const size=markerSize(point);
   const border=size>=20?3:2;
   const centreSize=size-(border*2);
   const style='width:'+centreSize+'px;height:'+centreSize+'px;border:'+border+'px solid #fff';
-  return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'" style="'+style+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
+  const showCone=point.own&&headingUp&&userHeadingDeg!==null;
+  const coneHtml=showCone
+    ? '<div class="olive-heading-cone" style="transform:rotate('+userHeadingDeg.toFixed(1)+'deg)">'
+      +'<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 1 L31 20 L20 15 L9 20 Z" fill="rgba(23,105,170,0.45)"/></svg>'
+      +'</div>'
+    : '';
+  return L.divIcon({
+    className:'olive-live-marker',
+    html:'<div class="olive-marker-wrap">'+coneHtml+'<div class="'+className+'" style="'+style+'"></div></div>',
+    iconSize:[size,size],
+    iconAnchor:[size/2,size/2]
+  });
 }
-// Map: Chooses the map marker style. It checks the value against the rules before using it.
 function markerStyle(point){return point.blue?'blue':(point.live?'live':(point.lastKnown?'last-known':'contact'));}
-// returns the animate marker for map. It goes through the list and keeps or changes each item that is needed.
 function animateMarker(uid,marker,target,duration){
   if(markerAnimations[uid]) cancelAnimationFrame(markerAnimations[uid]);
   const start=marker.getLatLng();
   const began=performance.now();
-  // returns the frame for map. It saves the new value and refreshes what the user sees.
   function frame(now){
     const progress=Math.min(1,(now-began)/duration);
     const eased=1-Math.pow(1-progress,3);
@@ -105,7 +204,6 @@ window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
     active[uid]=true;
     const target=[point.latitude,point.longitude];
     let marker=markers[uid];
-    // Only continue with marker when marker is false.
     if(!marker){
       marker=L.marker(target,{icon:markerIcon(point)}).addTo(map);
       marker._oliveStyle=markerStyle(point);
@@ -136,7 +234,6 @@ window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
       marker.unbindPopup();
     }
     const trailPoints=(point.trail||[]).map(entry=>[entry.latitude,entry.longitude]);
-    // Admins only see a trail after selecting that user's dot.
     if(pointIsSelected&&trailPoints.length>1){
       if(trails[uid]) trails[uid].setLatLngs(trailPoints).setStyle({color:point.blue?'#1769aa':'#c52b25'});
       else trails[uid]=L.polyline(trailPoints,{color:point.blue?'#1769aa':'#c52b25',weight:4,opacity:.78,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
@@ -153,7 +250,6 @@ window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
   const tracked=points.find(point=>
     point.live&&point.accuracy&&(!detailsOnlyForSelectedPoint||(point.uid||point.name)===selectedPointUid)
   );
-  // tracked is handled here by tracked.
   if(tracked){
     if(accuracyCircle) accuracyCircle.setLatLng([tracked.latitude,tracked.longitude]).setRadius(tracked.accuracy).setStyle({color:tracked.blue?'#1769aa':'#c52b25',fillColor:tracked.blue?'#1769aa':'#c52b25'});
     else accuracyCircle=L.circle([tracked.latitude,tracked.longitude],{
@@ -164,12 +260,10 @@ window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
     if(points.length===1) map.setView([points[0].latitude,points[0].longitude],14);
     else map.fitBounds(L.latLngBounds(points.map(point=>[point.latitude,point.longitude])),{padding:[36,36],maxZoom:14});
   }
-  // A navigation request can arrive before its live marker. Apply its close zoom once data arrives.
   if(followEnabled) window.oliveSetFollow(true,followUid,false);
 };
 window.oliveSetRoute=function(coordinates,fitRoute){
   const line=coordinates||[];
-  // line checks whether line length>1 before continuing.
   if(line.length>1){
     showMapboxAttribution();
     if(routeLine) routeLine.setLatLngs(line);
@@ -180,7 +274,6 @@ window.oliveSetRoute=function(coordinates,fitRoute){
 };
 window.oliveZoomIn=function(){map.zoomIn();};
 window.oliveZoomOut=function(){map.zoomOut();};
-// Resizes every dot after a zoom so crowded markers do not cover one another.
 map.on('zoomend',function(){
   Object.values(markers).forEach(marker=>{
     if(marker._olivePoint)marker.setIcon(markerIcon(marker._olivePoint));
@@ -201,7 +294,6 @@ window.oliveSetFollow=function(enabled,uid,focusClose){
         selectedPointUid=followUid;
         window.oliveSetPoints(points,false,true);
       }
-      // Search selection starts three zoom-out steps below the closest map view.
       if(followFocusPending){
         followFocusPending=false;
         const closeFollowZoom=Math.max(map.getMinZoom(),map.getMaxZoom()-3);
@@ -210,7 +302,6 @@ window.oliveSetFollow=function(enabled,uid,focusClose){
     }
   }
 };
-// Incident reports: lets the user tap the map or drag one pushpin to save exact coordinates.
 window.oliveSetSelection=function(enabled,latitude,longitude){
   selectionEnabled=!!enabled;
   if(!selectionEnabled){if(selectionMarker){map.removeLayer(selectionMarker);selectionMarker=null;}return;}

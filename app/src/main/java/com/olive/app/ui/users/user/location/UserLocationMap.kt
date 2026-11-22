@@ -34,11 +34,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.LocationSearching
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -55,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -113,6 +116,10 @@ internal fun InteractiveLocationMap(
     supportServices: List<NearbySupportService> = emptyList(),
     onSupportSelected: ((NearbySupportService) -> Unit)? = null,
     onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
+    headingUp: Boolean = false,
+    headingDegrees: Float? = null,
+    onToggleHeadingUp: (() -> Unit)? = null,
+    fitSupportServices: Boolean = false,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
@@ -203,12 +210,17 @@ internal fun InteractiveLocationMap(
      */
     fun updateSupportServices(view: WebView) {
         val encoded = JSONArray().apply {
-            supportServices.forEach { service -> put(JSONObject().apply {
-                put("id", service.id); put("name", service.name)
-                put("latitude", service.latitude); put("longitude", service.longitude)
-            }) }
+            supportServices.forEach { service ->
+                put(JSONObject().apply {
+                    put("id", service.id)
+                    put("name", service.name)
+                    put("latitude", service.latitude)
+                    put("longitude", service.longitude)
+                    put("saved", service.saved)
+                })
+            }
         }
-        val fit = !supportWereFitted && supportServices.isNotEmpty() && !navigationActive
+        val fit = fitSupportServices && !supportWereFitted && supportServices.isNotEmpty() && !navigationActive
         view.evaluateJavascript("window.oliveSetServices($encoded,$fit);", null)
         if (fit) supportWereFitted = true
     }
@@ -282,6 +294,14 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Ready) webView[0]?.let {
             updateRoute(it, route != null && !routeWasShown)
             routeWasShown = route != null
+        }
+    }
+
+    // Updates compass heading rotation on the WebView canvas.
+    LaunchedEffect(headingUp, headingDegrees, loadState, attempt) {
+        if (loadState == MapLoadState.Ready) {
+            val angle = if (headingUp) (headingDegrees ?: 0f) else 0f
+            webView[0]?.evaluateJavascript("window.oliveSetHeading($angle,$headingUp);", null)
         }
     }
 
@@ -520,6 +540,23 @@ internal fun InteractiveLocationMap(
                             if (following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
                             stringResource(if (following) R.string.location_stop_following else R.string.location_follow_user)
                         )
+                    }
+                    if (onToggleHeadingUp != null) {
+                        SmallFloatingActionButton(
+                            onClick = onToggleHeadingUp,
+                            containerColor = if (headingUp) MaterialTheme.colorScheme.primaryContainer
+                            else FloatingActionButtonDefaults.containerColor,
+                            modifier = Modifier.testTag("map_compass_mode"),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Explore,
+                                stringResource(
+                                    if (headingUp) R.string.location_compass_toggle_heading_desc
+                                    else R.string.location_compass_toggle_north_desc
+                                ),
+                                modifier = Modifier.rotate(if (headingUp) -(headingDegrees ?: 0f) else 0f),
+                            )
+                        }
                     }
                 }
             }

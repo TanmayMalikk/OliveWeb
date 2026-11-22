@@ -15,7 +15,13 @@ import java.util.Locale
 import org.json.JSONObject
 
 
-enum class HotlineResourceKind { Hotline, Shelter }
+enum class HotlineResourceKind {
+    Hotline,
+    Shelter,
+    LegalAid,
+    Counseling,
+    CrisisService,
+}
 
 data class HotlineResource(
     val id: String,
@@ -29,7 +35,23 @@ data class HotlineResource(
     val source: String,
     val phoneUri: String,
     val hours: String = "",
-)
+    val address: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val textNumber: String = "",
+) {
+    /** Whether the service operates 24/7. */
+    val is247: Boolean
+        get() = hours.contains("24/7", ignoreCase = true) ||
+            hours.contains("24 hours", ignoreCase = true)
+
+    /** Whether the service has a validated public street address and map coordinates. */
+    val hasMapLocation: Boolean
+        get() = address.isNotBlank() &&
+            latitude != null && longitude != null &&
+            latitude.isFinite() && longitude.isFinite() &&
+            latitude in -90.0..90.0 && longitude in -180.0..180.0
+}
 
 /** Searchable view of Lars's province-specific hotline and shelter datasets. */
 class HotlineDirectory private constructor(
@@ -100,34 +122,66 @@ class HotlineDirectory private constructor(
     }
 
     /**
-     * Checks whether a hotline serves the selected province or territory.
+     * Checks whether a hotline serves the selected province or territory and optional filters.
      *
      * @param region Region supplied to [matching].
      * @param city City supplied to [matching].
      * @param query Search query string entered by the user.
+     * @param kind Optional category filter.
+     * @param savedIds Optional set of saved resource IDs to filter by.
+     * @param onlyAlwaysOpen Whether to restrict results to 24/7 services.
      * @return List of resulting matching items.
      */
-    fun matching(region: String, city: String, query: String = ""): List<HotlineResource> {
+    fun matching(
+        region: String,
+        city: String,
+        query: String = "",
+        kind: HotlineResourceKind? = null,
+        savedIds: Set<String>? = null,
+        onlyAlwaysOpen: Boolean = false,
+    ): List<HotlineResource> {
         val normalizedQuery = normalize(query)
         val normalizedCity = normalize(city)
         val digits = query.filter(Char::isDigit)
-        val restrictToCity = normalizedCity.isNotBlank() && resources.any {
+        val restrictToCity = region != "CA" && normalizedCity.isNotBlank() && resources.any {
             it.region == region && normalize(it.city) == normalizedCity
         }
         return resources.filter { item ->
             (region == "CA" || item.region == region) &&
-                    (!restrictToCity || normalize(item.city) == normalizedCity) &&
-                    (normalizedQuery.isBlank() || normalizedQuery.split(' ').all {
-                        it in normalize("${item.name} ${item.description} ${item.city} ${item.phone} ${item.kind.name}")
-                    } || (digits.isNotEmpty() && query.all { it.isDigit() || it in " +-()" } &&
-                            digits in item.phone.filter(Char::isDigit)))
+                (!restrictToCity || normalize(item.city) == normalizedCity) &&
+                (kind == null || item.kind == kind) &&
+                (savedIds == null || item.id in savedIds) &&
+                (!onlyAlwaysOpen || item.is247) &&
+                (normalizedQuery.isBlank() || normalizedQuery.split(' ').all { token ->
+                    token in normalize(
+                        "${item.name} ${item.description} ${item.city} ${item.address} ${item.phone} ${item.textNumber} ${kindSearchTerms(item.kind)}"
+                    )
+                } || (digits.isNotEmpty() && query.all { it.isDigit() || it in " +-()" } &&
+                    (digits in item.phone.filter(Char::isDigit) || digits in item.textNumber.filter(Char::isDigit))))
         }
             .sortedWith(compareBy<HotlineResource> { if (normalize(it.city) == normalizedCity) 0 else 1 }
                 .thenBy { it.kind }.thenBy { it.name })
     }
 
+    /**
+     * Returns directory resources that have a validated public address and coordinates for map display.
+     *
+     * @param savedIds Optional saved resource ID filter.
+     * @return List of mappable directory resources.
+     */
+    fun mapLocations(savedIds: Set<String>? = null): List<HotlineResource> =
+        resources.filter { it.hasMapLocation && (savedIds == null || it.id in savedIds) }
+
     companion object {
-        private const val DATASET_DATE = "2026-10-15"
+        private const val DATASET_DATE = "2026-11-22"
+
+        private fun kindSearchTerms(kind: HotlineResourceKind): String = when (kind) {
+            HotlineResourceKind.Hotline -> "hotline helpline phone"
+            HotlineResourceKind.Shelter -> "shelter housing transition house"
+            HotlineResourceKind.LegalAid -> "legalaid legal aid lawyer court"
+            HotlineResourceKind.Counseling -> "counseling counselling therapy clinic"
+            HotlineResourceKind.CrisisService -> "crisisservice crisis service emergency"
+        }
 
         /**
          * Formats a hotline phone number for display.
@@ -176,6 +230,9 @@ class HotlineDirectory private constructor(
                         val kind = when (group) {
                             "Hotlines" -> HotlineResourceKind.Hotline
                             "Shelters" -> HotlineResourceKind.Shelter
+                            "LegalAid" -> HotlineResourceKind.LegalAid
+                            "Counseling" -> HotlineResourceKind.Counseling
+                            "CrisisServices" -> HotlineResourceKind.CrisisService
                             else -> error("Unsupported hotline group: $group")
                         }
                         val entries = groups.getJSONObject(group)
@@ -183,6 +240,29 @@ class HotlineDirectory private constructor(
                             val row = entries.getJSONObject(name)
                             val phone = row.getString("Phone")
                             require(phone.matches(Regex("[0-9+() -]+")))
+                            val textNumber = row.optString("Text").trim()
+                            if (textNumber.isNotBlank()) {
+                                require(textNumber.matches(Regex("[0-9+() -]+")))
+                            }
+                            val hours = row.optString("hours").trim()
+                            require(hours.isNotBlank()) { "Hours are required for $name" }
+                            val address = row.optString("address").trim()
+                            val hasLat = row.has("lat") && !row.isNull("lat")
+                            val hasLng = row.has("lng") && !row.isNull("lng")
+                            require(hasLat == hasLng) { "Coordinates must include both lat and lng for $name" }
+                            val latitude = if (hasLat) row.getDouble("lat") else null
+                            val longitude = if (hasLng) row.getDouble("lng") else null
+                            if (latitude != null && longitude != null) {
+                                require(
+                                    latitude.isFinite() && longitude.isFinite() &&
+                                        latitude in -90.0..90.0 && longitude in -180.0..180.0
+                                ) { "Coordinates out of bounds for $name" }
+                            }
+                            if (address.isNotBlank()) {
+                                require(latitude != null && longitude != null) {
+                                    "Mapped address must include lat and lng for $name"
+                                }
+                            }
                             val website = secureWebsite(row.getString("url"))
                             HotlineResource(
                                 id = listOf(
@@ -200,7 +280,11 @@ class HotlineDirectory private constructor(
                                 website = website,
                                 source = website,
                                 phoneUri = "tel:" + phone.filter { it.isDigit() || it == '+' },
-                                hours = row.optString("hours").trim(),
+                                hours = hours,
+                                address = address,
+                                latitude = latitude,
+                                longitude = longitude,
+                                textNumber = textNumber,
                             )
                         }
                     }

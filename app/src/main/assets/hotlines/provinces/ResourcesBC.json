@@ -4,7 +4,7 @@
       "VictimLinkBC": {
         "Desc": "Confidential 24/7 multilingual support and referral service for victims of family or sexual violence in BC.",
         "Phone": "1-800-563-0808",
-        "Text": "1-800-563-0808",
+        "Text": "604-836-6381",
         "hours": "24/7",
         "url": "https://www.victimlinkbc.ca/"
       },
@@ -14,8 +14,8 @@
         "hours": "24/7",
         "url": "https://crisiscentre.bc.ca/"
       },
-      "Vancouver Rape Relief & Women's Shelter": {
-        "Desc": "24/7 transition house and crisis line for women escaping violence and domestic abuse.",
+      "Vancouver Rape Relief & Women's Shelter Line": {
+        "Desc": "24/7 transition house intake and crisis line for women escaping violence and domestic abuse.",
         "Phone": "604-872-8212",
         "hours": "24/7",
         "url": "https://rapereliefshelter.bc.ca/"
@@ -25,14 +25,57 @@
       "Atira Women's Resource Society": {
         "Desc": "Emergency housing, crisis intervention, and supportive services for women and children in crisis.",
         "Phone": "604-681-4437",
-        "hours": "Monday to Friday, 8:30 a.m. – 5:00 p.m.",
+        "hours": "Monday to Friday, 8:30 AM - 5:00 PM PT (24/7 transition houses)",
         "url": "https://atira.bc.ca/"
       },
       "Downtown Eastside Women's Centre": {
-        "Desc": "Safe space, advocacy, housing support, and basic needs for women in Vancouver's DTES.",
+        "Desc": "Public drop-in centre providing safe daytime space, advocacy, housing support, and basic needs for women.",
         "Phone": "604-681-8480",
-        "hours": "Mon – Tue: 9am – 5pm; Wed: 11am – 5pm; Thur – Sun: 9am – 5pm",
+        "hours": "Mon-Tue & Thu-Sun 9:00 AM - 5:00 PM; Wed 11:00 AM - 5:00 PM PT",
+        "address": "302 Columbia St, Vancouver, BC V6A 4J1",
+        "lat": 49.2821,
+        "lng": -123.1023,
         "url": "https://dewc.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid BC (Vancouver Regional Centre)": {
+        "Desc": "Legal representation, family violence duty counsel, and immigration and poverty legal advice.",
+        "Phone": "604-408-2172",
+        "hours": "Mon, Tue, Thu, Fri 9:00 AM - 3:30 PM; Wed 9:00 AM - 2:30 PM PT",
+        "address": "Suite 400, 510 Burrard St, Vancouver, BC V6C 3A8",
+        "lat": 49.2862,
+        "lng": -123.1169,
+        "url": "https://legalaid.bc.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Services of Greater Vancouver": {
+        "Desc": "Trauma-informed individual, family, and violence-prevention counselling programs.",
+        "Phone": "604-731-4951",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM PT",
+        "address": "Unit 201, 1638 E Broadway, Vancouver, BC V5N 1W1",
+        "lat": 49.2623,
+        "lng": -123.0715,
+        "url": "https://fsgv.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Access and Assessment Centre (VGH)": {
+        "Desc": "Hospital-based mental health and crisis walk-in assessment, urgent care, and short-term stabilization.",
+        "Phone": "604-675-3700",
+        "hours": "Daily, 7:30 AM - 9:30 PM PT (24/7 line via 310-6789)",
+        "address": "803 W 12th Ave, Vancouver, BC V5Z 1N1",
+        "lat": 49.2610,
+        "lng": -123.1225,
+        "url": "https://www.vch.ca/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   },
@@ -41,6 +84,7 @@
       "Vancouver Island Crisis Line": {
         "Desc": "Confidential 24/7 crisis support line for Vancouver Island and surrounding areas.",
         "Phone": "1-888-494-3888",
+        "Text": "250-800-3806",
         "hours": "24/7",
         "url": "https://www.vicrisis.ca/"
       }
@@ -51,6 +95,33 @@
         "Phone": "250-385-6611",
         "hours": "24/7",
         "url": "https://www.transitionhouse.net/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid BC (Provincial Call Centre)": {
+        "Desc": "Province-wide legal aid intake and family violence protection support.",
+        "Phone": "1-866-577-2525",
+        "hours": "Mon, Tue, Thu, Fri 9:00 AM - 3:30 PM; Wed 9:00 AM - 2:30 PM PT",
+        "url": "https://legalaid.bc.ca/"
+      }
+    },
+    "Counseling": {
+      "Citizens' Counselling Centre": {
+        "Desc": "Low-cost, accessible individual and trauma counselling in Greater Victoria.",
+        "Phone": "250-384-9934",
+        "hours": "Phone Mon-Fri 10:00 AM - 3:00 PM; Appointments Mon-Sun 8:00 AM - 8:00 PM PT",
+        "address": "941 Kings Rd, Victoria, BC V8T 1W7",
+        "lat": 48.4368,
+        "lng": -123.3563,
+        "url": "https://citizenscounselling.com/"
+      }
+    },
+    "CrisisServices": {
+      "BC Mental Health Support Line": {
+        "Desc": "24/7 emotional support, crisis intervention, and community referrals across BC.",
+        "Phone": "310-6789",
+        "hours": "24/7",
+        "url": "https://www.heretohelp.bc.ca/"
       }
     }
   },
@@ -69,6 +140,33 @@
         "Phone": "250-763-1040",
         "hours": "24/7",
         "url": "https://kelownawomensshelter.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid BC (Interior Call Centre)": {
+        "Desc": "Legal aid applications and family law support serving Kelowna and the Okanagan.",
+        "Phone": "1-866-577-2525",
+        "hours": "Mon, Tue, Thu, Fri 9:00 AM - 3:30 PM; Wed 9:00 AM - 2:30 PM PT",
+        "url": "https://legalaid.bc.ca/"
+      }
+    },
+    "Counseling": {
+      "KCR Community Resources": {
+        "Desc": "Community counselling, crisis support, and settlement resources for individuals and families.",
+        "Phone": "250-763-8008",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM PT (closed 12:00 PM - 1:00 PM)",
+        "address": "620 Leon Ave, Kelowna, BC V1Y 9T2",
+        "lat": 49.8845,
+        "lng": -119.4903,
+        "url": "https://kcr.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Interior Crisis Line Network": {
+        "Desc": "24/7 confidential distress support and emergency referrals throughout the BC Interior.",
+        "Phone": "1-888-353-2273",
+        "hours": "24/7",
+        "url": "https://www.interiorcrisisline.com/"
       }
     }
   }

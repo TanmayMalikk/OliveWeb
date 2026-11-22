@@ -1,4 +1,4 @@
-// Tests Canadian support numbers and city-based matches for users.
+// Tests Canadian support numbers, all five categories, mapped addresses, and city/region matching.
 package com.olive.app.data
 
 import com.olive.app.data.account.DeliveryAddress
@@ -17,33 +17,41 @@ class HotlineDirectoryTest {
     )
         .first { it.isDirectory }
 
-    // Checks the files step with the test's sample data.
     private fun files() =
         assets.listFiles { file -> file.name.matches(Regex("Resources[A-Z]{2}\\.json")) }.orEmpty()
             .associate { it.name.removePrefix("Resources").removeSuffix(".json") to it.readText() }
 
-    // Checks the directory step with the test's sample data.
     private fun directory() = HotlineDirectory.parseProvinceFiles(files())
 
-    // Inputs: the values shown below. Expected: lars datasets cover every canadian region.
     @Test
-    fun larsDatasetsCoverEveryCanadianRegion() {
+    fun datasetsCoverEveryCanadianRegionAndAllFiveCategories() {
         val catalog = directory()
         assertEquals(
             CanadianRegion.entries.map { it.code }.toSet(),
             catalog.resources.map { it.region }.toSet()
         )
-        assertEquals(94, catalog.resources.size)
-        assertEquals(52, catalog.resources.count { it.kind == HotlineResourceKind.Hotline })
-        assertEquals(42, catalog.resources.count { it.kind == HotlineResourceKind.Shelter })
+        CanadianRegion.entries.forEach { region ->
+            val regionKinds = catalog.resources.filter { it.region == region.code }.map { it.kind }.toSet()
+            assertEquals(
+                "Region ${region.code} must include all five service categories",
+                HotlineResourceKind.entries.toSet(),
+                regionKinds,
+            )
+        }
+        assertTrue(catalog.resources.size >= 110)
+        assertTrue(catalog.mapLocations().size >= 35)
         assertTrue(catalog.resources.all {
-            it.source.startsWith("https://") && it.website.startsWith("https://") &&
-                    it.phone.isNotBlank() && it.description.isNotBlank()
+            it.source.startsWith("https://") &&
+                it.website.startsWith("https://") &&
+                it.phone.isNotBlank() &&
+                it.description.isNotBlank() &&
+                it.hours.isNotBlank() &&
+                (it.address.isBlank() || it.hasMapLocation)
         })
+        assertTrue(catalog.resources.any { it.is247 })
         assertEquals(catalog.resources.size, catalog.resources.map { it.id }.distinct().size)
     }
 
-    // Inputs: the values shown below. Expected: city only profiles and localized provinces resolve without gps.
     @Test
     fun cityOnlyProfilesAndLocalizedProvincesResolveWithoutGps() {
         val catalog = directory()
@@ -63,7 +71,6 @@ class HotlineDirectoryTest {
         assertNull(catalog.regionFor(DeliveryAddress(city = "Unknown town")))
     }
 
-    // Inputs: the values shown below. Expected: explicit province wins and postal codes distinguish northern territories.
     @Test
     fun explicitProvinceWinsAndPostalCodesDistinguishNorthernTerritories() {
         val catalog = directory()
@@ -85,7 +92,6 @@ class HotlineDirectoryTest {
         )
     }
 
-    // Inputs: the values shown below. Expected: foreign addresses never receive canadian resources automatically.
     @Test
     fun foreignAddressesNeverReceiveCanadianResourcesAutomatically() {
         val catalog = directory()
@@ -109,33 +115,45 @@ class HotlineDirectoryTest {
         )
     }
 
-    // Inputs: the values shown below. Expected: local province and national results respect service areas.
     @Test
-    fun localProvinceAndNationalResultsRespectServiceAreas() {
+    fun localProvinceKindSavedAnd247FiltersWork() {
         val catalog = directory()
         val edmonton = catalog.matching("AB", "Edmonton")
         assertTrue(edmonton.any { it.name == "Family Violence Info Line" })
         assertTrue(edmonton.any { it.kind == HotlineResourceKind.Shelter })
+        assertTrue(edmonton.any { it.kind == HotlineResourceKind.LegalAid && it.hasMapLocation })
+        assertTrue(edmonton.any { it.kind == HotlineResourceKind.Counseling && it.hasMapLocation })
+        assertTrue(edmonton.any { it.kind == HotlineResourceKind.CrisisService && it.hasMapLocation })
         assertFalse(edmonton.any { it.region == "ON" })
         assertFalse(catalog.matching("AB", "Calgary").any { it.city == "Edmonton" })
         assertTrue(catalog.matching("AB", "Unknown Alberta town").all { it.region == "AB" })
         assertEquals(catalog.resources.size, catalog.matching("CA", "").size)
+
+        val legalOnly = catalog.matching("AB", "Edmonton", kind = HotlineResourceKind.LegalAid)
+        assertTrue(legalOnly.isNotEmpty() && legalOnly.all { it.kind == HotlineResourceKind.LegalAid })
+
+        val sampleSaved = setOf(edmonton.first().id, catalog.matching("ON", "Toronto").first().id)
+        assertEquals(sampleSaved, catalog.matching("CA", "", savedIds = sampleSaved).map { it.id }.toSet())
+        assertTrue(catalog.matching("CA", "", onlyAlwaysOpen = true).all { it.is247 })
     }
 
-    // Inputs: the values shown below. Expected: searches include names descriptions categories and phone numbers.
     @Test
-    fun searchesIncludeNamesDescriptionsCategoriesAndPhoneNumbers() {
+    fun searchesIncludeNamesDescriptionsCategoriesAddressesAndPhoneNumbers() {
         val catalog = directory()
         assertTrue(catalog.matching("QC", "Montreal", "violence conjugale").isNotEmpty())
         assertTrue(
-            catalog.matching("AB", "Edmonton", "7804824357").any { it.phone == "780-482-4357" })
+            catalog.matching("AB", "Edmonton", "7804824357").any { it.phone == "780-482-4357" }
+        )
         assertTrue(
             catalog.matching("ON", "Toronto", "shelter")
-                .any { it.kind == HotlineResourceKind.Shelter })
+                .any { it.kind == HotlineResourceKind.Shelter }
+        )
+        assertTrue(
+            catalog.matching("AB", "Edmonton", "Gateway Blvd").any { it.name.contains("Momentum") }
+        )
         assertTrue(catalog.matching("AB", "Edmonton", "not-a-real-service").isEmpty())
     }
 
-    // Inputs: the values shown below. Expected: dialer targets strip tracking without changing the number.
     @Test
     fun dialerTargetsStripTrackingWithoutChangingTheNumber() {
         assertEquals("988", hotlineDialNumber("tel:988?oai_link_source=model_response_hotline"))
@@ -145,19 +163,21 @@ class HotlineDirectoryTest {
         assertNull(hotlineDialNumber("intent:988"))
     }
 
-    // Inputs: the values shown below. Expected: unsafe links and invalid phone numbers are rejected.
     @Test
-    fun unsafeLinksAndInvalidPhoneNumbersAreRejected() {
+    fun unsafeLinksInvalidPhonesAndIncompleteCoordinatesAreRejected() {
         val originals = files()
         val alberta = checkNotNull(originals["AB"])
         for (unsafe in listOf(
             alberta.replaceFirst("https://", "javascript:"),
-            alberta.replaceFirst("780-482-4357", "CALL-NOW")
+            alberta.replaceFirst("780-482-4357", "CALL-NOW"),
+            alberta.replaceFirst("\"lat\": 53.5416,", "\"lat\": 120.0,"),
+            alberta.replaceFirst("\"lng\": -113.4892,", ""),
         )) {
             try {
                 HotlineDirectory.parseProvinceFiles(originals + ("AB" to unsafe))
-                fail("Unsafe hotline data must fail validation")
-            } catch (_: IllegalArgumentException) { /* Invalid bundled data is never made actionable. */
+                fail("Invalid hotline data must fail validation")
+            } catch (_: IllegalArgumentException) {
+                // Invalid bundled data is never made actionable.
             }
         }
     }

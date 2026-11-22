@@ -4,13 +4,17 @@
       "SOS Violence Conjugale": {
         "Desc": "Confidential 24/7 Quebec-wide helpline providing immediate safety planning, support, and shelter referrals.",
         "Phone": "1-800-363-9010",
+        "Text": "1-438-601-1211",
         "hours": "24/7",
         "url": "https://sosviolenceconjugale.ca/"
       },
-      "Centre pour femmes de Montréal": {
-        "Desc": "Support, counselling, and emergency resources for women in difficulty or experiencing abuse.",
+      "YWCA Montreal (Y des femmes) Support Line": {
+        "Desc": "Information, referrals, and housing support for women in difficulty or experiencing abuse.",
         "Phone": "514-866-9941",
-        "hours": "Monday to Friday, 9:00 a.m. to 5:00 p.m.",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "1275 Ave De Lorimier, Montreal, QC H2K 0G1",
+        "lat": 45.5245,
+        "lng": -73.5535,
         "url": "https://www.ydesfemmesmtl.org/"
       }
     },
@@ -20,6 +24,49 @@
         "Phone": "514-932-2250",
         "hours": "24/7",
         "url": "https://maisonmarguerite.com/"
+      }
+    },
+    "LegalAid": {
+      "Aide juridique de Montréal — Civil & Family Law": {
+        "Desc": "Legal aid eligibility evaluation, family law, and youth protection representation in Montreal.",
+        "Phone": "514-864-2111",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM ET (closed 12:00 PM - 1:00 PM)",
+        "address": "Suite 5.04, 600 Rue Fullum, Montreal, QC H2K 3L6",
+        "lat": 45.5249,
+        "lng": -73.5522,
+        "url": "https://www.aidejuridiquedemontreal.ca/"
+      },
+      "Quebec 24/7 Emergency Legal Aid Line": {
+        "Desc": "24/7 toll-free urgent legal advice line upon police contact or detention anywhere in Quebec.",
+        "Phone": "1-800-842-2213",
+        "hours": "24/7",
+        "url": "https://www.csj.qc.ca/"
+      }
+    },
+    "Counseling": {
+      "YWCA Montreal Legal & Career Support Clinic": {
+        "Desc": "Free confidential social, housing, and legal information clinic for women in Montreal.",
+        "Phone": "514-866-9941",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "1275 Ave De Lorimier, Montreal, QC H2K 0G1",
+        "lat": 45.5245,
+        "lng": -73.5535,
+        "url": "https://www.ydesfemmesmtl.org/"
+      }
+    },
+    "CrisisServices": {
+      "Info-Social 811": {
+        "Desc": "24/7 confidential psychosocial crisis intervention and social worker triage anywhere in Quebec.",
+        "Phone": "811",
+        "hours": "24/7",
+        "url": "https://www.quebec.ca/en/health/finding-a-resource/info-social-811"
+      },
+      "Suicide Action Montreal": {
+        "Desc": "24/7 crisis line and suicide prevention support for Montreal residents and their families.",
+        "Phone": "1-866-277-3553",
+        "Text": "535353",
+        "hours": "24/7",
+        "url": "https://suicideactionmontreal.org/"
       }
     }
   },
@@ -34,10 +81,37 @@
     },
     "Shelters": {
       "Maison de la Famille de Québec": {
-        "Desc": "24/7 emergency shelter and support line for victims of conjugal and domestic violence in Quebec City.",
+        "Desc": "Emergency support and conjugal violence shelter referrals for families in Quebec City.",
         "Phone": "418-529-0263",
-        "hours": "Monday – Thursday. 9:00 AM – 10:00 PM; Friday. 9:00 AM – 4:00 PM",
+        "hours": "Mon-Thu 9:00 AM - 10:00 PM; Fri 9:00 AM - 4:00 PM ET",
         "url": "https://www.mf-quebec.org/"
+      }
+    },
+    "LegalAid": {
+      "Aide juridique de Québec (Centre-Ville)": {
+        "Desc": "Civil and family legal aid office serving residents of Quebec City.",
+        "Phone": "418-643-4167",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM ET (closed 12:00 PM - 1:00 PM)",
+        "address": "Suite 500, 420 Boul Charest E, Quebec City, QC G1K 8M4",
+        "lat": 46.8140,
+        "lng": -71.2244,
+        "url": "https://www.aidejuridiquequebec.qc.ca/"
+      }
+    },
+    "Counseling": {
+      "Viol-Secours (CALACS de Québec)": {
+        "Desc": "Confidential crisis support, accompaniment, and counselling for sexual assault survivors.",
+        "Phone": "418-522-2120",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET (24/7 provincial line via 1-888-933-9007)",
+        "url": "https://www.violsecours.qc.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Centre de prévention du suicide de Québec": {
+        "Desc": "24/7 crisis intervention and suicide prevention across the Capitale-Nationale region.",
+        "Phone": "1-866-277-3553",
+        "hours": "24/7",
+        "url": "https://www.cpsquebec.ca/"
       }
     }
   },
@@ -56,6 +130,33 @@
         "Phone": "819-568-4710",
         "hours": "24/7",
         "url": "https://maisonunies.ca/"
+      }
+    },
+    "LegalAid": {
+      "Aide juridique de l'Outaouais (Gatineau)": {
+        "Desc": "Family, youth, and civil legal aid representation in Gatineau and Outaouais.",
+        "Phone": "819-772-3084",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM ET (closed 12:00 PM - 1:00 PM)",
+        "address": "Suite 300, 135 Boul Saint-Raymond, Gatineau, QC J8Y 6X7",
+        "lat": 45.4437,
+        "lng": -75.7364,
+        "url": "https://www.ccjo.qc.ca/"
+      }
+    },
+    "Counseling": {
+      "CALACS de l'Outaouais": {
+        "Desc": "Confidential support and counselling for sexual violence survivors in Outaouais.",
+        "Phone": "819-771-1773",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "url": "https://calacsoutaouais.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Info-Social 811 (Outaouais)": {
+        "Desc": "24/7 confidential psychosocial crisis intervention and urgent mental health guidance.",
+        "Phone": "811",
+        "hours": "24/7",
+        "url": "https://www.quebec.ca/en/health/finding-a-resource/info-social-811"
       }
     }
   }

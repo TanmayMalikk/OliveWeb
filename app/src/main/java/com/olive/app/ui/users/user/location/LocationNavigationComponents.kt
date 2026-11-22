@@ -15,14 +15,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +88,12 @@ internal fun FullScreenLocationMap(
     onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
     onLoadMoreSupport: (() -> Unit)? = null,
     loadingMoreSupport: Boolean = false,
+    headingUp: Boolean = false,
+    headingDegrees: Float? = null,
+    onToggleHeadingUp: (() -> Unit)? = null,
+    showSavedOnly: Boolean = false,
+    savedCount: Int = 0,
+    onToggleSavedOnly: (() -> Unit)? = null,
 ) {
     val direction = ownPoint?.let { route?.nextDirection(it.latitude, it.longitude) }
     val progress = ownPoint?.let { route?.progress(it.latitude, it.longitude) }
@@ -104,6 +114,10 @@ internal fun FullScreenLocationMap(
             supportServices = supportServices,
             onSupportSelected = onSupportSelected,
             onViewportCenterChanged = onViewportCenterChanged,
+            headingUp = headingUp,
+            headingDegrees = headingDegrees,
+            onToggleHeadingUp = onToggleHeadingUp,
+            fitSupportServices = onLoadMoreSupport == null && ownPoint == null,
         )
         IconButton(
             onClick = onExitFullScreen,
@@ -114,6 +128,22 @@ internal fun FullScreenLocationMap(
             ),
         ) {
             Icon(Icons.Outlined.FullscreenExit, stringResource(R.string.location_exit_full_screen))
+        }
+        if (!navigating && onToggleSavedOnly != null) {
+            FilterChip(
+                selected = showSavedOnly,
+                onClick = onToggleSavedOnly,
+                label = { Text(stringResource(R.string.support_map_filter_saved_only, savedCount)) },
+                leadingIcon = {
+                    Icon(
+                        if (showSavedOnly) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                modifier = Modifier.statusBarsPadding().padding(start = 68.dp, top = 12.dp)
+                    .align(Alignment.TopStart).testTag("full_screen_saved_filter"),
+            )
         }
         if (navigating) Surface(
             modifier = Modifier.statusBarsPadding().padding(start = 68.dp, end = 72.dp, top = 12.dp)

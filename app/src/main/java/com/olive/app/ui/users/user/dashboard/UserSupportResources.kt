@@ -2,7 +2,6 @@
 package com.olive.app.ui.users.user.dashboard
 
 import com.olive.app.ui.shared.OliveButton as Button
-import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.content.ActivityNotFoundException
@@ -10,30 +9,39 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.Phone
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.olive.app.R
@@ -42,11 +50,18 @@ import com.olive.app.data.account.UserProfile
 import com.olive.app.data.location.DeviceLocation
 import com.olive.app.data.safety.CanadianRegion
 import com.olive.app.data.safety.HotlineDirectory
-import com.olive.app.data.safety.HotlineResource
-import com.olive.app.data.safety.HotlineResourceKind
+import com.olive.app.data.safety.SavedHotlineStore
 import com.olive.app.data.safety.hotlineDialNumber
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.shared.AccessibleMessage
+import com.olive.app.ui.shared.LoadingSkeleton
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.SkeletonLayout
+import com.olive.app.ui.shared.oliveScrollbar
+import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.users.shared.navigation.Field
+import com.olive.app.ui.users.shared.navigation.Heading
+import com.olive.app.ui.users.shared.navigation.SafePage
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.account.SafeBack
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -93,15 +108,12 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     val lookupLocation = LocalHotlineLocationLookup.current
     val scope = rememberCoroutineScope()
     val locate: () -> Unit = {
-        // Ignore another location tap while the first lookup is still running.
         if (!locating) {
             locating = true
             locationError = null
             permissionDenied = false
             scope.launch {
-                // A location lookup can fail, but the hotline list should stay open.
                 try {
-                    // Ask for permission before checking the phone's location.
                     if (!requestLocationPermission()) {
                         permissionDenied = true
                         locationError = R.string.support_location_denied
@@ -116,7 +128,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) { // Location is optional here, so show the unavailable message and keep the support screen usable.
+                } catch (_: Exception) {
                     locationError = R.string.support_location_unavailable
                 } finally {
                     locating = false
@@ -126,52 +138,71 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     }
     var query by rememberSaveable { mutableStateOf("") }
     var onlyAlwaysOpen by rememberSaveable { mutableStateOf(false) }
+    var activeTab by rememberSaveable { mutableStateOf(HotlineTab.All) }
     var choosingRegion by remember { mutableStateOf(false) }
     var openFailed by remember { mutableStateOf(false) }
     val open: (String, Boolean) -> Unit =
         { url, dial -> openFailed = !openHotlineDestination(context, url, dial) }
-    val matched =
-        catalog?.matching(selection, city, query).orEmpty().takeIf { selection.isNotBlank() }
-            .orEmpty().filter { !onlyAlwaysOpen || it.hours.contains("24/7") }
+
+    val savedVersion by SavedHotlineStore.updates.collectAsState()
+    val accountId = session.coverAccountId.orEmpty()
+    val savedIds = remember(catalog, accountId, savedVersion) {
+        SavedHotlineStore.savedIds(context, accountId, catalog?.resources.orEmpty())
+    }
+
+    val matched = when {
+        catalog == null -> emptyList()
+        activeTab == HotlineTab.Saved -> catalog.matching(
+            region = "CA",
+            city = "",
+            query = query,
+            savedIds = savedIds,
+            onlyAlwaysOpen = onlyAlwaysOpen,
+        )
+        selection.isBlank() -> emptyList()
+        else -> catalog.matching(
+            region = selection,
+            city = city,
+            query = query,
+            kind = activeTab.resourceKind(),
+            onlyAlwaysOpen = onlyAlwaysOpen,
+        )
+    }
+
     val text = rememberResourceText()
     val listState = rememberLazyListState()
-    var lastFilter by remember { mutableStateOf(selection to onlyAlwaysOpen) }
-    LaunchedEffect(selection, onlyAlwaysOpen) {
-        val current = selection to onlyAlwaysOpen
+    var lastFilter by remember { mutableStateOf(Triple(selection, activeTab, onlyAlwaysOpen)) }
+    LaunchedEffect(selection, activeTab, onlyAlwaysOpen) {
+        val current = Triple(selection, activeTab, onlyAlwaysOpen)
         if (current != lastFilter) {
             lastFilter = current
             listState.scrollToItem(0)
         }
     }
+
     LazyColumn(
         Modifier.fillMaxSize().oliveScrollbar(listState).testTag("hotline_page"),
         state = listState,
         contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             SafeBack(session)
-            Heading(
-                stringResource(R.string.support_hotlines),
-                ""
-            )
+            Heading(stringResource(R.string.support_hotlines), "")
         }
-        // Show a loading sign or a useful message while the hotline list loads.
         if (catalog == null) item {
-            // The directory is still loading, so keep the user informed.
             if (directory == null) LoadingSkeleton(SkeletonLayout.HotlineDirectory) else {
                 AccessibleMessage(stringResource(R.string.support_load_failed))
                 TextButton(onClick = {
                     open(
                         "https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html",
-                        false
+                        false,
                     )
                 }) {
                     Text(stringResource(R.string.support_full_directory))
                 }
             }
         }
-        // Show search and region controls after the hotline list is ready.
         if (catalog != null) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -179,40 +210,36 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                         OutlinedButton(
                             onClick = { choosingRegion = true },
                             enabled = !locating,
-                            modifier = Modifier.fillMaxWidth().testTag("hotline_region")
+                            modifier = Modifier.fillMaxWidth().testTag("hotline_region"),
                         ) {
                             Text(
-                                if (selection.isBlank()) stringResource(R.string.support_choose_region) else hotlineRegionName(
-                                    selection
-                                )
+                                if (selection.isBlank()) stringResource(R.string.support_choose_region)
+                                else hotlineRegionName(selection)
                             )
                         }
                         DropdownMenu(
                             expanded = choosingRegion,
-                            onDismissRequest = { choosingRegion = false }) {
+                            onDismissRequest = { choosingRegion = false },
+                        ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.support_saved_location)) },
                                 onClick = {
-                                    selection = savedRegion
-                                        ?: if (catalog.isCanada(address)) "CA" else ""
-                                    city =
-                                        address.city
-                                    locationError =
-                                        null
+                                    selection = savedRegion ?: if (catalog.isCanada(address)) "CA" else ""
+                                    city = address.city
+                                    locationError = null
                                     choosingRegion = false
-                                })
-                            // List Canada first, followed by each province and territory.
+                                },
+                            )
                             (listOf("CA") + CanadianRegion.entries.map { it.code }).forEach { code ->
                                 DropdownMenuItem(
                                     text = { Text(hotlineRegionName(code)) },
                                     onClick = {
                                         selection = code
-                                        city =
-                                            if (code == savedRegion) address.city else ""
+                                        city = if (code == savedRegion) address.city else ""
                                         locationError = null
                                         choosingRegion = false
                                     },
-                                    modifier = Modifier.testTag("hotline_region_$code")
+                                    modifier = Modifier.testTag("hotline_region_$code"),
                                 )
                             }
                         }
@@ -220,32 +247,44 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     Button(
                         onClick = locate,
                         enabled = !locating,
-                        modifier = Modifier.fillMaxWidth().testTag("hotline_use_device_location")
+                        modifier = Modifier.fillMaxWidth().testTag("hotline_use_device_location"),
                     ) {
-                        Text(stringResource(if (locating) R.string.support_finding_location else R.string.support_use_device_location))
+                        Text(
+                            stringResource(
+                                if (locating) R.string.support_finding_location
+                                else R.string.support_use_device_location
+                            )
+                        )
                     }
                     locationError?.let { error ->
                         AccessibleMessage(
                             stringResource(error),
-                            modifier = Modifier.testTag("hotline_location_error")
+                            modifier = Modifier.testTag("hotline_location_error"),
                         )
                     }
-                    // Offer a link to app settings if location permission was denied.
-                    if (permissionDenied) TextButton(onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    Uri.fromParts("package", context.packageName, null)
+                    if (permissionDenied) TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null),
+                                    )
                                 )
-                            )
-                        }
-                    }, modifier = Modifier.testTag("hotline_location_permissions")) {
-                        Text(
-                            stringResource(R.string.support_location_permissions)
-                        )
+                            }
+                        },
+                        modifier = Modifier.testTag("hotline_location_permissions"),
+                    ) {
+                        Text(stringResource(R.string.support_location_permissions))
                     }
-                    if (selection.isNotBlank()) {
+
+                    HotlineCategoryTabs(
+                        selected = activeTab,
+                        savedCount = savedIds.size,
+                        onSelect = { activeTab = it },
+                    )
+
+                    if (selection.isNotBlank() || activeTab == HotlineTab.Saved) {
                         Field(text(R.string.support_search), query, "hotline_search") {
                             query = it.take(160)
                         }
@@ -255,22 +294,54 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                             label = { Text(stringResource(R.string.hotline_filter_247)) },
                             modifier = Modifier.testTag("hotline_filter_247"),
                         )
-                    } else Text(stringResource(R.string.support_outside_canada))
+                    } else {
+                        Text(stringResource(R.string.support_outside_canada))
+                    }
                 }
             }
-            // Search results only make sense after a region has been chosen.
-            if (selection.isNotBlank()) {
+
+            if (selection.isNotBlank() || activeTab == HotlineTab.Saved) {
                 item {
                     Text(
                         stringResource(R.string.support_result_count, matched.size),
                         modifier = Modifier.semantics {
                             heading()
                             liveRegion = LiveRegionMode.Polite
-                        })
+                        },
+                    )
                 }
-                if (matched.isEmpty()) item { Text(stringResource(R.string.support_no_results)) }
-                items(matched, key = { it.id }) { resource -> HotlineResourceCard(resource, open) }
+                if (matched.isEmpty()) item {
+                    if (activeTab == HotlineTab.Saved && savedIds.isEmpty()) {
+                        SavedResourcesEmptyCard()
+                    } else {
+                        Text(stringResource(R.string.support_no_results))
+                    }
+                }
+                items(matched, key = { it.id }) { resource ->
+                    val onNavigate: (() -> Unit)? = if (resource.hasMapLocation) {
+                        {
+                            session.locationMap.queuePrivateDestination(
+                                resource.name,
+                                resource.latitude!!,
+                                resource.longitude!!,
+                            )
+                            session.navigation.openSafePage(SafePage.Location)
+                        }
+                    } else null
+                    HotlineResourceCard(
+                        resource = resource,
+                        saved = resource.id in savedIds,
+                        onToggleSave = {
+                            if (accountId.isNotBlank()) {
+                                SavedHotlineStore.toggle(context, accountId, resource.id)
+                            }
+                        },
+                        onOpen = open,
+                        onNavigate = onNavigate,
+                    )
+                }
             }
+
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val date = LocalDate.parse(catalog.checkedOn)
@@ -278,20 +349,18 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     Text(
                         stringResource(R.string.support_checked_on, date),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Muted
+                        color = Muted,
                     )
                     TextButton(onClick = {
                         open(
                             "https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html",
-                            false
+                            false,
                         )
                     }) {
                         Text(stringResource(R.string.support_full_directory))
                     }
                     TextButton(onClick = { open("https://lila.help/", false) }) {
-                        Text(
-                            stringResource(R.string.support_world_directory)
-                        )
+                        Text(stringResource(R.string.support_world_directory))
                     }
                 }
             }
@@ -299,115 +368,12 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         if (openFailed) item {
             AccessibleMessage(
                 stringResource(R.string.support_open_failed),
-                modifier = Modifier.testTag("hotline_open_failed")
+                modifier = Modifier.testTag("hotline_open_failed"),
             )
         }
     }
 }
 
-/**
- * Shows one hotline or shelter with its phone number, details, and safe action buttons.
- *
- * @param resource Resource supplied to [HotlineResourceCard].
- * @param onOpen Callback invoked when open changes or occurs.
- */
-@Composable
-private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Boolean) -> Unit) {
-    Card(
-        Modifier.fillMaxWidth().testTag("hotline_${resource.id}"),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = Ink
-        )
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(
-                Modifier.semantics(mergeDescendants = true) {},
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        resource.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f).semantics { heading() })
-                    if (resource.hours.contains("24/7")) HotlineAlwaysOpenIndicator()
-                }
-                Text(
-                    stringResource(if (resource.kind == HotlineResourceKind.Hotline) R.string.support_resource_hotline else R.string.support_resource_shelter),
-                    color = OliveGreen, style = MaterialTheme.typography.labelLarge
-                )
-                Text(
-                    "${resource.city}, ${hotlineRegionName(resource.region)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Muted
-                )
-                Text(resource.description, style = MaterialTheme.typography.bodyMedium)
-                if (resource.hours.isNotBlank()) {
-                    Text(stringResource(R.string.resource_hours, resource.hours), style = MaterialTheme.typography.bodyMedium)
-                }
-                Text(resource.phone, style = MaterialTheme.typography.headlineSmall)
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                val dialLabel =
-                    stringResource(R.string.support_dial_label, resource.name, resource.phone)
-                OutlinedButton(
-                    onClick = { onOpen(resource.phoneUri, true) },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                        .semantics { contentDescription = dialLabel }) {
-                    Icon(Icons.Outlined.Phone, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.support_open_dialer)
-                    )
-                }
-                val detailsLabel = stringResource(R.string.support_details_label, resource.name)
-                TextButton(
-                    onClick = { onOpen(resource.website, false) },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                        .semantics { contentDescription = detailsLabel }) {
-                    Text(stringResource(R.string.support_service_details))
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        Icons.AutoMirrored.Outlined.OpenInNew,
-                        null
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Composes the hotline always open indicator UI element.
- */
-@Composable
-private fun HotlineAlwaysOpenIndicator() {
-    val description = stringResource(R.string.hotline_available_247)
-    val transition = rememberInfiniteTransition(label = "24/7 hotline availability")
-    val opacity by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
-        label = "Availability light opacity",
-    )
-    Box(
-        Modifier.size(12.dp).alpha(opacity)
-            .background(MaterialTheme.colorScheme.primary, CircleShape)
-            .semantics { contentDescription = description },
-    )
-}
-
-/**
- * Opening a dialer never calls automatically and needs no phone permission. Android leaving the app locks the safe area.
- *
- * @param context Android context used to access system services, resources, or storage.
- * @param value Input value to store, parse, or format.
- * @param dial Whether to apply dial.
- * @return `true` if open hotline destination, or `false` otherwise.
- */
 private fun openHotlineDestination(context: Context, value: String, dial: Boolean): Boolean {
     val uri = value.toUri()
     if (if (dial) uri.scheme != "tel" else uri.scheme != "https" || uri.host.isNullOrBlank()) return false
@@ -415,10 +381,7 @@ private fun openHotlineDestination(context: Context, value: String, dial: Boolea
         if (dial) Uri.fromParts("tel", hotlineDialNumber(value) ?: return false, null) else uri
     return try {
         context.startActivity(
-            Intent(
-                if (dial) Intent.ACTION_DIAL else Intent.ACTION_VIEW,
-                destination
-            )
+            Intent(if (dial) Intent.ACTION_DIAL else Intent.ACTION_VIEW, destination)
         )
         true
     } catch (_: ActivityNotFoundException) {
@@ -427,30 +390,3 @@ private fun openHotlineDestination(context: Context, value: String, dial: Boolea
         false
     }
 }
-
-/**
- * Changes a Canadian region code into the province or territory name shown on the hotline card.
- *
- * @param code Verification, invitation, or error code.
- */
-@Composable
-private fun hotlineRegionName(code: String) = stringResource(
-    // Match each short region code to its translated name. Unknown codes fall back to Canada.
-    when (code) {
-        "AB" -> R.string.support_region_ab
-        "BC" -> R.string.support_region_bc
-        "MB" -> R.string.support_region_mb
-        "NB" -> R.string.support_region_nb
-        "NL" -> R.string.support_region_nl
-        "NS" -> R.string.support_region_ns
-        "NT" -> R.string.support_region_nt
-        "NU" -> R.string.support_region_nu
-        "ON" -> R.string.support_region_on
-        "PE" -> R.string.support_region_pe
-        "QC" -> R.string.support_region_qc
-        "SK" -> R.string.support_region_sk
-        "YT" -> R.string.support_region_yt
-        else -> R.string.support_canada
-    }
-)
-

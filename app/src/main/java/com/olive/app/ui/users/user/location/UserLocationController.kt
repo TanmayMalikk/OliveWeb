@@ -18,6 +18,7 @@ import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationTrailPoint
 import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.MapboxDirectionsClient
+import com.olive.app.data.location.RouteProfile
 import com.olive.app.data.location.SavedLocationUnavailableException
 import com.olive.app.data.location.distanceFromRouteMeters
 import com.olive.app.data.messaging.ChatSubscription
@@ -62,6 +63,9 @@ internal data class LocationMapState(
     val routeWorking: Boolean = false,
     val routeError: String? = null,
     val locating: Boolean = false,
+    val ownBearing: Float? = null,
+    val ownSpeedMps: Float? = null,
+    val routeProfile: RouteProfile = RouteProfile.DRIVING,
 ) {
     /**
      * Chooses the user's own map marker from live or saved location data.
@@ -79,12 +83,7 @@ internal class LocationMapController(
     private val scope: CoroutineScope,
     private val repository: LocationSharingDataSource?,
     private val addressResolver: AddressCoordinateResolver = AndroidAddressCoordinateResolver(context.applicationContext),
-    private val requestRoute: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? =
-        if (MapboxDirectionsClient.configured) {
-            { origin, target ->
-                MapboxDirectionsClient.drivingRoute(origin.latitude, origin.longitude, target.latitude, target.longitude)
-            }
-        } else null,
+    private val requestRoute: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? = DEFAULT_ROUTE_REQUEST,
 ) {
     private val applicationContext = context.applicationContext
     private var locationJob: Job? = null
@@ -92,6 +91,8 @@ internal class LocationMapController(
     private var expiryJob: Job? = null
     private var subscription: ChatSubscription? = null
     private var generation = 0
+    private var pendingDestination: MapLocationPoint? = null
+    private var pendingAutoStart = false
     private val stateMutableFlow = MutableStateFlow(LocationMapState())
     val stateFlow: StateFlow<LocationMapState> = stateMutableFlow.asStateFlow()
     private var stateSnapshot by mutableStateOf(stateMutableFlow.value)
@@ -121,6 +122,8 @@ internal class LocationMapController(
         val token = ++generation
         val uid = configuration.identity.uid
         val friendIds = configuration.friends.mapTo(mutableSetOf()) { it.uid }
+        val queuedDestination = pendingDestination
+        pendingDestination = null
         state = LocationMapState(
             ownerUid = uid,
             locating = true,
@@ -129,6 +132,7 @@ internal class LocationMapController(
             liveActive = LiveLocationController.active(applicationContext),
             expiresAt = LiveLocationController.expiresAt(applicationContext),
             staticSharing = repository?.staticSharingEnabled(uid) == true,
+            privateDestination = queuedDestination,
         )
         if (!configuration.localMode) {
             subscription = if (configuration.profile.role == AccountRole.USER)
@@ -191,7 +195,9 @@ internal class LocationMapController(
                                         true,
                                         fix.accuracy,
                                         trail = trail.takeLast(MAX_TRAIL_POINTS)
-                                    )
+                                    ),
+                                    ownBearing = fix.bearing,
+                                    ownSpeedMps = fix.speedMetersPerSecond,
                                 )
                             }
                         }
@@ -264,6 +270,44 @@ internal class LocationMapController(
     }
 
     /**
+     * Queues a private destination before navigating to the map screen so [open] preserves it.
+     */
+    fun queuePrivateDestination(
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        autoStart: Boolean = true,
+    ) {
+        pendingDestination = MapLocationPoint(
+            "private-route-destination",
+            name,
+            latitude,
+            longitude,
+            0L,
+            false,
+            null,
+        )
+        pendingAutoStart = autoStart
+    }
+
+    /**
+     * Returns true once if a queued destination is ready for automatic route guidance.
+     */
+    fun consumePendingAutoStart(): Boolean {
+        if (!pendingAutoStart || state.privateDestination == null || state.ownPoint == null) return false
+        pendingAutoStart = false
+        return true
+    }
+
+    /**
+     * Switches between driving and walking directions.
+     */
+    fun setRouteProfile(profile: RouteProfile) {
+        if (state.navigating || state.routeProfile == profile) return
+        state = state.copy(routeProfile = profile)
+    }
+
+    /**
      * Selects private destination.
      *
      * @param name Field, key, or display name.
@@ -291,7 +335,20 @@ internal class LocationMapController(
         failedMessage: String,
     ) {
         if (state.navigating || state.routeWorking) return
-        val directions = requestRoute
+        val useDefaultDirections = requestRoute === DEFAULT_ROUTE_REQUEST
+        val directions: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? = if (useDefaultDirections) {
+            if (MapboxDirectionsClient.configured) {
+                { origin, target ->
+                    MapboxDirectionsClient.route(
+                        origin.latitude,
+                        origin.longitude,
+                        target.latitude,
+                        target.longitude,
+                        state.routeProfile,
+                    )
+                }
+            } else null
+        } else requestRoute
         if (directions == null) {
             state = state.copy(routeError = notConfiguredMessage)
             return
@@ -568,6 +625,7 @@ internal class LocationMapController(
         const val TRAIL_WINDOW_MILLIS = 30 * 60_000L
         const val MIN_TRAIL_DISTANCE_METERS = 2f
         const val MAX_TRAIL_POINTS = 1_000
+        private val DEFAULT_ROUTE_REQUEST: suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute? = { _, _ -> null }
     }
 }
 

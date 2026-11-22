@@ -10,23 +10,87 @@
     },
     "Shelters": {
       "Crossroads for Women / Carrefour pour femmes": {
-        "Desc": "24/7 crisis line and emergency shelter for women and children escaping domestic abuse in Moncton region.",
+        "Desc": "24/7 crisis line and emergency shelter for women and children escaping domestic abuse in the Moncton region.",
         "Phone": "1-844-853-0811",
         "Text": "506-853-0811",
         "hours": "24/7",
         "url": "https://crossroadsforwomen.ca/"
       }
+    },
+    "LegalAid": {
+      "New Brunswick Legal Aid (Moncton Office)": {
+        "Desc": "Family and domestic violence legal aid and duty counsel for Southeastern New Brunswick.",
+        "Phone": "506-853-7300",
+        "hours": "Monday to Friday, 8:15 AM - 4:30 PM AT",
+        "address": "Suite 300, 774 Main St, Moncton, NB E1C 9Y3",
+        "lat": 46.0888,
+        "lng": -64.7777,
+        "url": "https://www.legalaid-aidejuridique-nb.ca/"
+      }
+    },
+    "Counseling": {
+      "Crossroads for Women Outreach Counselling": {
+        "Desc": "Confidential safety planning and bilingual supportive counselling for survivors.",
+        "Phone": "1-844-853-0811",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT (Crisis line 24/7)",
+        "url": "https://crossroadsforwomen.ca/"
+      }
+    },
+    "CrisisServices": {
+      "NB Mobile Crisis Services (Moncton)": {
+        "Desc": "24/7 crisis intervention, suicide prevention, and urgent community mental health referrals.",
+        "Phone": "1-866-771-7760",
+        "hours": "24/7",
+        "url": "https://www2.gnb.ca/"
+      }
     }
   },
   "Saint John": {
     "Hotlines": {
+      "Chimo Helpline (Saint John)": {
+        "Desc": "24/7 bilingual provincial helpline providing emotional support and domestic violence intervention.",
+        "Phone": "1-800-667-5005",
+        "hours": "24/7",
+        "url": "https://chimoservices.com/"
+      }
     },
     "Shelters": {
       "Coverdale Centre for Women": {
         "Desc": "Emergency shelter and crisis support for women experiencing homelessness, trauma, or abuse.",
         "Phone": "506-634-1649",
-        "hours": "8:00am - 4:00pm, Mon - Sun",
+        "hours": "Daily, 8:00 AM - 4:00 PM AT (24/7 shelter bed intake)",
         "url": "https://www.coverdalecentreforwomen.com/"
+      }
+    },
+    "LegalAid": {
+      "New Brunswick Legal Aid (Saint John Office)": {
+        "Desc": "Legal aid services and family law representation in Saint John.",
+        "Phone": "506-633-6030",
+        "hours": "Monday to Friday, 8:15 AM - 4:30 PM AT",
+        "address": "Suite 802, 15 Market Square, Saint John, NB E2L 1E8",
+        "lat": 45.2725,
+        "lng": -66.0637,
+        "url": "https://www.legalaid-aidejuridique-nb.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Plus / Addiction & Mental Health Counselling": {
+        "Desc": "Bilingual mental health and trauma-informed community counselling in Saint John.",
+        "Phone": "506-634-8295",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "address": "199 Chesley Dr, Saint John, NB E2K 4S9",
+        "lat": 45.2797,
+        "lng": -66.0825,
+        "url": "https://www.familyplus.ca/"
+      }
+    },
+    "CrisisServices": {
+      "9-8-8 Suicide Crisis Helpline (Saint John)": {
+        "Desc": "24/7 call and text crisis response across New Brunswick.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   },
@@ -34,7 +98,7 @@
     "Hotlines": {
       "Chimo Helpline": {
         "Desc": "Provincial 24/7 crisis line providing emotional support and family violence intervention.",
-        "Phone": "1-800-784-2433",
+        "Phone": "1-800-667-5005",
         "hours": "24/7",
         "url": "https://chimoservices.com/"
       }
@@ -45,6 +109,36 @@
         "Phone": "1-800-565-6878",
         "hours": "24/7",
         "url": "https://www.gignoohouse.ca/"
+      }
+    },
+    "LegalAid": {
+      "New Brunswick Legal Aid (Fredericton Office)": {
+        "Desc": "Regional legal aid intake, protection orders, and family law services.",
+        "Phone": "506-444-2777",
+        "hours": "Monday to Friday, 8:15 AM - 4:30 PM AT",
+        "address": "Suite 210, 412 Queen St, Fredericton, NB E3B 1B6",
+        "lat": 45.9636,
+        "lng": -66.6431,
+        "url": "https://www.legalaid-aidejuridique-nb.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Enrichment and Counselling Service": {
+        "Desc": "Confidential individual, family, and trauma recovery counselling in Fredericton.",
+        "Phone": "506-458-8211",
+        "hours": "Mon-Thu 8:00 AM - 4:15 PM; Fri 8:00 AM - 3:30 PM AT",
+        "address": "356 Queen St, Fredericton, NB E3B 1B2",
+        "lat": 45.9642,
+        "lng": -66.6443,
+        "url": "https://www.familyenrichment.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Chimo Crisis & Suicide Support": {
+        "Desc": "24/7 confidential crisis intervention, safety planning, and mental health navigation.",
+        "Phone": "1-800-667-5005",
+        "hours": "24/7",
+        "url": "https://chimoservices.com/"
       }
     }
   }

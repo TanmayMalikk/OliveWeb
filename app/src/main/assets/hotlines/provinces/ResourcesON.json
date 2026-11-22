@@ -2,7 +2,7 @@
   "Toronto": {
     "Hotlines": {
       "Assaulted Women's Helpline (AWHL)": {
-        "Desc": "Confidential 24/7 provincial crisis line for women experiencing domestic, emotional, or physical abuse.",
+        "Desc": "Confidential 24/7 provincial crisis line in over 200 languages for women experiencing domestic, emotional, or physical abuse.",
         "Phone": "1-866-863-0511",
         "hours": "24/7",
         "url": "https://www.awhl.org/"
@@ -13,25 +13,77 @@
         "hours": "24/7",
         "url": "https://www.awhl.org/"
       },
-      "Barbra Schlifer Commemorative Clinic": {
-        "Desc": "Free legal, counselling, and language support for women experiencing violence.",
+      "Barbra Schlifer Commemorative Clinic Intake": {
+        "Desc": "Free legal representation, trauma-informed counselling, and multilingual interpretation for women experiencing violence.",
         "Phone": "416-323-9149",
-        "hours": "Mon 9am-5pm * Tue 9am-5pm * Wed 9am-5pm * Thu 9am-5pm * Fri 9am-5pm",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET (Walk-in intake Fri 9:30 AM - 3:30 PM)",
+        "address": "Suite 503, 489 College St, Toronto, ON M6G 1A5",
+        "lat": 43.6559,
+        "lng": -79.4095,
         "url": "https://schliferclinic.com/"
       }
     },
     "Shelters": {
       "Ernestine's Women's Shelter": {
-        "Desc": "Emergency shelter and 24/7 crisis line providing safe refuge, food, and legal support for women and children.",
+        "Desc": "Emergency shelter and 24/7 crisis support providing safe refuge, food, and advocacy for women and children.",
         "Phone": "416-746-3701",
-        "hours": "Mon - Fri: 10 am - 5:30 pm",
+        "hours": "24/7 crisis support; Office Mon-Fri 10:00 AM - 5:30 PM ET",
         "url": "https://ernestines.ca/"
       },
       "Red Door Family Shelter": {
-        "Desc": "Safe emergency shelter for families and women fleeing domestic abuse.",
+        "Desc": "Safe emergency shelter for families and women fleeing domestic abuse or housing crisis.",
         "Phone": "416-915-5671",
-        "hours": "Mon-Fri 9 am-5 pm",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET (24/7 shelter bed intake via Central Intake)",
         "url": "https://www.reddoorshelter.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Provincial Contact Centre & Head Office)": {
+        "Desc": "Provincial legal aid intake in 300+ languages, domestic violence advice certificates, and family law services.",
+        "Phone": "1-800-668-8258",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM ET",
+        "address": "Suite 730, 20 Dundas St W, Toronto, ON M5G 2H1",
+        "lat": 43.6561,
+        "lng": -79.3818,
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service Toronto": {
+        "Desc": "Trauma-informed counselling, gender-based violence support, and community social work across Toronto.",
+        "Phone": "416-595-9618",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "355 Church St, Toronto, ON M5B 0B2",
+        "lat": 43.6598,
+        "lng": -79.3788,
+        "url": "https://familyservicetoronto.org/"
+      },
+      "Barbra Schlifer Commemorative Clinic Counselling": {
+        "Desc": "Free individual and group trauma counselling and interpreter services for women survivors of violence.",
+        "Phone": "416-323-9149",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "Suite 503, 489 College St, Toronto, ON M6G 1A5",
+        "lat": 43.6559,
+        "lng": -79.4095,
+        "url": "https://schliferclinic.com/"
+      }
+    },
+    "CrisisServices": {
+      "Gerstein Crisis Centre": {
+        "Desc": "24/7 community mental health crisis response, mobile crisis team, and short-stay crisis beds.",
+        "Phone": "416-929-5200",
+        "hours": "24/7",
+        "address": "100 Charles St E, Toronto, ON M4Y 1V3",
+        "lat": 43.6695,
+        "lng": -79.3827,
+        "url": "https://gersteincentre.org/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   },
@@ -52,10 +104,40 @@
         "url": "https://maisondamitie.ca/"
       },
       "Interval House Ottawa": {
-        "Desc": "Emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
+        "Desc": "24/7 emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
         "Phone": "613-234-5181",
         "hours": "24/7",
         "url": "https://www.intervalhouseottawa.org/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Ottawa District Office)": {
+        "Desc": "Legal representation, Integrated Legal Services, and family violence court support in Ottawa.",
+        "Phone": "613-238-7931",
+        "hours": "Monday to Friday, 8:30 AM - 4:00 PM ET",
+        "address": "Suite 1101, 275 Slater St, Ottawa, ON K1P 5H9",
+        "lat": 45.4193,
+        "lng": -75.7024,
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Services Ottawa": {
+        "Desc": "Walk-in and ongoing individual, couple, and family counselling including trauma programs.",
+        "Phone": "613-725-3601",
+        "hours": "Mon-Thu 8:30 AM - 7:00 PM; Fri 8:30 AM - 4:30 PM ET",
+        "address": "312 Parkdale Ave, Ottawa, ON K1Y 4X5",
+        "lat": 45.4027,
+        "lng": -75.7302,
+        "url": "https://familyservicesottawa.org/"
+      }
+    },
+    "CrisisServices": {
+      "Mental Health Crisis Line (Ottawa & Region)": {
+        "Desc": "24/7 bilingual crisis line and mobile crisis team dispatch across Ottawa and Eastern Ontario.",
+        "Phone": "613-722-6914",
+        "hours": "24/7",
+        "url": "https://www.crisisline.ca/"
       }
     }
   },
@@ -70,10 +152,37 @@
     },
     "Shelters": {
       "Interval House Hamilton": {
-        "Desc": "24/7 safe emergency shelter, advocacy, and community support.",
+        "Desc": "24/7 safe emergency shelter, advocacy, and community support for women and children.",
         "Phone": "905-387-8881",
         "hours": "24/7",
         "url": "https://intervalhousehamilton.org/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Hamilton Toll-Free)": {
+        "Desc": "Family law aid, duty counsel, and protection support across Hamilton-Wentworth.",
+        "Phone": "1-800-668-8258",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM ET",
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Catholic Family Services of Hamilton": {
+        "Desc": "Walk-in and trauma-informed counselling services open to all individuals and families.",
+        "Phone": "905-527-3823",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM ET",
+        "address": "Suite 201, 447 Main St E, Hamilton, ON L8N 1K1",
+        "lat": 43.2528,
+        "lng": -79.8559,
+        "url": "https://cfshw.com/"
+      }
+    },
+    "CrisisServices": {
+      "COAST Hamilton Crisis Line": {
+        "Desc": "24/7 mobile mental health crisis outreach and emergency distress line for Hamilton.",
+        "Phone": "905-972-8338",
+        "hours": "24/7",
+        "url": "https://coasthamilton.ca/"
       }
     }
   }

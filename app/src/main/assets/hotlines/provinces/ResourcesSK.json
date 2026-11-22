@@ -8,7 +8,7 @@
         "url": "https://saskatooncrisis.ca/"
       },
       "Saskatoon Sexual Assault & Information Centre": {
-        "Desc": "24/7 crisis line providing confidential support and counselling for survivors of sexual violence.",
+        "Desc": "24/7 crisis line providing confidential support and counselling referrals for survivors of sexual violence.",
         "Phone": "306-244-2224",
         "hours": "24/7",
         "url": "https://ssaic.ca/"
@@ -20,6 +20,39 @@
         "Phone": "1-888-338-0880",
         "hours": "24/7",
         "url": "https://saskatoonintervalhouse.org/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Saskatchewan (Saskatoon Office)": {
+        "Desc": "Legal aid intake and representation for family, domestic violence, and criminal matters.",
+        "Phone": "306-933-5300",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM CST",
+        "address": "Suite 400, 201 21st St E, Saskatoon, SK S7K 0B8",
+        "lat": 52.1286,
+        "lng": -106.6634,
+        "url": "https://www.legalaid.sk.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service Saskatoon": {
+        "Desc": "Walk-in rapid access counselling, domestic violence recovery, and trauma support.",
+        "Phone": "306-244-0127",
+        "hours": "Mon, Thu, Fri 9:00 AM - 5:00 PM; Tue-Wed 9:00 AM - 8:00 PM CST",
+        "address": "Suite 102, 506 25th St E, Saskatoon, SK S7K 4A7",
+        "lat": 52.1333,
+        "lng": -106.6584,
+        "url": "https://familyservice.sk.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Saskatoon Mobile Crisis Centre": {
+        "Desc": "24/7 mobile crisis response, walk-in office, and urgent safety planning.",
+        "Phone": "306-933-6200",
+        "hours": "24/7",
+        "address": "Suite 103, 506 25th St E, Saskatoon, SK S7K 4A7",
+        "lat": 52.1333,
+        "lng": -106.6584,
+        "url": "https://saskatooncrisis.ca/"
       }
     }
   },
@@ -39,29 +72,90 @@
         "hours": "24/7",
         "url": "https://reginatransitionhouse.ca/"
       },
-      "Sofiya House (YWCA Regina)": {
-        "Desc": "Emergency shelter and second-stage housing for women and children escaping family violence.",
-        "Phone": "306-525-2141",
+      "Sofia House (YWCA Regina)": {
+        "Desc": "Safe emergency and second-stage housing for women and children escaping family violence.",
+        "Phone": "306-565-2537",
         "hours": "24/7",
-        "url": "https://ywcaregina.com/"
+        "url": "https://sofiahouse.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Saskatchewan (Regina Area Office)": {
+        "Desc": "Legal aid intake and family law assistance in Regina.",
+        "Phone": "306-787-8760",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM CST",
+        "address": "Suite 200, 1871 Smith St, Regina, SK S4P 4W5",
+        "lat": 50.4494,
+        "lng": -104.6143,
+        "url": "https://www.legalaid.sk.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service Regina": {
+        "Desc": "Intimate partner violence outreach, rapid access counselling, and crisis support.",
+        "Phone": "306-757-6675",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM CST (closed 12:00 PM - 1:00 PM)",
+        "address": "Suite 200, 2505 11th Ave, Regina, SK S4P 0K6",
+        "lat": 50.4510,
+        "lng": -104.6177,
+        "url": "https://familyserviceregina.com/"
+      }
+    },
+    "CrisisServices": {
+      "Mobile Crisis Services Regina Centre": {
+        "Desc": "24/7 walk-in and mobile emergency crisis intervention in Regina.",
+        "Phone": "306-757-0127",
+        "hours": "24/7",
+        "address": "1646 11th Ave, Regina, SK S4P 0H4",
+        "lat": 50.4508,
+        "lng": -104.6042,
+        "url": "https://mobilecrisis.ca/"
       }
     }
   },
   "Prince Albert": {
     "Hotlines": {
       "Prince Albert Mobile Crisis Line": {
-        "Desc": "24/7 crisis line providing emergency intervention, family support, and emergency housing referrals.",
+        "Desc": "After-hours and weekend crisis line providing emergency intervention and family violence referrals.",
         "Phone": "306-764-1011",
-        "hours": "Monday to Friday - 4:00 pm to 8:30 am; Saturday to Sunday - Open 24 hours",
+        "hours": "Mon-Fri 4:00 PM - 8:30 AM; Sat-Sun 24 hours CST",
         "url": "https://www.pacrisis.ca/"
       }
     },
     "Shelters": {
-      "Prince Albert Women's Shelter": {
+      "Prince Albert Safe Shelter for Women": {
         "Desc": "Safe emergency shelter and 24/7 crisis line for women and children escaping domestic abuse.",
         "Phone": "306-764-7233",
         "hours": "24/7",
         "url": "https://www.pasafeshelter.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Saskatchewan (Toll-Free Intake)": {
+        "Desc": "Province-wide legal aid application line serving Prince Albert.",
+        "Phone": "1-800-667-3764",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM CST",
+        "url": "https://www.legalaid.sk.ca/"
+      }
+    },
+    "Counseling": {
+      "Catholic Family Services Prince Albert": {
+        "Desc": "Community counselling, domestic violence support, and trauma programs.",
+        "Phone": "306-922-3202",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM CST",
+        "address": "1008 1st Ave W, Prince Albert, SK S6V 4Y4",
+        "lat": 53.2044,
+        "lng": -105.7586,
+        "url": "https://www.cfspa.ca/"
+      }
+    },
+    "CrisisServices": {
+      "9-8-8 Suicide Crisis Helpline (Prince Albert)": {
+        "Desc": "Confidential 24/7 call and text crisis response anywhere in Saskatchewan.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   }

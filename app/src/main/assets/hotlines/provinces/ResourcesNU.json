@@ -5,7 +5,7 @@
         "Desc": "Confidential 24/7 crisis line offering support in Inuktitut and English for anyone in Nunavut experiencing distress or violence.",
         "Phone": "1-800-265-3333",
         "hours": "24/7",
-        "url": "http://nunavuthelpline.ca/"
+        "url": "https://nunavuthelpline.ca/"
       }
     },
     "Shelters": {
@@ -14,6 +14,34 @@
         "Phone": "867-979-4500",
         "hours": "24/7",
         "url": "https://www.ywca-agvik.ca/"
+      }
+    },
+    "LegalAid": {
+      "Maliiganik Tukisiiniarvik Legal Services (Nunavut Legal Aid)": {
+        "Desc": "Legal aid clinics, family law support, and 24/7 custody legal advice across Nunavut.",
+        "Phone": "867-975-6395",
+        "hours": "Monday to Friday, 8:30 AM - 5:00 PM ET (24/7 arrest line 1-866-202-5593)",
+        "address": "Building 1104-B, Inuksugait Plaza, Iqaluit, NU X0A 0H0",
+        "lat": 63.7486,
+        "lng": -68.5197,
+        "url": "https://www.nulegalaid.com/"
+      }
+    },
+    "Counseling": {
+      "Hope for Wellness Help Line (Inuktitut & English)": {
+        "Desc": "24/7 culturally grounded counselling and crisis intervention for Indigenous Peoples across Nunavut.",
+        "Phone": "1-855-242-3310",
+        "hours": "24/7",
+        "url": "https://www.hopeforwellness.ca/"
+      }
+    },
+    "CrisisServices": {
+      "9-8-8 Suicide Crisis Helpline (Nunavut)": {
+        "Desc": "Confidential 24/7 call and text crisis response across Nunavut.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   }

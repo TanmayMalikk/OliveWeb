@@ -55,7 +55,9 @@ internal data class DeviceCoordinates(
     val latitude: Double,
     val longitude: Double,
     val accuracy: Float?,
-    val timestamp: Long
+    val timestamp: Long,
+    val bearing: Float? = null,
+    val speedMetersPerSecond: Float? = null,
 )
 
 // Stops a shared device-location listener when a feature no longer needs GPS updates.
@@ -116,6 +118,8 @@ internal object DeviceLocation {
                             longitude = location.longitude,
                             accuracy = location.accuracy.takeIf { location.hasAccuracy() },
                             timestamp = location.time,
+                            bearing = location.bearing.takeIf { location.hasBearing() },
+                            speedMetersPerSecond = location.speed.takeIf { location.hasSpeed() },
                         )
                     )
                 }
@@ -156,9 +160,24 @@ internal object DeviceLocation {
                 location.latitude,
                 location.longitude,
                 location.accuracy.takeIf { location.hasAccuracy() },
-                location.time
+                location.time,
+                location.bearing.takeIf { location.hasBearing() },
+                location.speed.takeIf { location.hasSpeed() },
             )
         }
+    }
+
+    /**
+     * Geocodes a free-text address query into map coordinates via Android's platform Geocoder.
+     *
+     * @param context Android context used to access system services.
+     * @param query Free-text address or place query.
+     * @return Coordinates pair, or `null` when unavailable.
+     */
+    suspend fun coordinatesForQuery(context: Context, query: String): Pair<Double, Double>? {
+        if (!Geocoder.isPresent() || query.isBlank()) return null
+        val address = forwardGeocode(Geocoder(context, Locale.getDefault()), query.trim()) ?: return null
+        return address.latitude to address.longitude
     }
 
     /**
@@ -457,7 +476,13 @@ data class LocationRoute(
         } ?: 0
 }
 
-// Requests traffic-aware driving routes. Geoapify remains responsible for address lookup.
+// Navigation routing profile for Mapbox Directions requests.
+internal enum class RouteProfile(val mapboxPath: String) {
+    DRIVING("driving-traffic"),
+    WALKING("walking"),
+}
+
+// Requests traffic-aware driving or walking routes. Geoapify/Mapbox remain responsible for address lookup.
 internal object MapboxDirectionsClient {
     val configured get() = BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()
 
@@ -475,6 +500,17 @@ internal object MapboxDirectionsClient {
         startLongitude: Double,
         endLatitude: Double,
         endLongitude: Double,
+    ): LocationRoute? = route(startLatitude, startLongitude, endLatitude, endLongitude, RouteProfile.DRIVING)
+
+    /**
+     * Requests a route for [profile] and converts the response into map points and directions.
+     */
+    suspend fun route(
+        startLatitude: Double,
+        startLongitude: Double,
+        endLatitude: Double,
+        endLongitude: Double,
+        profile: RouteProfile = RouteProfile.DRIVING,
     ): LocationRoute? = withContext(Dispatchers.IO) {
         if (!configured) return@withContext null
         val coordinates = "$startLongitude,$startLatitude;$endLongitude,$endLatitude"
@@ -488,7 +524,7 @@ internal object MapboxDirectionsClient {
             "access_token=${encode(BuildConfig.MAPBOX_ACCESS_TOKEN)}",
         ).joinToString("&")
         val connection =
-            (URL("https://api.mapbox.com/directions/v5/mapbox/driving-traffic/$coordinates?$parameters")
+            (URL("https://api.mapbox.com/directions/v5/mapbox/${profile.mapboxPath}/$coordinates?$parameters")
                 .openConnection() as HttpsURLConnection).apply {
                 connectTimeout = 8_000
                 readTimeout = 10_000
@@ -728,7 +764,12 @@ internal class AdminLocationRepository(
 }
 
 internal data class NearbySupportService(
-    val id: String, val name: String, val address: String, val latitude: Double, val longitude: Double,
+    val id: String,
+    val name: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    val saved: Boolean = false,
 )
 internal data class NearbySupportResult(val radiusKm: Int, val services: List<NearbySupportService>)
 

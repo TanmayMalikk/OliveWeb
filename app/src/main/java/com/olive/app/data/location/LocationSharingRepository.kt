@@ -669,9 +669,13 @@ internal object GeoapifyClient {
      * @param cityOnly Whether to apply city only.
      * @return List of resulting autocomplete items.
      */
-    suspend fun autocomplete(query: String, cityOnly: Boolean): List<AddressSuggestion> =
+    suspend fun autocomplete(
+        query: String,
+        cityOnly: Boolean,
+        minLength: Int = 3,
+    ): List<AddressSuggestion> =
         withContext(Dispatchers.IO) {
-            if (!configured || query.trim().length < 3) return@withContext emptyList()
+            if (!configured || query.trim().length < minLength) return@withContext emptyList()
             val parameters = buildList {
                 add("text=${encode(query.trim())}")
                 add("format=json")
