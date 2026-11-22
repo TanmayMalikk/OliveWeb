@@ -175,7 +175,7 @@ internal class SafetyDocumentsController(
         tags: Set<String> = emptySet(),
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         transfers.queueDocument(uri, identity, ocrReview, tags, onQueued = {
             state = state.copy(loading = false, error = null)
             if (subscription == null) load(identity.uid, identity.username, false)
@@ -207,7 +207,7 @@ internal class SafetyDocumentsController(
         onComplete: () -> Unit
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         val review = when {
             kind != MediaKind.DOCUMENT -> OcrReview.NOT_APPLICABLE
             ocr == null -> OcrReview.NOT_RUN

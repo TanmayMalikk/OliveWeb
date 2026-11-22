@@ -14,6 +14,7 @@ import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -197,7 +198,15 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             if (state.loading) item(key = "loading_documents") { LoadingSkeleton(SkeletonLayout.Documents) }
             if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
             items(uploads, key = { "upload_${it.jobId}" }) { upload ->
-                PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }
+                PendingUploadCard(
+                    upload = upload,
+                    onOpen = {
+                        mediaController?.openPendingUpload(upload.jobId, uid)?.let { (doc, local) ->
+                            opened = doc to local
+                        }
+                    },
+                    onRetry = { mediaController?.retryUpload(upload.jobId) }
+                )
             }
             items(shown, key = { it.id }) { file ->
                 SafetyDocumentCard(file, uid, session.messages.friends,
@@ -450,7 +459,11 @@ private fun PreparingUploadCard() {
  * @param onRetry Callback invoked when retry changes or occurs.
  */
 @Composable
-internal fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
+internal fun PendingUploadCard(
+    upload: MediaUploadPresentation,
+    onOpen: (() -> Unit)? = null,
+    onRetry: () -> Unit,
+) {
     val failed = upload.status == MediaTransferStatus.FAILED
     val waitingToRetry = upload.status == MediaTransferStatus.QUEUED && upload.error != null
     val retryable = failed || waitingToRetry
@@ -470,7 +483,10 @@ internal fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> U
         MediaTransferStatus.CANCELLED -> stringResource(R.string.documents_upload_cancelled)
     }
     val summary = listOfNotNull(upload.name, status, upload.error?.takeIf { retryable }).joinToString(". ")
-    OutlinedCard(Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics {
@@ -487,7 +503,7 @@ internal fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> U
                 Column(Modifier.weight(1f)) {
                     Text(upload.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                     Text(
-                        status,
+                        status + if (onOpen != null && !retryable) " • Tap to preview" else "",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         color = if (retryable) MaterialTheme.colorScheme.error else Muted

@@ -113,6 +113,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 waitingForConversations = online
                 updateIndexLoading()
                 val token = epoch
+                scope.launch {
+                    val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
+                    if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
+                        !serverConversationIndexLoaded && conversations.isEmpty()) {
+                        conversations = cached
+                    }
+                }
                 /**
                  * Checks whether current listener.
                  *
@@ -137,13 +144,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             (role ?: device.role).localizedTitle(ResourceText(application.resources)),
                         )
                         return@launch
-                    }
-                    scope.launch {
-                        val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
-                        if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
-                            !serverConversationIndexLoaded && conversations.isEmpty()) {
-                            conversations = cached
-                        }
                     }
                     val identity = AccountIdentity(device.uid, coverUsername)
                     // Organization accounts stay in the portal, so keep their notification listener

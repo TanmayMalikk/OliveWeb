@@ -77,6 +77,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
         val defaults = safetyDefaults(context, !profile.affectedNames.isNullOrBlank())
         launch { session.safetyPlans.open(uid, profile.fullName.ifBlank { profile.username }, defaults, "safe_area_warmup") }
         launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { com.olive.app.data.safety.HotlineDirectory.readBundled(context) } }
+        launch { runCatching { android.webkit.WebView(context).destroy() } }
     }
     AnimatedContent(
         targetState = session.page, label = "safe page",

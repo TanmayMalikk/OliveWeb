@@ -124,6 +124,14 @@ internal interface MediaTransferOperations {
      */
     suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String)
     /**
+     * Opens a local preview of a pending upload before the server confirms it.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     * @param viewerUid Firebase UID of the viewing account.
+     * @return The resulting pair of document and decrypted preview file, or `null`.
+     */
+    fun openPendingUpload(jobId: String, viewerUid: String): Pair<SafetyDocument, File>? = null
+    /**
      * Handles the document snapshot event.
      *
      * @param viewerUid Firebase UID of the viewing account.
@@ -400,6 +408,54 @@ internal class MediaTransferController(
             state=MediaTransferState.Failed(null,message,true)
             throw failure
         }
+    }
+
+    override fun openPendingUpload(jobId: String, viewerUid: String): Pair<SafetyDocument, File>? {
+        val job = store.get(jobId) ?: return null
+        val target = File(job.source.filePath)
+        if (!target.isFile) return null
+        val metadata = runCatching {
+            val wrapped = job.source.wrappedKeys[viewerUid] ?: return null
+            JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,
+                KeyManager.unwrapKey(wrapped, job.source.encryptionVersion)))
+        }.getOrNull() ?: return null
+        val doc = SafetyDocument(
+            id = job.id,
+            ownerUid = job.ownerUid,
+            storagePath = "",
+            name = metadata.optString("name", "Document"),
+            mimeType = metadata.optString("mimeType", "application/octet-stream"),
+            allowedUsers = job.source.allowedUsers,
+            createdAt = job.createdAt,
+            objectKey = "pending/${job.id}",
+            ciphertextSize = job.source.ciphertextSize,
+            ciphertextSha256 = job.source.ciphertextSha256,
+            wrappedKeys = job.source.wrappedKeys,
+            deviceWrappedKeys = job.source.deviceWrappedKeys,
+            encryptionVersion = job.source.encryptionVersion,
+        )
+        val file = sessionDecryptedCache[job.id]?.takeIf { it.isFile && it.length() > 0 } ?: run {
+            val wrapped = listOfNotNull(doc.deviceWrappedKeys["$viewerUid--${KeyManager.deviceId()}"], doc.wrappedKeys[viewerUid])
+            val key = runCatching { KeyManager.unwrapFirst(wrapped, doc.encryptionVersion) }.getOrNull() ?: return null
+            val opened = File(applicationContext.cacheDir, "opened-documents").apply { mkdirs() }
+            val extension = doc.name.substringAfterLast('.', "").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+            val partial = File.createTempFile("preview-", ".part", opened)
+            val decryptedTarget = File(opened, partial.nameWithoutExtension + (extension?.let { ".$it" } ?: ".preview"))
+            try {
+                target.inputStream().buffered().use { input ->
+                    partial.outputStream().buffered().use { output ->
+                        MediaCipher.decrypt(input, output, key)
+                    }
+                }
+                check(partial.renameTo(decryptedTarget))
+                sessionDecryptedCache[job.id] = decryptedTarget
+                decryptedTarget
+            } catch (_: Exception) {
+                partial.delete()
+                return null
+            }
+        }
+        return doc to file
     }
 
     /**
