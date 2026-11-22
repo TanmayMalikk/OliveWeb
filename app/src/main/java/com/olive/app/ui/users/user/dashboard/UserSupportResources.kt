@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -34,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -42,6 +45,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.olive.app.R
@@ -206,55 +210,69 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         if (catalog != null) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box {
-                        OutlinedButton(
-                            onClick = { choosingRegion = true },
-                            enabled = !locating,
-                            modifier = Modifier.fillMaxWidth().testTag("hotline_region"),
-                        ) {
-                            Text(
-                                if (selection.isBlank()) stringResource(R.string.support_choose_region)
-                                else hotlineRegionName(selection)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = choosingRegion,
-                            onDismissRequest = { choosingRegion = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.support_saved_location)) },
-                                onClick = {
-                                    selection = savedRegion ?: if (catalog.isCanada(address)) "CA" else ""
-                                    city = address.city
-                                    locationError = null
-                                    choosingRegion = false
-                                },
-                            )
-                            (listOf("CA") + CanadianRegion.entries.map { it.code }).forEach { code ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { choosingRegion = true },
+                                enabled = !locating,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                    .testTag("hotline_region"),
+                            ) {
+                                Text(
+                                    text = if (selection.isBlank()) stringResource(R.string.support_choose_region)
+                                    else hotlineRegionName(selection),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = choosingRegion,
+                                onDismissRequest = { choosingRegion = false },
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text(hotlineRegionName(code)) },
+                                    text = { Text(stringResource(R.string.support_saved_location)) },
                                     onClick = {
-                                        selection = code
-                                        city = if (code == savedRegion) address.city else ""
+                                        selection = savedRegion ?: if (catalog.isCanada(address)) "CA" else ""
+                                        city = address.city
                                         locationError = null
                                         choosingRegion = false
                                     },
-                                    modifier = Modifier.testTag("hotline_region_$code"),
                                 )
+                                (listOf("CA") + CanadianRegion.entries.map { it.code }).forEach { code ->
+                                    DropdownMenuItem(
+                                        text = { Text(hotlineRegionName(code)) },
+                                        onClick = {
+                                            selection = code
+                                            city = if (code == savedRegion) address.city else ""
+                                            locationError = null
+                                            choosingRegion = false
+                                        },
+                                        modifier = Modifier.testTag("hotline_region_$code"),
+                                    )
+                                }
                             }
                         }
-                    }
-                    Button(
-                        onClick = locate,
-                        enabled = !locating,
-                        modifier = Modifier.fillMaxWidth().testTag("hotline_use_device_location"),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (locating) R.string.support_finding_location
-                                else R.string.support_use_device_location
+                        Button(
+                            onClick = locate,
+                            enabled = !locating,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                .testTag("hotline_use_device_location"),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (locating) R.string.support_finding_location
+                                    else R.string.support_use_device_location
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                        )
+                        }
                     }
                     locationError?.let { error ->
                         AccessibleMessage(
