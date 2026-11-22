@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
@@ -337,9 +338,9 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
 
     Column(
         Modifier.fillMaxSize()
-            .then(if (profile.role == AccountRole.USER) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .then(if (profile.role == AccountRole.USER) Modifier.padding(bottom = 88.dp) else Modifier),
+            .padding(bottom = if (profile.role == AccountRole.USER) 88.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -369,21 +370,16 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
         if (profile.role == AccountRole.USER && requestBackgroundPermission != null) BackgroundLocationButton(
             requestBackgroundPermission, explainBackground, { explainBackground = false },
         )
-        if (profile.role == AccountRole.USER) {
-            FreeUseGpsDestinationCard(
-                controller = controller,
-                state = state,
-                directoryPlaces = directoryPlaces,
-                routeNotConfigured = routeNotConfigured,
-                routeUnavailable = routeUnavailable,
-                routeFailed = routeFailed,
-            )
-        }
+        FreeUseGpsDestinationCard(
+            controller = controller,
+            state = state,
+            directoryPlaces = if (profile.role == AccountRole.USER) directoryPlaces else emptyList(),
+            routeNotConfigured = routeNotConfigured,
+            routeUnavailable = routeUnavailable,
+            routeFailed = routeFailed,
+        )
         Surface(
-            Modifier.fillMaxWidth().then(
-                if (profile.role == AccountRole.USER) Modifier.height(360.dp)
-                else Modifier.weight(1f).heightIn(min = 280.dp)
-            ),
+            Modifier.fillMaxWidth().height(if (profile.role == AccountRole.USER) 360.dp else 250.dp),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 2.dp,
@@ -490,15 +486,56 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                 },
             )
         } else {
-            Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = SoftCardSurface) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = SoftCardSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.safe_contact_live_location), style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.safe_contact_live_location),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilterChip(
+                            selected = headingUp,
+                            onClick = { headingUp = !headingUp },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (headingUp) R.string.location_compass_heading_up
+                                        else R.string.location_compass_north_up
+                                    ),
+                                    maxLines = 1,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(16.dp))
+                            },
+                            modifier = Modifier.testTag("map_heading_chip"),
+                        )
+                    }
                     Text(stringResource(R.string.safe_contact_live_location_help), style = MaterialTheme.typography.bodySmall, color = Muted)
-                    if (liveUsers.isEmpty()) Text(
+                    state.privateDestination?.let { destination ->
+                        Text(
+                            destination.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (liveUsers.isEmpty() && state.privateDestination == null) Text(
                         stringResource(R.string.location_no_shared_users),
                         style = MaterialTheme.typography.bodySmall,
                         color = Muted,
-                    ) else {
+                    ) else if (liveUsers.isNotEmpty()) {
                         Text(stringResource(R.string.location_navigation_destination), style = MaterialTheme.typography.labelLarge)
                         Row(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -506,7 +543,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                         ) {
                             liveUsers.forEach { point ->
                                 FilterChip(
-                                    selected = point.uid == state.navigationTargetUid,
+                                    selected = state.privateDestination == null && point.uid == state.navigationTargetUid,
                                     onClick = { controller.selectNavigationTarget(point.uid) },
                                     label = { Text(point.name) },
                                     enabled = !state.navigating,
@@ -523,31 +560,41 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                                 formatRouteDuration(progress?.durationSeconds ?: route.durationSeconds),
                             ),
                             style = MaterialTheme.typography.titleSmall,
+                            color = OliveGreen,
                         )
                         displayedOwn?.let { route.nextDirection(it.latitude, it.longitude) }?.let { direction ->
                             Text(stringResource(R.string.location_next_direction, direction.text), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                     if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
-                    Button(
-                        onClick = {
-                            if (state.navigating) controller.stopNavigation()
-                            else controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed)
-                        },
-                        enabled = state.navigating || (!state.routeWorking && state.ownPoint != null && state.navigationTargetUid != null),
-                        modifier = Modifier.fillMaxWidth().testTag("location_navigate"),
-                    ) {
-                        Icon(Icons.Outlined.Navigation, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (state.navigating) R.string.location_stop_navigation else R.string.location_start_navigation))
-                    }
-                    if (state.navigating) OutlinedButton(
-                        onClick = { fullScreenMap = true },
-                        modifier = Modifier.fillMaxWidth().testTag("location_full_screen_navigation"),
-                    ) {
-                        Icon(Icons.Outlined.Fullscreen, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.location_full_screen_navigation))
+                    if (state.navigating) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedButton(
+                                onClick = { fullScreenMap = true },
+                                modifier = Modifier.weight(1f).testTag("location_full_screen_navigation"),
+                            ) {
+                                Icon(Icons.Outlined.Fullscreen, null)
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.location_full_screen_navigation), maxLines = 1)
+                            }
+                            Button(
+                                onClick = controller::stopNavigation,
+                                modifier = Modifier.weight(1f).testTag("location_navigate"),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            ) {
+                                Text(stringResource(R.string.location_stop_navigation), maxLines = 1)
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed) },
+                            enabled = !state.routeWorking && state.ownPoint != null && (state.navigationTargetUid != null || state.privateDestination != null),
+                            modifier = Modifier.fillMaxWidth().testTag("location_navigate"),
+                        ) {
+                            Icon(Icons.Outlined.Navigation, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.location_start_navigation))
+                        }
                     }
                     Text(stringResource(R.string.location_route_privacy), style = MaterialTheme.typography.bodySmall, color = Muted)
                 }

@@ -281,7 +281,7 @@ internal class LocationMapController(
      */
     fun selectNavigationTarget(uid: String) {
         if (!state.navigating && state.contacts.any { it.uid == uid && it.live })
-            state = state.copy(navigationTargetUid = uid, routeError = null)
+            state = state.copy(navigationTargetUid = uid, privateDestination = null, routeError = null)
     }
 
     /**
@@ -333,6 +333,23 @@ internal class LocationMapController(
         if (state.navigating) return
         state = state.copy(
             privateDestination = MapLocationPoint("private-route-destination", name, latitude, longitude, 0L, false, null),
+            routeError = null,
+        )
+    }
+
+    /**
+     * Clears any manually entered destination and restores a live-sender target when available.
+     */
+    fun clearPrivateDestination() {
+        if (state.navigating) return
+        val restoredTarget = if (state.navigationTargetUid == state.privateDestination?.uid) {
+            state.contacts.firstOrNull { it.live }?.uid
+        } else {
+            state.navigationTargetUid
+        }
+        state = state.copy(
+            privateDestination = null,
+            navigationTargetUid = restoredTarget,
             routeError = null,
         )
     }

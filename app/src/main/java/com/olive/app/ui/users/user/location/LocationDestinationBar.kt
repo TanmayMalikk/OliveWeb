@@ -297,7 +297,7 @@ internal fun FreeUseGpsDestinationCard(
                     onClick = {
                         query = ""
                         resolveError = null
-                        controller.stopNavigation()
+                        controller.clearPrivateDestination()
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 ) {

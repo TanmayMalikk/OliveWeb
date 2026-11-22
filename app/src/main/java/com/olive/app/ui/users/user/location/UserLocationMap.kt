@@ -20,8 +20,9 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -104,6 +105,7 @@ internal fun InteractiveLocationMap(
     headingUp: Boolean = false,
     headingDegrees: Float? = null,
     onToggleHeadingUp: (() -> Unit)? = null,
+    compassEnabled: Boolean = true,
     fitSupportServices: Boolean = false,
     onUserGesture: (() -> Unit)? = null,
 ) {
@@ -121,10 +123,25 @@ internal fun InteractiveLocationMap(
     var mapBearing by remember { mutableFloatStateOf(0f) }
     val lastCssSize = remember { intArrayOf(0, 0) }
 
+    val usesInternalCompass = onToggleHeadingUp == null && compassEnabled
+    var internalHeadingUp by remember { mutableStateOf(false) }
+    val headingReference = points.firstOrNull { it.uid == ownPointUid } ?: points.firstOrNull()
+    val internalHeadingDegrees = rememberDeviceHeading(
+        enabled = usesInternalCompass && (internalHeadingUp || ownPointUid != null),
+        latitude = headingReference?.latitude,
+        longitude = headingReference?.longitude,
+    )
+    val effectiveHeadingUp = if (usesInternalCompass) internalHeadingUp else headingUp
+    val effectiveHeadingDegrees = if (usesInternalCompass) internalHeadingDegrees else headingDegrees
+
     val currentSupportServices by rememberUpdatedState(supportServices)
     val currentSupportSelection by rememberUpdatedState(onSupportSelected)
     val currentViewportCallback by rememberUpdatedState(onViewportCenterChanged)
     val currentUserGestureCallback by rememberUpdatedState(onUserGesture)
+    val currentHeadingUp by rememberUpdatedState(effectiveHeadingUp)
+    val currentHeadingDegrees by rememberUpdatedState(effectiveHeadingDegrees)
+    val currentNavigationActive by rememberUpdatedState(navigationActive)
+    val currentUsesInternalCompass by rememberUpdatedState(usesInternalCompass)
 
     val followTargetUid = selectedFollowUid ?: if (navigationActive) ownPointUid
     else points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
@@ -268,20 +285,58 @@ internal fun InteractiveLocationMap(
         }
     }
 
-    LaunchedEffect(headingUp, headingDegrees, navigationActive, loadState, attempt) {
+    LaunchedEffect(effectiveHeadingUp, effectiveHeadingDegrees, navigationActive, loadState, attempt) {
         if (loadState == MapLoadState.Ready) {
-            val degArg = headingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
+            val degArg = effectiveHeadingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
             webView[0]?.evaluateJavascript(
-                "window.oliveSetHeading($degArg,$headingUp,$navigationActive);",
+                "window.oliveSetHeading($degArg,$effectiveHeadingUp,$navigationActive);",
                 null,
             )
-            if (headingUp && headingDegrees != null && headingDegrees.isFinite()) {
-                mapBearing = headingDegrees
+            if (effectiveHeadingUp && effectiveHeadingDegrees != null && effectiveHeadingDegrees.isFinite()) {
+                mapBearing = effectiveHeadingDegrees
             }
         }
     }
 
-    Box(modifier.semantics { contentDescription = description }) {
+    val showCompassControl = compassEnabled || onToggleHeadingUp != null || abs(mapBearing) >= 2f
+
+    @Composable
+    fun CompassFab() {
+        SmallFloatingActionButton(
+            onClick = {
+                if (!effectiveHeadingUp && abs(mapBearing) >= 2f) {
+                    mapBearing = 0f
+                    webView[0]?.evaluateJavascript("window.oliveResetNorth();", null)
+                } else {
+                    if (!effectiveHeadingUp && !userSearchEnabled && followTargetUid != null) {
+                        following = true
+                    }
+                    if (usesInternalCompass) {
+                        if (internalHeadingUp) mapBearing = 0f
+                        internalHeadingUp = !internalHeadingUp
+                    } else {
+                        if (effectiveHeadingUp) mapBearing = 0f
+                        onToggleHeadingUp?.invoke()
+                    }
+                }
+            },
+            containerColor = if (effectiveHeadingUp) MaterialTheme.colorScheme.primaryContainer
+            else FloatingActionButtonDefaults.containerColor,
+            modifier = Modifier.testTag("map_compass_mode"),
+        ) {
+            Icon(
+                Icons.Outlined.Explore,
+                stringResource(
+                    if (effectiveHeadingUp) R.string.location_compass_toggle_heading_desc
+                    else R.string.location_compass_toggle_north_desc
+                ),
+                modifier = Modifier.rotate(-mapBearing),
+            )
+        }
+    }
+
+    BoxWithConstraints(modifier.semantics { contentDescription = description }) {
+        val compactHeight = maxHeight < 310.dp
         key(attempt) {
             AndroidView(
                 factory = { context ->
@@ -346,6 +401,7 @@ internal fun InteractiveLocationMap(
                             MapCameraBridge(
                                 onGesture = {
                                     following = false
+                                    if (currentUsesInternalCompass) internalHeadingUp = false
                                     currentUserGestureCallback?.invoke()
                                 },
                                 onBearing = { bearing ->
@@ -364,9 +420,9 @@ internal fun InteractiveLocationMap(
                                     updateSupportServices(view)
                                     updateRoute(view, route != null)
                                     updateSelection(view)
-                                    val degArg = headingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
+                                    val degArg = currentHeadingDegrees?.takeIf { it.isFinite() }?.toString() ?: "null"
                                     view.evaluateJavascript(
-                                        "window.oliveSetHeading($degArg,$headingUp,$navigationActive);",
+                                        "window.oliveSetHeading($degArg,$currentHeadingUp,$currentNavigationActive);",
                                         null,
                                     )
                                     if (onViewportCenterChanged != null) {
@@ -462,38 +518,15 @@ internal fun InteractiveLocationMap(
                         ) {
                             Icon(Icons.Outlined.Search, stringResource(R.string.location_search_user))
                         }
-                    } else if (onToggleHeadingUp != null || abs(mapBearing) >= 2f) {
-                        SmallFloatingActionButton(
-                            onClick = {
-                                if (!headingUp && abs(mapBearing) >= 2f) {
-                                    mapBearing = 0f
-                                    webView[0]?.evaluateJavascript("window.oliveResetNorth();", null)
-                                } else {
-                                    if (!headingUp && followTargetUid != null) following = true
-                                    onToggleHeadingUp?.invoke()
-                                }
-                            },
-                            containerColor = if (headingUp) MaterialTheme.colorScheme.primaryContainer
-                            else FloatingActionButtonDefaults.containerColor,
-                            modifier = Modifier.testTag("map_compass_mode"),
-                        ) {
-                            Icon(
-                                Icons.Outlined.Explore,
-                                stringResource(
-                                    if (headingUp) R.string.location_compass_toggle_heading_desc
-                                    else R.string.location_compass_toggle_north_desc
-                                ),
-                                modifier = Modifier.rotate(-mapBearing),
-                            )
-                        }
+                    }
+                    if (showCompassControl && (!compactHeight || userSearchEnabled)) {
+                        CompassFab()
                     }
                 }
 
                 if (!userSearchEnabled) {
-                    Column(
-                        Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 28.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    @Composable
+                    fun RecenterFab() {
                         SmallFloatingActionButton(
                             onClick = {
                                 if (followTargetUid != null) following = true
@@ -503,6 +536,10 @@ internal fun InteractiveLocationMap(
                         ) {
                             Icon(Icons.Outlined.MyLocation, stringResource(R.string.recenter_map))
                         }
+                    }
+
+                    @Composable
+                    fun FollowFab() {
                         SmallFloatingActionButton(
                             onClick = { if (followTargetUid != null) following = !following },
                             containerColor = if (following) MaterialTheme.colorScheme.primaryContainer
@@ -513,6 +550,25 @@ internal fun InteractiveLocationMap(
                                 if (following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
                                 stringResource(if (following) R.string.location_stop_following else R.string.location_follow_user),
                             )
+                        }
+                    }
+
+                    if (compactHeight) {
+                        Row(
+                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 28.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (showCompassControl) CompassFab()
+                            RecenterFab()
+                            FollowFab()
+                        }
+                    } else {
+                        Column(
+                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 28.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            RecenterFab()
+                            FollowFab()
                         }
                     }
                 }

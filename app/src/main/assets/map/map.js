@@ -313,6 +313,8 @@ window.oliveSetHeading = function (degrees, enabled, navigating) {
     stopHeadingCameraLoop();
     if (modeChanged) {
       mbMap.easeTo({ bearing: 0, pitch: 0, duration: 350 });
+      lastReportedBearing = 0;
+      window.OliveMapCamera?.onBearingChanged(0);
     }
   }
 };
@@ -320,7 +322,11 @@ window.oliveSetHeading = function (degrees, enabled, navigating) {
 window.oliveResetNorth = function () {
   headingUp = false;
   stopHeadingCameraLoop();
-  if (mbMap) mbMap.easeTo({ bearing: 0, pitch: 0, duration: 350 });
+  if (mbMap) {
+    mbMap.easeTo({ bearing: 0, pitch: 0, duration: 350 });
+    lastReportedBearing = 0;
+    window.OliveMapCamera?.onBearingChanged(0);
+  }
 };
 
 window.oliveZoomIn = function () {
