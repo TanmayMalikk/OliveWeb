@@ -12,6 +12,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -482,6 +483,14 @@ internal fun EmergencyResponseScreen(
     var pendingResolutions by remember { mutableStateOf(emptyMap<String, Boolean>()) }
     var resolveError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    var lastShowResolved by remember { mutableStateOf(showResolved) }
+    LaunchedEffect(showResolved) {
+        if (showResolved != lastShowResolved) {
+            lastShowResolved = showResolved
+            listState.scrollToItem(0)
+        }
+    }
     val visibleAlerts = alerts.orEmpty().filter {
         (pendingResolutions[it.id] ?: (it.resolvedAt > 0L)) == showResolved
     }
@@ -501,6 +510,7 @@ internal fun EmergencyResponseScreen(
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

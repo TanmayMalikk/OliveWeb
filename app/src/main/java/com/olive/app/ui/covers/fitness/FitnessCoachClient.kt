@@ -1,6 +1,8 @@
 package com.olive.app.ui.covers.fitness
 
+import android.content.SharedPreferences
 import android.net.Uri
+import androidx.core.content.edit
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
@@ -10,8 +12,91 @@ import kotlin.math.max
 
 internal data class CoachTurn(val role: String, val text: String)
 internal data class CoachReply(val text: String, val goals: Map<String, Int>)
-internal data class CoachMembership(val active: Boolean, val canManage: Boolean)
+internal data class CoachMembership(
+    val active: Boolean,
+    val canManage: Boolean,
+    val currentPeriodEndMs: Long? = null,
+)
 internal data class CoachPayment(val publishableKey: String, val clientSecret: String)
+
+private const val COACH_MEMBERSHIP_ACTIVE_KEY = "coach_membership_active"
+private const val COACH_MEMBERSHIP_MANAGE_KEY = "coach_membership_can_manage"
+private const val COACH_MEMBERSHIP_PERIOD_END_KEY = "coach_membership_period_end_ms"
+
+/**
+ * Returns cached active Coach membership until its current period end or renewal timestamp.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ * @return The cached active [CoachMembership], or `null` if uncached or expired.
+ */
+internal fun cachedActiveCoachMembership(
+    preferences: SharedPreferences,
+    nowMillis: Long = System.currentTimeMillis(),
+): CoachMembership? {
+    if (!preferences.getBoolean(COACH_MEMBERSHIP_ACTIVE_KEY, false)) return null
+    val periodEndMs = preferences.getLong(COACH_MEMBERSHIP_PERIOD_END_KEY, 0L)
+    if (periodEndMs <= nowMillis) return null
+    return CoachMembership(
+        active = true,
+        canManage = preferences.getBoolean(COACH_MEMBERSHIP_MANAGE_KEY, false),
+        currentPeriodEndMs = periodEndMs,
+    )
+}
+
+/**
+ * Stores active Coach membership and expiration timestamp, or clears cache if inactive or expired.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ * @param membership Latest membership returned by billing status.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ */
+internal fun saveCoachMembershipCache(
+    preferences: SharedPreferences,
+    membership: CoachMembership,
+    nowMillis: Long = System.currentTimeMillis(),
+) {
+    val periodEndMs = membership.currentPeriodEndMs
+    if (membership.active && periodEndMs != null && periodEndMs > nowMillis) {
+        preferences.edit {
+            putBoolean(COACH_MEMBERSHIP_ACTIVE_KEY, true)
+            putBoolean(COACH_MEMBERSHIP_MANAGE_KEY, membership.canManage)
+            putLong(COACH_MEMBERSHIP_PERIOD_END_KEY, periodEndMs)
+        }
+    } else {
+        clearCoachMembershipCache(preferences)
+    }
+}
+
+/**
+ * Clears any locally cached AI Coach subscription state from SharedPreferences.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ */
+internal fun clearCoachMembershipCache(preferences: SharedPreferences) {
+    preferences.edit {
+        remove(COACH_MEMBERSHIP_ACTIVE_KEY)
+        remove(COACH_MEMBERSHIP_MANAGE_KEY)
+        remove(COACH_MEMBERSHIP_PERIOD_END_KEY)
+    }
+}
+
+/**
+ * Returns true when a cached active subscription is still within its billing period and does not need rechecking.
+ *
+ * @param membership Cached or in-memory membership snapshot.
+ * @param forceRefresh True when returning from billing management or an explicit user refresh.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ * @return `true` if remote status lookup can be skipped until period end, `false` otherwise.
+ */
+internal fun shouldSkipCoachStatusCheck(
+    membership: CoachMembership?,
+    forceRefresh: Boolean,
+    nowMillis: Long = System.currentTimeMillis(),
+): Boolean {
+    val periodEndMs = membership?.currentPeriodEndMs ?: return false
+    return !forceRefresh && membership.active && nowMillis < periodEndMs
+}
 
 internal const val FITNESS_COACH_HISTORY_DAYS = 14
 
@@ -87,7 +172,8 @@ internal class FitnessCoachClient(
      */
     override suspend fun membership(): CoachMembership {
         val data = call("fitnessAiBilling", mapOf("action" to "status"))
-        return CoachMembership(data["active"] == true, data["canManage"] == true)
+        val periodEndMs = (data["currentPeriodEndMs"] as? Number)?.toLong()?.takeIf { it > 0L }
+        return CoachMembership(data["active"] == true, data["canManage"] == true, periodEndMs)
     }
 
     /**

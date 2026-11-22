@@ -17,6 +17,7 @@ import com.olive.app.R
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +65,13 @@ internal fun NewsCover(
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
-    var tab by rememberSaveable(session.coverAccountId) { mutableStateOf("Today") }
+    val tabSaver = remember {
+        Saver<String, String>(
+            save = { if (it == "Account") "Today" else it },
+            restore = { if (it == "Account") "Today" else it },
+        )
+    }
+    var tab by rememberSaveable(session.coverAccountId, stateSaver = tabSaver) { mutableStateOf("Today") }
     var scope by rememberSaveable(session.coverAccountId) { mutableStateOf(NewsScope.LOCAL) }
     var query by remember { mutableStateOf("") }
     val articleSaver = remember {
@@ -106,6 +114,48 @@ internal fun NewsCover(
     // Reload history whenever the user returns from an article or opens the Saved tab.
     LaunchedEffect(selected, tab) {
         if (selected == null) readingHistory = withContext(Dispatchers.IO) { historyStore.load() }
+    }
+    var handledCoverReset by remember { mutableIntStateOf(session.coverReset) }
+    LaunchedEffect(interactive, session.coverReset) {
+        val resetChanged = session.coverReset != handledCoverReset
+        handledCoverReset = session.coverReset
+        if (!interactive || resetChanged) {
+            if (tab == "Account") {
+                tab = "Today"
+                selected = null
+            }
+            tabHistory.removeAll { it == "Account" }
+            locationEditorOpen = false
+        }
+    }
+    val todayListState = rememberLazyListState()
+    val savedListState = rememberLazyListState()
+    val accountListState = rememberLazyListState()
+    var lastTab by remember { mutableStateOf(tab) }
+    LaunchedEffect(tab) {
+        if (tab != lastTab) {
+            lastTab = tab
+            when (tab) {
+                "Today" -> todayListState
+                "Saved" -> savedListState
+                else -> accountListState
+            }.scrollToItem(0)
+        }
+    }
+    var lastFeedFilter by remember { mutableStateOf(Triple(scope, category, customPlace)) }
+    LaunchedEffect(scope, category, customPlace) {
+        val current = Triple(scope, category, customPlace)
+        if (current != lastFeedFilter) {
+            lastFeedFilter = current
+            todayListState.scrollToItem(0)
+        }
+    }
+    var lastShowHistory by remember { mutableStateOf(showHistory) }
+    LaunchedEffect(showHistory) {
+        if (showHistory != lastShowHistory) {
+            lastShowHistory = showHistory
+            savedListState.scrollToItem(0)
+        }
     }
     // Back closes an article first, then returns through the previous news tabs.
     val back = rememberOliveBack(interactive, preview = tab != "Today" || tabHistory.isNotEmpty()) {
@@ -315,13 +365,22 @@ internal fun NewsCover(
             listOf("Today", "Saved", "Account").forEach { choice ->
                 NavigationBarItem(
                     selected = tab == choice, onClick = {
-                        if (choice != tab) tabHistory += tab
-                        selected = null
-                        tab = choice
-                        if (choice == "Account") session.recordSettingsInteraction(
-                            "Daily Digest",
-                            "Opened account page"
-                        )
+                        if (choice == tab && selected == null) {
+                            val activeListState = when (tab) {
+                                "Today" -> todayListState
+                                "Saved" -> savedListState
+                                else -> accountListState
+                            }
+                            locationSaveScope.launch { activeListState.scrollToItem(0) }
+                        } else {
+                            if (choice != tab) tabHistory += tab
+                            selected = null
+                            tab = choice
+                            if (choice == "Account") session.recordSettingsInteraction(
+                                "Daily Digest",
+                                "Opened account page"
+                            )
+                        }
                     },
                     icon = {
                         Icon(
@@ -384,7 +443,13 @@ internal fun NewsCover(
                                     historyStore.clear()
                                     readingHistory = emptyList()
                                 },
-                            ), Modifier.fillMaxSize()
+                            ),
+                                Modifier.fillMaxSize(),
+                                listState = when (tab) {
+                                    "Today" -> todayListState
+                                    "Saved" -> savedListState
+                                    else -> accountListState
+                                },
                         )
                     }
                 }

@@ -30,10 +30,30 @@ function fitnessBilling(secret, priceId) {
     }
     return matches;
   }
+  function subscriptionPeriodEndMs(plans) {
+    let latestEndSeconds = 0;
+    for (const plan of plans) {
+      if (plan.status !== "active") continue;
+      const item = plan.items?.data?.find((entry) => entry.price?.id === priceId && isWeeklyOffer(entry.price));
+      const candidates = [item?.current_period_end, plan.current_period_end]
+        .filter((value) => Number.isFinite(value) && value > 0);
+      if (candidates.length === 0) continue;
+      let endSeconds = Math.min(...candidates);
+      if (Number.isFinite(plan.cancel_at) && plan.cancel_at > 0 && plan.cancel_at < endSeconds) {
+        endSeconds = plan.cancel_at;
+      }
+      if (endSeconds > latestEndSeconds) latestEndSeconds = endSeconds;
+    }
+    return latestEndSeconds > 0 ? Math.trunc(latestEndSeconds * 1000) : null;
+  }
   async function status(uid) {
     const customer = await customerFor(uid);
     const plans = await subscriptions(customer);
-    return {active: plans.some((plan) => plan.status === "active"), canManage: Boolean(customer)};
+    const active = plans.some((plan) => plan.status === "active");
+    const currentPeriodEndMs = active ? subscriptionPeriodEndMs(plans) : null;
+    return currentPeriodEndMs === null
+      ? {active, canManage: Boolean(customer)}
+      : {active, canManage: Boolean(customer), currentPeriodEndMs};
   }
   async function checkPrice() {
     const price = await stripe.prices.retrieve(priceId);

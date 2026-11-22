@@ -135,6 +135,14 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
             .orEmpty().filter { !onlyAlwaysOpen || it.hours.contains("24/7") }
     val text = rememberResourceText()
     val listState = rememberLazyListState()
+    var lastFilter by remember { mutableStateOf(selection to onlyAlwaysOpen) }
+    LaunchedEffect(selection, onlyAlwaysOpen) {
+        val current = selection to onlyAlwaysOpen
+        if (current != lastFilter) {
+            lastFilter = current
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().oliveScrollbar(listState).testTag("hotline_page"),
         state = listState,

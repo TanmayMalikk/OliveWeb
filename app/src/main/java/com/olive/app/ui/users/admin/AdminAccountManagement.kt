@@ -10,6 +10,7 @@ import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -64,8 +65,17 @@ internal fun AdminAccounts(
             AccountRole.entries.forEach { role -> put(role, true) }
         }
     }
+    val listState = rememberLazyListState()
+    var lastStatus by remember { mutableIntStateOf(status) }
+    LaunchedEffect(status) {
+        if (status != lastStatus) {
+            lastStatus = status
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
+        state = listState,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item("account_header") {

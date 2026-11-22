@@ -112,4 +112,59 @@ class FitnessCoachClientTest {
         assertTrue(formattedMeals.contains("• Dinner: Salmon with veggies."))
         assertTrue(formattedMeals.contains("• Snacks: Almonds."))
     }
+
+    @Test fun membershipParsesCurrentPeriodEndMsAndCachesUntilRenewalBoundary() = runBlocking<Unit> {
+        val auth = mock(FirebaseAuth::class.java)
+        val user = mock(FirebaseUser::class.java)
+        val functions = mock(FirebaseFunctions::class.java)
+        val billing = mock(HttpsCallableReference::class.java)
+        fun result(payload: Any) = Tasks.forResult(
+            HttpsCallableResult::class.java.getConstructor(Any::class.java).newInstance(payload)
+        )
+        `when`(auth.currentUser).thenReturn(user)
+        `when`(user.uid).thenReturn("coach-cache-owner")
+        `when`(functions.getHttpsCallable("fitnessAiBilling")).thenReturn(billing)
+        val renewalEndMs = 1_900_000_000_000L
+        `when`(billing.call(mapOf("action" to "status"))).thenReturn(
+            result(mapOf("active" to true, "canManage" to true, "currentPeriodEndMs" to renewalEndMs)),
+            result(mapOf("active" to true, "canManage" to false)),
+        )
+
+        mockStatic(FirebaseAuth::class.java).use { authSdk ->
+            authSdk.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(auth)
+            val client = FitnessCoachClient("coach-cache-owner") { functions }
+            val withEnd = client.membership()
+            assertEquals(CoachMembership(active = true, canManage = true, currentPeriodEndMs = renewalEndMs), withEnd)
+
+            val withoutEnd = client.membership()
+            assertEquals(CoachMembership(active = true, canManage = false, currentPeriodEndMs = null), withoutEnd)
+        }
+
+        val app = RuntimeEnvironment.getApplication()
+        val storeA = FitnessStore(app, "coach-cache-a")
+        val storeB = FitnessStore(app, "coach-cache-b")
+        val membershipA = CoachMembership(active = true, canManage = true, currentPeriodEndMs = renewalEndMs)
+
+        saveCoachMembershipCache(storeA.preferences, membershipA, nowMillis = renewalEndMs - 60_000L)
+        assertEquals(membershipA, cachedActiveCoachMembership(storeA.preferences, nowMillis = renewalEndMs - 1L))
+        assertNull(cachedActiveCoachMembership(storeB.preferences, nowMillis = renewalEndMs - 1L))
+
+        assertTrue(shouldSkipCoachStatusCheck(membershipA, forceRefresh = false, nowMillis = renewalEndMs - 1L))
+        assertFalse(shouldSkipCoachStatusCheck(membershipA, forceRefresh = true, nowMillis = renewalEndMs - 1L))
+        assertFalse(shouldSkipCoachStatusCheck(membershipA, forceRefresh = false, nowMillis = renewalEndMs))
+        assertFalse(shouldSkipCoachStatusCheck(membershipA, forceRefresh = false, nowMillis = renewalEndMs + 1L))
+        assertNull(cachedActiveCoachMembership(storeA.preferences, nowMillis = renewalEndMs))
+        assertNull(cachedActiveCoachMembership(storeA.preferences, nowMillis = renewalEndMs + 1L))
+
+        saveCoachMembershipCache(storeA.preferences, CoachMembership(active = true, canManage = false, currentPeriodEndMs = null))
+        assertNull(cachedActiveCoachMembership(storeA.preferences, nowMillis = 0L))
+
+        saveCoachMembershipCache(storeA.preferences, membershipA, nowMillis = renewalEndMs - 60_000L)
+        saveCoachMembershipCache(storeA.preferences, CoachMembership(active = false, canManage = true, currentPeriodEndMs = renewalEndMs))
+        assertNull(cachedActiveCoachMembership(storeA.preferences, nowMillis = 0L))
+
+        saveCoachMembershipCache(storeA.preferences, membershipA, nowMillis = renewalEndMs - 60_000L)
+        clearCoachMembershipCache(storeA.preferences)
+        assertNull(cachedActiveCoachMembership(storeA.preferences, nowMillis = 0L))
+    }
 }

@@ -57,9 +57,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -122,7 +124,16 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     var pendingSnapshot by remember(store) { mutableStateOf<FitnessSnapshot?>(null) }
     val snapshot = pendingSnapshot ?: loaded?.first
     val history = loaded?.second.orEmpty()
-    var page by rememberSaveable(accountId) { mutableStateOf(FitnessPage.HOME) }
+    val pageSaver = remember {
+        Saver<FitnessPage, String>(
+            save = { (if (it == FitnessPage.ACCOUNT) FitnessPage.HOME else it).name },
+            restore = { saved ->
+                val parsed = runCatching { FitnessPage.valueOf(saved) }.getOrNull() ?: FitnessPage.HOME
+                if (parsed == FitnessPage.ACCOUNT) FitnessPage.HOME else parsed
+            },
+        )
+    }
+    var page by rememberSaveable(accountId, stateSaver = pageSaver) { mutableStateOf(FitnessPage.HOME) }
     var foodSection by rememberSaveable(accountId) { mutableStateOf(FoodLibrarySection.Search) }
     var foodMeal by rememberSaveable(accountId) { mutableStateOf<MealType?>(null) }
     val snackbars = remember(store) { SnackbarHostState() }
@@ -160,8 +171,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         store, interactive, onPermissionSettled = { sensorPermissionSettled = true },
     ) { pendingSnapshot = it }
     DisposableEffect(store, interactive) {
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            if (interactive) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (interactive && key?.startsWith("coach_membership_") != true) {
                 pendingSnapshot = store.snapshot()
                 loaded = pendingSnapshot!! to store.history(days = 14)
             }
@@ -225,6 +236,15 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.FOOD_SEARCH)) {
             withFrameNanos { }
             pageFocus.requestFocus()
+        }
+    }
+
+    var handledCoverReset by remember { mutableIntStateOf(session.coverReset) }
+    LaunchedEffect(interactive, session.coverReset) {
+        val resetChanged = session.coverReset != handledCoverReset
+        handledCoverReset = session.coverReset
+        if ((!interactive || resetChanged) && page == FitnessPage.ACCOUNT) {
+            page = FitnessPage.HOME
         }
     }
 

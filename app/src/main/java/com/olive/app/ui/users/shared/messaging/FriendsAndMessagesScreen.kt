@@ -18,6 +18,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -112,6 +113,7 @@ internal fun MessagesScreen(
         }
     }
     val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
+    val listState = rememberLazyListState()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         // Wide screens place the conversation list and open chat beside each other.
@@ -123,6 +125,7 @@ internal fun MessagesScreen(
                 onSupportFilterChange = { supportFilter = it },
                 onShowingArchivedChange = { showingArchived = it },
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
+                listState = listState,
             )
             VerticalDivider()
             if (active == null) Box(
@@ -141,6 +144,7 @@ internal fun MessagesScreen(
             onSupportFilterChange = { supportFilter = it },
             onShowingArchivedChange = { showingArchived = it },
             modifier = Modifier.fillMaxSize(),
+            listState = listState,
         )
         else {
             val back = rememberOliveBack(onBack = session.messages::closeConversation)
@@ -201,6 +205,7 @@ private fun MessagingSidebar(
     onChatTabChange: (Boolean) -> Unit,
     onSupportFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val uiText = rememberResourceText()
     val offerUndo = LocalOliveUndo.current
@@ -233,8 +238,14 @@ private fun MessagingSidebar(
     var friendsExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingExpanded by rememberSaveable { mutableStateOf(false) }
     var outgoingExpanded by rememberSaveable { mutableStateOf(false) }
-    val listState = rememberLazyListState()
-    LaunchedEffect(ticketChats) { listState.scrollToItem(0) }
+    var lastListFilter by remember { mutableStateOf(Triple(ticketChats, showingArchived, supportFilter)) }
+    LaunchedEffect(ticketChats, showingArchived, supportFilter) {
+        val current = Triple(ticketChats, showingArchived, supportFilter)
+        if (current != lastListFilter) {
+            lastListFilter = current
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         modifier,
         state = listState,

@@ -188,6 +188,13 @@ internal fun ActivityHistory(session: SessionViewModel) {
         if (selected == category) rows else rows.take(5)
 
     val listState = rememberLazyListState()
+    var lastCategory by remember { mutableStateOf(selected) }
+    LaunchedEffect(selected) {
+        if (selected != lastCategory) {
+            lastCategory = selected
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().oliveScrollbar(listState).testTag("activity_list"),
         state = listState,

@@ -113,6 +113,15 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var newestFirst by rememberSaveable { mutableStateOf(true) }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
+    val notesGridState = rememberLazyGridState()
+    var lastBoardFilter by remember { mutableStateOf(shownKind to newestFirst) }
+    LaunchedEffect(shownKind, newestFirst) {
+        val current = shownKind to newestFirst
+        if (current != lastBoardFilter) {
+            lastBoardFilter = current
+            notesGridState.scrollToItem(0)
+        }
+    }
     val editorTitleFocus = remember { FocusRequester() }
     val mapTitleFocus = remember { FocusRequester() }
     val formatter = remember {
@@ -524,7 +533,6 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val sorted = if (newestFirst) filtered.sortedByDescending { it.updatedAt }
         else filtered.sortedBy { it.updatedAt }
     val (pinned, others) = sorted.partition { it.pinned }
-    val notesGridState = rememberLazyGridState()
     LazyVerticalGrid(
         columns = if (LocalDensity.current.fontScale >= 1.3f) GridCells.Fixed(1) else GridCells.Adaptive(192.dp),
         modifier = Modifier.fillMaxSize().oliveScrollbar(notesGridState),

@@ -85,7 +85,10 @@ internal fun FitnessCoachPage(
     val coachTitle = stringResource(R.string.fitness_coach_title)
     val chatHistory = remember(context, accountId) { FitnessCoachHistory(context, accountId) }
     val scope = rememberCoroutineScope()
-    var membership by remember { mutableStateOf<CoachMembership?>(null) }
+    var membership by remember(accountId, cloudAvailable) {
+        mutableStateOf(if (cloudAvailable) cachedActiveCoachMembership(store.preferences) else null)
+    }
+    var forceBillingRefresh by remember(accountId) { mutableStateOf(false) }
     var billingBusy by remember { mutableStateOf(false) }
     var paymentOpen by remember { mutableStateOf(false) }
     var paymentResult by remember { mutableStateOf<PaymentSheetResult?>(null) }
@@ -116,12 +119,16 @@ internal fun FitnessCoachPage(
         scope.launch {
             try {
                 if (action == "status") {
-                    membership = client.membership()
+                    val fetched = client.membership()
+                    saveCoachMembershipCache(store.preferences, fetched)
+                    membership = fetched
                     if (verifyPayment) {
                         repeat(3) {
                             if (membership?.active == true) return@repeat
                             delay(1000)
-                            membership = client.membership()
+                            val retried = client.membership()
+                            saveCoachMembershipCache(store.preferences, retried)
+                            membership = retried
                         }
                         if (membership?.active != true) error = R.string.fitness_coach_payment_pending
                     }
@@ -139,13 +146,18 @@ internal fun FitnessCoachPage(
                         PaymentSheet.Configuration.Builder(coachTitle).build(),
                     )
                 } else if (action == "portal") {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, client.billingPortal()))
+                    val portalUri = client.billingPortal()
+                    forceBillingRefresh = true
+                    context.startActivity(Intent(Intent.ACTION_VIEW, portalUri))
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 paymentOpen = false
-                if (action == "status") membership = null
+                if (action == "status") {
+                    clearCoachMembershipCache(store.preferences)
+                    membership = null
+                }
                 error = R.string.fitness_coach_billing_error
             } finally {
                 billingBusy = false
@@ -163,7 +175,15 @@ internal fun FitnessCoachPage(
         }
     }
     LifecycleResumeEffect(accountId, cloudAvailable) {
-        runBilling("status")
+        val now = System.currentTimeMillis()
+        val effective = membership?.takeIf { shouldSkipCoachStatusCheck(it, false, now) }
+            ?: if (cloudAvailable) cachedActiveCoachMembership(store.preferences, now) else null
+        if (shouldSkipCoachStatusCheck(effective, forceBillingRefresh, now)) {
+            membership = effective
+        } else {
+            forceBillingRefresh = false
+            runBilling("status")
+        }
         onPauseOrDispose {}
     }
     val active = cloudAvailable && membership?.active == true
@@ -213,6 +233,19 @@ internal fun FitnessCoachPage(
         proposed = emptyMap()
         scope.launch {
             try {
+                val periodEndMs = membership?.currentPeriodEndMs
+                if (periodEndMs != null && System.currentTimeMillis() >= periodEndMs) {
+                    val refreshed = client.membership()
+                    saveCoachMembershipCache(store.preferences, refreshed)
+                    membership = refreshed
+                    if (!refreshed.active) {
+                        proposed = emptyMap()
+                        appliedGoals = emptyMap()
+                        showSettings = false
+                        error = R.string.fitness_coach_subscription_required
+                        return@launch
+                    }
+                }
                 val history = withContext(Dispatchers.IO) { store.coachHistory() }
                 val hint = if (isWorkoutOrMealAdvice(message, "")) {
                     "\n(Format with each day/meal section separated by blank lines and each exercise/food as a bulleted item starting with • on its own line. Provide specific exercises, sets, and reps or food ideas, not step count suggestions.)"
@@ -247,7 +280,8 @@ internal fun FitnessCoachPage(
                 error = when (failure.code) {
                     FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED -> R.string.fitness_coach_limit
                     FirebaseFunctionsException.Code.PERMISSION_DENIED -> {
-                        membership = membership?.copy(active = false)
+                        clearCoachMembershipCache(store.preferences)
+                        membership = membership?.copy(active = false, currentPeriodEndMs = null)
                         R.string.fitness_coach_subscription_required
                     }
                     else -> R.string.fitness_coach_reply_error

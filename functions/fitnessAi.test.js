@@ -158,3 +158,28 @@ test("in-app checkout resumes the unpaid subscription and does not grant access 
   assert.equal((await billing.status("member")).active, true);
   await assert.rejects(billing.paymentSheet("member", "pk_test_fixture"), {code: "failed-precondition"});
 });
+
+test("Stripe status returns currentPeriodEndMs from item or plan period end capped by cancel_at", async () => {
+  const price = {id: "price_weekly", currency: "cad", unit_amount: 599, recurring: {interval: "week", interval_count: 1}};
+  let plans = [];
+  const f = fixture({stripe: class {
+    subscriptions = {list: () => plans};
+  }});
+  f.records.set("fitnessAiBilling/member", {customerId: "cus_member"});
+  const billing = f.load("fitnessAiBilling").fitnessBilling("fixture", price.id);
+
+  // Inactive plans omit currentPeriodEndMs.
+  plans = [{status: "canceled", current_period_end: 2_000_000_000, items: {data: [{price, current_period_end: 2_000_000_000}]}}];
+  assert.deepEqual(await billing.status("member"), {active: false, canManage: true});
+
+  // Stripe v23 item-level current_period_end is converted to milliseconds.
+  plans = [{status: "active", items: {data: [{price, current_period_end: 1_800_000_000}]}}];
+  assert.deepEqual(await billing.status("member"), {active: true, canManage: true, currentPeriodEndMs: 1_800_000_000_000});
+
+  // Falls back to top-level plan.current_period_end and caps by earlier cancel_at; picks latest across active plans.
+  plans = [
+    {status: "active", current_period_end: 1_800_001_000, cancel_at: 1_800_000_500, items: {data: [{price}]}},
+    {status: "active", cancel_at: 1_800_002_000, items: {data: [{price, current_period_end: 1_800_001_200}]}},
+  ];
+  assert.deepEqual(await billing.status("member"), {active: true, canManage: true, currentPeriodEndMs: 1_800_001_200_000});
+});

@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -65,6 +66,14 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    var lastFilter by remember { mutableStateOf(filter) }
+    LaunchedEffect(filter) {
+        if (filter != lastFilter) {
+            lastFilter = filter
+            listState.scrollToItem(0)
+        }
+    }
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
         controller.load(uid, session.coverUsername, session.localMode)
     }
@@ -192,7 +201,9 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             }
         }
         LazyColumn(
-            Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp),
+            Modifier.weight(1f).fillMaxWidth().oliveScrollbar(listState),
+            state = listState,
+            contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (state.loading) item(key = "loading_documents") { LoadingSkeleton(SkeletonLayout.Documents) }

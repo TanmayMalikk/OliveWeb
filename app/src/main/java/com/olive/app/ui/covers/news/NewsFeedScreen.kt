@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.outlined.Article
@@ -91,25 +92,26 @@ internal fun NewsFeed(
     session: SessionViewModel,
     feed: NewsFeedState,
     actions: NewsFeedActions,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
     val shareTitle = uiText(R.string.news_share_article)
     with(feed) {
         PullToRefreshBox(isRefreshing = loading, onRefresh = actions.refresh, modifier = modifier) {
-            val listState = rememberLazyListState()
-            LazyColumn(
-                Modifier.fillMaxSize().oliveScrollbar(listState).testTag("news_cover"),
-                state = listState,
-                contentPadding = PaddingValues(
-                    start = 18.dp,
-                    end = 18.dp,
-                    top = 8.dp,
-                    bottom = 28.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            key(tab) {
+                LazyColumn(
+                    Modifier.fillMaxSize().oliveScrollbar(listState).testTag("news_cover"),
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = 8.dp,
+                        bottom = 28.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 // Shows loading, articles, or an error for the current news request.
                 when (tab) {
                     "Account" -> {
@@ -282,6 +284,7 @@ internal fun NewsFeed(
                         }
                     }
                 }
+            }
             }
         }
     }

@@ -307,7 +307,16 @@ internal fun GameCover(
 ) {
     var nickname by remember { mutableStateOf("") }
     var score by rememberSaveable(sessionViewModel?.coverAccountId) { mutableIntStateOf(0) }
-    var settingsOpen by rememberSaveable(sessionViewModel?.coverAccountId) { mutableStateOf(false) }
+    var settingsOpen by remember(sessionViewModel?.coverAccountId) { mutableStateOf(false) }
+    val coverReset = sessionViewModel?.coverReset ?: 0
+    var handledCoverReset by remember { mutableIntStateOf(coverReset) }
+    LaunchedEffect(interactive, coverReset) {
+        val resetChanged = coverReset != handledCoverReset
+        handledCoverReset = coverReset
+        if ((!interactive || resetChanged) && settingsOpen) {
+            settingsOpen = false
+        }
+    }
     if (settingsOpen && sessionViewModel != null) {
         CoverSettingsPage(sessionViewModel) { settingsOpen = false }
         return
