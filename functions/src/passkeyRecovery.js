@@ -118,11 +118,19 @@ function credentialRecord(credential, uid, registrationInfo) {
 function storedCredential(snapshot, uid) {
   if (!snapshot.exists) throw new HttpsError("not-found", "Passkey recovery is not configured.");
   const record = snapshot.data() || {};
-  const expected = credentialRecord(record, uid, record);
+  const expected = credentialRecord(record, uid, {
+    credentialDeviceType: record.deviceType,
+    credentialBackedUp: record.backedUp,
+  });
   if (record.ownerUid !== uid || record.credentialId !== snapshot.id) {
     throw new HttpsError("failed-precondition", "Stored passkey recovery record is invalid.");
   }
-  return {...expected, envelope: record.envelope, prfInput: record.prfInput};
+  return {
+    ...expected,
+    envelope: record.envelope,
+    prfInput: record.prfInput,
+    createdAt: record.createdAt,
+  };
 }
 
 function root(uid) {
@@ -430,6 +438,7 @@ exports._test = {
   accountDisplayName,
   recoveryEnvelope,
   credentialRecord,
+  storedCredential,
   rejectPrfResult,
   requiredCredentialId,
   credentialSummary,

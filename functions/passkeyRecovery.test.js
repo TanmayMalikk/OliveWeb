@@ -142,6 +142,34 @@ test("passkey recovery exposes only bounded public factor metadata", () => {
   });
 });
 
+test("passkey recovery preserves a stored credential creation timestamp for its owner summary", () => {
+  const createdAt = {toMillis: () => 1_795_000_000_000};
+  const record = recovery.storedCredential({
+    exists: true,
+    id: "credential_abcdefghijklmnop",
+    data: () => ({
+      ownerUid: "uid-a",
+      allowedUsers: ["uid-a"],
+      credentialId: "credential_abcdefghijklmnop",
+      publicKey: Buffer.alloc(77, 4),
+      counter: 0,
+      transports: ["internal"],
+      deviceType: "multiDevice",
+      backedUp: true,
+      envelope: {ciphertext: "opaque"},
+      prfInput: b64(32),
+      createdAt,
+    }),
+  }, "uid-a");
+
+  assert.deepEqual(recovery.credentialSummary(record), {
+    credentialId: "credential_abcdefghijklmnop",
+    deviceType: "multiDevice",
+    backedUp: true,
+    createdAtEpochMillis: 1_795_000_000_000,
+  });
+});
+
 test("passkey recovery rejects malformed factor IDs across input classes", () => {
   for (const value of [undefined, null, 7, {}, [], "", "short", "bad/id", "x".repeat(1025)]) {
     assert.throws(() => recovery.requiredCredentialId(value));
