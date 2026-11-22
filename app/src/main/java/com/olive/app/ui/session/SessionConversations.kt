@@ -195,22 +195,40 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                 withContext(Dispatchers.IO) { chatCache.remove(uid, conversation.id) }
                                 throw onlineFailure
                             }
-                            val cached = withContext(Dispatchers.IO) {
-                                chatCache.open(
-                                    uid,
-                                    conversation.id,
-                                    KeyManager.deviceId(),
-                                    System.currentTimeMillis(),
-                                )
+                            try {
+                                val cached = withContext(Dispatchers.IO) {
+                                    chatCache.open(
+                                        uid,
+                                        conversation.id,
+                                        KeyManager.deviceId(),
+                                        System.currentTimeMillis(),
+                                    )
+                                }
+                                val offlineKey = KeyManager.unwrapKey(cached.wrappedRoomKey)
+                                val cachedMessages = withContext(Dispatchers.Default) {
+                                    secure.decryptMessages(cached.messages, offlineKey)
+                                }
+                                if (epoch == token && activeConversation?.id == conversation.id) {
+                                    remoteChatMessages = cachedMessages
+                                }
+                                offlineKey
+                            } catch (cacheFailure: Exception) {
+                                if (cacheFailure is CancellationException) throw cacheFailure
+                                val recoveredKey = secureSharing.recoverRoomKey(conversation)
+                                val wrapped = secure.wrappedRoomKey(conversation.id, uid)
+                                if (wrapped != null) {
+                                    withContext(Dispatchers.IO) {
+                                        chatCache.saveAccess(
+                                            uid,
+                                            conversation,
+                                            wrapped,
+                                            KeyManager.deviceId(),
+                                            System.currentTimeMillis(),
+                                        )
+                                    }
+                                }
+                                recoveredKey
                             }
-                            val offlineKey = KeyManager.unwrapKey(cached.wrappedRoomKey)
-                            val cachedMessages = withContext(Dispatchers.Default) {
-                                secure.decryptMessages(cached.messages, offlineKey)
-                            }
-                            if (epoch == token && activeConversation?.id == conversation.id) {
-                                remoteChatMessages = cachedMessages
-                            }
-                            offlineKey
                         }
                         if (epoch != token || activeConversation?.id != conversation.id) return@launch
                         activeRoomKey = key

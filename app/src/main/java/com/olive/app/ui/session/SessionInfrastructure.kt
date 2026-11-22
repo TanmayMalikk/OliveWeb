@@ -9,6 +9,8 @@ import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRepository
+import com.olive.app.data.account.AccountKeysetRepository
+import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminRepository
 import com.olive.app.data.account.CoverType
@@ -77,6 +79,7 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
     val chatCache = ChatCacheStore(application)
     val documentIndex = DocumentIndexStore(application)
     val offlineMediaCache = OfflineMediaCache(application)
+    val accountKeysets = AccountKeysetLocalStore(vault)
 }
 
 // Builds cloud repositories only for a Firebase session. Tests can supply a replacement bundle.
@@ -90,6 +93,8 @@ internal class SessionDataSources(
     val safetyDocuments: SafetyDocumentDataSource?,
     val locations: LocationSharingDataSource?,
     val adminLocations: AdminLocationRepository?,
+    val accountKeysets: AccountKeysetRepository?,
+    val passkeyRecovery: PasskeyRecoveryRepository?,
 ) {
     companion object {
         /**
@@ -123,6 +128,8 @@ internal class SessionDataSources(
                 },
                 locations = if (localMode) null else LocationSharingRepository(application),
                 adminLocations = if (localMode) null else AdminLocationRepository(),
+                accountKeysets = if (localMode) null else AccountKeysetRepository(),
+                passkeyRecovery = if (localMode) null else PasskeyRecoveryRepository(),
             )
         }
     }
@@ -282,9 +289,6 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 safePageHistory.clear()
                 enterSafeWithAnimation()
                 privacy.startIdleTimer()
-                scope.launch(Dispatchers.IO) {
-                    runCatching { dataSources.safetyDocuments?.upgradeOwnedRecoveryKeys(device.uid) }
-                }
             }
         }
     }
@@ -292,7 +296,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
 
 // Holds an active biometric/device-credential unlock request.
 internal class DeviceLockRequest internal constructor(
-    val challenge: DeviceLockChallenge,
+    val challenge: DeviceAuthenticationChallenge,
     val settingsChange: Boolean = false
 ) {
     internal val result = CompletableDeferred<Cipher?>()
@@ -303,6 +307,22 @@ internal class DeviceLockRequest internal constructor(
      */
     fun complete(cipher: Cipher?) {
         result.complete(cipher)
+    }
+}
+
+internal sealed interface PasskeyCredentialResult {
+    data class Registration(val serverResponseJson: String) : PasskeyCredentialResult
+    data class Assertion(val value: PasskeyPrfProtocol.AssertionResult) : PasskeyCredentialResult
+}
+
+/** One Activity-owned Credential Manager ceremony; raw PRF JSON never enters session state. */
+internal class PasskeyCredentialRequest internal constructor(
+    val requestJson: String,
+    val assertion: Boolean,
+) {
+    internal val result = CompletableDeferred<PasskeyCredentialResult?>()
+    fun complete(value: PasskeyCredentialResult?) {
+        result.complete(value)
     }
 }
 
@@ -398,6 +418,7 @@ internal class SessionRuntime(
     val scope: CoroutineScope,
     dataSourcesOverride: SessionDataSources? = null,
     val localMode: Boolean = !BuildConfig.FIREBASE_CONFIGURED,
+    prioritySyncOverride: PrioritySyncCoordinator? = null,
 ) {
     val state: SessionState = SessionState { canEnterSafe() }
     private val localStorage = SessionLocalStorage(application, localMode)
@@ -422,7 +443,8 @@ internal class SessionRuntime(
     val chatCache get() = localStorage.chatCache
     val documentIndex get() = localStorage.documentIndex
     val offlineMediaCache get() = localStorage.offlineMediaCache
-    val prioritySync = PrioritySyncCoordinator(application)
+    val accountKeysets get() = localStorage.accountKeysets
+    val prioritySync = prioritySyncOverride ?: PrioritySyncCoordinator(application)
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(
         application,
         localMode,
@@ -437,6 +459,8 @@ internal class SessionRuntime(
     val mediaRepository get() = dataSources.media
     val safetyDocumentRepository get() = dataSources.safetyDocuments
     val locationSharingRepository get() = dataSources.locations
+    val accountKeysetRepository get() = dataSources.accountKeysets
+    val passkeyRecoveryRepository get() = dataSources.passkeyRecovery
     private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment

@@ -173,6 +173,10 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-effect:$media3Version")
     implementation("androidx.media3:media3-transformer:$media3Version")
+    // Recovery and the debug compatibility probe use the same verified Credential Manager version.
+    val credentialsVersion = "1.6.0"
+    implementation("androidx.credentials:credentials:$credentialsVersion")
+    implementation("androidx.credentials:credentials-play-services-auth:$credentialsVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")

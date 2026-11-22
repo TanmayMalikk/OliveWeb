@@ -29,6 +29,14 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PublicKeyCredential
+import androidx.credentials.exceptions.NoCredentialException
 import com.olive.app.R
 import com.olive.app.data.account.HistoryRecord
 import com.olive.app.data.account.PrivateEntry
@@ -36,6 +44,11 @@ import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.trashExpired
 import com.olive.app.ui.session.DeviceLockRequest
+import com.olive.app.ui.session.PasskeyCredentialRequest
+import com.olive.app.ui.session.PasskeyCredentialResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 
 // Encrypted, account-scoped activity and private-entry storage; no authentication responsibilities.
@@ -413,8 +426,12 @@ object KeyManager {
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
-        return android.util.Base64.encodeToString(wrappedBytes, android.util.Base64.NO_WRAP)
+        return Base64.getEncoder().encodeToString(wrappedBytes)
     }
+
+    /** Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest. */
+    internal fun wrapForAccountKeyset(secretKey: SecretKey, publicKey: PublicKey): String =
+        wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA256)
 
     /**
      * Converts a Base64 string from Firestore back into an RSA PublicKey.
@@ -437,9 +454,24 @@ object KeyManager {
      * @return The resulting [SecretKey] for unwrap key.
      */
     fun unwrapKey(wrappedKeyBase64: String, keyWrapVersion: Int? = null): SecretKey {
-        val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
         val privateKeys = getPrivateKeys()
         if (privateKeys.isEmpty()) error("Private key missing")
+        return unwrapKey(wrappedKeyBase64, privateKeys, keyWrapVersion)
+    }
+
+    /** Opens a File DEK with an unlocked account private key during the keyset migration. */
+    fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKey: PrivateKey,
+        keyWrapVersion: Int? = null,
+    ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
+
+    private fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKeys: List<PrivateKey>,
+        keyWrapVersion: Int?,
+    ): SecretKey {
+        val decodedBytes = Base64.getDecoder().decode(wrappedKeyBase64)
         val candidates = oaepProfiles(keyWrapVersion)
         var lastFailure: GeneralSecurityException? = null
         privateKeys.forEach { privateKey ->
@@ -685,5 +717,70 @@ internal class AndroidDeviceLock(
         pendingCipher = null
         prompt.cancelAuthentication()
         previous?.complete(null)
+    }
+}
+
+/** Runs Credential Manager only while an Activity is present and sanitizes results immediately. */
+internal class AndroidPasskeyCredentials(private val activity: FragmentActivity) {
+    private val credentials = CredentialManager.create(activity)
+    private var request: PasskeyCredentialRequest? = null
+    private var job: Job? = null
+    var awaitingCredential: Boolean = false
+        private set
+
+    fun show(value: PasskeyCredentialRequest) {
+        if (request === value) return
+        cancel()
+        request = value
+        awaitingCredential = true
+        job = activity.lifecycleScope.launch {
+            val result = try {
+                if (value.assertion) {
+                    val credential = credentials.getCredential(
+                        activity,
+                        GetCredentialRequest(listOf(GetPublicKeyCredentialOption(value.requestJson))),
+                    ).credential as? PublicKeyCredential
+                        ?: throw IllegalStateException("Credential provider returned an invalid assertion")
+                    PasskeyCredentialResult.Assertion(
+                        PasskeyPrfProtocol.assertionResult(credential.authenticationResponseJson),
+                    )
+                } else {
+                    val response = credentials.createCredential(
+                        activity,
+                        CreatePublicKeyCredentialRequest(value.requestJson),
+                    ) as? CreatePublicKeyCredentialResponse
+                        ?: throw IllegalStateException("Credential provider returned an invalid registration")
+                    PasskeyCredentialResult.Registration(
+                        PasskeyPrfProtocol.registrationResult(response.registrationResponseJson),
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: NoCredentialException) {
+                null
+            } catch (_: Exception) {
+                null
+            }
+            finish(value, result)
+        }
+    }
+
+    fun cancel() {
+        job?.cancel()
+        job = null
+        request?.complete(null)
+        request = null
+        awaitingCredential = false
+    }
+
+    private fun finish(value: PasskeyCredentialRequest, result: PasskeyCredentialResult?) {
+        if (request !== value) {
+            (result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)
+            return
+        }
+        job = null
+        request = null
+        awaitingCredential = false
+        value.complete(result)
     }
 }

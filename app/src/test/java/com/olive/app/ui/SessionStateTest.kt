@@ -171,6 +171,7 @@ class SessionStateTest {
             val dataSources = SessionDataSources(
                 accounts, admin, messaging, secureChat, secureDocuments,
                 media, safetyDocuments, locations, adminLocations,
+                null, null,
             )
             `when`(accounts.authenticatedUid()).thenReturn("owner")
             `when`(accounts.authenticatedUsername()).thenReturn("fixture_owner")

@@ -49,6 +49,11 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/ic_app_info_blank" android:roundIcon="@drawable/ic_app_info_blank"
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
+        <!-- Associates every signed build with Olive's relying-party domain. The hosted
+             assetlinks.json contains the allowed debug and release signing certificates. -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
         <activity android:name=".ui.covers.fitness.FitnessHealthPrivacyActivity" android:exported="true">
             <intent-filter><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" /></intent-filter>
         </activity>

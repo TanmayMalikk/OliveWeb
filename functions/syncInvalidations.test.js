@@ -44,6 +44,7 @@ test("ordinary chat message markers do not trigger conversation reconciliation",
   assert.equal(sync.conversationAccessChanged(before, {...before, lastMessageId:"two", updatedAt:2}), false);
   assert.equal(sync.conversationAccessChanged(before, {...before, participantIds:["owner"]}), true);
   assert.equal(sync.conversationAccessChanged(before, {...before, roomKeys:{owner:"new", staff:"b"}}), true);
+  assert.equal(sync.conversationAccessChanged(before, {...before, accountRoomKeys:{owner:{wrappedKey:"new"}}}), true);
 });
 
 test("audience parsing rejects malformed and oversized identifiers under repetition", () => {

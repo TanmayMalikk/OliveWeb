@@ -2,8 +2,7 @@
 package com.olive.app.data
 
 import com.olive.app.data.media.*
-import com.olive.app.data.messaging.OutgoingAttachment
-import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.security.AccountKeysetWrappedKey
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -19,6 +18,20 @@ class MediaTransferModelsEdgeCaseTest {
         encryptionVersion = 2,
         kind = MediaKind.DOCUMENT,
         ocrReview = OcrReview.RETAKE_DECLINED,
+        accountWrappedKeys = mapOf(
+            "owner" to AccountKeysetWrappedKey(
+                keyId = "123e4567-e89b-42d3-a456-426614174000",
+                epoch = 1,
+                algorithm = "RSA-OAEP-256",
+                wrappedKey = "opaque owner wrapper",
+            ),
+            "trusted" to AccountKeysetWrappedKey(
+                keyId = "223e4567-e89b-42d3-a456-426614174000",
+                epoch = 2,
+                algorithm = "RSA-OAEP-256",
+                wrappedKey = "opaque trusted wrapper",
+            ),
+        ),
     )
 
     // Inputs: the values shown below. Expected: durable upload job round trips every recovery field.
@@ -43,24 +56,16 @@ class MediaTransferModelsEdgeCaseTest {
     }
 
     @Test
-    fun voiceSendSurvivesRestartBeforeAndAfterMediaIdAssignment() {
-        val staged = MediaUploadJob(
-            id = "voice-job", ownerUid = "owner", source = source(),
-            voiceDraft = PendingVoiceMessage("chat", "sender", "wrapped room key", "2400,01239841"),
-        )
-        assertEquals(staged, MediaUploadJob.fromJson(staged.toJson()))
-        val prepared = staged.copy(
-            voiceDraft = null,
-            mediaId = "media",
-            voiceMessage = OutgoingMessage(
-                id = staged.id, ownerUid = staged.ownerUid, conversationId = "chat",
-                senderUsername = "sender", ciphertext = "encrypted chat message",
-                clientSentAt = staged.createdAt, attachment = OutgoingAttachment("media"),
-            ),
-        )
-        val restored = MediaUploadJob.fromJson(prepared.toJson())
-        assertEquals(prepared, restored)
-        assertFalse(prepared.toJson().toString().contains("wrapped room key"))
+    fun uploadRequestContainsOnlyOpaqueAccountWrappers() {
+        val request = mediaCreateUploadRequest(MediaUploadJob("job", "owner", source()))
+
+        assertFalse(request.containsKey("accountAccessKey"))
+        assertFalse(request.containsKey("recoveryKeyToSeal"))
+        val wrappers = request["accountWrappedKeys"] as Map<*, *>
+        val owner = wrappers["owner"] as Map<*, *>
+        assertEquals("123e4567-e89b-42d3-a456-426614174000", owner["keyId"])
+        assertEquals("RSA-OAEP-256", owner["algorithm"])
+        assertEquals("opaque owner wrapper", owner["wrappedKey"])
     }
 
     // Inputs: the values shown below. Expected: older upload jobs receive safe encryption and ocr defaults.
@@ -70,12 +75,14 @@ class MediaTransferModelsEdgeCaseTest {
         json.remove("encryptionVersion")
         json.remove("ocrReview")
         json.remove("completedParts")
+        json.remove("accountWrappedKeys")
 
         val restored = MediaUploadJob.fromJson(json)
 
         assertEquals(1, restored.source.encryptionVersion)
         assertEquals(OcrReview.NOT_RUN, restored.source.ocrReview)
         assertTrue(restored.completedParts.isEmpty())
+        assertTrue(restored.source.accountWrappedKeys.isEmpty())
     }
 
     // Inputs: the values shown below. Expected: upload progress is null for unknown totals and clamped for bad counters.
@@ -112,6 +119,14 @@ class MediaTransferModelsEdgeCaseTest {
         val badKeys = MediaUploadJob(id = "job", ownerUid = "owner", source = source()).toJson()
             .put("wrappedKeys", "not an object")
         assertThrows(Exception::class.java) { MediaUploadJob.fromJson(badKeys) }
+
+        val badAccountWrapper = MediaUploadJob(id = "job", ownerUid = "owner", source = source()).toJson()
+            .put("accountWrappedKeys", org.json.JSONObject().put("owner", org.json.JSONObject()
+                .put("keyId", "not-a-key-id")
+                .put("epoch", 0)
+                .put("algorithm", "AES")
+                .put("wrappedKey", "raw")))
+        assertThrows(Exception::class.java) { MediaUploadJob.fromJson(badAccountWrapper) }
     }
 
     // Inputs: every media kind and OCR review combination. Expected: durable storage preserves both enums exactly.

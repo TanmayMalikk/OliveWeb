@@ -4,6 +4,7 @@ import android.content.Context
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.media.CloudMediaRecord
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.media.MediaCompletedPart
 import com.olive.app.data.media.MediaDownloadTicket
 import com.olive.app.data.media.MediaKind
@@ -15,6 +16,8 @@ import com.olive.app.data.media.MediaUploadSession
 import com.olive.app.data.media.MediaUploadTicket
 import com.olive.app.data.media.OcrReview
 import com.olive.app.data.media.ProcessedMedia
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountRecoveryKey
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.CountDownLatch
@@ -59,6 +62,7 @@ class MediaPreparationMemoryTest {
             preprocessor=MediaPreprocessor { _,_,_ ->
                 ProcessedMedia(FailingAfterFirstChunkInput(),"video/mp4","mp4")
             },
+            accountKeysetProvider={ uid -> AccountKeysetEnvelope.create(uid,AccountRecoveryKey.generate()) },
             preparationFailureResolver={ _,failure,kind ->
                 if(failure is OutOfMemoryError && kind==MediaKind.VIDEO) EXPECTED_VIDEO_GUIDANCE
                 else error("Unexpected preparation failure: $failure")
@@ -114,6 +118,7 @@ class MediaPreparationMemoryTest {
             mediaId:String,
             wrappedKeys:Map<String,String>,
             deviceWrappedKeys:Map<String,String>,
+            accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
             grantIndependentRecipients:List<String>,
             revokeIndependentRecipients:List<String>,
         ):CloudMediaRecord=error("unused")

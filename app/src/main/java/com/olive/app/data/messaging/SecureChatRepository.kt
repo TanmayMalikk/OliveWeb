@@ -15,7 +15,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import com.olive.app.security.AccountKeysetWrappedKey
+import com.olive.app.security.UnlockedAccountKeyset
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.security.PublicKey
 import java.security.spec.MGF1ParameterSpec
 import javax.crypto.SecretKey
@@ -105,10 +110,15 @@ class SecureChatRepository(
      *
      * @param conversationId Unique identifier of the conversation or support ticket.
      * @param currentUid Current user ID supplied to [existingRoomKey].
+     * @param accountKeyset Unlocked account keyset when available for account-wrapped keys.
      * @return The resulting [SecretKey], or `null` if unavailable.
      */
-    suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
-        return roomKeyAccess(conversationId, currentUid)?.secretKey
+    internal suspend fun existingRoomKey(
+        conversationId: String,
+        currentUid: String,
+        accountKeyset: UnlockedAccountKeyset? = null,
+    ): SecretKey? {
+        return roomKeyAccess(conversationId, currentUid, accountKeyset = accountKeyset)?.secretKey
     }
 
     /**
@@ -134,6 +144,7 @@ class SecureChatRepository(
         conversationId: String,
         currentUid: String,
         source: Source = Source.DEFAULT,
+        accountKeyset: UnlockedAccountKeyset? = null,
     ): KeyManager.UnwrappedKeyEnvelope? {
         val snapshot = firestore.collection("conversations").document(conversationId).get(source).await()
         if (currentUid !in (snapshot.get("participantIds") as? List<*>).orEmpty()) return null
@@ -141,7 +152,14 @@ class SecureChatRepository(
         val deviceKey = snapshot.reference.collection("deviceKeys")
             .document("$currentUid--$deviceId").get(source).await().getString("wrappedKey")
         val candidates = listOfNotNull(deviceKey, snapshot.roomKeys().orEmpty()[currentUid])
-        return runCatching { KeyManager.unwrapFirstWithEnvelope(candidates) }.getOrNull()
+        val local = runCatching { KeyManager.unwrapFirstWithEnvelope(candidates) }.getOrNull()
+        if (local != null) return local
+        val recovered = accountKeyset?.let { keyset ->
+            snapshot.accountRoomKeys()[currentUid]?.let { wrapper ->
+                runCatching { wrapper.unwrap(keyset) }.getOrNull()
+            }
+        } ?: return null
+        return KeyManager.UnwrappedKeyEnvelope("", recovered)
     }
 
     /**
@@ -273,6 +291,55 @@ class SecureChatRepository(
             }
         }
         if (writes > 0) batch.commit().await()
+        shareWithRecoverableAccounts(conversation, roomKey)
+    }
+
+    /** Publishes optional account-recovery copies without requiring every chat role to enroll first. */
+    private suspend fun shareWithRecoverableAccounts(
+        conversation: ChatConversation,
+        roomKey: SecretKey,
+    ) {
+        val wrappers = coroutineScope {
+            conversation.participantIds.map { uid ->
+                async {
+                    val row = runCatching {
+                        firestore.collection("accountKeyDirectories").document(uid)
+                            .get(Source.SERVER).await()
+                    }.getOrNull() ?: return@async null
+                    if (!row.exists() || row.getString("ownerUid") != uid) return@async null
+                    runCatching {
+                        uid to AccountKeysetWrappedKey(
+                            keyId = row.getString("keyId").orEmpty(),
+                            epoch = row.getLong("epoch") ?: 0,
+                            algorithm = row.getString("algorithm").orEmpty(),
+                            wrappedKey = KeyManager.wrapForAccountKeyset(
+                                roomKey,
+                                KeyManager.decodePublicKey(row.getString("publicKey").orEmpty()),
+                            ),
+                        )
+                    }.getOrNull()
+                }
+            }.awaitAll().filterNotNull().toMap()
+        }
+        if (wrappers.isEmpty()) return
+        val reference = firestore.collection("conversations").document(conversation.id)
+        firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(reference)
+            val participants = (snapshot.get("participantIds") as? List<*>)
+                .orEmpty().filterIsInstance<String>().toSet()
+            check(participants == conversation.participantIds.toSet()) {
+                "Conversation membership changed during key distribution."
+            }
+            val retained = snapshot.accountRoomKeys().filterKeys { it in participants }.toMutableMap()
+            retained.putAll(wrappers)
+            transaction.update(
+                reference,
+                mapOf(
+                    "accountRoomKeys" to retained.mapValues { it.value.toMap() },
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            )
+        }.await()
     }
 
     /**
@@ -444,6 +511,13 @@ class SecureChatRepository(
      */
     private fun DocumentSnapshot.roomKeys() =
         get("roomKeys").cloudStringMap()
+
+    private fun DocumentSnapshot.accountRoomKeys(): Map<String, AccountKeysetWrappedKey> =
+        (get("accountRoomKeys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
+            val id = uid as? String ?: return@mapNotNull null
+            val fields = value as? Map<*, *> ?: return@mapNotNull null
+            runCatching { id to AccountKeysetWrappedKey.fromMap(fields) }.getOrNull()
+        }?.toMap().orEmpty()
 
     /**
      * Loads each participant's public key before sharing a room key.

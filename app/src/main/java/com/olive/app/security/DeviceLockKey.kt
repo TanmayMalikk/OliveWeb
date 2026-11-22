@@ -88,10 +88,17 @@ internal class DeviceLockKey(private val namespace: String) {
     }
 }
 
+/** Minimum cipher contract needed by the shared Android device-authentication prompt. */
+internal interface DeviceAuthenticationChallenge {
+    val enrolling: Boolean
+    val promptCipher: Cipher?
+    fun legacyCipher(): Cipher
+}
+
 class DeviceLockChallenge internal constructor(
     private val uid: String, private val key: SecretKey, private val saved: JSONObject?,
     private val keyId: String, private val alias: String,
-) {
+) : DeviceAuthenticationChallenge {
     private var committed = false
     /**
      * Reports whether this phone finished creating its device-lock key.
@@ -113,18 +120,18 @@ class DeviceLockChallenge internal constructor(
         }
     }
 
-    val enrolling get() = saved == null
+    override val enrolling get() = saved == null
     private val expected get() = "olive-safe-entry-v1:$uid".toByteArray(Charsets.UTF_8)
 
     // API 30+ binds this exact operation to BiometricPrompt. Legacy devices initialize only after credentials succeed.
-    internal val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
+    override val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
     private var credentialCipher: Cipher? = null
     /**
      * Creates the legacy cipher that protects app security.
      *
      * @return The resulting [Cipher] for legacy cipher.
      */
-    internal fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
+    override fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
     /**
      * Creates the cipher that wraps or unwraps the account key after device authentication.
      *

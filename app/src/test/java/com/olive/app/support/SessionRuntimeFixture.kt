@@ -8,6 +8,7 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.data.messaging.SecureChatRepository
 import com.olive.app.data.safety.SafetyDocumentDataSource
+import com.olive.app.data.sync.PrioritySyncCoordinator
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.ui.session.SessionDataSources
 import com.olive.app.ui.session.SessionRuntime
@@ -44,7 +45,8 @@ internal class SessionRuntimeFixture(
         `when`(accounts.authenticatedUsername()).thenReturn("fixture_owner")
         runtime = SessionRuntime(application, scope, SessionDataSources(
             accounts, admin, messaging, secureChat, secureDocuments, null, documents, null, null,
-        ), localMode = localMode)
+            null, null,
+        ), localMode = localMode, prioritySyncOverride = PrioritySyncCoordinator(application, null))
         runtime.enrollment = DeviceEnrollment("owner", "", role)
         runtime.state.accountRole = role
         runtime.state.coverUsername = "fixture_owner"

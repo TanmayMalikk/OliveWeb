@@ -5,7 +5,9 @@ import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.network.decodeJsonObject
 import com.olive.app.data.network.encodeToJsonObject
 import kotlinx.serialization.Serializable
+import org.json.JSONArray
 import org.json.JSONObject
+import com.olive.app.security.AccountKeysetWrappedKey
 
 /** A requested send waiting for the upload service to assign the encrypted media ID. */
 @Serializable
@@ -105,6 +107,7 @@ data class PreparedEncryptedMedia(
     val kind:MediaKind,
     val ocrReview:OcrReview,
     val deviceWrappedKeys:Map<String,String> = emptyMap(),
+    val accountWrappedKeys:Map<String,AccountKeysetWrappedKey> = emptyMap(),
 )
 
 /**
@@ -144,7 +147,22 @@ data class MediaUploadJob(
      *
      * @return JSON representation of this object.
      */
-    fun toJson(): JSONObject = StoredMediaUploadJob.from(this).encodeToJsonObject()
+    fun toJson()=JSONObject().apply {
+        put("id",id);put("ownerUid",ownerUid);put("filePath",source.filePath)
+        put("ciphertextSize",source.ciphertextSize);put("ciphertextSha256",source.ciphertextSha256)
+        put("encryptedMetadata",source.encryptedMetadata);put("wrappedKeys",JSONObject(source.wrappedKeys))
+        put("allowedUsers",JSONArray(source.allowedUsers));put("encryptionVersion",source.encryptionVersion)
+        put("deviceWrappedKeys",JSONObject(source.deviceWrappedKeys))
+        put("accountWrappedKeys",JSONObject(source.accountWrappedKeys.mapValues { it.value.toJson() }))
+        put("kind",source.kind.name);put("ocrReview",source.ocrReview.name);put("status",status.name)
+        mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
+        put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
+        put("attachToSafetyPlan",attachToSafetyPlan)
+        voiceDraft?.let { put("voiceDraft", it.toJson()) }
+        voiceMessage?.let { put("voiceMessage", it.toJson()) }
+        put("completedParts",JSONObject(completedParts.mapKeys { it.key.toString() }))
+        error?.let { put("error",it) }
+    }
 
     companion object {
         /**
@@ -153,108 +171,35 @@ data class MediaUploadJob(
          * @param value Input value to store, parse, or format.
          * @return Parsed instance constructed from the JSON data.
          */
-        fun fromJson(value: JSONObject): MediaUploadJob =
-            value.decodeJsonObject<StoredMediaUploadJob>().toModel()
-    }
-}
-
-@Serializable
-private data class StoredMediaUploadJob(
-    val id: String,
-    val ownerUid: String,
-    val filePath: String,
-    val ciphertextSize: Long,
-    val ciphertextSha256: String,
-    val encryptedMetadata: String,
-    val wrappedKeys: Map<String, String>,
-    val allowedUsers: List<String>,
-    val encryptionVersion: Int = 1,
-    val deviceWrappedKeys: Map<String, String> = emptyMap(),
-    val kind: String,
-    val ocrReview: String = OcrReview.NOT_RUN.name,
-    val status: String,
-    val mode: String? = null,
-    val mediaId: String = "",
-    val objectKey: String = "",
-    val uploadId: String = "",
-    val partSize: Long = 0,
-    val completedParts: Map<String, String> = emptyMap(),
-    val error: String? = null,
-    val createdAt: Long,
-    val attachToSafetyPlan: Boolean = false,
-    val voiceDraft: PendingVoiceMessage? = null,
-    val voiceMessage: OutgoingMessage? = null,
-) {
-    /**
-     * Converts this stored upload job into an active [MediaUploadJob] model instance.
-     *
-     * @return The active [MediaUploadJob].
-     */
-    fun toModel(): MediaUploadJob {
-        val source = PreparedEncryptedMedia(
-            filePath = filePath,
-            ciphertextSize = ciphertextSize,
-            ciphertextSha256 = ciphertextSha256,
-            encryptedMetadata = encryptedMetadata,
-            wrappedKeys = wrappedKeys,
-            allowedUsers = allowedUsers,
-            encryptionVersion = encryptionVersion,
-            kind = MediaKind.valueOf(kind),
-            ocrReview = OcrReview.valueOf(ocrReview),
-            deviceWrappedKeys = deviceWrappedKeys,
-        )
-        return MediaUploadJob(
-            id = id,
-            ownerUid = ownerUid,
-            source = source,
-            status = MediaTransferStatus.valueOf(status),
-            mode = mode?.takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
-            mediaId = mediaId,
-            objectKey = objectKey,
-            uploadId = uploadId,
-            partSize = partSize,
-            completedParts = completedParts.entries.associate { it.key.toInt() to it.value },
-            error = error?.takeIf(String::isNotBlank),
-            createdAt = createdAt,
-            attachToSafetyPlan = attachToSafetyPlan,
-            voiceDraft = voiceDraft,
-            voiceMessage = voiceMessage,
-        )
-    }
-
-    companion object {
-        /**
-         * Creates a [StoredMediaUploadJob] representation from an active [MediaUploadJob].
-         *
-         * @param job The active upload job to persist.
-         * @return The persisted upload job representation.
-         */
-        fun from(job: MediaUploadJob) = StoredMediaUploadJob(
-            id = job.id,
-            ownerUid = job.ownerUid,
-            filePath = job.source.filePath,
-            ciphertextSize = job.source.ciphertextSize,
-            ciphertextSha256 = job.source.ciphertextSha256,
-            encryptedMetadata = job.source.encryptedMetadata,
-            wrappedKeys = job.source.wrappedKeys,
-            allowedUsers = job.source.allowedUsers,
-            encryptionVersion = job.source.encryptionVersion,
-            deviceWrappedKeys = job.source.deviceWrappedKeys,
-            kind = job.source.kind.name,
-            ocrReview = job.source.ocrReview.name,
-            status = job.status.name,
-            mode = job.mode?.name,
-            mediaId = job.mediaId,
-            objectKey = job.objectKey,
-            uploadId = job.uploadId,
-            partSize = job.partSize,
-            completedParts = job.completedParts.mapKeys { it.key.toString() },
-            error = job.error,
-            createdAt = job.createdAt,
-            attachToSafetyPlan = job.attachToSafetyPlan,
-            voiceDraft = job.voiceDraft,
-            voiceMessage = job.voiceMessage,
-        )
+        fun fromJson(value:JSONObject):MediaUploadJob {
+            val wrapped=value.getJSONObject("wrappedKeys").let { json ->
+                json.keys().asSequence().associateWith(json::getString)
+            }
+            val allowed=value.getJSONArray("allowedUsers").let { array ->
+                (0 until array.length()).map(array::getString)
+            }
+            val deviceWrapped=value.optJSONObject("deviceWrappedKeys")?.let { json ->
+                json.keys().asSequence().associateWith(json::getString)
+            }.orEmpty()
+            val accountWrapped=value.optJSONObject("accountWrappedKeys")?.let { json ->
+                json.keys().asSequence().associateWith { AccountKeysetWrappedKey.fromJson(json.getJSONObject(it)) }
+            }.orEmpty()
+            val parts=value.optJSONObject("completedParts")?.let { json ->
+                json.keys().asSequence().associate { it.toInt() to json.getString(it) }
+            }.orEmpty()
+            val source=PreparedEncryptedMedia(value.getString("filePath"),value.getLong("ciphertextSize"),
+                value.getString("ciphertextSha256"),value.getString("encryptedMetadata"),wrapped,allowed,
+                value.optInt("encryptionVersion",1),MediaKind.valueOf(value.getString("kind")),
+                OcrReview.valueOf(value.optString("ocrReview",OcrReview.NOT_RUN.name)),deviceWrapped,
+                accountWrapped)
+            return MediaUploadJob(value.getString("id"),value.getString("ownerUid"),source,
+                MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
+                value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),
+                value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),
+                value.getLong("createdAt"),value.optBoolean("attachToSafetyPlan"),
+                value.optJSONObject("voiceDraft")?.let(PendingVoiceMessage::fromJson),
+                value.optJSONObject("voiceMessage")?.let(OutgoingMessage::fromJson))
+        }
     }
 }
 
@@ -278,6 +223,7 @@ data class CloudMediaRecord(
     val wrappedKeys:Map<String,String>,val allowedUsers:List<String>,val ciphertextSize:Long,
     val ciphertextSha256:String,val encryptionVersion:Int,val createdAt:Long,
     val deviceWrappedKeys:Map<String,String> = emptyMap(),
+    val accountWrappedKeys:Map<String,AccountKeysetWrappedKey> = emptyMap(),
 )
 
 /**

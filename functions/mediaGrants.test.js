@@ -9,13 +9,16 @@ function prepared(send = async () => ({})) {
     "@aws-sdk/client-s3": {...require("@aws-sdk/client-s3"), S3Client: class {async send(command) {calls.push({command}); return send(command);}}},
     "./emergencyReports": {canReadEmergencyMedia: async () => false},
   });
-  f.records.set("files/file", {owner_id: "owner", allowed_users: ["owner"], wrapped_keys: {owner: "owner-key"}, device_wrapped_keys: {"owner--phone": "owner-device-key"}, object_key: "encrypted/file", encrypted_metadata: "ciphertext-metadata"});
+  f.records.set("files/file", {owner_id: "owner", allowed_users: ["owner"], wrapped_keys: {owner: "owner-key"}, account_wrapped_keys: wrappers("owner"), device_wrapped_keys: {"owner--phone": "owner-device-key"}, object_key: "encrypted/file", encrypted_metadata: "ciphertext-metadata"});
   f.records.set("safetyPlans/owner", {safeContactUids: ["friend"], fields: {primary_documents: {value: JSON.stringify({oliveSafetyChecklist: 1, items: [{id: "row", attachmentIds: ["file"]}]})}}});
   return {...f, calls, api: f.load("mediaTickets")};
 }
 const request = (uid, data) => ({auth: {uid}, data: {mediaId: "file", ...data}});
 const grant = "safetyPlanMediaGrants/owner/files/file";
-const access = {wrappedKeys: {owner: "owner-key", friend: "friend-key"}};
+const wrapper = () => ({keyId: "123e4567-e89b-42d3-a456-426614174000", epoch: 1,
+  algorithm: "RSA-OAEP-256", wrappedKey: Buffer.alloc(384, 1).toString("base64")});
+const wrappers = (...uids) => Object.fromEntries(uids.map(uid => [uid, wrapper()]));
+const access = {wrappedKeys: {owner: "owner-key", friend: "friend-key"}, accountWrappedKeys: wrappers("owner", "friend")};
 test("an independent share survives plan attachment removal and reconciliation", async () => {
   const f = prepared();
   await f.api.mediaUpdateAccess(request("owner", {...access, forPlan: true}));
@@ -42,7 +45,7 @@ test("removing an independent share preserves a still-active plan grant", async 
   const f = prepared();
   await f.api.mediaUpdateAccess(request("owner", {...access, forPlan: true}));
   await f.api.mediaUpdateAccess(request("owner", {...access, grantIndependentRecipients: ["friend"]}));
-  await f.api.mediaUpdateAccess(request("owner", {wrappedKeys: {owner: "owner-key"}, revokeIndependentRecipients: ["friend"]}));
+  await f.api.mediaUpdateAccess(request("owner", {wrappedKeys: {owner: "owner-key"}, accountWrappedKeys: wrappers("owner"), revokeIndependentRecipients: ["friend"]}));
   assert.equal(f.records.get("files/file").wrapped_keys.friend, "friend-key");
   assert.deepEqual(f.records.get(grant).independentReaders, []);
   await f.api.mediaDownloadTicket(request("friend", {}));
@@ -50,8 +53,8 @@ test("removing an independent share preserves a still-active plan grant", async 
 test("plan grants cannot authorize unshared readers or change independent grants", async () => {
   const f = prepared();
   await assert.rejects(f.api.mediaUpdateAccess(request("owner", {...access, forPlan: true, grantIndependentRecipients: ["friend"]})), {code: "invalid-argument"});
-  await assert.rejects(f.api.mediaUpdateAccess(request("owner", {wrappedKeys: {owner: "key", stranger: "key"}, forPlan: true})), {code: "permission-denied"});
-  await assert.rejects(f.api.mediaUpdateAccess(request("other", {wrappedKeys: {other: "key"}})), {code: "permission-denied"});
+  await assert.rejects(f.api.mediaUpdateAccess(request("owner", {wrappedKeys: {owner: "key", stranger: "key"}, accountWrappedKeys: wrappers("owner", "stranger"), forPlan: true})), {code: "permission-denied"});
+  await assert.rejects(f.api.mediaUpdateAccess(request("other", {wrappedKeys: {other: "key"}, accountWrappedKeys: wrappers("other")})), {code: "permission-denied"});
   await assert.rejects(f.api.mediaDownloadTicket({data: {mediaId: "file"}}), {code: "unauthenticated"});
   await assert.rejects(f.api.mediaDownloadTicket(request("stranger", {})), {code: "permission-denied"});
 });
@@ -79,9 +82,8 @@ test("owner deletion removes the object and recovery record and is safe to retry
   await f.api.mediaDelete(request("owner", {}));
   assert.equal(f.calls.length, 1);
 });
-
 const jobId = "11111111-1111-4111-8111-111111111111";
-const upload = (size = 100) => ({jobId, ciphertextSize: size, ciphertextSha256: "a".repeat(64), encryptedMetadata: "encrypted-metadata", allowedUsers: ["owner"], wrappedKeys: {owner: "owner-key"}, encryptionVersion: 1});
+const upload = (size = 100) => ({jobId, ciphertextSize: size, ciphertextSha256: "a".repeat(64), encryptedMetadata: "encrypted-metadata", allowedUsers: ["owner"], wrappedKeys: {owner: "owner-key"}, accountWrappedKeys: wrappers("owner"), encryptionVersion: 1});
 test("single uploads resume idempotently, sign only the assigned object and publish after size verification", async () => {
   const f = prepared(async command => command.constructor.name === "HeadObjectCommand" ? {ContentLength: 100} : {});
   const session = await f.api.mediaCreateUpload(request("owner", upload()));
@@ -166,21 +168,4 @@ test("legacy chat media validates the owner storage path before granting access"
   f.records.get("files/file").storage_path = "users/owner/media/file";
   await f.api.mediaShareInChat(request("owner", share));
   assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend"]);
-});
-
-test("only the owner can upgrade recovery and revoked recipients cannot retrieve recovered file keys", async () => {
-  const f = prepared();
-  const {randomBytes, createCipheriv} = require("node:crypto");
-  const key = randomBytes(32), iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", key, iv);
-  const body = Buffer.concat([cipher.update("private metadata"), cipher.final()]);
-  f.records.get("files/file").encrypted_metadata = Buffer.concat([iv, body, cipher.getAuthTag()]).toString("base64");
-  await assert.rejects(f.api.mediaStoreAccountAccessKey(request("friend", {recoveryKeyToSeal: key.toString("base64")})), {code: "permission-denied"});
-  await f.api.mediaStoreAccountAccessKey(request("owner", {recoveryKeyToSeal: key.toString("base64")}));
-  assert.equal(f.records.get("files/file").account_recovery_ready, true);
-  assert.equal((await f.api.mediaAccountAccessKey(request("owner", {}))).accountAccessKey, key.toString("base64"));
-  await assert.rejects(f.api.mediaAccountAccessKey(request("friend", {})), {code: "permission-denied"});
-  await f.api.mediaUpdateAccess(request("owner", access));
-  assert.equal((await f.api.mediaAccountAccessKey(request("friend", {}))).accountAccessKey, key.toString("base64"));
-  await f.api.mediaUpdateAccess(request("owner", {wrappedKeys: {owner: "owner-key"}}));
-  await assert.rejects(f.api.mediaAccountAccessKey(request("friend", {})), {code: "permission-denied"});
 });
