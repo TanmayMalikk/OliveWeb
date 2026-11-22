@@ -740,39 +740,22 @@ internal fun InteractiveLocationMap(
 
 private class LocationSelectionBridge(private val onChange: (Double, Double) -> Unit) {
     private val mainHandler = Handler(Looper.getMainLooper())
-
     @JavascriptInterface
     fun selected(latitude: Double, longitude: Double) {
-        if (latitude in -90.0..90.0 && longitude in -180.0..180.0) {
-            mainHandler.post { onChange(latitude, longitude) }
-        }
+        if (latitude in -90.0..90.0 && longitude in -180.0..180.0) mainHandler.post { onChange(latitude, longitude) }
     }
 }
 
 private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
-
     @JavascriptInterface
-    fun selected(id: String) {
-        if (id.length in 1..512) handler.post { onSelected(id) }
-    }
+    fun selected(id: String) { if (id.length in 1..512) handler.post { onSelected(id) } }
 }
 
-private class MapCameraBridge(
-    private val onGesture: () -> Unit,
-    private val onBearing: (Float) -> Unit,
-) {
+private class MapCameraBridge(private val onGesture: () -> Unit, private val onBearing: (Float) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
-
-    @JavascriptInterface
-    fun onUserGesture() {
-        handler.post(onGesture)
-    }
-
-    @JavascriptInterface
-    fun onBearingChanged(bearing: Double) {
-        if (bearing.isFinite()) handler.post { onBearing(bearing.toFloat()) }
-    }
+    @JavascriptInterface fun onUserGesture() { handler.post(onGesture) }
+    @JavascriptInterface fun onBearingChanged(bearing: Double) { if (bearing.isFinite()) handler.post { onBearing(bearing.toFloat()) } }
 }
 
 private enum class MapLoadState { Loading, Ready, Error }
@@ -782,51 +765,17 @@ private const val MAP_READY_TITLE = "olive-map-ready"
 @Composable
 private fun CompassNeedleIcon(bearingDegrees: Float, contentDescription: String) {
     Box(
-        modifier = Modifier
-            .size(26.dp)
-            .semantics { this.contentDescription = contentDescription },
+        modifier = Modifier.size(26.dp).semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = -bearingDegrees },
-        ) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val dialRadius = size.minDimension * 0.44f
-            val needleLength = size.minDimension * 0.36f
-            val halfWidth = size.minDimension * 0.14f
-            drawCircle(
-                color = OliveGreen.copy(alpha = 0.28f),
-                radius = dialRadius,
-                center = Offset(cx, cy),
-                style = Stroke(width = 1.5.dp.toPx()),
-            )
-            val northPath = Path().apply {
-                moveTo(cx, cy - needleLength)
-                lineTo(cx + halfWidth, cy)
-                lineTo(cx - halfWidth, cy)
-                close()
-            }
-            drawPath(path = northPath, color = ComposeColor(0xFFD32F2F))
-            val southPath = Path().apply {
-                moveTo(cx, cy + needleLength)
-                lineTo(cx + halfWidth, cy)
-                lineTo(cx - halfWidth, cy)
-                close()
-            }
-            drawPath(path = southPath, color = Muted.copy(alpha = 0.72f))
-            drawCircle(
-                color = ComposeColor.White,
-                radius = 2.dp.toPx(),
-                center = Offset(cx, cy),
-            )
-            drawCircle(
-                color = OliveGreen,
-                radius = 1.dp.toPx(),
-                center = Offset(cx, cy),
-            )
+        Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = -bearingDegrees }) {
+            val cx = size.width / 2f; val cy = size.height / 2f
+            val dialRadius = size.minDimension * 0.44f; val needleLength = size.minDimension * 0.36f; val halfWidth = size.minDimension * 0.14f
+            drawCircle(OliveGreen.copy(alpha = 0.28f), dialRadius, Offset(cx, cy), style = Stroke(width = 1.5.dp.toPx()))
+            drawPath(Path().apply { moveTo(cx, cy - needleLength); lineTo(cx + halfWidth, cy); lineTo(cx - halfWidth, cy); close() }, ComposeColor(0xFFD32F2F))
+            drawPath(Path().apply { moveTo(cx, cy + needleLength); lineTo(cx + halfWidth, cy); lineTo(cx - halfWidth, cy); close() }, Muted.copy(alpha = 0.72f))
+            drawCircle(ComposeColor.White, 2.dp.toPx(), Offset(cx, cy))
+            drawCircle(OliveGreen, 1.dp.toPx(), Offset(cx, cy))
         }
     }
 }
