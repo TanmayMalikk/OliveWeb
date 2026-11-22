@@ -37,7 +37,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import com.olive.app.ui.users.user.documents.sendCoverEmergency
+import android.media.AudioAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.widget.Toast
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.location.DeviceLocation
+import com.olive.app.location.AdminLocationService
+import com.olive.app.ui.users.shared.navigation.SessionScreen
+import com.olive.app.ui.users.user.documents.EmergencyReportLocation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -398,4 +411,79 @@ internal fun GameCover(
             }
         }
     }
+}
+
+/**
+ * Send an explicitly requested report without unlocking or exposing the Safe App on the cover.
+ */
+internal fun SessionViewModel.sendCoverEmergency() {
+    val uid = coverAccountId ?: return
+    if (accountRole != AccountRole.USER || screen != SessionScreen.Cover || busy || coverEmergencyInFlight) return
+    coverEmergencyInFlight = true
+    val token = runtime.epoch
+    /**
+     * Finishes the target.
+     *
+     * @param result Result payload delivered to the callback.
+     */
+    fun finish(result: Result<Unit>) {
+        coverEmergencyInFlight = false
+        if (coverAccountId == uid && runtime.epoch == token && result.isFailure) {
+            Toast.makeText(runtime.application, R.string.emergency_report_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+    runtime.scope.launch {
+        try {
+            val (savedProfile, entries) = withContext(Dispatchers.IO) {
+                runtime.store.profile(uid) to runtime.store.privateEntries(uid)
+            }
+            if (coverAccountId != uid || runtime.epoch != token) {
+                coverEmergencyInFlight = false
+                return@launch
+            }
+            if (!localMode) runCatching { AdminLocationService.start(runtime.application, uid, savedProfile.fullName) }
+            documents.createEmergencyReport(AccountIdentity(uid, savedProfile.username), savedProfile, entries,
+                location = {
+                    DeviceLocation.currentCoordinates(runtime.application)?.let {
+                        EmergencyReportLocation(it.latitude, it.longitude, it.accuracy, it.timestamp)
+                    }
+                },
+                onAlertSent = {
+                    if (coverAccountId == uid && runtime.epoch == token) {
+                        val confirmation = uid to android.os.SystemClock.elapsedRealtime()
+                        coverEmergencyConfirmation = confirmation
+                        runtime.scope.launch {
+                            kotlinx.coroutines.delay(3_500)
+                            if (coverEmergencyConfirmation == confirmation) coverEmergencyConfirmation = null
+                        }
+                    }
+                },
+                onFinished = ::finish,
+            )
+        } catch (cancelled: CancellationException) {
+            coverEmergencyInFlight = false
+            throw cancelled
+        } catch (failure: Exception) {
+            finish(Result.failure(failure))
+        }
+    }
+}
+
+/**
+ * Amplitude is a hardware request; devices without amplitude control use their default strength.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @return `true` if perform emergency vibration, or `false` otherwise.
+ */
+@Suppress("DEPRECATION")
+internal fun performEmergencyVibration(context: Context): Boolean {
+    val vibrator = if (Build.VERSION.SDK_INT >= 31)
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    else context.getSystemService(Vibrator::class.java)
+    if (vibrator == null || !vibrator.hasVibrator()) return false
+    val amplitude = if (vibrator.hasAmplitudeControl()) 179 else VibrationEffect.DEFAULT_AMPLITUDE
+    val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+    vibrator.vibrate(VibrationEffect.createOneShot(120, amplitude), attributes)
+    return true
 }

@@ -2,15 +2,32 @@ package com.olive.app.ui.covers.fitness
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
+import android.util.Log
 import androidx.core.content.edit
 import androidx.work.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.data.network.nonNegativeFloat
 import com.olive.app.data.network.sha256Hex
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.time.LocalDate
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -429,4 +446,601 @@ internal class FitnessFoodLibrary(private val preferences: SharedPreferences) {
      * @return The resulting key.
      */
     private fun key(id: String) = SAVED_FOOD_PREFIX + fitnessAccountKey(id)
+}
+
+internal data class CoachTurn(val role: String, val text: String)
+internal data class CoachReply(val text: String, val goals: Map<String, Int>)
+internal data class CoachMembership(
+    val active: Boolean,
+    val canManage: Boolean,
+    val currentPeriodEndMs: Long? = null,
+)
+internal data class CoachPayment(val publishableKey: String, val clientSecret: String)
+
+private const val COACH_MEMBERSHIP_ACTIVE_KEY = "coach_membership_active"
+private const val COACH_MEMBERSHIP_MANAGE_KEY = "coach_membership_can_manage"
+private const val COACH_MEMBERSHIP_PERIOD_END_KEY = "coach_membership_period_end_ms"
+
+/**
+ * Returns cached active Coach membership until its current period end or renewal timestamp.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ * @return The cached active [CoachMembership], or `null` if uncached or expired.
+ */
+internal fun cachedActiveCoachMembership(
+    preferences: SharedPreferences,
+    nowMillis: Long = System.currentTimeMillis(),
+): CoachMembership? {
+    if (!preferences.getBoolean(COACH_MEMBERSHIP_ACTIVE_KEY, false)) return null
+    val periodEndMs = preferences.getLong(COACH_MEMBERSHIP_PERIOD_END_KEY, 0L)
+    if (periodEndMs <= nowMillis) return null
+    return CoachMembership(
+        active = true,
+        canManage = preferences.getBoolean(COACH_MEMBERSHIP_MANAGE_KEY, false),
+        currentPeriodEndMs = periodEndMs,
+    )
+}
+
+/**
+ * Stores active Coach membership and expiration timestamp, or clears cache if inactive or expired.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ * @param membership Latest membership returned by billing status.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ */
+internal fun saveCoachMembershipCache(
+    preferences: SharedPreferences,
+    membership: CoachMembership,
+    nowMillis: Long = System.currentTimeMillis(),
+) {
+    val periodEndMs = membership.currentPeriodEndMs
+    if (membership.active && periodEndMs != null && periodEndMs > nowMillis) {
+        preferences.edit {
+            putBoolean(COACH_MEMBERSHIP_ACTIVE_KEY, true)
+            putBoolean(COACH_MEMBERSHIP_MANAGE_KEY, membership.canManage)
+            putLong(COACH_MEMBERSHIP_PERIOD_END_KEY, periodEndMs)
+        }
+    } else {
+        clearCoachMembershipCache(preferences)
+    }
+}
+
+/**
+ * Clears any locally cached AI Coach subscription state from SharedPreferences.
+ *
+ * @param preferences Account-scoped fitness SharedPreferences instance.
+ */
+internal fun clearCoachMembershipCache(preferences: SharedPreferences) {
+    preferences.edit {
+        remove(COACH_MEMBERSHIP_ACTIVE_KEY)
+        remove(COACH_MEMBERSHIP_MANAGE_KEY)
+        remove(COACH_MEMBERSHIP_PERIOD_END_KEY)
+    }
+}
+
+/**
+ * Returns true when a cached active subscription is still within its billing period and does not need rechecking.
+ *
+ * @param membership Cached or in-memory membership snapshot.
+ * @param forceRefresh True when returning from billing management or an explicit user refresh.
+ * @param nowMillis Current wall-clock time in milliseconds since epoch.
+ * @return `true` if remote status lookup can be skipped until period end, `false` otherwise.
+ */
+internal fun shouldSkipCoachStatusCheck(
+    membership: CoachMembership?,
+    forceRefresh: Boolean,
+    nowMillis: Long = System.currentTimeMillis(),
+): Boolean {
+    val periodEndMs = membership?.currentPeriodEndMs ?: return false
+    return !forceRefresh && membership.active && nowMillis < periodEndMs
+}
+
+internal const val FITNESS_COACH_HISTORY_DAYS = 14
+
+internal data class FitnessCoachDay(
+    val date: LocalDate,
+    val steps: Int?,
+    val nutrition: NutritionTotals?,
+    val foodNames: List<String>,
+)
+
+internal interface FitnessCoachService {
+    /**
+     * Returns the membership.
+     *
+     * @return The resulting [CoachMembership] instance.
+     */
+    suspend fun membership(): CoachMembership
+    /**
+     * Returns the billing portal.
+     *
+     * @return The resulting [Uri] for billing portal.
+     */
+    suspend fun billingPortal(): Uri
+    /**
+     * Returns the payment sheet.
+     *
+     * @return The resulting [CoachPayment] for payment sheet.
+     */
+    suspend fun paymentSheet(): CoachPayment
+    /**
+     * Sends the fitness coach service.
+     *
+     * @param text Text string to display, parse, or send.
+     * @param turns Collection of turns values to process.
+     * @param profile Account profile details.
+     * @param history Collection of history values to process.
+     * @return The resulting [CoachReply] instance.
+     */
+    suspend fun send(
+        text: String,
+        turns: List<CoachTurn>,
+        profile: FitnessProfile,
+        history: List<FitnessCoachDay>,
+    ): CoachReply
+}
+
+// No access to the Safe App session or to any account profile repository.
+internal class FitnessCoachClient(
+    private val uid: String,
+    private val functions: () -> FirebaseFunctions,
+) : FitnessCoachService {
+    constructor(uid: String) : this(uid, { FirebaseFunctions.getInstance("northamerica-northeast1") })
+
+    /**
+     * Invokes the fitness coach client.
+     *
+     * @param name Field, key, or display name.
+     * @param input Input stream, matrix, or value to process.
+     * @return Map containing the resulting call entries.
+     */
+    private suspend fun call(name: String, input: Map<String, Any>): Map<*, *> {
+        check(FirebaseAuth.getInstance().currentUser?.uid == uid)
+        val result = functions()
+            .getHttpsCallable(name).call(input).await().data
+        check(FirebaseAuth.getInstance().currentUser?.uid == uid)
+        return result as? Map<*, *> ?: error("Invalid coach response")
+    }
+
+    /**
+     * Returns the membership.
+     *
+     * @return The resulting [CoachMembership] instance.
+     */
+    override suspend fun membership(): CoachMembership {
+        val data = call("fitnessAiBilling", mapOf("action" to "status"))
+        val periodEndMs = (data["currentPeriodEndMs"] as? Number)?.toLong()?.takeIf { it > 0L }
+        return CoachMembership(data["active"] == true, data["canManage"] == true, periodEndMs)
+    }
+
+    /**
+     * Returns the billing portal.
+     *
+     * @return The resulting [Uri] for billing portal.
+     */
+    override suspend fun billingPortal(): Uri {
+        val data = call("fitnessAiBilling", mapOf("action" to "portal"))
+        val uri = Uri.parse(data["url"] as? String ?: error("Missing billing URL"))
+        check(uri.scheme == "https" && uri.host == "billing.stripe.com" && uri.userInfo == null)
+        return uri
+    }
+
+    /**
+     * Returns the payment sheet.
+     *
+     * @return The resulting [CoachPayment] for payment sheet.
+     */
+    override suspend fun paymentSheet(): CoachPayment {
+        val data = call("fitnessAiBilling", mapOf("action" to "paymentSheet"))
+        val key = data["publishableKey"] as? String ?: error("Missing publishable key")
+        val secret = data["clientSecret"] as? String ?: error("Missing payment intent")
+        check(key.startsWith("pk_") && secret.startsWith("pi_") && "_secret_" in secret)
+        return CoachPayment(key, secret)
+    }
+
+    /**
+     * Sends the fitness coach client.
+     *
+     * @param text Text string to display, parse, or send.
+     * @param turns Collection of turns values to process.
+     * @param profile Account profile details.
+     * @param history Collection of history values to process.
+     * @return The resulting [CoachReply] instance.
+     */
+    override suspend fun send(
+        text: String,
+        turns: List<CoachTurn>,
+        profile: FitnessProfile,
+        history: List<FitnessCoachDay>,
+    ): CoachReply {
+        val data = call("fitnessAiCoach", mapOf(
+            "message" to text,
+            "conversation" to turns.takeLast(5).map { mapOf("role" to it.role, "text" to it.text) },
+            "goals" to coachGoals(profile),
+            "history" to history.takeLast(FITNESS_COACH_HISTORY_DAYS).map { day ->
+                buildMap {
+                    put("date", day.date.toString())
+                    day.steps?.let { put("steps", it) }
+                    day.nutrition?.let {
+                        put("calories", it.calories)
+                        put("protein", it.proteinGrams)
+                        put("carbohydrates", it.carbohydrateGrams)
+                        put("fat", it.fatGrams)
+                    }
+                    if (day.foodNames.isNotEmpty()) put("foodNames", day.foodNames)
+                }
+            },
+        ))
+        val goals = (data["goals"] as? Map<*, *>)?.entries.orEmpty().mapNotNull { (key, value) ->
+            val name = key as? String ?: return@mapNotNull null
+            val number = (value as? Number)?.toInt() ?: return@mapNotNull null
+            if (name in coachGoals(profile)) name to number else null
+        }.toMap()
+        return CoachReply(data["reply"] as? String ?: error("Missing coaching reply"), goals)
+    }
+}
+
+/**
+ * Computes coach goals.
+ *
+ * @param profile Account profile details.
+ * @return The resulting coach goals.
+ */
+internal fun coachGoals(profile: FitnessProfile) = mapOf(
+    "steps" to profile.stepGoal, "calories" to profile.calorieGoal, "protein" to profile.proteinGoal,
+    "carbohydrates" to profile.carbohydrateGoal, "fat" to profile.fatGoal, "waterMl" to profile.waterGoalMl,
+)
+
+/**
+ * Computes with coach goals for this fitness profile.
+ *
+ * @param goals Key-value mapping of goals entries.
+ */
+internal fun FitnessProfile.withCoachGoals(goals: Map<String, Int>) = copy(
+    stepGoal = goals["steps"]?.takeIf { it in 500..100_000 } ?: stepGoal,
+    calorieGoal = goals["calories"]?.takeIf { it in 500..10_000 } ?: calorieGoal,
+    proteinGoal = goals["protein"]?.takeIf { it in 10..1_000 } ?: proteinGoal,
+    carbohydrateGoal = goals["carbohydrates"]?.takeIf { it in 10..2_000 } ?: carbohydrateGoal,
+    fatGoal = goals["fat"]?.takeIf { it in 10..1_000 } ?: fatGoal,
+    waterGoalMl = goals["waterMl"]?.takeIf { it in 250..10_000 } ?: waterGoalMl,
+)
+
+/**
+ * Computes automatic coach goals.
+ *
+ * @param before Before supplied to [automaticCoachGoals].
+ * @param current Current supplied to [automaticCoachGoals].
+ * @param proposed Key-value mapping of proposed entries.
+ * @param lastUpdate Last update supplied to [automaticCoachGoals].
+ * @param today Today supplied to [automaticCoachGoals].
+ * @return Map containing the resulting automatic coach goals entries.
+ */
+internal fun automaticCoachGoals(
+    before: FitnessProfile,
+    current: FitnessProfile,
+    proposed: Map<String, Int>,
+    lastUpdate: String,
+    today: LocalDate,
+): Map<String, Int> {
+    val original = coachGoals(before)
+    val currentGoals = coachGoals(current)
+    val validated = coachGoals(current.withCoachGoals(proposed))
+    return currentGoals.mapNotNull { (name, value) ->
+        val target = validated.getValue(name)
+        val allowed = name == "steps" ||
+            (lastUpdate != today.toString() && abs(target - value) <= max(1, value / 10))
+        if (original[name] == value && target != value && allowed) {
+            name to target
+        } else null
+    }.toMap()
+}
+
+internal interface FoodNutritionDataSource {
+    /**
+     * Searches the food nutrition data source.
+     *
+     * @param query Search query string entered by the user.
+     * @param page Page supplied to [search].
+     * @return The resulting [FoodSearchResult] instance.
+     */
+    suspend fun search(query: String, page: Int): FoodSearchResult
+    /**
+     * Computes suggestions.
+     *
+     * @param query Search query string entered by the user.
+     * @return List of resulting suggestions items.
+     */
+    suspend fun suggestions(query: String): List<String>
+    /**
+     * Looks up barcode.
+     *
+     * @param barcode Barcode supplied to [lookupBarcode].
+     * @return The resulting [FoodSearchResult] for lookup barcode.
+     */
+    suspend fun lookupBarcode(barcode: String): FoodSearchResult
+    /**
+     * Computes food by ID.
+     *
+     * @param id ID supplied to [foodById].
+     * @return The resulting [NutritionFood], or `null` if unavailable.
+     */
+    suspend fun foodById(id: String): NutritionFood? = null
+}
+
+internal class FoodNutritionRepository(
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build(),
+    private val signedIn: () -> Boolean = { runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null }.getOrDefault(false) },
+    functions: () -> FirebaseFunctions = {
+        FirebaseFunctions.getInstance("northamerica-northeast1")
+    },
+) : FoodNutritionDataSource {
+    // Manual entry and scanning can open before Firebase is available.
+    private val remoteFunctions by lazy(functions)
+    /**
+     * Both sources are independent. A failure in one source does not hide results from the other.
+     *
+     * @param query Search query string entered by the user.
+     * @return The resulting [FoodSearchResult] instance.
+     */
+    suspend fun search(query: String): FoodSearchResult = search(query, 0)
+
+    /**
+     * Searches the target.
+     *
+     * @param query Search query string entered by the user.
+     * @param page Page supplied to [search].
+     * @return The resulting [FoodSearchResult] instance.
+     */
+    override suspend fun search(query: String, page: Int): FoodSearchResult = search(query, page, "")
+
+    /**
+     * Searches the target.
+     *
+     * @param query Search query string entered by the user.
+     * @param page Page supplied to [search].
+     * @param foodType Food type supplied to [search].
+     * @return The resulting [FoodSearchResult] instance.
+     */
+    suspend fun search(query: String, page: Int = 0, foodType: String): FoodSearchResult = coroutineScope {
+        val cleanQuery = query.trim().take(80)
+        if (cleanQuery.length < 2) return@coroutineScope FoodSearchResult()
+
+        val searches = listOf(
+            async { providerResult { searchFatSecret(cleanQuery, page, foodType) } },
+            async { providerResult {
+                if (foodType.isBlank()) searchOpenFoodFacts(cleanQuery, page) else FoodSearchResult()
+            } },
+        ).awaitAll()
+        searches.forEachIndexed { index, search ->
+            search.exceptionOrNull()?.let { error ->
+                val provider = if (index == 0) "FatSecret" else "Open Food Facts"
+                Log.w("FitnessFoodSearch", "$provider search failed", error)
+            }
+        }
+        val foods = searches.flatMap { it.getOrDefault(FoodSearchResult()).foods }
+            .distinctBy { food ->
+                food.barcode.takeIf(String::isNotBlank)
+                    ?: "${food.name.lowercase()}|${food.brand.lowercase()}"
+            }
+            .take(40)
+        FoodSearchResult(
+            foods = foods,
+            providerFailures = searches.count { it.isFailure } * if (foodType.isBlank()) 1 else 2,
+            hasMore = searches.any { it.getOrNull()?.hasMore == true },
+            needsSignIn = !signedIn() && searches.any {
+                (it.exceptionOrNull() as? com.google.firebase.functions.FirebaseFunctionsException)?.code ==
+                    com.google.firebase.functions.FirebaseFunctionsException.Code.UNAUTHENTICATED
+            },
+            needsIpApproval = searches.any {
+                (it.exceptionOrNull() as? com.google.firebase.functions.FirebaseFunctionsException)?.code ==
+                    com.google.firebase.functions.FirebaseFunctionsException.Code.FAILED_PRECONDITION
+            },
+        )
+    }
+
+    /**
+     * Computes suggestions.
+     *
+     * @param query Search query string entered by the user.
+     * @return List of resulting suggestions items.
+     */
+    override suspend fun suggestions(query: String): List<String> {
+        val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")
+            .call(mapOf("query" to query.trim().take(80), "action" to "suggest")).await()
+            .data as? Map<*, *> ?: return emptyList()
+        return (response["suggestions"] as? List<*>).orEmpty().filterIsInstance<String>().take(4)
+    }
+
+    /**
+     * Looks up barcode.
+     *
+     * @param barcode Barcode supplied to [lookupBarcode].
+     * @return The resulting [FoodSearchResult] for lookup barcode.
+     */
+    override suspend fun lookupBarcode(barcode: String): FoodSearchResult = try {
+        fatSecret(mapOf("barcode" to barcode.trim()))
+    } catch (error: kotlinx.coroutines.CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        FoodSearchResult(providerFailures = 2, needsIpApproval =
+            (error as? com.google.firebase.functions.FirebaseFunctionsException)?.code ==
+                com.google.firebase.functions.FirebaseFunctionsException.Code.FAILED_PRECONDITION)
+    }
+
+    /**
+     * Searches fat secret.
+     *
+     * @param query Search query string entered by the user.
+     * @param page Page supplied to [searchFatSecret].
+     * @param foodType Food type supplied to [searchFatSecret].
+     * @return The resulting search fat secret.
+     */
+    private suspend fun searchFatSecret(query: String, page: Int, foodType: String) =
+        fatSecret(mapOf("query" to query, "page" to page, "foodType" to foodType))
+
+    /**
+     * Computes food by ID.
+     *
+     * @param id ID supplied to [foodById].
+     * @return The resulting [NutritionFood], or `null` if unavailable.
+     */
+    override suspend fun foodById(id: String): NutritionFood? {
+        val foodId = id.removePrefix("fatsecret:").substringBefore(':')
+        val food = fatSecret(mapOf("action" to "detail", "foodId" to foodId)).foods.firstOrNull() ?: return null
+        if (food.id == id) return food
+        return food.servingOptions.firstOrNull { it.id == id }?.copy(servingOptions = food.servingOptions)
+    }
+
+    /**
+     * Computes fat secret.
+     *
+     * @param parameters WorkManager parameters supplied for this worker execution.
+     * @return The resulting [FoodSearchResult] for fat secret.
+     */
+    private suspend fun fatSecret(parameters: Map<String, Any>): FoodSearchResult {
+        val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")
+            .call(parameters).await().data as? Map<*, *> ?: error("Missing food response")
+        return FoodSearchResult(
+            foods = (response["foods"] as? List<*>).orEmpty().mapNotNull { raw ->
+                parseFatSecretFood(raw as? Map<*, *> ?: return@mapNotNull null)
+            },
+            hasMore = response["hasMore"] == true,
+        )
+    }
+
+    /**
+     * Searches Open Food Facts when packaged-food results are needed.
+     *
+     * @param query Search query string entered by the user.
+     * @param page Page supplied to [searchOpenFoodFacts].
+     * @return The resulting [FoodSearchResult] for search open food facts.
+     */
+    private suspend fun searchOpenFoodFacts(query: String, page: Int): FoodSearchResult =
+        withContext(Dispatchers.IO) {
+            val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
+            val url = "https://world.openfoodfacts.org/cgi/search.pl" +
+                    "?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=20" +
+                    "&page=${page + 1}&fields=code,product_name,brands,nutriments"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "OliveBranchSchoolProject/1.0 (yourolivebranch.ca)")
+                .build()
+            client.newCall(request).execute().use { response ->
+                check(response.isSuccessful) { "Open Food Facts returned ${response.code}" }
+                val body = response.body.string()
+                val payload = JSONObject(body)
+                val products = payload.optJSONArray("products") ?: return@use FoodSearchResult()
+                val foods = buildList {
+                    for (index in 0 until products.length()) {
+                        parseOpenFoodFactsProduct(products.optJSONObject(index))?.let(::add)
+                    }
+                }
+                FoodSearchResult(foods = foods, hasMore = (page + 1) * 20 < payload.optInt("count"))
+            }
+        }
+}
+
+internal data class FoodSearchResult(
+    val foods: List<NutritionFood> = emptyList(),
+    val providerFailures: Int = 0,
+    val hasMore: Boolean = false,
+    val needsIpApproval: Boolean = false,
+    val needsSignIn: Boolean = false,
+)
+
+/**
+ * Converts a FatSecret result into the shared nutrition model.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The resulting [NutritionFood], or `null` if unavailable.
+ */
+internal fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
+    val name = value["name"]?.toString()?.trim().orEmpty()
+    if (name.isBlank()) return null
+    return NutritionFood(
+        id = "fatsecret:${value["id"]}",
+        name = name,
+        brand = value["brand"]?.toString().orEmpty(),
+        servingDescription = value["servingDescription"]?.toString()
+            ?.takeIf(String::isNotBlank) ?: "1 serving",
+        calories = value.nonNegativeFloat("calories"),
+        proteinGrams = value.nonNegativeFloat("proteinGrams"),
+        carbohydrateGrams = value.nonNegativeFloat("carbohydrateGrams"),
+        fatGrams = value.nonNegativeFloat("fatGrams"),
+        source = FoodDataSource.FATSECRET,
+        barcode = value["barcode"]?.toString().orEmpty(),
+        saturatedFatGrams = value.nonNegativeFloat("saturatedFatGrams"),
+        transFatGrams = value.nonNegativeFloat("transFatGrams"),
+        fiberGrams = value.nonNegativeFloat("fiberGrams"),
+        sugarGrams = value.nonNegativeFloat("sugarGrams"),
+        sodiumMilligrams = value.nonNegativeFloat("sodiumMilligrams"),
+        cholesterolMilligrams = value.nonNegativeFloat("cholesterolMilligrams"),
+        potassiumMilligrams = value.nonNegativeFloat("potassiumMilligrams"),
+        servingOptions = (value["servings"] as? List<*>).orEmpty().mapNotNull { raw ->
+            val serving = raw as? Map<*, *> ?: return@mapNotNull null
+            parseFatSecretFood(value.filterKeys { it != "servings" } + serving +
+                mapOf("id" to "${value["id"]}:${serving["servingId"]}"))
+        },
+    )
+}
+
+/**
+ * Fitness cover: Converts open food facts product.
+ *
+ * @param product Optional product supplied to [parseOpenFoodFactsProduct].
+ * @return The resulting [NutritionFood], or `null` if unavailable.
+ */
+private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
+    product ?: return null
+    val name = product.optString("product_name").trim()
+    if (name.isBlank()) return null
+    val nutrients = product.optJSONObject("nutriments") ?: JSONObject()
+    if (!nutrients.hasCoreNutrition()) return null
+    return NutritionFood(
+        id = "openfoodfacts:${product.optString("code", name)}",
+        name = name,
+        brand = product.optString("brands").substringBefore(',').trim(),
+        // OFF nutrients below are per 100 g, never per the product's arbitrary serving size.
+        servingDescription = "100 g",
+        calories = nutrients.nonNegativeFloat("energy-kcal_100g"),
+        proteinGrams = nutrients.nonNegativeFloat("proteins_100g"),
+        carbohydrateGrams = nutrients.nonNegativeFloat("carbohydrates_100g"),
+        fatGrams = nutrients.nonNegativeFloat("fat_100g"),
+        source = FoodDataSource.OPEN_FOOD_FACTS,
+        barcode = product.optString("code"),
+        saturatedFatGrams = nutrients.nonNegativeFloat("saturated-fat_100g"),
+        transFatGrams = nutrients.nonNegativeFloat("trans-fat_100g"),
+        fiberGrams = nutrients.nonNegativeFloat("fiber_100g"),
+        sugarGrams = nutrients.nonNegativeFloat("sugars_100g"),
+        sodiumMilligrams = nutrients.nonNegativeFloat("sodium_100g") * 1_000f,
+        cholesterolMilligrams = nutrients.nonNegativeFloat("cholesterol_100g") * 1_000f,
+        potassiumMilligrams = nutrients.nonNegativeFloat("potassium_100g") * 1_000f,
+    )
+}
+
+/**
+ * Keeps only foods that include calories and the three main macros.
+ *
+ * @return `true` if has core nutrition, or `false` otherwise.
+ */
+private fun JSONObject.hasCoreNutrition() =
+    has("energy-kcal_100g") && has("proteins_100g") &&
+            has("carbohydrates_100g") && has("fat_100g")
+
+/**
+ * Cancellation belongs to the screen lifecycle, not to provider fallback.
+ *
+ * @param block Callback or suspending lambda executed within this scope.
+ * @return Outcome [Result] wrapping the provider result result or failure.
+ */
+private suspend fun <T> providerResult(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (error: kotlinx.coroutines.CancellationException) {
+    throw error
+} catch (error: Exception) {
+    Result.failure(error)
 }

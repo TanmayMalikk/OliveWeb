@@ -1,7 +1,19 @@
 // Safe-app users: parses free-use GPS coordinates and fetches fast address autocomplete suggestions.
 package com.olive.app.data.location
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
+import android.location.Location
+import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
+import android.view.Surface
+import androidx.annotation.RequiresPermission
+import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.olive.app.BuildConfig
 import com.olive.app.data.safety.HotlineDirectory
 import com.olive.app.data.safety.HotlineResource
@@ -12,13 +24,16 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.resume
+import kotlin.math.atan2
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -334,5 +349,204 @@ internal object DestinationAutocompleteClient {
 
     internal fun clearCache() {
         synchronized(cacheLock) { cache.clear() }
+    }
+}
+
+/**
+ * Normalizes any heading angle in degrees into `[0f, 360f)`.
+ */
+internal fun normalizeHeadingDegrees(degrees: Float): Float {
+    if (!degrees.isFinite()) return 0f
+    val mod = degrees % 360f
+    return if (mod < 0f) mod + 360f else if (mod >= 360f) mod - 360f else mod
+}
+
+/**
+ * Returns the shortest signed angular difference from [fromDegrees] to [toDegrees] in `(-180f, 180f]`.
+ */
+internal fun shortestAngleDelta(fromDegrees: Float, toDegrees: Float): Float {
+    val diff = (normalizeHeadingDegrees(toDegrees) - normalizeHeadingDegrees(fromDegrees)) % 360f
+    return when {
+        diff > 180f -> diff - 360f
+        diff <= -180f -> diff + 360f
+        else -> diff
+    }
+}
+
+/**
+ * Applies circular exponential smoothing across the 0°/360° boundary.
+ */
+internal fun smoothHeading(current: Float?, target: Float, alpha: Float = 0.22f): Float {
+    val normalizedTarget = normalizeHeadingDegrees(target)
+    if (current == null || !current.isFinite()) return normalizedTarget
+    val clampedAlpha = alpha.coerceIn(0f, 1f)
+    val delta = shortestAngleDelta(current, normalizedTarget)
+    return normalizeHeadingDegrees(current + clampedAlpha * delta)
+}
+
+/**
+ * Prefers GPS movement bearing once moving at walking speed (>= 0.8 m/s), falling back to compass azimuth.
+ */
+internal fun selectPreferredHeading(
+    gpsBearing: Float?,
+    gpsSpeedMetersPerSecond: Float?,
+    compassAzimuth: Float?,
+): Float? {
+    val movingWithBearing = gpsBearing != null && gpsBearing.isFinite() &&
+        gpsSpeedMetersPerSecond != null && gpsSpeedMetersPerSecond.isFinite() &&
+        gpsSpeedMetersPerSecond >= 0.8f
+    return when {
+        movingWithBearing -> normalizeHeadingDegrees(gpsBearing)
+        compassAzimuth != null && compassAzimuth.isFinite() -> normalizeHeadingDegrees(compassAzimuth)
+        gpsBearing != null && gpsBearing.isFinite() -> normalizeHeadingDegrees(gpsBearing)
+        else -> null
+    }
+}
+
+/**
+ * Adjusts magnetic azimuth for the current Android display rotation.
+ */
+internal fun adjustAzimuthForDisplayRotation(azimuthDegrees: Float, surfaceRotation: Int): Float {
+    val offset = when (surfaceRotation) {
+        Surface.ROTATION_90 -> 90f
+        Surface.ROTATION_180 -> 180f
+        Surface.ROTATION_270 -> 270f
+        else -> 0f
+    }
+    return normalizeHeadingDegrees(azimuthDegrees + offset)
+}
+
+/**
+ * Computes a tilt-invariant compass azimuth from a screen-remapped 3x3 rotation matrix
+ * (east = col/row world X, north = world Y). Smoothly blends device +Y (when held flat)
+ * and back-of-phone -Z (when held upright while walking) to eliminate gimbal lock at 45°–90° tilt.
+ */
+internal fun computeTiltInvariantAzimuthDegrees(rotationMatrix: FloatArray): Float? {
+    if (rotationMatrix.size < 9) return null
+    val flatWeight = rotationMatrix[8].coerceAtLeast(0f)
+    val uprightWeight = rotationMatrix[7]
+    var east = rotationMatrix[1] * flatWeight - rotationMatrix[2] * uprightWeight
+    var north = rotationMatrix[4] * flatWeight - rotationMatrix[5] * uprightWeight
+    if (east * east + north * north < 1e-4f) {
+        east = rotationMatrix[1]
+        north = rotationMatrix[4]
+    }
+    if (!east.isFinite() || !north.isFinite() || (east == 0f && north == 0f)) return null
+    val degrees = Math.toDegrees(atan2(east.toDouble(), north.toDouble())).toFloat()
+    return normalizeHeadingDegrees(degrees)
+}
+
+/**
+ * Converts magnetic compass heading to true north heading using magnetic declination.
+ */
+internal fun applyMagneticDeclination(magneticHeadingDegrees: Float, declinationDegrees: Float): Float {
+    val normalized = normalizeHeadingDegrees(magneticHeadingDegrees)
+    if (!declinationDegrees.isFinite()) return normalized
+    return normalizeHeadingDegrees(normalized + declinationDegrees)
+}
+
+// Grab a one-off coarse location for cover content; nothing from here is saved to the account.
+object CoverLocation {
+    /**
+     * Joins available address parts into the city label shown by the cover.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param fallback Fallback supplied to [city].
+     * @return The resulting city string.
+     */
+    suspend fun city(context: Context, fallback: String): String {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return fallback
+        val manager = context.getSystemService(LocationManager::class.java)
+        val cached = newestCachedLocation(manager)
+        val location = cached ?: withTimeoutOrNull(6.seconds) { current(context, manager) }
+        if (location == null) return fallback
+        return reverseGeocode(context, location) ?: fallback
+    }
+
+    /**
+     * Keeps the newest cached GPS point returned by Android.
+     *
+     * @param manager Manager supplied to [newestCachedLocation].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
+    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
+    private fun newestCachedLocation(manager: LocationManager): Location? =
+        manager.getProviders(true)
+            .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull(Location::getTime)
+
+    /**
+     * Requests the best available current device location.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param manager Manager supplied to [current].
+     * @return The resulting [Location], or `null` if unavailable.
+     */
+    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
+    private suspend fun current(context: Context, manager: LocationManager): Location? =
+        suspendCancellableCoroutine { continuation ->
+            val provider = when {
+                manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+                manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                else -> null
+            }
+            if (provider == null) continuation.resume(null)
+            else runCatching {
+                LocationManagerCompat.getCurrentLocation(
+                    manager, provider, null as CancellationSignal?,
+                    ContextCompat.getMainExecutor(context)
+                ) { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+            }.onFailure { if (continuation.isActive) continuation.resume(null) }
+        }
+
+    /**
+     * Gives location sharing the reverse geocode it needs.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param location Location supplied to [reverseGeocode].
+     * @return The resulting reverse geocode string, or `null` when unavailable.
+     */
+    private suspend fun reverseGeocode(context: Context, location: Location): String? {
+        if (Build.VERSION.SDK_INT < 33 || !Geocoder.isPresent()) return null
+        val address = withTimeoutOrNull(6.seconds) {
+            suspendCancellableCoroutine<Address?> { continuation ->
+                Geocoder(context, Locale.getDefault()).getFromLocation(
+                    location.latitude, location.longitude, 1,
+                    // Converts the cover's coordinates into the first local address returned by Android.
+                    object : Geocoder.GeocodeListener {
+                        /**
+                         * Runs the geocode callback when location sharing finishes that step.
+                         *
+                         * @param addresses Collection of addresses values to process.
+                         */
+                        override fun onGeocode(addresses: MutableList<Address>) {
+                            if (continuation.isActive) continuation.resume(addresses.firstOrNull())
+                        }
+
+                        /**
+                         * Returns a readable location error when the device request fails.
+                         *
+                         * @param errorMessage Optional error message supplied to [onError].
+                         */
+                        override fun onError(errorMessage: String?) {
+                            if (continuation.isActive) continuation.resume(null)
+                        }
+                    })
+            }
+        } ?: return null
+        return withContext(Dispatchers.Default) {
+            listOfNotNull(address.locality, address.adminArea, address.countryName)
+                .filter(String::isNotBlank).joinToString(", ").takeUnless(String::isBlank)
+        }
     }
 }

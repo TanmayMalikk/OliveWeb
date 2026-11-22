@@ -48,7 +48,6 @@ import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
 import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.KeyManager
-import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
@@ -300,7 +299,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    10L,
                     TimeUnit.SECONDS,
                 ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP

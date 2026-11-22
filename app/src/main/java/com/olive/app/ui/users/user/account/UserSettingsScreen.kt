@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.security.IdlePolicy
+import com.olive.app.security.ScreenCapturePreferences
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.UserProfile
@@ -611,6 +613,27 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
             Spacer(Modifier.width(8.dp))
             Text(label)
         }
+    }
+}
+
+/**
+ * Composes the screen capture setting UI element.
+ *
+ * @param uid Firebase UID of the target user account, or null when not provided.
+ */
+@Composable
+internal fun ScreenCaptureSetting(uid: String?) {
+    val context = LocalContext.current
+    val label = stringResource(R.string.privacy_block_captures)
+    var enabled by remember(uid) { mutableStateOf(ScreenCapturePreferences.enabled(context, uid)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.privacy_block_captures_help), style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = enabled, enabled = !uid.isNullOrBlank(), onCheckedChange = { value ->
+            uid?.let { ScreenCapturePreferences.setEnabled(context, it, value); enabled = value }
+        }, modifier = Modifier.testTag("block_screen_captures").semantics { contentDescription = label })
     }
 }
 

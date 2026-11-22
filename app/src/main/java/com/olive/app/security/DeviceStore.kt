@@ -1,7 +1,11 @@
 // All signed-in roles: stores device state.
 package com.olive.app.security
 
+import android.content.Context
+import android.content.SharedPreferences
+import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.news.NewsArticle
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -960,4 +964,79 @@ data class DeviceSession(val enrollment: DeviceEnrollment, val profile: UserProf
 sealed interface PinResult {
     data object Accepted : PinResult
     data class Rejected(val failures: Int) : PinResult
+}
+
+// Device-local choices are isolated by account; never inherit another account's setting.
+internal object ScreenCapturePreferences {
+    /**
+     * Stores the screen capture preferences.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [SharedPreferences] instance.
+     */
+    fun store(context: Context): SharedPreferences =
+        context.getSharedPreferences("olive_capture_privacy", Context.MODE_PRIVATE)
+
+    /**
+     * Computes enabled.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account, or null when not provided.
+     * @return `true` if enabled, or `false` otherwise.
+     */
+    fun enabled(context: Context, uid: String?): Boolean =
+        if (uid.isNullOrBlank()) context.resources.getBoolean(R.bool.screen_capture_protection_enabled)
+        else store(context).getBoolean("blocked_$uid", context.resources.getBoolean(R.bool.screen_capture_protection_enabled))
+
+    /**
+     * Sets enabled.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @param enabled Whether this feature or control is currently enabled.
+     */
+    fun setEnabled(context: Context, uid: String, enabled: Boolean) {
+        require(uid.isNotBlank())
+        store(context).edit().putBoolean("blocked_$uid", enabled).apply()
+    }
+}
+
+// Persists account-isolated state for the cover applications.
+class CoverStateStore(private val vault: EncryptedVault) {
+    /**
+     * Restores the saved news feed for the given account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting restore items.
+     */
+    fun restore(uid: String): List<NewsArticle> = news(uid)
+
+    /**
+     * Reads cached news articles from the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting news items.
+     */
+    fun news(uid: String): List<NewsArticle> {
+        val item = vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
+        val rows = item.optJSONArray("news") ?: JSONArray()
+        return (0 until rows.length()).mapNotNull { index ->
+            runCatching { NewsArticle.fromJson(rows.getJSONObject(index)) }.getOrNull()
+        }
+    }
+
+    /**
+     * Saves cached news articles into the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param articles Collection of articles values to process.
+     */
+    fun saveNews(uid: String, articles: List<NewsArticle>) {
+        vault.update { root ->
+            root.child("accounts").child(uid).put(
+                "news",
+                JSONArray().also { rows -> articles.forEach { rows.put(it.toJson()) } },
+            )
+        }
+    }
 }

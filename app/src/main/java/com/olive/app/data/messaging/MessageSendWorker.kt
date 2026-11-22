@@ -25,7 +25,6 @@ import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentRepository
 import com.olive.app.data.safety.callJsonObject
-import com.olive.app.data.work.DurableWorkPolicy
 import com.olive.app.security.EncryptionUtils
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
@@ -191,7 +190,7 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 )
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    10L,
                     TimeUnit.SECONDS,
                 )
                 .addTag(ownerTag(message.ownerUid))
