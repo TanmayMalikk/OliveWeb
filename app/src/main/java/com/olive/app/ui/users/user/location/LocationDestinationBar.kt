@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,6 +88,7 @@ internal fun FreeUseGpsDestinationCard(
     var searchingRemote by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<DestinationSuggestion>>(emptyList()) }
     var resolveError by remember { mutableStateOf<String?>(null) }
+    val latestOwnPoint by rememberUpdatedState(state.ownPoint)
 
     val coordFormat = stringResource(R.string.location_gps_coordinates_label, "%1\$s")
     val coordSubtitle = stringResource(R.string.location_gps_coordinates_hint)
@@ -97,11 +99,16 @@ internal fun FreeUseGpsDestinationCard(
         suggestions = emptyList()
         resolveError = null
         controller.stopNavigation()
-        controller.selectPrivateDestination(title, lat, lon)
-        controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed)
+        if (latestOwnPoint != null) {
+            controller.selectPrivateDestination(title, lat, lon)
+            controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed)
+        } else {
+            controller.queuePrivateDestination(title, lat, lon, autoStart = true)
+            controller.selectPrivateDestination(title, lat, lon)
+        }
     }
 
-    LaunchedEffect(query, directoryPlaces, state.ownPoint) {
+    LaunchedEffect(query, directoryPlaces) {
         if (suppressNextAutocomplete) {
             suppressNextAutocomplete = false
             searchingRemote = false
@@ -128,10 +135,11 @@ internal fun FreeUseGpsDestinationCard(
         delay(50.milliseconds)
         searchingRemote = true
         try {
+            val proximity = latestOwnPoint
             val remote = DestinationAutocompleteClient.suggest(
                 query = trimmed,
-                proximityLatitude = state.ownPoint?.latitude,
-                proximityLongitude = state.ownPoint?.longitude,
+                proximityLatitude = proximity?.latitude,
+                proximityLongitude = proximity?.longitude,
             )
             val seen = local.map { "${it.latitude},${it.longitude}" }.toMutableSet()
             val merged = local + remote.filter { seen.add("${it.latitude},${it.longitude}") }
@@ -147,8 +155,8 @@ internal fun FreeUseGpsDestinationCard(
 
     fun submitFreeText() {
         val currentQuery = query.trim()
-        val origin = state.ownPoint
-        if (currentQuery.isEmpty() || origin == null) return
+        if (currentQuery.isEmpty()) return
+        val origin = latestOwnPoint
         resolveError = null
         suggestions.firstOrNull()?.let { first ->
             val targetTitle = if (first.kind == DestinationSuggestionKind.Coordinates) currentQuery else first.title
@@ -162,8 +170,8 @@ internal fun FreeUseGpsDestinationCard(
                     context = context,
                     query = currentQuery,
                     directoryPlaces = directoryPlaces,
-                    proximityLatitude = origin.latitude,
-                    proximityLongitude = origin.longitude,
+                    proximityLatitude = origin?.latitude,
+                    proximityLongitude = origin?.longitude,
                 )
                 if (resolved != null) {
                     query = resolved.title
@@ -310,7 +318,7 @@ internal fun FreeUseGpsDestinationCard(
             if (query.isNotBlank() && !state.navigating) {
                 Button(
                     onClick = { submitFreeText() },
-                    enabled = state.ownPoint != null && !state.routeWorking,
+                    enabled = !state.routeWorking,
                     modifier = Modifier.fillMaxWidth().testTag("map_gps_start_route"),
                 ) {
                     Icon(Icons.Outlined.Navigation, null)

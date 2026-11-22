@@ -94,6 +94,7 @@ internal fun FullScreenLocationMap(
     showSavedOnly: Boolean = false,
     savedCount: Int = 0,
     onToggleSavedOnly: (() -> Unit)? = null,
+    onUserGesture: (() -> Unit)? = null,
 ) {
     val direction = ownPoint?.let { route?.nextDirection(it.latitude, it.longitude) }
     val progress = ownPoint?.let { route?.progress(it.latitude, it.longitude) }
@@ -117,7 +118,8 @@ internal fun FullScreenLocationMap(
             headingUp = headingUp,
             headingDegrees = headingDegrees,
             onToggleHeadingUp = onToggleHeadingUp,
-            fitSupportServices = onLoadMoreSupport == null && ownPoint == null,
+            fitSupportServices = (onLoadMoreSupport == null && ownPoint == null) || (showSavedOnly && savedCount > 0),
+            onUserGesture = onUserGesture,
         )
         IconButton(
             onClick = onExitFullScreen,

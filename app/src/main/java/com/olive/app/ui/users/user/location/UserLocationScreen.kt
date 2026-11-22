@@ -173,7 +173,9 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     }
 
     val liveHeading = rememberDeviceHeading(
-        enabled = headingUp,
+        enabled = true,
+        latitude = origin?.latitude,
+        longitude = origin?.longitude,
         gpsBearing = state.ownBearing,
         gpsSpeedMetersPerSecond = state.ownSpeedMps,
     )
@@ -279,6 +281,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
             showSavedOnly = showSavedOnly,
             savedCount = savedMappedCount,
             onToggleSavedOnly = if (profile.role == AccountRole.USER) ({ showSavedOnly = !showSavedOnly }) else null,
+            onUserGesture = { if (headingUp) headingUp = false },
         )
         return
     }
@@ -312,9 +315,19 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
         if (profile.role == AccountRole.USER && requestBackgroundPermission != null) BackgroundLocationButton(
             requestBackgroundPermission, explainBackground, { explainBackground = false },
         )
+        if (profile.role == AccountRole.USER) {
+            FreeUseGpsDestinationCard(
+                controller = controller,
+                state = state,
+                directoryPlaces = directoryPlaces,
+                routeNotConfigured = routeNotConfigured,
+                routeUnavailable = routeUnavailable,
+                routeFailed = routeFailed,
+            )
+        }
         Surface(
             Modifier.fillMaxWidth().then(
-                if (profile.role == AccountRole.USER) Modifier.height(300.dp)
+                if (profile.role == AccountRole.USER) Modifier.height(360.dp)
                 else Modifier.weight(1f).heightIn(min = 280.dp)
             ),
             shape = RoundedCornerShape(20.dp),
@@ -334,7 +347,8 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                     headingUp = headingUp,
                     headingDegrees = liveHeading,
                     onToggleHeadingUp = { headingUp = !headingUp },
-                    fitSupportServices = origin == null && showSavedOnly,
+                    fitSupportServices = showSavedOnly && savedMappedCount > 0,
+                    onUserGesture = { if (headingUp) headingUp = false },
                 )
                 IconButton(
                     onClick = { fullScreenMap = true },
@@ -356,14 +370,6 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                 onToggleSavedOnly = { showSavedOnly = !showSavedOnly },
                 onToggleHeadingUp = { headingUp = !headingUp },
                 onOpenDirectoryList = { showDirectoryList = true },
-            )
-            FreeUseGpsDestinationCard(
-                controller = controller,
-                state = state,
-                directoryPlaces = directoryPlaces,
-                routeNotConfigured = routeNotConfigured,
-                routeUnavailable = routeUnavailable,
-                routeFailed = routeFailed,
             )
             PrivateRouteControls(controller, state)
             if (state.navigating) OutlinedButton(onClick = { fullScreenMap = true }) {

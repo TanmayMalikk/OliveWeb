@@ -2,6 +2,7 @@
 package com.olive.app.data.location
 
 import android.view.Surface
+import kotlin.math.atan2
 
 /**
  * Normalizes any heading angle in degrees into `[0f, 360f)`.
@@ -65,4 +66,33 @@ internal fun adjustAzimuthForDisplayRotation(azimuthDegrees: Float, surfaceRotat
         else -> 0f
     }
     return normalizeHeadingDegrees(azimuthDegrees + offset)
+}
+
+/**
+ * Computes a tilt-invariant compass azimuth from a screen-remapped 3x3 rotation matrix
+ * (east = col/row world X, north = world Y). Smoothly blends device +Y (when held flat)
+ * and back-of-phone -Z (when held upright while walking) to eliminate gimbal lock at 45°–90° tilt.
+ */
+internal fun computeTiltInvariantAzimuthDegrees(rotationMatrix: FloatArray): Float? {
+    if (rotationMatrix.size < 9) return null
+    val flatWeight = rotationMatrix[8].coerceAtLeast(0f)
+    val uprightWeight = rotationMatrix[7]
+    var east = rotationMatrix[1] * flatWeight - rotationMatrix[2] * uprightWeight
+    var north = rotationMatrix[4] * flatWeight - rotationMatrix[5] * uprightWeight
+    if (east * east + north * north < 1e-4f) {
+        east = rotationMatrix[1]
+        north = rotationMatrix[4]
+    }
+    if (!east.isFinite() || !north.isFinite() || (east == 0f && north == 0f)) return null
+    val degrees = Math.toDegrees(atan2(east.toDouble(), north.toDouble())).toFloat()
+    return normalizeHeadingDegrees(degrees)
+}
+
+/**
+ * Converts magnetic compass heading to true north heading using magnetic declination.
+ */
+internal fun applyMagneticDeclination(magneticHeadingDegrees: Float, declinationDegrees: Float): Float {
+    val normalized = normalizeHeadingDegrees(magneticHeadingDegrees)
+    if (!declinationDegrees.isFinite()) return normalized
+    return normalizeHeadingDegrees(normalized + declinationDegrees)
 }

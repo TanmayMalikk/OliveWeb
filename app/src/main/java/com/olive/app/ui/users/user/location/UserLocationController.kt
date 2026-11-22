@@ -10,7 +10,9 @@ import androidx.compose.runtime.setValue
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
+import com.olive.app.data.location.DeviceCoordinates
 import com.olive.app.data.location.DeviceLocation
+import com.olive.app.data.location.DeviceLocationUpdates
 import com.olive.app.data.location.AddressCoordinateResolver
 import com.olive.app.data.location.AndroidAddressCoordinateResolver
 import com.olive.app.data.location.LocationRoute
@@ -87,6 +89,7 @@ internal class LocationMapController(
 ) {
     private val applicationContext = context.applicationContext
     private var locationJob: Job? = null
+    private var liveLocationUpdates: DeviceLocationUpdates? = null
     private var navigationJob: Job? = null
     private var expiryJob: Job? = null
     private var subscription: ChatSubscription? = null
@@ -161,48 +164,30 @@ internal class LocationMapController(
         locationJob = scope.launch {
             try {
                 if (requestPermission()) {
-                    // User location controller: Keeps open active while is active.
-                    while (isActive) {
-                        DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
-                            // Apply the map result only if it belongs to the newest open request.
-                            if (token == generation) {
-                                val previous = state.ownPoint
-                                val trail = previous?.trail.orEmpty()
-                                    .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
-                                    .toMutableList()
-                                val moved = previous == null || FloatArray(1).also { result ->
-                                    Location.distanceBetween(
-                                        previous.latitude,
-                                        previous.longitude,
-                                        fix.latitude,
-                                        fix.longitude,
-                                        result
-                                    )
-                                }[0] >= MIN_TRAIL_DISTANCE_METERS
-                                if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp)
-                                    trail += LocationTrailPoint(
-                                        fix.latitude,
-                                        fix.longitude,
-                                        fix.timestamp
-                                    )
-                                state = state.copy(
-                                    ownPoint = MapLocationPoint(
-                                        uid,
-                                        configuration.youLabel,
-                                        fix.latitude,
-                                        fix.longitude,
-                                        fix.timestamp,
-                                        true,
-                                        fix.accuracy,
-                                        trail = trail.takeLast(MAX_TRAIL_POINTS)
-                                    ),
-                                    ownBearing = fix.bearing,
-                                    ownSpeedMps = fix.speedMetersPerSecond,
-                                )
-                            }
+                    DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+                        applyLocationFix(token, uid, configuration.youLabel, fix)
+                    }
+                    if (token == generation && state.locating) state = state.copy(locating = false)
+                    val updates = runCatching {
+                        DeviceLocation.startUpdates(
+                            applicationContext,
+                            intervalMillis = 1_500L,
+                            minimumDistanceMeters = 1f,
+                        ) { fix ->
+                            applyLocationFix(token, uid, configuration.youLabel, fix)
                         }
-                        if (token == generation && state.locating) state = state.copy(locating = false)
-                        delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
+                    }.getOrNull()
+                    if (updates != null) {
+                        liveLocationUpdates = updates
+                        awaitCancellation()
+                    } else {
+                        while (isActive) {
+                            delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
+                            DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
+                                applyLocationFix(token, uid, configuration.youLabel, fix)
+                            }
+                            if (token == generation && state.locating) state = state.copy(locating = false)
+                        }
                     }
                 } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
                     val coordinates = addressResolver.coordinates(configuration.profile.address)
@@ -234,11 +219,41 @@ internal class LocationMapController(
         watchExpiry()
     }
 
+    private fun applyLocationFix(token: Int, uid: String, youLabel: String, fix: DeviceCoordinates) {
+        if (token != generation) return
+        val previous = state.ownPoint
+        val trail = previous?.trail.orEmpty()
+            .filter { it.updatedAt >= System.currentTimeMillis() - TRAIL_WINDOW_MILLIS }
+            .toMutableList()
+        val moved = previous == null || FloatArray(1).also { result ->
+            Location.distanceBetween(previous.latitude, previous.longitude, fix.latitude, fix.longitude, result)
+        }[0] >= MIN_TRAIL_DISTANCE_METERS
+        if (moved && trail.lastOrNull()?.updatedAt != fix.timestamp) {
+            trail += LocationTrailPoint(fix.latitude, fix.longitude, fix.timestamp)
+        }
+        state = state.copy(
+            ownPoint = MapLocationPoint(
+                uid,
+                youLabel,
+                fix.latitude,
+                fix.longitude,
+                fix.timestamp,
+                true,
+                fix.accuracy,
+                trail = trail.takeLast(MAX_TRAIL_POINTS),
+            ),
+            ownBearing = fix.bearing ?: state.ownBearing,
+            ownSpeedMps = fix.speedMetersPerSecond ?: state.ownSpeedMps,
+        )
+    }
+
     /**
      * User location controller: Stops map.
      */
     fun closeMap() {
         generation++
+        runCatching { liveLocationUpdates?.stop() }
+        liveLocationUpdates = null
         locationJob?.cancel()
         locationJob = null
         navigationJob?.cancel()
