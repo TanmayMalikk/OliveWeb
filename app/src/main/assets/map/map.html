@@ -13,7 +13,7 @@
     .mapboxgl-ctrl-attrib a{color:#314b28;text-decoration:underline}
     .mapboxgl-popup-content{background:#fff;color:#253322;border:1px solid #5d6952;font-size:14px;
       padding:8px 12px;border-radius:10px}
-    .olive-live-marker{position:relative;display:grid;place-items:center;background:transparent;border:0;cursor:pointer}
+    .olive-live-marker{position:absolute;top:0;left:0;margin:0;padding:0;display:grid;place-items:center;background:transparent;border:0;cursor:pointer}
     .olive-live-dot,.olive-last-known-dot,.olive-own-live-dot,.olive-contact-dot{position:relative;z-index:2;
       box-sizing:border-box}
     .olive-live-dot{border-radius:50%;background:#c52b25;
@@ -32,7 +32,7 @@
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(197,43,37,.12)}}
     @keyframes oliveBluePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(14,66,111,.45)}
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(26,115,232,.18)}}
-    .olive-service-marker{display:grid;place-items:center;width:28px;height:28px;background:transparent;
+    .olive-service-marker{position:absolute;top:0;left:0;margin:0;padding:0;display:grid;place-items:center;width:28px;height:28px;background:transparent;
       border:0;cursor:pointer}
     .olive-service-dot{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#258142;
       box-shadow:0 0 0 2px #175c2c;animation:oliveServiceBreath 3.6s ease-in-out infinite}

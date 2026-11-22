@@ -655,7 +655,7 @@ function startMap() {
       window.OliveMapCamera?.onBearingChanged(b);
     }
   });
-  mbMap.on('zoom', function () {
+  mbMap.on('zoomend', function () {
     Object.values(markers).forEach(marker => {
       if (marker._olivePoint && marker._el?.firstChild) {
         styleDotElement(marker._el.firstChild, marker._olivePoint);
