@@ -53,11 +53,17 @@ function requiredCredentialId(value) {
 }
 
 function credentialSummary(value) {
-  return {
+  const createdAtEpochMillis = value?.createdAt?.toMillis?.();
+  const summary = {
     credentialId: requiredCredentialId(value?.credentialId),
     deviceType: value?.deviceType === "multiDevice" ? "multiDevice" : "singleDevice",
     backedUp: value?.backedUp === true,
   };
+  // Creation time is non-secret owner-only metadata; legacy records can safely omit it.
+  if (Number.isSafeInteger(createdAtEpochMillis) && createdAtEpochMillis > 0) {
+    summary.createdAtEpochMillis = createdAtEpochMillis;
+  }
+  return summary;
 }
 
 function rejectPrfResult(response) {

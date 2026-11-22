@@ -73,6 +73,8 @@ import com.olive.app.ui.shared.BirthdayPicker
 import com.olive.app.ui.shared.rememberBirthdayInput
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.math.roundToInt
+import java.text.DateFormat
+import java.util.Date
 
 
 // Saves profile and situation edits from the user settings screen.
@@ -355,15 +357,26 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     recoveryCredentials.isEmpty() ->
                                         Text(stringResource(R.string.passkey_recovery_none))
                                     else -> recoveryCredentials.forEachIndexed { index, credential ->
+                                        val typeLabel = stringResource(
+                                            if (credential.backedUp) R.string.passkey_recovery_synced_factor
+                                            else R.string.passkey_recovery_device_factor,
+                                        )
+                                        val label = credential.createdAtEpochMillis?.let { createdAt ->
+                                            stringResource(
+                                                R.string.passkey_recovery_factor_created_at,
+                                                typeLabel,
+                                                DateFormat.getDateTimeInstance(
+                                                    DateFormat.MEDIUM,
+                                                    DateFormat.SHORT,
+                                                ).format(Date(createdAt)),
+                                            )
+                                        } ?: typeLabel
                                         Row(
                                             Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(
-                                                stringResource(
-                                                    if (credential.backedUp) R.string.passkey_recovery_synced_factor
-                                                    else R.string.passkey_recovery_device_factor,
-                                                ),
+                                                label,
                                                 modifier = Modifier.weight(1f),
                                             )
                                             OutlinedButton(

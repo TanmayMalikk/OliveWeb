@@ -125,6 +125,7 @@ class PasskeyRecoveryRepositoryTest {
                 "credentialId" to "credential_abcdefghijklmnop",
                 "deviceType" to "multiDevice",
                 "backedUp" to true,
+                "createdAtEpochMillis" to 1_795_000_000_000L,
             ))),
             mapOf("removed" to true, "credentialId" to "credential_abcdefghijklmnop"),
         ))
@@ -136,6 +137,7 @@ class PasskeyRecoveryRepositoryTest {
             """{"id":"credential_abcdefghijklmnop","clientExtensionResults":{"prf":{"enabled":true}}}""",
         ).envelope)
         assertEquals(true, repository.listCredentials().single().backedUp)
+        assertEquals(1_795_000_000_000L, repository.listCredentials().single().createdAtEpochMillis)
         repository.removeCredential("credential_abcdefghijklmnop")
     }
 

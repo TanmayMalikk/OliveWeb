@@ -106,6 +106,7 @@ internal class PasskeyRecoveryRepository(
         val credentialId: String,
         val deviceType: String,
         val backedUp: Boolean,
+        val createdAtEpochMillis: Long?,
     )
 
     suspend fun beginEnrollment(): RegistrationStart {
@@ -165,6 +166,7 @@ internal class PasskeyRecoveryRepository(
                     else -> error("Invalid passkey recovery credential")
                 },
                 value["backedUp"] as? Boolean ?: error("Invalid passkey recovery credential"),
+                (value["createdAtEpochMillis"] as? Number)?.toLong()?.takeIf { it > 0 },
             )
         }
     }

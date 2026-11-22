@@ -125,6 +125,7 @@ test("passkey recovery rejects uploaded PRF outputs but permits non-secret suppo
 });
 
 test("passkey recovery exposes only bounded public factor metadata", () => {
+  const createdAt = {toMillis: () => 1_795_000_000_000};
   assert.deepEqual(recovery.credentialSummary({
     credentialId: "credential_abcdefghijklmnop",
     deviceType: "multiDevice",
@@ -132,10 +133,12 @@ test("passkey recovery exposes only bounded public factor metadata", () => {
     publicKey: Buffer.alloc(77, 4),
     envelope: {ciphertext: "secret"},
     prfInput: b64(32),
+    createdAt,
   }), {
     credentialId: "credential_abcdefghijklmnop",
     deviceType: "multiDevice",
     backedUp: true,
+    createdAtEpochMillis: 1_795_000_000_000,
   });
 });
 

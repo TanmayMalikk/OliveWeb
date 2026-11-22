@@ -492,6 +492,7 @@
     <string name="passkey_recovery_none">No hay llaves de recuperación registradas.</string>
     <string name="passkey_recovery_synced_factor">Llave de recuperación sincronizada</string>
     <string name="passkey_recovery_device_factor">Llave de recuperación del dispositivo</string>
+    <string name="passkey_recovery_factor_created_at">%1$s — Agregada el %2$s</string>
     <string name="passkey_recovery_list_unavailable">No se pudieron comprobar las llaves de recuperación. Conéctate a Internet y vuelve a abrir la configuración.</string>
     <string name="passkey_recovery_remove_confirm_title">¿Eliminar esta llave de recuperación?</string>
     <string name="passkey_recovery_remove_confirm_help">Esta llave ya no podrá restaurar tu clave de cifrado. Las demás llaves de recuperación registradas no cambiarán.</string>
