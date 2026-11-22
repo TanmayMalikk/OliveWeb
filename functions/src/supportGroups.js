@@ -293,8 +293,9 @@ async function validateTicketRemoval(transaction, reference, conversation, calle
     throw new HttpsError("not-found", "This person is not in the ticket.");
   }
   const history = await transaction.get(reference.collection("membershipEvents").where("participantUid", "==", participantUid));
+  const eventTime = event => event.get("createdAt")?.toMillis?.() ?? 0;
   const latest = history.docs.reduce((previous, event) =>
-    !previous || event.get("createdAt").toMillis() > previous.get("createdAt").toMillis() ? event : previous, null);
+    !previous || eventTime(event) > eventTime(previous) ? event : previous, null);
   if (latest?.get("action") !== "ADDED" || latest.get("actorUid") !== caller.uid) {
     throw new HttpsError("permission-denied", "You can only remove friends you added to this ticket.");
   }

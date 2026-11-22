@@ -57,7 +57,10 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         enrollment = null
         state.profile = null
         state.accountRole = AccountRole.USER
+        secureSharing.stopSharedEntriesObservation()
         state.privateEntries = emptyList()
+        state.sharedPrivateEntries = emptyList()
+        state.sharedEntryRecipients = emptyMap()
         state.viewedSharedEntry = null
         state.passkeyRecoveryCredentials = null
         state.screen = SessionScreen.Cover

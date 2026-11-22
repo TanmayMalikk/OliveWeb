@@ -524,4 +524,10 @@
     <string name="news_category_world">العالم</string>
     <string name="news_swipe_bookmark">حفظ</string>
     <string name="news_swipe_share">مشاركة</string>
+    <string name="notes_shared_with_you">تمت مشاركتها معك</string>
+    <string name="notes_shared_by">تمت المشاركة بواسطة %1$s</string>
+    <string name="notes_share_title">مشاركة الملاحظة الخاصة</string>
+    <string name="notes_share_help">يمكن فقط للأصدقاء المقبولين المحددين فتح هذه الملاحظة أو الحادثة. ألغِ تحديد أي شخص لإلغاء وصوله فوراً.</string>
+    <string name="notes_manage_sharing">إدارة مشاركة الملاحظة</string>
+    <string name="safety_sharing_saved">تم حفظ صلاحيات المشاركة.</string>
 </resources>

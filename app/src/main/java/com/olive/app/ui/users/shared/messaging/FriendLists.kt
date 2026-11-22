@@ -434,6 +434,7 @@ internal fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
     onOpen: (SafetyDocument, File) -> Unit,
     sender: String? = null,
+    onLightSurface: Boolean = false,
 ) {
     val opening = id in session.documents.state.openingDocumentIds
     val document = session.documents.state.files.firstOrNull { it.id == id }
@@ -450,7 +451,13 @@ internal fun SharedMediaMessage(
                 id,
             ) { document, local -> onOpen(document, local) }
         }, enabled = !opening, shape = MaterialTheme.shapes.medium,
-        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+        color = when {
+            onLightSurface -> Color.White
+            mine -> Color.White.copy(alpha = .2f)
+            else -> Color.Black.copy(alpha = .05f)
+        },
+        contentColor = if (onLightSurface) Ink else LocalContentColor.current,
+        border = if (onLightSurface) androidx.compose.foundation.BorderStroke(1.dp, ChatBorder) else null,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
             .semantics { if (senderDescription != null) stateDescription = senderDescription }
     ) {

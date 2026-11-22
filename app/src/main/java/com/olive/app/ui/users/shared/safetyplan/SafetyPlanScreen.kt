@@ -530,9 +530,11 @@ internal fun SafetyPlanScreen(
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
-    LaunchedEffect(session.coverAccountId) { controller.observeAccess() }
     var selected by rememberSaveable { mutableStateOf<SharedSafetyPlan?>(null) }
-    LaunchedEffect(Unit) { controller.refreshSharedPlans() }
+    LaunchedEffect(session.coverAccountId) {
+        controller.observeAccess()
+        controller.refreshSharedPlans()
+    }
     if (selected != null) SafetyPlanScreen(
         session,
         checkNotNull(selected).ownerUid,
@@ -669,12 +671,20 @@ private fun SafetyContactSharingControls(session: SessionViewModel, plan: Safety
                 }
             }
         }
+        val controller = session.safetyPlans
+        val uiState by controller.uiState.collectAsState()
+        val inlineError = uiState.sharingError ?: controller.error?.let { stringResource(it) }
+        if (inlineError != null) {
+            AccessibleMessage(inlineError)
+        } else if (uiState.sharingSaved && selected == plan.safeContactUids.toSet()) {
+            Text(stringResource(R.string.safety_sharing_saved), style = MaterialTheme.typography.bodySmall, color = OliveGreen)
+        }
         Button(
-            onClick = { session.safetyPlans.shareWithContacts(session.messages.friends.filter { it.uid in selected }) },
-            enabled = !session.localMode && selected != plan.safeContactUids.toSet(),
+            onClick = { controller.shareWithContacts(session.messages.friends.filter { it.uid in selected }) },
+            enabled = !session.localMode && controller.saving == 0 && selected != plan.safeContactUids.toSet(),
             modifier = Modifier.fillMaxWidth().testTag("share_safety_plan")
         ) {
-            Text(stringResource(R.string.safety_save_sharing))
+            Text(stringResource(if (controller.saving > 0) R.string.safety_saving else R.string.safety_save_sharing))
         }
     }
 }

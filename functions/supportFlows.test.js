@@ -124,6 +124,20 @@ test("consultations reuse active ticket numbers and reserve new numbers after st
   assert.equal(next.ticketNumber, first.ticketNumber + 1);
   assert.notEqual(next.consultationConversationId, first.consultationConversationId);
 });
+test("consultation request assigns the available staff member with the lowest active consult tickets", async () => {
+  const f = prepared(), api = f.load("safetyConsultations");
+  f.users.set("staff2", {uid: "staff2", customClaims: {role: "STAFF"}});
+  for (const id of ["staff", "staff2"]) {
+    f.profiles.set(id, Object.assign(f.profiles.get(id) || {}, {username: `${id}_name`, role: "STAFF", fullName: id, email: `${id}@example.invalid`, dob: "1990-01-01"}));
+  }
+  f.records.set("safetyStaff/staff", {available: true, activeCount: 1});
+  f.records.set("safetyStaff/staff2", {available: true, activeCount: 4});
+  f.records.set("safetyPlans/existing-owner", {ownerUid: "existing-owner", staffUid: "staff", consultationRequested: true, consultationConversationId: "plan-consult-existing"});
+  f.records.set("conversations/plan-consult-existing", {type: "SUPPORT", supportOrigin: "PLAN_CONSULT", staffUid: "staff"});
+  f.records.set("safetyPlans/owner", {ownerUid: "owner", fields: {}, consultationRequested: false});
+  const assigned = (await api.safetyPlanConsult({data: {action: "request"}})).plan;
+  assert.equal(assigned.staffUid, "staff2");
+});
 test("support closing rejects personal and unrelated organization accounts", async () => {
   const f = prepared();
   const id = "support-owner-fixture";

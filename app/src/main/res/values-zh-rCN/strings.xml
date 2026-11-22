@@ -509,4 +509,10 @@
     <string name="news_category_world">国际</string>
     <string name="news_swipe_bookmark">收藏</string>
     <string name="news_swipe_share">分享</string>
+    <string name="notes_shared_with_you">与你共享</string>
+    <string name="notes_shared_by">由 %1$s 共享</string>
+    <string name="notes_share_title">共享私密记录</string>
+    <string name="notes_share_help">仅所选已接受好友可打开此笔记或事件记录。取消勾选即可立即撤销其访问权限。</string>
+    <string name="notes_manage_sharing">管理共享权限</string>
+    <string name="safety_sharing_saved">已保存共享访问权限。</string>
 </resources>

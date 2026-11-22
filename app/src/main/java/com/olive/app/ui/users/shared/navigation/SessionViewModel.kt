@@ -103,9 +103,17 @@ internal class SessionViewModel @JvmOverloads constructor(
     val privacyHistory get() = runtime.state.privacyHistory
     val triggerHistory get() = runtime.state.triggerHistory
     val privateEntries get() = runtime.state.privateEntries
+    val sharedPrivateEntries get() = runtime.state.sharedPrivateEntries
+    val sharedEntryRecipients get() = runtime.state.sharedEntryRecipients
     val loadingHistory get() = coverAccountId?.let { it == runtime.history.loadingUid } == true
     val historyLoadFailed get() = coverAccountId?.let { it == runtime.history.failedUid } == true
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
+    fun ensureSharedEntriesObservation() = runtime.secureSharing.observeSharedEntries()
+    fun sharePrivateEntryWithFriends(
+        entry: PrivateEntry,
+        friends: List<Friend>,
+        onComplete: () -> Unit = {},
+    ) = runtime.secureSharing.shareWithFriends(entry, friends, onComplete)
     internal val safetyPlans get() = runtime.safety
     internal val staffSupport get() = runtime.staffSupport
 

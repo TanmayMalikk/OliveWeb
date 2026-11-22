@@ -121,6 +121,15 @@ class SafetyDocumentGrantSdkTest {
             assertEquals("Encrypted document", recoveredDoc.name)
             assertTrue(recoveredDoc.accountWrappedKeys.containsKey("owner"))
             assertTrue(listed.any { it.id == "failed" && it.name == "Encrypted document" && it.accountWrappedKeys.isEmpty() })
+
+            // Recipients without an accountKeyDirectories record (e.g. SAFE_CONTACT / STAFF / ADMIN) can still receive chat and direct shares
+            f.db.records["messageDirectory/safe_fixture"] = mapOf("uid" to "safe_contact", "publicKey" to f.public)
+            f.db.records["messageDirectory/safe_fixture/devices/phone"] = mapOf("uid" to "safe_contact", "deviceId" to "phone", "publicKey" to f.public, "mgf1Digest" to "SHA-1")
+            clearInvocations(f.media)
+            f.repo.shareInChat(f.doc, outgoing, mapOf("safe_contact" to "safe_fixture"))
+            val safeChatSent = mockingDetails(f.media).invocations.single { it.method.name == "shareInChat" }
+            assertEquals(setOf("owner", "safe_contact"), (safeChatSent.arguments[3] as Map<*, *>).keys)
+            assertEquals(setOf("owner"), (safeChatSent.arguments[5] as Map<*, *>).keys)
         }
     }
 }

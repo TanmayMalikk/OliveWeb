@@ -102,7 +102,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                     if (epoch == observationEpoch && enrollment?.uid == uid &&
                                         activeConversation?.id == conversation.id &&
                                         activeConversation?.participantIds == conversation.participantIds
-                                    ) secureChatRepository?.shareWithRegisteredDevices(conversation, availableKey)
+                                    ) {
+                                        secureChatRepository?.shareWithRegisteredDevices(conversation, availableKey)
+                                        secureSharing.invalidateConversationSharedSync()
+                                        secureSharing.syncSharedItemsForConversation(conversation, state.chatMessages)
+                                    }
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled
                                 } catch (_: Exception) {
@@ -487,6 +491,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             runtime.state.chatMessages = (remote + local)
                 .distinctBy(ChatMessage::id)
                 .sortedWith(compareBy(ChatMessage::sentAt, ChatMessage::id))
+            runtime.state.activeConversation?.takeIf { it.id == conversationId }?.let { active ->
+                runtime.secureSharing.syncSharedItemsForConversation(active, runtime.state.chatMessages)
+            }
         }
     }
 

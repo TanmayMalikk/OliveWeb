@@ -391,6 +391,11 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                     onTrashed,
                 )
                 val uid = enrollment?.uid ?: return
+                if (!localMode) {
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { secureDocumentRepository?.revokeAllRecipients(id, uid) }
+                    }
+                }
                 scope.launch {
                     delay((PRIVATE_ENTRY_TRASH_RETENTION_MS + 100L).milliseconds)
                     val purged =

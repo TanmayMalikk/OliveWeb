@@ -515,4 +515,10 @@
     <string name="news_category_world">Mundo</string>
     <string name="news_swipe_bookmark">Guardar</string>
     <string name="news_swipe_share">Compartir</string>
+    <string name="notes_shared_with_you">Compartido contigo</string>
+    <string name="notes_shared_by">Compartido por %1$s</string>
+    <string name="notes_share_title">Compartir nota privada</string>
+    <string name="notes_share_help">Solo las amistades aceptadas seleccionadas pueden abrir esta nota o incidente. Desmarca a una persona para revocar su acceso de inmediato.</string>
+    <string name="notes_manage_sharing">Administrar acceso compartido</string>
+    <string name="safety_sharing_saved">Acceso compartido guardado.</string>
 </resources>

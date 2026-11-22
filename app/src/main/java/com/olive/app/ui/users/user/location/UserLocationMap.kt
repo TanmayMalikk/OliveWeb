@@ -19,7 +19,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -61,6 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -115,14 +122,15 @@ internal fun InteractiveLocationMap(
     fitSupportServices: Boolean = false,
     bottomControlsPadding: Dp = 28.dp,
     onUserGesture: (() -> Unit)? = null,
+    showControls: Boolean = true,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
     val webView = remember { arrayOfNulls<WebView>(1) }
     var loadState by remember { mutableStateOf(MapLoadState.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
-    var following by remember { mutableStateOf(false) }
-    var selectedFollowUid by remember { mutableStateOf<String?>(null) }
+    var following by remember { mutableStateOf(initialFollowUid != null) }
+    var selectedFollowUid by remember { mutableStateOf(initialFollowUid) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var routeWasShown by remember { mutableStateOf(false) }
@@ -164,6 +172,12 @@ internal fun InteractiveLocationMap(
         if (initialFollowUid != null) {
             selectedFollowUid = initialFollowUid
             following = true
+            if (loadState == MapLoadState.Ready) {
+                webView[0]?.evaluateJavascript(
+                    "window.oliveSetFollow(true,${JSONObject.quote(initialFollowUid)},true);",
+                    null,
+                )
+            }
         }
     }
 
@@ -337,13 +351,12 @@ internal fun InteractiveLocationMap(
             else FloatingActionButtonDefaults.containerColor,
             modifier = Modifier.testTag("map_compass_mode"),
         ) {
-            Icon(
-                Icons.Outlined.Explore,
-                stringResource(
+            CompassNeedleIcon(
+                bearingDegrees = mapBearingState.floatValue,
+                contentDescription = stringResource(
                     if (effectiveHeadingUp) R.string.location_compass_toggle_heading_desc
                     else R.string.location_compass_toggle_north_desc
                 ),
-                modifier = Modifier.graphicsLayer { rotationZ = -mapBearingState.floatValue },
             )
         }
     }
@@ -429,7 +442,13 @@ internal fun InteractiveLocationMap(
                                 if (title == "olive-map-error") loadState = MapLoadState.Error
                                 if (title == MAP_READY_TITLE) {
                                     loadState = MapLoadState.Ready
-                                    updatePoints(view, moveCamera = true)
+                                    if (following && followTargetUid != null) {
+                                        view.evaluateJavascript(
+                                            "window.oliveSetFollow(true,${JSONObject.quote(followTargetUid)},${selectedFollowUid != null && (userSearchEnabled || initialFollowUid != null)});",
+                                            null,
+                                        )
+                                    }
+                                    updatePoints(view, moveCamera = !following || followTargetUid == null)
                                     updateSupportServices(view)
                                     updateRoute(view, route != null)
                                     updateSelection(view)
@@ -507,7 +526,7 @@ internal fun InteractiveLocationMap(
                 }
             }
 
-            loadState == MapLoadState.Ready -> {
+            loadState == MapLoadState.Ready -> if (showControls) {
                 Column(
                     Modifier.align(Alignment.TopEnd).padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -653,6 +672,10 @@ internal fun InteractiveLocationMap(
                                             selectedFollowUid = point.uid
                                             following = true
                                             searchOpen = false
+                                            webView[0]?.evaluateJavascript(
+                                                "window.oliveSetFollow(true,${JSONObject.quote(point.uid)},true);",
+                                                null,
+                                            )
                                         },
                                         modifier = Modifier.fillMaxWidth().testTag("location_user_${point.uid}"),
                                     ) {
@@ -723,3 +746,55 @@ private class MapCameraBridge(
 private enum class MapLoadState { Loading, Ready, Error }
 
 private const val MAP_READY_TITLE = "olive-map-ready"
+
+@Composable
+private fun CompassNeedleIcon(bearingDegrees: Float, contentDescription: String) {
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = -bearingDegrees },
+        ) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val dialRadius = size.minDimension * 0.44f
+            val needleLength = size.minDimension * 0.36f
+            val halfWidth = size.minDimension * 0.14f
+            drawCircle(
+                color = OliveGreen.copy(alpha = 0.28f),
+                radius = dialRadius,
+                center = Offset(cx, cy),
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+            val northPath = Path().apply {
+                moveTo(cx, cy - needleLength)
+                lineTo(cx + halfWidth, cy)
+                lineTo(cx - halfWidth, cy)
+                close()
+            }
+            drawPath(path = northPath, color = ComposeColor(0xFFD32F2F))
+            val southPath = Path().apply {
+                moveTo(cx, cy + needleLength)
+                lineTo(cx + halfWidth, cy)
+                lineTo(cx - halfWidth, cy)
+                close()
+            }
+            drawPath(path = southPath, color = Muted.copy(alpha = 0.72f))
+            drawCircle(
+                color = ComposeColor.White,
+                radius = 2.dp.toPx(),
+                center = Offset(cx, cy),
+            )
+            drawCircle(
+                color = OliveGreen,
+                radius = 1.dp.toPx(),
+                center = Offset(cx, cy),
+            )
+        }
+    }
+}

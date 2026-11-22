@@ -169,3 +169,12 @@ test("legacy chat media validates the owner storage path before granting access"
   await f.api.mediaShareInChat(request("owner", share));
   assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend"]);
 });
+test("chat and direct sharing allow recipients without an enrolled account keyset wrapper", async () => {
+  const f = prepared(); direct(f);
+  const ownerOnlyWrappers = {wrappedKeys: {owner: "owner-key", friend: "friend-key"}, accountWrappedKeys: wrappers("owner")};
+  await f.api.mediaShareInChat(request("owner", {...share, ...ownerOnlyWrappers}));
+  assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend"]);
+  assert.deepEqual(Object.keys(f.records.get("files/file").account_wrapped_keys), ["owner"]);
+  await f.api.mediaUpdateAccess(request("owner", {...ownerOnlyWrappers, grantIndependentRecipients: ["friend"]}));
+  assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend"]);
+});

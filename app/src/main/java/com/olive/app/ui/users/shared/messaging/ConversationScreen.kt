@@ -685,7 +685,7 @@ internal fun ChatPane(
             session = session,
             currentUid = currentUid,
             onClose = { showChatInfo = false },
-            onOpenMedia = { document, file -> openedMedia = document to file },
+            onOpenMedia = { document, file -> showChatInfo = false; openedMedia = document to file },
         )
         session.calls.message?.takeIf {
             callAllowed && callState == VoipSessionState.Idle

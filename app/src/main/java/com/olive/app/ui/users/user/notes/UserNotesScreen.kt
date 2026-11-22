@@ -116,6 +116,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var newestFirst by rememberSaveable { mutableStateOf(true) }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
+    var sharingEntry by remember { mutableStateOf<PrivateEntry?>(null) }
     val notesGridState = rememberLazyGridState()
     var lastBoardFilter by remember { mutableStateOf(shownKind to newestFirst) }
     LaunchedEffect(shownKind, newestFirst) {
@@ -189,7 +190,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }
     }
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
-        if (uid != null) session.documents.load(uid, session.coverUsername, session.localMode)
+        if (uid != null) {
+            session.documents.load(uid, session.coverUsername, session.localMode)
+            if (!session.localMode) {
+                session.messages.ensureMessagingObservation()
+                session.ensureSharedEntriesObservation()
+            }
+        }
     }
     LaunchedEffect(incidentLocation, kind, locationSearchRetry) {
         locationSearchFailed = false
@@ -297,6 +304,18 @@ internal fun PrivateNotes(session: SessionViewModel) {
                                 paneTitle = if (editingId == null) uiText(R.string.new_private_entry)
                                 else uiText(R.string.edit_private_entry)
                             })
+                    if (entry != null && !session.localMode) IconButton(
+                        onClick = { sharingEntry = entry },
+                        enabled = !session.busy,
+                        modifier = Modifier.size(48.dp).testTag("private_share_editor")
+                    ) {
+                        val sharedCount = session.sharedEntryRecipients[entry.id].orEmpty().size
+                        Icon(
+                            Icons.Outlined.Share,
+                            uiText(R.string.notes_manage_sharing),
+                            tint = if (sharedCount > 0) OliveGreen else Muted
+                        )
+                    }
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
@@ -534,6 +553,18 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 attachAfterUpload = true
             },
         )
+        sharingEntry?.let { target ->
+            NoteSharingDialog(
+                entry = target,
+                currentRecipientUids = session.sharedEntryRecipients[target.id].orEmpty(),
+                friends = session.messages.friends,
+                contacts = session.profile?.contacts.orEmpty(),
+                onDismiss = { sharingEntry = null },
+                onSave = { friends ->
+                    session.sharePrivateEntryWithFriends(target, friends) { sharingEntry = null }
+                },
+            )
+        }
         return
     }
     val trashed =
@@ -555,6 +586,15 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val sorted = if (newestFirst) filtered.sortedByDescending { it.updatedAt }
         else filtered.sortedBy { it.updatedAt }
     val (pinned, others) = sorted.partition { it.pinned }
+    val filteredShared = session.sharedPrivateEntries.filter { shared ->
+        val entry = shared.entry
+        entry.deletedAt == null && (shownKind == null || entry.kind == shownKind) &&
+            (search.isBlank() || entry.title.contains(search, ignoreCase = true) ||
+                entry.body.contains(search, ignoreCase = true))
+    }.let { list ->
+        if (newestFirst) list.sortedByDescending { it.entry.updatedAt }
+        else list.sortedBy { it.entry.updatedAt }
+    }
     LazyVerticalGrid(
         columns = if (LocalDensity.current.fontScale >= 1.3f) GridCells.Fixed(1) else GridCells.Adaptive(192.dp),
         modifier = Modifier.fillMaxSize().oliveScrollbar(notesGridState),
@@ -632,12 +672,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
             NoteBoardControls(shownKind, newestFirst, { shownKind = it }, { newestFirst = it })
         }
         if (hasFilters) item(span = { GridItemSpan(maxLineSpan) }) {
+            val totalMatches = filtered.size + filteredShared.size
             AccessibleMessage(
-                androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, filtered.size, filtered.size),
+                androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, totalMatches, totalMatches),
             )
         }
         // Let the empty-search message use the full grid width.
-        if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+        if (filtered.isEmpty() && filteredShared.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 if (hasFilters) uiText(R.string.notes_board_no_matching_entries)
                 else uiText(R.string.no_private_entries_yet),
@@ -664,6 +705,25 @@ internal fun PrivateNotes(session: SessionViewModel) {
             PrivateNoteCard(
                 entry, formatter, { openEditor(entry) },
                 { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
+            )
+        }
+        if (filteredShared.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+            Text(
+                stringResource(R.string.notes_shared_with_you),
+                style = MaterialTheme.typography.titleMedium,
+                color = OliveGreen,
+                modifier = Modifier.semantics { heading() }
+            )
+        }
+        gridItems(filteredShared, key = { "shared_${it.entry.id}" }) { shared ->
+            val ownerName = session.messages.friends.firstOrNull { it.uid == shared.ownerUid }?.username
+                ?: stringResource(R.string.account)
+            SharedPrivateNoteCard(
+                item = shared,
+                ownerDisplayName = ownerName,
+                formatter = formatter,
+                onOpen = { session.messages.openSharedPrivateEntry(shared.entry.id) },
+                modifier = Modifier.animateItem(),
             )
         }
     }

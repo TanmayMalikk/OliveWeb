@@ -22,6 +22,7 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.PrivateContactNote
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.safety.SharedPrivateEntry
 import com.olive.app.ui.users.shared.navigation.ActivityCategory
 import com.olive.app.ui.users.shared.navigation.CredentialFieldError
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -67,6 +68,8 @@ internal data class SessionActivityState(
     val privacyHistory: List<SettingsEvent> = emptyList<SettingsEvent>(),
     val triggerHistory: List<TriggerEvent> = emptyList<TriggerEvent>(),
     val privateEntries: List<PrivateEntry> = emptyList<PrivateEntry>(),
+    val sharedPrivateEntries: List<SharedPrivateEntry> = emptyList<SharedPrivateEntry>(),
+    val sharedEntryRecipients: Map<String, List<String>> = emptyMap<String, List<String>>(),
     val viewedSharedEntry: PrivateEntry? = null,
 )
 
@@ -246,6 +249,12 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var privateEntries: List<PrivateEntry>
         get() = activitySnapshot.privateEntries
         set(value) = updateActivity { it.copy(privateEntries = value) }
+    var sharedPrivateEntries: List<SharedPrivateEntry>
+        get() = activitySnapshot.sharedPrivateEntries
+        set(value) = updateActivity { it.copy(sharedPrivateEntries = value) }
+    var sharedEntryRecipients: Map<String, List<String>>
+        get() = activitySnapshot.sharedEntryRecipients
+        set(value) = updateActivity { it.copy(sharedEntryRecipients = value) }
     var viewedSharedEntry: PrivateEntry?
         get() = activitySnapshot.viewedSharedEntry
         set(value) = updateActivity { it.copy(viewedSharedEntry = value) }

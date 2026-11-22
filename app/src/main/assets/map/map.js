@@ -19,6 +19,7 @@ const supportMarkers = Object.create(null);
 let followEnabled = false;
 let followUid = null;
 let followFocusPending = false;
+let followCloseMode = false;
 let headingUp = false;
 let navigatingActive = false;
 let userHeadingDeg = null;
@@ -81,6 +82,11 @@ const map = {
   }
 };
 
+function closeFollowZoom() {
+  if (!mbMap) return 16;
+  return Math.max(mbMap.getMinZoom(), mbMap.getMaxZoom() - 3);
+}
+
 function updateOwnHeadingCones() {
   const currentBearing = mbMap ? mbMap.getBearing() : 0;
   points.forEach(point => {
@@ -133,7 +139,7 @@ function updateHeadingCameraLoop() {
   let nextZoom = null;
   if (followEnabled && followFocusPending) {
     const z = mbMap.getZoom();
-    const targetZ = navigatingActive ? 16.5 : Math.max(z, 15.5);
+    const targetZ = navigatingActive ? 16.5 : Math.max(z, followCloseMode ? closeFollowZoom() : 15.5);
     if (Math.abs(targetZ - z) < 0.05) {
       followFocusPending = false;
     } else {
@@ -347,29 +353,40 @@ window.oliveRecenter = function () {
   });
 };
 
-window.oliveSetFollow = function (enabled, uid, focusClose) {
+window.oliveSetFollow = function (enabled, uid, focusClose, fromPointsSync) {
   pendingFollowCall = { enabled: !!enabled, uid: uid || null, focusClose: !!focusClose };
   if (!mbMap || !styleLoaded) return;
-  if (!enabled || followUid !== (uid || null)) followFocusPending = false;
+  if (!enabled || followUid !== (uid || null)) {
+    followFocusPending = false;
+    if (!enabled) followCloseMode = false;
+  }
   followEnabled = !!enabled;
   followUid = uid || null;
-  if (followEnabled && focusClose) followFocusPending = true;
+  if (followEnabled && focusClose) {
+    followFocusPending = true;
+    followCloseMode = true;
+  }
   if (followEnabled) {
     const target = points.find(point => (point.uid || point.name) === followUid);
     if (target) {
-      if (detailsOnlyForSelectedPoint && selectedPointUid !== followUid) {
+      if (detailsOnlyForSelectedPoint && selectedPointUid !== followUid && !fromPointsSync) {
         selectedPointUid = followUid;
-        window.oliveSetPoints(points, false, true);
+        window.oliveSetPoints(points, false, true, true);
       }
       if (headingUp) {
         startHeadingCameraLoop();
       } else if (followFocusPending) {
         followFocusPending = false;
-        const closeFollowZoom = Math.max(mbMap.getMinZoom(), mbMap.getMaxZoom() - 3);
         mbMap.easeTo({
           center: [target.longitude, target.latitude],
-          zoom: closeFollowZoom,
+          zoom: closeFollowZoom(),
           duration: 450
+        });
+      } else if (followCloseMode) {
+        mbMap.easeTo({
+          center: [target.longitude, target.latitude],
+          zoom: Math.max(mbMap.getZoom(), closeFollowZoom()),
+          duration: 380
         });
       } else {
         mbMap.easeTo({
@@ -381,7 +398,7 @@ window.oliveSetFollow = function (enabled, uid, focusClose) {
   }
 };
 
-window.oliveSetPoints = function (next, moveCamera, hideUnselectedDetails) {
+window.oliveSetPoints = function (next, moveCamera, hideUnselectedDetails, skipFollowSync) {
   pendingPointsCall = [next, !!moveCamera, !!hideUnselectedDetails];
   if (!mbMap || !styleLoaded) return;
   const firstLocation = points.length === 0 && next && next.length > 0;
@@ -507,10 +524,12 @@ window.oliveSetPoints = function (next, moveCamera, hideUnselectedDetails) {
 
   updateOwnHeadingCones();
 
-  if ((moveCamera || firstLocation) && points.length) {
+  const followTargetPresent = followEnabled && followUid &&
+    points.some(point => (point.uid || point.name) === followUid);
+  if ((moveCamera || firstLocation) && points.length && !followTargetPresent) {
     fitLngLatPoints(points.map(p => [p.longitude, p.latitude]), 14, 44);
   }
-  if (followEnabled) window.oliveSetFollow(true, followUid, false);
+  if (followEnabled && !skipFollowSync) window.oliveSetFollow(true, followUid, false, true);
 };
 
 window.oliveSetServices = function (services, fit) {
@@ -645,6 +664,8 @@ function startMap() {
     if (!ev || !ev.originalEvent) return;
     if (followEnabled || headingUp) {
       followEnabled = false;
+      followCloseMode = false;
+      followFocusPending = false;
       headingUp = false;
       stopHeadingCameraLoop();
       window.OliveMapCamera?.onUserGesture();
@@ -656,7 +677,7 @@ function startMap() {
   mbMap.on('rotate', function () {
     updateOwnHeadingCones();
     const b = mbMap.getBearing();
-    if (Math.abs(shortestDelta(lastReportedBearing, b)) >= 2) {
+    if (Math.abs(shortestDelta(lastReportedBearing, b)) >= 0.5) {
       lastReportedBearing = b;
       window.OliveMapCamera?.onBearingChanged(b);
     }

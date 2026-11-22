@@ -404,6 +404,7 @@ internal fun ChatInfoDialog(
                                 session,
                                 item.senderUid == currentUid,
                                 onOpenMedia,
+                                onLightSurface = true,
                             )
                             "SHARED_NOTE", "SHARED_INCIDENT" -> Button(
                                 onClick = {

@@ -73,13 +73,17 @@ function accountKeysetWrapper(value) {
   };
 }
 
-// Keeps one opaque account-keyset wrapper for every currently authorized account.
-function validateAccountWrappedKeys(value, allowedUsers) {
+// Keeps opaque account-keyset wrappers for authorized accounts that have enrolled recovery.
+function validateAccountWrappedKeys(value, allowedUsers, {requireAll = true} = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
   }
   const entries = Object.entries(value);
-  if (entries.length !== allowedUsers.length || entries.some(([uid]) => !allowedUsers.includes(uid))) {
+  if (
+    (requireAll && entries.length !== allowedUsers.length) ||
+    entries.length > allowedUsers.length ||
+    entries.some(([uid]) => !allowedUsers.includes(uid))
+  ) {
     throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
   }
   return Object.fromEntries(entries.map(([uid, wrapper]) => [uid, accountKeysetWrapper(wrapper)]));
@@ -161,7 +165,9 @@ function accessRequest(data, uid) {
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? null
     : validateAccessDeviceWrappedKeys(data.deviceWrappedKeys, allowedUsers);
-  const accountWrappedKeys = validateAccountWrappedKeys(data?.accountWrappedKeys, allowedUsers);
+  const accountWrappedKeys = validateAccountWrappedKeys(
+    data?.accountWrappedKeys, allowedUsers, {requireAll: false},
+  );
   return { wrappedKeys, allowedUsers, deviceWrappedKeys, accountWrappedKeys };
 }
 
@@ -429,7 +435,12 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
       throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
     }
     let wrappedKeys = {...access.wrappedKeys};
-    let accountWrappedKeys = {...access.accountWrappedKeys};
+    let accountWrappedKeys = {
+      ...Object.fromEntries(
+        Object.entries(value.account_wrapped_keys || {}).filter(([id]) => access.allowedUsers.includes(id)),
+      ),
+      ...access.accountWrappedKeys,
+    };
     let deviceWrappedKeys = access.deviceWrappedKeys ?? retainedDeviceKeys(value.device_wrapped_keys, access.allowedUsers);
     if (forPlan) {
       const recipients = planMediaReaders(plan, mediaId);

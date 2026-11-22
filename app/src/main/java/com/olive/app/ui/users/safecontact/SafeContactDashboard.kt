@@ -63,7 +63,15 @@ import com.olive.app.data.account.PrivateEntryKind
 @Composable
 internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
     val profile = session.profile ?: return
-    LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
+    LaunchedEffect(session.coverAccountId, session.coverUsername, session.localMode) {
+        session.messages.ensureMessagingObservation()
+        if (!session.localMode) {
+            session.ensureSharedEntriesObservation()
+            session.coverAccountId?.let { uid ->
+                session.documents.load(uid, session.coverUsername, false)
+            }
+        }
+    }
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
@@ -153,7 +161,7 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_notes_help),
             Icons.Outlined.Description,
             "safe_contact_notes",
-            0,
+            session.sharedPrivateEntries.size,
             { session.navigation.openSafePage(SafePage.Notes) })
         SafeContactActionCard(
             stringResource(R.string.messages),
@@ -174,7 +182,7 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_documents_help),
             Icons.Outlined.FolderOpen,
             "safe_contact_documents",
-            0,
+            session.documents.state.files.count { it.ownerUid != session.coverAccountId },
             { session.navigation.openSafePage(SafePage.Documents) })
         if (session.pendingSync) Surface(
             Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,

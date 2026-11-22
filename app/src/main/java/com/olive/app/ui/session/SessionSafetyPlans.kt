@@ -48,6 +48,8 @@ import android.os.SystemClock
 internal data class SafetyPlansUiState(
     val plan: SafetyPlan? = null,
     val error: Int? = null,
+    val sharingError: String? = null,
+    val sharingSaved: Boolean = false,
     val saving: Int = 0,
     val syncing: Boolean = false,
     val loadingPlan: Boolean = true,
@@ -78,6 +80,7 @@ internal class SessionSafetyPlans(
     private val foregroundSyncRequests = Channel<Unit>(Channel.CONFLATED)
     private var immediateSyncRequested = false
     private val consultationRefreshMutex = Mutex()
+    private val sharedPlansRefreshMutex = Mutex()
     private var consultationsSession: Pair<String, Long>? = null
     private var consultationsRefreshedAt = 0L
     private var accessRevision = 0
@@ -211,6 +214,7 @@ internal class SessionSafetyPlans(
         plan = null
         loadingPlan = true
         error = null
+        updateUiState { it.copy(sharingError = null, sharingSaved = false) }
         saving =
             0
         if (screenLease == null && !(preserveAdminIndex && runtime.state.accountRole == AccountRole.ADMIN &&
@@ -253,6 +257,7 @@ internal class SessionSafetyPlans(
         plan = null
         loadingPlan = true
         error = null
+        updateUiState { it.copy(sharingError = null, sharingSaved = false) }
         saving = 0
         // Use the fallback when open is unavailable.
         try {
@@ -507,6 +512,7 @@ internal class SessionSafetyPlans(
         val token = generation
         saving++
         error = null
+        updateUiState { it.copy(sharingError = null, sharingSaved = false) }
         runtime.scope.launch {
             // Use the fallback when share with contacts is unavailable.
             try {
@@ -519,11 +525,15 @@ internal class SessionSafetyPlans(
                 if (current(actor, actor, token)) {
                     plan = updated
                     error = null
+                    updateUiState { it.copy(sharingError = null, sharingSaved = true) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Preserve the local conflict resolution and tell the user that cloud sync must be retried.
-                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } catch (failure: Exception) { // Preserve the local conflict resolution and tell the user that cloud sync must be retried.
+                if (current(actor, actor, token)) {
+                    error = R.string.safety_sync_error
+                    updateUiState { it.copy(sharingError = failure.localizedMessage?.takeIf(String::isNotBlank), sharingSaved = false) }
+                }
             } finally {
                 if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
             }
@@ -571,23 +581,25 @@ internal class SessionSafetyPlans(
         val actor = runtime.coverAccountId
         val token = generation
         runtime.scope.launch {
-            // Turn an unexpected refresh shared plans failure into a readable message.
-            loadingAccess = true
-            try {
-                if (actor != null) loadCachedAccessLists(actor)
-                val result = repository.sharedWithMe()
-                if (actor != null && runtime.coverAccountId == actor && authorized() && generation == token) {
-                    sharedPlans = result
-                    error = null
-                    withContext(Dispatchers.IO) { accessIndex.replaceShared(actor, result) }
+            sharedPlansRefreshMutex.withLock {
+                // Turn an unexpected refresh shared plans failure into a readable message.
+                loadingAccess = true
+                try {
+                    if (actor != null && sharedPlans.isEmpty()) loadCachedAccessLists(actor)
+                    val result = repository.sharedWithMe()
+                    if (actor != null && runtime.coverAccountId == actor && authorized() && generation == token) {
+                        sharedPlans = result
+                        error = null
+                        withContext(Dispatchers.IO) { accessIndex.replaceShared(actor, result) }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
+                    if (actor != null && runtime.coverAccountId == actor && authorized()) error =
+                        R.string.safety_sync_error
+                } finally {
+                    if (runtime.coverAccountId == actor && authorized()) loadingAccess = false
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
-                if (actor != null && runtime.coverAccountId == actor && authorized()) error =
-                    R.string.safety_sync_error
-            } finally {
-                if (runtime.coverAccountId == actor && authorized()) loadingAccess = false
             }
         }
     }

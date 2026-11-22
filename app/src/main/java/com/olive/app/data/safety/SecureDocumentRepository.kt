@@ -1,12 +1,22 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data.safety
 
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.PublicKey
 import javax.crypto.SecretKey
@@ -131,7 +141,195 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         )
     }
 
+    /**
+     * Replaces the non-owner recipient list for a shared private entry, or deletes the cloud copy when
+     * all recipients are revoked so revoked contacts immediately lose access.
+     */
+    suspend fun updateMultiRecipientEntry(
+        entry: PrivateEntry,
+        ownerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val nonOwnerRecipients = recipientPublicKeys.filterKeys { it != ownerUid }
+        if (nonOwnerRecipients.isEmpty()) {
+            revokeAllRecipients(entry.id, ownerUid)
+            return
+        }
+        val documentRef = firestore.collection("privateEntries").document(entry.id)
+        val existing = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
+        }
+        val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
+        val documentKey: SecretKey = existingWrapped[ownerUid]?.let { runCatching { KeyManager.unwrapKey(it) }.getOrNull() }
+            ?: EncryptionUtils.generateSymmetricKey()
+        val payload = entry.toJson().toString()
+        val ciphertext = EncryptionUtils.encryptText(payload, documentKey)
+        val ownerPublicKey = recipientPublicKeys[ownerUid] ?: KeyManager.getOrCreatePublicKey()
+        val wrappedKeysMap = linkedMapOf(
+            ownerUid to (existingWrapped[ownerUid] ?: KeyManager.wrapKey(documentKey, ownerPublicKey)),
+        )
+        for ((uid, publicKey) in nonOwnerRecipients) {
+            wrappedKeysMap[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        val secureEntry = mapOf(
+            "id" to entry.id,
+            "ownerUid" to ownerUid,
+            "ciphertext" to ciphertext,
+            "wrappedKeys" to wrappedKeysMap,
+            "allowedUsers" to wrappedKeysMap.keys.toList(),
+            "createdAt" to (existing?.get("createdAt") ?: FieldValue.serverTimestamp()),
+            "updatedAt" to FieldValue.serverTimestamp(),
+        )
+        documentRef.set(secureEntry).await()
+    }
+
+    /**
+     * Deletes the shared cloud record for an owned entry when the entry is trashed or all recipients are revoked.
+     */
+    suspend fun revokeAllRecipients(entryId: String, ownerUid: String) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        try {
+            val snapshot = documentRef.get().await()
+            if (snapshot.exists() && snapshot.getString("ownerUid") == ownerUid) {
+                documentRef.delete().await()
+            }
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code !in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) throw error
+        }
+    }
+
+    /**
+     * Grants access to any current conversation participants (such as an escalated Admin or newly added friend)
+     * who were not yet wrapped on a previously shared private entry.
+     */
+    suspend fun ensureRecipientsHaveAccess(
+        entryId: String,
+        ownerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        val snapshot = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) return
+            throw error
+        }
+        if (!snapshot.exists() || snapshot.getString("ownerUid") != ownerUid) return
+        val existingWrapped = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
+        val existingAllowed = (snapshot.get("allowedUsers") as? List<*>)
+            .orEmpty().filterIsInstance<String>().toSet()
+        val missing = recipientPublicKeys.filterKeys { uid ->
+            uid != ownerUid && (uid !in existingWrapped || uid !in existingAllowed)
+        }
+        if (missing.isEmpty()) return
+        val ownerWrappedKey = existingWrapped[ownerUid] ?: return
+        val documentKey = runCatching { KeyManager.unwrapKey(ownerWrappedKey) }.getOrNull() ?: return
+        val updatedWrapped = existingWrapped.toMutableMap()
+        for ((uid, publicKey) in missing) {
+            updatedWrapped[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        documentRef.update(
+            mapOf(
+                "wrappedKeys" to updatedWrapped,
+                "allowedUsers" to updatedWrapped.keys.toList(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    /**
+     * Streams private entries shared with [currentUid] alongside the recipient map for entries owned by [currentUid].
+     */
+    internal fun observeUserSharedEntries(
+        currentUid: String,
+        onUpdate: (PrivateEntriesSnapshot) -> Unit,
+        onError: (String) -> Unit = {},
+    ): ListenerRegistration {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        var job: Job? = null
+        val registration = firestore.collection("privateEntries")
+            .whereArrayContains("allowedUsers", currentUid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                job?.cancel()
+                if (error != null) {
+                    onError(error.localizedMessage.orEmpty())
+                    return@addSnapshotListener
+                }
+                val docs = snapshot?.documents.orEmpty()
+                job = scope.launch {
+                    val parsed = withContext(Dispatchers.Default) {
+                        decodeSharedEntriesSnapshot(docs, currentUid)
+                    }
+                    onUpdate(parsed)
+                }
+            }
+        return ListenerRegistration {
+            registration.remove()
+            scope.cancel()
+        }
+    }
+
+    private fun decodeSharedEntriesSnapshot(
+        documents: List<DocumentSnapshot>,
+        currentUid: String,
+    ): PrivateEntriesSnapshot {
+        val sharedWithMe = mutableListOf<SharedPrivateEntry>()
+        val ownedRecipients = linkedMapOf<String, List<String>>()
+        for (doc in documents) {
+            val ownerUid = doc.getString("ownerUid").orEmpty()
+            if (ownerUid.isBlank()) continue
+            val allowed = (doc.get("allowedUsers") as? List<*>)
+                .orEmpty().filterIsInstance<String>()
+            if (currentUid !in allowed) continue
+            if (ownerUid == currentUid) {
+                val others = allowed.filter { it != currentUid }.distinct()
+                if (others.isNotEmpty()) ownedRecipients[doc.id] = others
+                continue
+            }
+            val wrappedKeys = doc.get("wrappedKeys").cloudStringMap() ?: continue
+            val wrapped = wrappedKeys[currentUid] ?: continue
+            val ciphertext = doc.getString("ciphertext")?.takeIf(String::isNotBlank) ?: continue
+            val entry = runCatching {
+                val key = KeyManager.unwrapKey(wrapped)
+                val plaintext = EncryptionUtils.decryptText(ciphertext, key)
+                val json = JSONObject(plaintext)
+                if (json.has("timestamp")) PrivateEntry.fromJson(json)
+                else PrivateEntry(
+                    id = doc.id,
+                    title = json.optString("title", ""),
+                    body = json.optString("body", ""),
+                )
+            }.getOrNull() ?: continue
+            if (entry.deletedAt == null) {
+                sharedWithMe += SharedPrivateEntry(entry = entry, ownerUid = ownerUid)
+            }
+        }
+        sharedWithMe.sortByDescending { it.entry.updatedAt }
+        return PrivateEntriesSnapshot(
+            sharedWithMe = sharedWithMe,
+            ownedSharedRecipients = ownedRecipients,
+        )
+    }
+
 }
+
+internal data class SharedPrivateEntry(
+    val entry: PrivateEntry,
+    val ownerUid: String,
+)
+
+internal data class PrivateEntriesSnapshot(
+    val sharedWithMe: List<SharedPrivateEntry> = emptyList(),
+    val ownedSharedRecipients: Map<String, List<String>> = emptyMap(),
+)
 
 // Safe-app users and support staff: defines safety-plan fields and conflict data.
 

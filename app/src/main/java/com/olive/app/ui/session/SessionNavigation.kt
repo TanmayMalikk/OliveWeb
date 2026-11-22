@@ -93,7 +93,10 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 privacyHistory = emptyList()
                 triggerHistory =
                     emptyList()
+                secureSharing.stopSharedEntriesObservation()
                 privateEntries = emptyList()
+                sharedPrivateEntries = emptyList()
+                sharedEntryRecipients = emptyMap()
                 messaging.stopMessaging()
                 if (!localMode) messaging.syncLocalNotificationHandler()
                 activeTriggerId = null

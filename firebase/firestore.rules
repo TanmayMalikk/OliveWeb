@@ -124,7 +124,7 @@ service cloud.firestore {
     }
 
     match /accountKeysets/{uid} {
-      allow get: if owner(uid) && validAccountKeysetShape(resource.data, uid);
+      allow get: if owner(uid) && (resource == null || validAccountKeysetShape(resource.data, uid));
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
       allow update: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid)
@@ -153,7 +153,7 @@ service cloud.firestore {
     }
 
     match /accountKeyDirectories/{uid} {
-      allow get: if signedIn() && validAccountKeyDirectory(resource.data, uid);
+      allow get: if signedIn() && (resource == null || validAccountKeyDirectory(resource.data, uid));
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
         && request.resource.data.updatedAt == request.time
@@ -399,7 +399,6 @@ service cloud.firestore {
           && data.wrapped_keys is map
           && (!data.keys().hasAny(['device_wrapped_keys']) || data.device_wrapped_keys is map)
           && (!data.keys().hasAny(['account_wrapped_keys']) || (data.account_wrapped_keys is map
-            && data.account_wrapped_keys.keys().hasAll(data.allowed_users)
             && data.account_wrapped_keys.keys().hasOnly(data.allowed_users)))
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25

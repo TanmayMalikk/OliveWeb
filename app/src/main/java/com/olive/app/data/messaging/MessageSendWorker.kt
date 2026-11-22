@@ -105,8 +105,12 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
             if (message.ownerUid !in conversation.participantIds) {
                 throw AttachmentDeliveryRejected("PERMISSION_DENIED")
             }
+            val usernames = if (conversation.type == "SUPPORT") {
+                conversation.participantUsernames +
+                    runCatching { conversations.prepareTicketParticipantNames(conversation.id) }.getOrDefault(emptyMap())
+            } else conversation.participantUsernames
             val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
-                conversation.participantUsernames[uid]
+                usernames[uid]?.takeIf(String::isNotBlank)
                     ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
             }
             if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")

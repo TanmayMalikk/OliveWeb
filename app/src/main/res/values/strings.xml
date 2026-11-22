@@ -566,4 +566,10 @@
     <string name="news_category_world">World</string>
     <string name="news_swipe_bookmark">Bookmark</string>
     <string name="news_swipe_share">Share</string>
+    <string name="notes_shared_with_you">Shared with you</string>
+    <string name="notes_shared_by">Shared by %1$s</string>
+    <string name="notes_share_title">Share private entry</string>
+    <string name="notes_share_help">Only selected accepted friends can open this note or incident. Uncheck a person to revoke their access immediately.</string>
+    <string name="notes_manage_sharing">Manage note sharing</string>
+    <string name="safety_sharing_saved">Sharing access saved.</string>
 </resources>
