@@ -132,6 +132,13 @@ internal interface MediaTransferOperations {
      */
     fun openPendingUpload(jobId: String, viewerUid: String): Pair<SafetyDocument, File>? = null
     /**
+     * Speculatively prefetches remote ciphertext into the offline cache so opening is instant.
+     *
+     * @param documents Collection of documents values to process.
+     * @param viewerUid Firebase UID of the viewing account.
+     */
+    suspend fun prefetchRecentCiphertext(documents: List<SafetyDocument>, viewerUid: String) {}
+    /**
      * Handles the document snapshot event.
      *
      * @param viewerUid Firebase UID of the viewing account.
@@ -170,6 +177,7 @@ internal class MediaTransferController(
     private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
     private val downloadGate=DocumentDownloadGate()
     private val sessionDecryptedCache = java.util.concurrent.ConcurrentHashMap<String, File>()
+    private val speculativeCiphertextFiles = java.util.concurrent.ConcurrentHashMap<String, File>()
     private val uiStateFlow = MutableStateFlow(MediaTransferUiState())
     val uiState: StateFlow<MediaTransferUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
@@ -522,6 +530,9 @@ internal class MediaTransferController(
                 documents.associate { it.id to offlineCache.availability(viewerUid, it) }
             }
             if (observedOwnerUid == null || observedOwnerUid == viewerUid) offlineCopies = values
+            if (serverConfirmed) {
+                prefetchRecentCiphertext(documents, viewerUid)
+            }
         }
     }
 
@@ -538,6 +549,8 @@ internal class MediaTransferController(
         offlineCopies = emptyMap()
         cachePreferenceOwnerUid = null
         recentCachingEnabled = false
+        speculativeCiphertextFiles.values.forEach(File::delete)
+        speculativeCiphertextFiles.clear()
         state = MediaTransferState.Idle
     }
 
@@ -765,6 +778,13 @@ internal class MediaTransferController(
         offlineCache.verifiedCiphertext(viewerUid, document)?.let {
             return decryptCiphertext(it, document, viewerUid)
         }
+        speculativeCiphertextFiles[document.id]?.takeIf { it.isFile && it.length() == document.ciphertextSize }?.let { cachedFile ->
+            val opened = decryptCiphertext(cachedFile, document, viewerUid)
+            runCatching { offlineCache.retainRecentDownloaded(viewerUid, document, cachedFile) }
+            cachedFile.delete()
+            speculativeCiphertextFiles.remove(document.id)
+            return opened
+        }
         if (offlineCache.promoteUploadCandidateAsRecent(viewerUid, document)) {
             offlineCache.verifiedCiphertext(viewerUid, document)?.let {
                 return decryptCiphertext(it, document, viewerUid)
@@ -790,6 +810,38 @@ internal class MediaTransferController(
             opened
         }
         finally { encrypted.delete() }
+    }
+
+    /**
+     * Prefetches ciphertext for recent documents into offline media cache or private storage.
+     *
+     * @param documents Collection of documents values to process.
+     * @param viewerUid Firebase UID of the viewing account.
+     */
+    override suspend fun prefetchRecentCiphertext(documents: List<SafetyDocument>, viewerUid: String) {
+        val candidates = documents
+            .filter { it.objectKey.isNotBlank() && viewerUid in it.allowedUsers }
+            .take(3)
+        if (candidates.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            for (doc in candidates) {
+                if (offlineCache.verifiedCiphertext(viewerUid, doc) != null) continue
+                if (speculativeCiphertextFiles[doc.id]?.exists() == true) continue
+                downloadGate.withDocumentLock(doc.id) {
+                    if (offlineCache.verifiedCiphertext(viewerUid, doc) != null) return@withDocumentLock
+                    if (speculativeCiphertextFiles[doc.id]?.exists() == true) return@withDocumentLock
+                    runCatching {
+                        val encrypted = downloadRemoteCiphertext(doc)
+                        val retained = offlineCache.retainRecentDownloaded(viewerUid, doc, encrypted)
+                        if (!retained) {
+                            speculativeCiphertextFiles[doc.id] = encrypted
+                        } else {
+                            encrypted.delete()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**

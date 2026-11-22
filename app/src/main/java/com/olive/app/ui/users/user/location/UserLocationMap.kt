@@ -390,7 +390,7 @@ internal fun InteractiveLocationMap(
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest,
-                            ): WebResourceResponse? = bundledMapAsset(context, request.url)
+                            ): WebResourceResponse? = bundledMapAsset(context, request.url, request.method)
 
                             /**
                              * Matches the map height to its container after the page loads.

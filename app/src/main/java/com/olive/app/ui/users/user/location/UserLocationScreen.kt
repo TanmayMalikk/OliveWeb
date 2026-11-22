@@ -175,15 +175,28 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
         if (serviceSearchEnabled && origin != null && state.ownerUid == uid &&
             loadedAreas.isEmpty() && requestedArea == null && failedArea == null
         ) {
-            requestedArea = SupportMapCenter(origin.latitude, origin.longitude)
+            val cached = SupportServiceSpatialCache.get(origin.latitude, origin.longitude)
+            if (cached != null) {
+                loadedAreas = listOf(cached)
+            } else {
+                requestedArea = SupportMapCenter(origin.latitude, origin.longitude)
+            }
         }
     }
     LaunchedEffect(uid, requestedArea) {
         val center = requestedArea ?: return@LaunchedEffect
         failedArea = null
         try {
-            val result = NearbySupportServices.find(center.latitude, center.longitude)
-            loadedAreas = loadedAreas + LoadedSupportArea(center, result)
+            val cached = SupportServiceSpatialCache.get(center.latitude, center.longitude)
+            val area = if (cached != null) {
+                cached
+            } else {
+                val result = NearbySupportServices.find(center.latitude, center.longitude)
+                LoadedSupportArea(center, result).also { SupportServiceSpatialCache.put(it) }
+            }
+            if (loadedAreas.none { it.covers(center) }) {
+                loadedAreas = loadedAreas + area
+            }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {

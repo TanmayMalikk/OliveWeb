@@ -249,6 +249,7 @@ internal class LocationMapController(
      */
     fun clear() {
         closeMap()
+        SupportServiceSpatialCache.clear()
         state = LocationMapState()
     }
 

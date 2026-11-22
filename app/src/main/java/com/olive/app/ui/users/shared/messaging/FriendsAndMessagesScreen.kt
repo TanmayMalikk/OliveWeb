@@ -362,12 +362,13 @@ private fun MessagingSidebar(
                 }
             }
         }
-        if (session.messages.loadingIndex) item {
+        val showSkeleton = session.messages.conversations.isEmpty() && session.messages.loadingIndex
+        if (showSkeleton) item {
             val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
             LoadingSkeleton(layout, rows = 3)
         }
         item { Status(session) }
-        if (session.messages.loadingIndex) return@LazyColumn
+        if (showSkeleton) return@LazyColumn
         if (!organizationAccount && !ticketChats && !showingArchived) friendLists(
             session = session,
             pendingExpanded = pendingExpanded,
