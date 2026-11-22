@@ -202,12 +202,12 @@ interface SafetyDocumentDataSource {
      * Ensures every current participant in an active chat can open a previously shared document.
      *
      * @param documentId Unique identifier of the safety document.
-     * @param ownerUid Firebase UID of the resource owner.
+     * @param callerUid Firebase UID of the authorized caller wrapping keys for missing participants.
      * @param recipients Map of recipient UID to username.
      */
     suspend fun ensureChatMediaAccess(
         documentId: String,
-        ownerUid: String,
+        callerUid: String,
         recipients: Map<String, String>,
     ) = Unit
     /**
@@ -411,7 +411,7 @@ class SafetyDocumentRepository(
         recipientUsername: String,
         forPlan: Boolean,
     ) {
-        require(document.ownerUid == ownerUid && recipientUid != ownerUid)
+        require(recipientUid != ownerUid && (document.ownerUid == ownerUid || ownerUid in document.allowedUsers))
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
             val documentKey = unwrapDocumentKey(current, ownerUid)
@@ -419,25 +419,25 @@ class SafetyDocumentRepository(
             if (forPlan) {
                 if (recipientUid in current.allowedUsers &&
                     current.deviceWrappedKeys.keys.containsAll(recipient.deviceKeys.keys)) return
-                val ownerAccountKey = current.accountWrappedKeys[ownerUid]
-                    ?: accountKeysetAccess(documentKey, ownerUid)
+                val ownerAccountKey = current.accountWrappedKeys[current.ownerUid]
+                    ?: accountKeysetAccess(documentKey, current.ownerUid)
                 val planAccountWrapped = buildMap {
-                    if (ownerAccountKey != null) put(ownerUid, ownerAccountKey)
+                    if (ownerAccountKey != null) put(current.ownerUid, ownerAccountKey)
                     if (recipient.accountKeysetKey != null) put(recipientUid, recipient.accountKeysetKey)
                 }
                 media.updatePlanAccess(current.id, mapOf(
-                    ownerUid to checkNotNull(current.wrappedKeys[ownerUid]),
+                    current.ownerUid to checkNotNull(current.wrappedKeys[current.ownerUid] ?: current.wrappedKeys[ownerUid]),
                     recipientUid to recipient.accountKey,
                 ), recipient.deviceKeys, planAccountWrapped)
                 return
             }
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
-            val ownerAccountKey = current.accountWrappedKeys[ownerUid]
-                ?: accountKeysetAccess(documentKey, ownerUid)
+            val ownerAccountKey = current.accountWrappedKeys[current.ownerUid]
+                ?: accountKeysetAccess(documentKey, current.ownerUid)
             val accountWrapped = buildMap {
                 putAll(current.accountWrappedKeys.filterKeys { it in wrapped.keys })
-                if (ownerAccountKey != null) put(ownerUid, ownerAccountKey)
+                if (ownerAccountKey != null) put(current.ownerUid, ownerAccountKey)
                 if (recipient.accountKeysetKey != null) put(recipientUid, recipient.accountKeysetKey)
             }
             media.updateAccess(
@@ -500,15 +500,18 @@ class SafetyDocumentRepository(
 
     override suspend fun ensureChatMediaAccess(
         documentId: String,
-        ownerUid: String,
+        callerUid: String,
         recipients: Map<String, String>,
     ) {
-        val current = runCatching { getFor(ownerUid, documentId) }.getOrNull() ?: return
-        if (current.ownerUid != ownerUid) return
+        var current = runCatching { getFor(callerUid, documentId) }.getOrNull() ?: return
+        if (callerUid !in current.allowedUsers) return
         for ((uid, username) in recipients) {
-            if (uid == ownerUid || username.isBlank()) continue
+            if (uid == callerUid || uid == current.ownerUid || username.isBlank()) continue
             if (uid !in current.allowedUsers || (current.objectKey.isNotBlank() && uid !in current.wrappedKeys)) {
-                runCatching { grantAccess(current, ownerUid, uid, username, forPlan = false) }
+                runCatching {
+                    grantAccess(current, callerUid, uid, username, forPlan = false)
+                    current = getFor(callerUid, documentId)
+                }
             }
         }
     }
@@ -1030,9 +1033,9 @@ class IndexedSafetyDocumentRepository(
 
     override suspend fun ensureChatMediaAccess(
         documentId: String,
-        ownerUid: String,
+        callerUid: String,
         recipients: Map<String, String>,
-    ) = remote.ensureChatMediaAccess(documentId, ownerUid, recipients)
+    ) = remote.ensureChatMediaAccess(documentId, callerUid, recipients)
 
     /**
      * Deletes the indexed safety document repository.

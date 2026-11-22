@@ -19,7 +19,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -81,8 +83,13 @@ import com.olive.app.R
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.NearbySupportService
+import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.OliveOutline
+import com.olive.app.ui.shared.OlivePill
+import com.olive.app.ui.shared.PaleOlive
+import com.olive.app.ui.shared.Paper
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -347,9 +354,14 @@ internal fun InteractiveLocationMap(
                     }
                 }
             },
-            containerColor = if (effectiveHeadingUp) MaterialTheme.colorScheme.primaryContainer
-            else FloatingActionButtonDefaults.containerColor,
-            modifier = Modifier.testTag("map_compass_mode"),
+            containerColor = if (effectiveHeadingUp) PaleOlive else Paper,
+            contentColor = Ink,
+            modifier = Modifier
+                .border(
+                    BorderStroke(1.dp, if (effectiveHeadingUp) OliveGreen else OliveOutline.copy(alpha = 0.55f)),
+                    OlivePill,
+                )
+                .testTag("map_compass_mode"),
         ) {
             CompassNeedleIcon(
                 bearingDegrees = mapBearingState.floatValue,
@@ -527,26 +539,36 @@ internal fun InteractiveLocationMap(
             }
 
             loadState == MapLoadState.Ready -> if (showControls) {
+                val mapFabModifier = Modifier.border(
+                    BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
+                    OlivePill,
+                )
                 Column(
                     Modifier.align(Alignment.TopEnd).padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     SmallFloatingActionButton(
                         onClick = { webView[0]?.evaluateJavascript("window.oliveZoomIn();", null) },
-                        modifier = Modifier.testTag("map_zoom_in"),
+                        containerColor = Paper,
+                        contentColor = Ink,
+                        modifier = mapFabModifier.testTag("map_zoom_in"),
                     ) {
                         Icon(Icons.Outlined.Add, stringResource(R.string.location_zoom_in))
                     }
                     SmallFloatingActionButton(
                         onClick = { webView[0]?.evaluateJavascript("window.oliveZoomOut();", null) },
-                        modifier = Modifier.testTag("map_zoom_out"),
+                        containerColor = Paper,
+                        contentColor = Ink,
+                        modifier = mapFabModifier.testTag("map_zoom_out"),
                     ) {
                         Icon(Icons.Outlined.Remove, stringResource(R.string.location_zoom_out))
                     }
                     if (userSearchEnabled) {
                         SmallFloatingActionButton(
                             onClick = { searchOpen = true },
-                            modifier = Modifier.testTag("search_user_location"),
+                            containerColor = Paper,
+                            contentColor = Ink,
+                            modifier = mapFabModifier.testTag("search_user_location"),
                         ) {
                             Icon(Icons.Outlined.Search, stringResource(R.string.location_search_user))
                         }
@@ -564,7 +586,9 @@ internal fun InteractiveLocationMap(
                                 if (followTargetUid != null) following = true
                                 webView[0]?.evaluateJavascript("window.oliveRecenter();", null)
                             },
-                            modifier = Modifier.testTag("recenter_map"),
+                            containerColor = Paper,
+                            contentColor = Ink,
+                            modifier = mapFabModifier.testTag("recenter_map"),
                         ) {
                             Icon(Icons.Outlined.MyLocation, stringResource(R.string.recenter_map))
                         }
@@ -574,9 +598,14 @@ internal fun InteractiveLocationMap(
                     fun FollowFab() {
                         SmallFloatingActionButton(
                             onClick = { if (followTargetUid != null) following = !following },
-                            containerColor = if (following) MaterialTheme.colorScheme.primaryContainer
-                            else FloatingActionButtonDefaults.containerColor,
-                            modifier = Modifier.testTag("follow_user_location"),
+                            containerColor = if (following) OliveGreen else Paper,
+                            contentColor = if (following) Paper else Ink,
+                            modifier = Modifier
+                                .border(
+                                    BorderStroke(1.dp, if (following) OliveGreen else OliveOutline.copy(alpha = 0.55f)),
+                                    OlivePill,
+                                )
+                                .testTag("follow_user_location"),
                         ) {
                             Icon(
                                 if (following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
@@ -613,6 +642,9 @@ internal fun InteractiveLocationMap(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth()
                         .testTag("followed_user_coordinates"),
                     shape = MaterialTheme.shapes.extraLarge,
+                    color = Paper,
+                    contentColor = Ink,
+                    border = BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
                     shadowElevation = 6.dp,
                 ) {
                     Column(

@@ -209,7 +209,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
      */
     suspend fun ensureRecipientsHaveAccess(
         entryId: String,
-        ownerUid: String,
+        callerUid: String,
         recipientPublicKeys: Map<String, PublicKey>,
     ) {
         val documentRef = firestore.collection("privateEntries").document(entryId)
@@ -222,16 +222,16 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
                 )) return
             throw error
         }
-        if (!snapshot.exists() || snapshot.getString("ownerUid") != ownerUid) return
-        val existingWrapped = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
         val existingAllowed = (snapshot.get("allowedUsers") as? List<*>)
             .orEmpty().filterIsInstance<String>().toSet()
+        if (!snapshot.exists() || callerUid !in existingAllowed) return
+        val existingWrapped = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
         val missing = recipientPublicKeys.filterKeys { uid ->
-            uid != ownerUid && (uid !in existingWrapped || uid !in existingAllowed)
+            uid != callerUid && (uid !in existingWrapped || uid !in existingAllowed)
         }
         if (missing.isEmpty()) return
-        val ownerWrappedKey = existingWrapped[ownerUid] ?: return
-        val documentKey = runCatching { KeyManager.unwrapKey(ownerWrappedKey) }.getOrNull() ?: return
+        val callerWrappedKey = existingWrapped[callerUid] ?: return
+        val documentKey = runCatching { KeyManager.unwrapKey(callerWrappedKey) }.getOrNull() ?: return
         val updatedWrapped = existingWrapped.toMutableMap()
         for ((uid, publicKey) in missing) {
             updatedWrapped[uid] = KeyManager.wrapKey(documentKey, publicKey)

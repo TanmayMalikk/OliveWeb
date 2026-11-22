@@ -33,8 +33,10 @@ import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,8 +62,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.safety.HotlineResource
+import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.OliveOutline
+import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.users.user.dashboard.hotlineKindLabel
 import com.olive.app.ui.users.user.dashboard.hotlineRegionName
 import kotlinx.coroutines.launch
@@ -79,6 +84,14 @@ internal fun DirectoryMapFilterRow(
     onToggleHeadingUp: () -> Unit,
     onOpenDirectoryList: () -> Unit,
 ) {
+    val filterColors = FilterChipDefaults.filterChipColors(
+        containerColor = Paper,
+        labelColor = Ink,
+        iconColor = OliveGreen,
+        selectedContainerColor = OliveGreen,
+        selectedLabelColor = Paper,
+        selectedLeadingIconColor = Paper,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -101,6 +114,13 @@ internal fun DirectoryMapFilterRow(
                         modifier = Modifier.size(16.dp),
                     )
                 },
+                colors = filterColors,
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = showSavedOnly,
+                    borderColor = OliveOutline.copy(alpha = 0.65f),
+                    selectedBorderColor = OliveGreen,
+                ),
                 modifier = Modifier.testTag("map_filter_saved_only"),
             )
             FilterChip(
@@ -118,6 +138,13 @@ internal fun DirectoryMapFilterRow(
                 leadingIcon = {
                     Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(16.dp))
                 },
+                colors = filterColors,
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = headingUp,
+                    borderColor = OliveOutline.copy(alpha = 0.65f),
+                    selectedBorderColor = OliveGreen,
+                ),
                 modifier = Modifier.testTag("map_heading_chip"),
             )
             if (visibleCount > 0) {
@@ -141,6 +168,15 @@ internal fun DirectoryMapFilterRow(
                             tint = OliveGreen,
                         )
                     },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = Paper,
+                        labelColor = Ink,
+                        leadingIconContentColor = OliveGreen,
+                    ),
+                    border = AssistChipDefaults.assistChipBorder(
+                        enabled = true,
+                        borderColor = OliveOutline.copy(alpha = 0.65f),
+                    ),
                     modifier = Modifier.testTag("nearby_support_list"),
                 )
             }

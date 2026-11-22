@@ -177,4 +177,17 @@ test("chat and direct sharing allow recipients without an enrolled account keyse
   assert.deepEqual(Object.keys(f.records.get("files/file").account_wrapped_keys), ["owner"]);
   await f.api.mediaUpdateAccess(request("owner", {...ownerOnlyWrappers, grantIndependentRecipients: ["friend"]}));
   assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend"]);
+  // An existing authorized reader (e.g., assigned staff) can grant independent access to a new participant (e.g., escalated admin) without removing existing readers
+  await f.api.mediaUpdateAccess(request("friend", {
+    wrappedKeys: {owner: "owner-key", friend: "friend-key", admin: "admin-key"},
+    accountWrappedKeys: wrappers("owner"),
+    grantIndependentRecipients: ["admin"],
+  }));
+  assert.deepEqual(f.records.get("files/file").allowed_users, ["owner", "friend", "admin"]);
+  assert.deepEqual(f.records.get(grant).independentReaders, ["friend", "admin"]);
+  // Non-owners cannot revoke existing readers
+  await assert.rejects(f.api.mediaUpdateAccess(request("friend", {
+    wrappedKeys: {owner: "owner-key", friend: "friend-key"},
+    accountWrappedKeys: wrappers("owner"),
+  })), {code: "permission-denied"});
 });

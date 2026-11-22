@@ -667,7 +667,7 @@ class MediaRepository(
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
-        require(accountWrappedKeys.keys==wrappedKeys.keys)
+        require(wrappedKeys.keys.containsAll(accountWrappedKeys.keys))
         return call("mediaUpdateAccess",mapOf(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,

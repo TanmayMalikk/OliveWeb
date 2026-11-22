@@ -6,6 +6,7 @@ import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
 import android.util.Patterns
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -273,6 +274,9 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
         Surface(
             modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = 280.dp),
             shape = MaterialTheme.shapes.large,
+            color = Paper,
+            contentColor = Ink,
+            border = BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
             shadowElevation = 4.dp,
         ) {
             Row(
@@ -295,6 +299,10 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
             Surface(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
+                color = Paper,
+                contentColor = Ink,
+                border = BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
+                shadowElevation = 4.dp,
             ) {
                 AccessibleMessage(
                     it,

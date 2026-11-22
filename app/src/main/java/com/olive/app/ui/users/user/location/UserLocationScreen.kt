@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -83,9 +87,12 @@ import com.olive.app.data.safety.HotlineResource
 import com.olive.app.data.safety.SavedHotlineStore
 import com.olive.app.data.safety.hotlineDialNumber
 import com.olive.app.ui.shared.AccessibleMessage
+import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.LoadingSkeleton
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.OliveOutline
+import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.shared.SkeletonLayout
 import com.olive.app.ui.shared.SoftCardSurface
 import com.olive.app.ui.shared.oliveScrollbar
@@ -409,9 +416,13 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                 )
                 IconButton(
                     onClick = { fullScreenMap = true },
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp).testTag("location_expand_map"),
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                        .shadow(4.dp, CircleShape)
+                        .border(BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)), CircleShape)
+                        .testTag("location_expand_map"),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = Paper,
+                        contentColor = Ink,
                     ),
                 ) {
                     Icon(Icons.Outlined.Fullscreen, stringResource(R.string.location_expand_map))
@@ -525,6 +536,20 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                             leadingIcon = {
                                 Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(16.dp))
                             },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Paper,
+                                labelColor = Ink,
+                                iconColor = OliveGreen,
+                                selectedContainerColor = OliveGreen,
+                                selectedLabelColor = Paper,
+                                selectedLeadingIconColor = Paper,
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = headingUp,
+                                borderColor = OliveOutline.copy(alpha = 0.65f),
+                                selectedBorderColor = OliveGreen,
+                            ),
                             modifier = Modifier.testTag("map_heading_chip"),
                         )
                     }

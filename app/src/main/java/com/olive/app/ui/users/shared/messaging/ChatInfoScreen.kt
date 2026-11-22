@@ -56,7 +56,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
         val parts = message.body.split(":", limit = 3)
         val kind = parts.firstOrNull().orEmpty()
         if (kind !in setOf(
-                "SHARED_MEDIA", "SHARED_NOTE", "SHARED_INCIDENT", "SHARED_SAFETY_PLAN", "SHARED_LOCATION"
+                "SHARED_MEDIA", "SHARED_VOICE", "SHARED_NOTE", "SHARED_INCIDENT", "SHARED_SAFETY_PLAN", "SHARED_LOCATION"
             )
         ) return@mapNotNull null
         val id = parts.getOrNull(1).orEmpty()
@@ -64,7 +64,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
             key = "$kind:${id.ifBlank { message.id }}",
             kind = kind,
             id = id,
-            title = parts.getOrNull(2).orEmpty(),
+            title = if (kind == "SHARED_VOICE") "Voice message.m4a" else parts.getOrNull(2).orEmpty(),
             senderUid = message.senderUid,
         )
     }
@@ -398,7 +398,7 @@ internal fun ChatInfoDialog(
                     }
                     items(sharedItems, key = SharedChatItem::key) { item ->
                         when (item.kind) {
-                            "SHARED_MEDIA" -> SharedMediaMessage(
+                            "SHARED_MEDIA", "SHARED_VOICE" -> SharedMediaMessage(
                                 item.id,
                                 item.title,
                                 session,

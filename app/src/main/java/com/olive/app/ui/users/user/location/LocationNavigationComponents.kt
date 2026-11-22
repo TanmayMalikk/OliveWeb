@@ -8,6 +8,7 @@ import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.outlined.UTurnLeft
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -80,8 +83,11 @@ import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.RouteDirection
 import com.olive.app.data.location.RouteProfile
 import com.olive.app.data.location.supportDistanceMeters
+import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.OliveOutline
 import com.olive.app.ui.shared.OlivePrivateLayout
+import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import kotlin.math.ceil
 
@@ -171,9 +177,12 @@ internal fun FullScreenLocationMap(
         IconButton(
             onClick = onExitFullScreen,
             modifier = Modifier.statusBarsPadding().padding(12.dp).align(Alignment.TopStart)
+                .shadow(4.dp, CircleShape)
+                .border(BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)), CircleShape)
                 .testTag("exit_full_screen_navigation"),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = Paper,
+                contentColor = Ink,
             ),
         ) {
             Icon(Icons.Outlined.FullscreenExit, stringResource(R.string.location_exit_full_screen))
@@ -182,7 +191,12 @@ internal fun FullScreenLocationMap(
             FilterChip(
                 selected = showSavedOnly,
                 onClick = onToggleSavedOnly,
-                label = { Text(stringResource(R.string.support_map_filter_saved_only, savedCount)) },
+                label = {
+                    Text(
+                        stringResource(R.string.support_map_filter_saved_only, savedCount),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         if (showSavedOnly) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
@@ -190,6 +204,23 @@ internal fun FullScreenLocationMap(
                         modifier = Modifier.size(16.dp),
                     )
                 },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Paper,
+                    labelColor = Ink,
+                    iconColor = OliveGreen,
+                    selectedContainerColor = OliveGreen,
+                    selectedLabelColor = Paper,
+                    selectedLeadingIconColor = Paper,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = showSavedOnly,
+                    borderColor = OliveOutline.copy(alpha = 0.7f),
+                    selectedBorderColor = OliveGreen,
+                    borderWidth = 1.dp,
+                    selectedBorderWidth = 1.dp,
+                ),
+                elevation = FilterChipDefaults.elevatedFilterChipElevation(elevation = 4.dp),
                 modifier = Modifier.statusBarsPadding().padding(start = 68.dp, top = 12.dp)
                     .align(Alignment.TopStart).testTag("full_screen_saved_filter"),
             )

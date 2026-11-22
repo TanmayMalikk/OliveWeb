@@ -539,21 +539,23 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val repository = messagingRepository ?: return
             val otherUids = conversation.participantIds.filter { it != device.uid }
             if (otherUids.isEmpty()) return
-            val myShares = messages.asSequence()
-                .filter { !it.unsent && it.senderUid == device.uid }
+            val shares = messages.asSequence()
+                .filter { !it.unsent }
                 .mapNotNull { msg ->
                     val parts = msg.body.split(":", limit = 3)
                     val kind = parts.firstOrNull().orEmpty()
                     val id = parts.getOrNull(1).orEmpty()
-                    if (id.isNotBlank() && kind in setOf("SHARED_NOTE", "SHARED_INCIDENT", "SHARED_MEDIA")) {
+                    if (id.isNotBlank() && kind in setOf(
+                            "SHARED_NOTE", "SHARED_INCIDENT", "SHARED_MEDIA", "SHARED_VOICE",
+                        )) {
                         kind to id
                     } else null
                 }
                 .distinct()
                 .toList()
-            if (myShares.isEmpty()) return
+            if (shares.isEmpty()) return
             val signature = "${conversation.id}|${otherUids.sorted().joinToString(",")}|" +
-                myShares.joinToString(",") { "${it.first}:${it.second}" }
+                shares.joinToString(",") { "${it.first}:${it.second}" }
             if (signature == lastSyncedSharedSignature) return
             val token = epoch
             scope.launch {
@@ -563,8 +565,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             runCatching { repository.prepareTicketParticipantNames(conversation.id) }
                                 .getOrDefault(emptyMap())
                     } else conversation.participantUsernames
-                    val noteIds = myShares.filter { it.first != "SHARED_MEDIA" }.map { it.second }.distinct()
-                    val mediaIds = myShares.filter { it.first == "SHARED_MEDIA" }.map { it.second }.distinct()
+                    val noteIds = shares
+                        .filter { it.first in setOf("SHARED_NOTE", "SHARED_INCIDENT") }
+                        .map { it.second }.distinct()
+                    val mediaIds = shares
+                        .filter { it.first in setOf("SHARED_MEDIA", "SHARED_VOICE") }
+                        .map { it.second }.distinct()
                     var allParticipantsResolved = true
                     if (noteIds.isNotEmpty() && secureDocumentRepository != null) {
                         val resolvedKeys = mutableMapOf<String, PublicKey>()
