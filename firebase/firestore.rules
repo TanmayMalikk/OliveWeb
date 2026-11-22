@@ -119,7 +119,12 @@ service cloud.firestore {
     }
 
     match /accountKeysets/{uid} {
-      allow get: if owner(uid) && validAccountKeysetShape(resource.data, uid);
+      // A first-run owner must be able to distinguish an absent keyset from an access denial.
+      // Existing records still have to pass the ciphertext-envelope schema before being returned.
+      allow get: if owner(uid) && (
+        !exists(/databases/$(database)/documents/accountKeysets/$(uid))
+        || validAccountKeysetShape(resource.data, uid)
+      );
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
       allow update: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid)

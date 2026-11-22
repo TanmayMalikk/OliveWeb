@@ -165,6 +165,9 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
   const bob = env.authenticatedContext('keyset-bob').firestore();
   const anonymous = env.unauthenticatedContext().firestore();
   const target = doc(alice, 'accountKeysets', uid);
+  await assertSucceeds(getDoc(target));
+  await assertFails(getDoc(doc(bob, 'accountKeysets', uid)));
+  await assertFails(getDoc(doc(anonymous, 'accountKeysets', uid)));
   const envelope = {
     version: 1,
     accountId: uid,

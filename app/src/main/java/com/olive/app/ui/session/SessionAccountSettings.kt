@@ -17,6 +17,8 @@ import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.profileChanges
 import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.security.*
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -431,6 +433,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
             operations.runOperation(
                 application.getString(R.string.passkey_recovery_setup_failed),
                 timeoutMillis = 180_000,
+                failureFor = { passkeyRecoveryFailureMessage(it) },
             ) { token ->
                 val ark = accountRecoveryKey(uid, token)
                 val registration = recovery.beginEnrollment()
@@ -617,12 +620,57 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         val request = PasskeyCredentialRequest(requestJson, assertion)
         runtime.state.passkeyCredentialRequest = request
         return try {
-            request.result.await() ?: error("Passkey request was cancelled")
+            when (val result = request.result.await()) {
+                null -> throw PasskeyCredentialFailureException(PasskeyCredentialFailure.CANCELLED)
+                is PasskeyCredentialResult.Failure -> throw PasskeyCredentialFailureException(result.reason)
+                else -> result
+            }
         } finally {
             if (runtime.state.passkeyCredentialRequest === request) {
                 runtime.state.passkeyCredentialRequest = null
             }
         }
+    }
+
+    private fun passkeyRecoveryFailureMessage(failure: Exception): String {
+        val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
+        val credential = causes.filterIsInstance<PasskeyCredentialFailureException>().firstOrNull()
+        val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()
+        val firestore = causes.filterIsInstance<FirebaseFirestoreException>().firstOrNull()
+        val message = when {
+            credential != null -> when (credential.reason) {
+                PasskeyCredentialFailure.CANCELLED -> R.string.passkey_recovery_setup_cancelled
+                PasskeyCredentialFailure.INTERRUPTED -> R.string.passkey_recovery_setup_interrupted
+                PasskeyCredentialFailure.PROVIDER_UNAVAILABLE -> R.string.passkey_recovery_provider_unavailable
+                PasskeyCredentialFailure.UNSUPPORTED -> R.string.passkey_recovery_unsupported
+                PasskeyCredentialFailure.NO_CREDENTIAL -> R.string.passkey_recovery_no_credential
+                PasskeyCredentialFailure.NETWORK -> R.string.passkey_recovery_network_error
+                PasskeyCredentialFailure.SECURITY -> R.string.passkey_recovery_security_error
+                PasskeyCredentialFailure.ALREADY_EXISTS -> R.string.passkey_recovery_already_exists
+                PasskeyCredentialFailure.INVALID_RESPONSE -> R.string.passkey_recovery_invalid_response
+                PasskeyCredentialFailure.UNKNOWN -> R.string.passkey_recovery_setup_failed
+            }
+            functions != null -> when (functions.code) {
+                FirebaseFunctionsException.Code.UNAUTHENTICATED -> R.string.passkey_recovery_sign_in_again
+                FirebaseFunctionsException.Code.UNAVAILABLE,
+                FirebaseFunctionsException.Code.DEADLINE_EXCEEDED -> R.string.passkey_recovery_network_error
+                FirebaseFunctionsException.Code.ALREADY_EXISTS -> R.string.passkey_recovery_already_exists
+                FirebaseFunctionsException.Code.INVALID_ARGUMENT,
+                FirebaseFunctionsException.Code.FAILED_PRECONDITION,
+                FirebaseFunctionsException.Code.PERMISSION_DENIED -> R.string.passkey_recovery_server_rejected
+                else -> R.string.passkey_recovery_setup_failed
+            }
+            firestore != null -> when (firestore.code) {
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> R.string.passkey_recovery_sign_in_again
+                FirebaseFirestoreException.Code.UNAVAILABLE,
+                FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> R.string.passkey_recovery_network_error
+                FirebaseFirestoreException.Code.PERMISSION_DENIED -> R.string.passkey_recovery_storage_denied
+                else -> R.string.passkey_recovery_setup_failed
+            }
+            causes.any { it is IllegalArgumentException } -> R.string.passkey_recovery_sign_in_again
+            else -> R.string.passkey_recovery_setup_failed
+        }
+        return runtime.application.getString(message)
     }
 
     private fun currentRecoverySession(uid: String, token: Long) = with(runtime) {

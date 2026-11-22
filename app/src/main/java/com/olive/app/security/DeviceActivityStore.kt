@@ -36,7 +36,6 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
-import androidx.credentials.exceptions.NoCredentialException
 import com.olive.app.R
 import com.olive.app.data.account.HistoryRecord
 import com.olive.app.data.account.PrivateEntry
@@ -607,10 +606,8 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: NoCredentialException) {
-                null
-            } catch (_: Exception) {
-                null
+            } catch (failure: Exception) {
+                PasskeyCredentialResult.Failure(classifyPasskeyCredentialFailure(failure))
             }
             finish(value, result)
         }
