@@ -21,7 +21,6 @@ import javax.crypto.Mac
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import org.json.JSONArray
 import org.json.JSONObject
 
 /** AES-256 key that unlocks one account's encrypted keyset. */
@@ -413,7 +412,7 @@ internal class AccountKeysetLocalStore(private val vault: JsonVault) {
 }
 
 /**
- * Single WebAuthn JSON boundary shared by the compatibility probe and production recovery.
+ * Single WebAuthn JSON boundary for production passkey recovery.
  * PRF output is extracted and removed here before a response can be sent to Firebase.
  */
 internal object PasskeyPrfProtocol {
@@ -474,71 +473,6 @@ internal object PasskeyPrfProtocol {
             ?.optJSONObject("prf")
             ?.remove("results")
         return response.toString()
-    }
-
-    /** Debug-only request shape; it deliberately does not ask for PRF during creation. */
-    fun probeCreationRequest(challenge: ByteArray, userId: ByteArray): String {
-        requireLength(challenge, 32, "Create challenge")
-        requireLength(userId, 16, "Probe user ID")
-        return JSONObject().apply {
-            put("challenge", base64Url(challenge))
-            put("rp", JSONObject().put("id", RP_ID).put("name", "Olive Branch PRF Probe"))
-            put("user", JSONObject().apply {
-                put("id", base64Url(userId))
-                put("name", "prf-probe")
-                put("displayName", "Olive Branch compatibility test")
-            })
-            put("pubKeyCredParams", JSONArray().apply {
-                put(JSONObject().put("type", "public-key").put("alg", -7))
-                put(JSONObject().put("type", "public-key").put("alg", -257))
-            })
-            put("authenticatorSelection", JSONObject()
-                .put("residentKey", "required")
-                .put("userVerification", "required"))
-            put("attestation", "none")
-        }.toString()
-    }
-
-    /** Debug-only assertion builder using already decoded random probe values. */
-    fun probeAssertionRequest(challenge: ByteArray, credentialId: String, prfInput: ByteArray): String {
-        requireLength(challenge, 32, "Assertion challenge")
-        require(CREDENTIAL_ID.matches(credentialId)) { "Invalid passkey credential ID" }
-        requireLength(prfInput, PRF_BYTES, "PRF input")
-        return JSONObject().apply {
-            put("challenge", base64Url(challenge))
-            put("rpId", RP_ID)
-            put("allowCredentials", JSONArray().put(JSONObject()
-                .put("type", "public-key")
-                .put("id", credentialId)))
-            put("userVerification", "required")
-            put("extensions", JSONObject().put("prf", JSONObject()
-                .put("evalByCredential", JSONObject().put(
-                    credentialId,
-                    JSONObject().put("first", base64Url(prfInput)),
-                ))))
-        }.toString()
-    }
-
-    /** Probe helper that never throws or retains malformed provider output. */
-    fun prfOutputOrNull(authenticationResponseJson: String): ByteArray? {
-        val encoded = runCatching {
-            JSONObject(authenticationResponseJson)
-                .optJSONObject("clientExtensionResults")
-                ?.optJSONObject("prf")
-                ?.optJSONObject("results")
-                ?.optString("first")
-                .orEmpty()
-        }.getOrDefault("")
-        if (encoded.isBlank()) return null
-        val bytes = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull() ?: return null
-        return bytes.takeIf { it.size == PRF_BYTES } ?: run {
-            bytes.fill(0)
-            null
-        }
-    }
-
-    private fun requireLength(value: ByteArray, expected: Int, name: String) {
-        require(value.size == expected) { "$name must contain $expected bytes" }
     }
 
     private fun decodeBase64(value: String): ByteArray = try {
