@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Search
@@ -109,29 +111,21 @@ private fun PrivateRouteControls(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            state.privateDestination?.let { destination ->
-                Text(
-                    destination.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            val progress = state.route?.let { r -> displayedOwn?.let { r.progress(it.latitude, it.longitude) } }
+            TripSummaryMetrics(
+                route = state.route,
+                progress = progress,
+                destinationName = state.privateDestination?.name.orEmpty(),
+                routeProfile = state.routeProfile,
+            )
             state.route?.let { route ->
-                val progress = displayedOwn?.let { route.progress(it.latitude, it.longitude) }
-                Text(
-                    stringResource(
-                        R.string.location_route_summary,
-                        formatRouteDistance(progress?.distanceMeters ?: route.distanceMeters),
-                        formatRouteDuration(progress?.durationSeconds ?: route.durationSeconds),
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = OliveGreen,
-                )
                 displayedOwn?.let { origin -> route.nextDirection(origin.latitude, origin.longitude) }
                     ?.let {
                         Text(
                             stringResource(R.string.location_next_direction, it.text),
                             style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
             }
@@ -139,18 +133,30 @@ private fun PrivateRouteControls(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onOpenFullScreen,
-                    modifier = Modifier.weight(1f).testTag("location_full_screen_navigation"),
+                    modifier = Modifier.weight(1f).height(44.dp).testTag("location_full_screen_navigation"),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                 ) {
-                    Icon(Icons.Outlined.Fullscreen, null)
+                    Icon(Icons.Outlined.Fullscreen, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.location_full_screen_navigation), maxLines = 1)
+                    Text(
+                        stringResource(R.string.location_full_screen_navigation),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 Button(
                     onClick = controller::stopNavigation,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Text(stringResource(R.string.location_stop_navigation), maxLines = 1)
+                    Icon(Icons.Outlined.Close, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.location_stop_navigation),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -331,6 +337,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
             showSavedOnly = showSavedOnly,
             savedCount = savedMappedCount,
             onToggleSavedOnly = if (profile.role == AccountRole.USER) ({ showSavedOnly = !showSavedOnly }) else null,
+            routeProfile = state.routeProfile,
             onUserGesture = { if (headingUp) headingUp = false },
         )
         return
@@ -553,17 +560,19 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                     }
                     state.route?.takeIf { state.navigating }?.let { route ->
                         val progress = displayedOwn?.let { route.progress(it.latitude, it.longitude) }
-                        Text(
-                            stringResource(
-                                R.string.location_route_summary,
-                                formatRouteDistance(progress?.distanceMeters ?: route.distanceMeters),
-                                formatRouteDuration(progress?.durationSeconds ?: route.durationSeconds),
-                            ),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = OliveGreen,
+                        TripSummaryMetrics(
+                            route = route,
+                            progress = progress,
+                            destinationName = navigationTarget?.name.orEmpty(),
+                            routeProfile = state.routeProfile,
                         )
                         displayedOwn?.let { route.nextDirection(it.latitude, it.longitude) }?.let { direction ->
-                            Text(stringResource(R.string.location_next_direction, direction.text), style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(R.string.location_next_direction, direction.text),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                     if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
@@ -571,18 +580,30 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedButton(
                                 onClick = { fullScreenMap = true },
-                                modifier = Modifier.weight(1f).testTag("location_full_screen_navigation"),
+                                modifier = Modifier.weight(1f).height(44.dp).testTag("location_full_screen_navigation"),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             ) {
-                                Icon(Icons.Outlined.Fullscreen, null)
+                                Icon(Icons.Outlined.Fullscreen, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.location_full_screen_navigation), maxLines = 1)
+                                Text(
+                                    stringResource(R.string.location_full_screen_navigation),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                             Button(
                                 onClick = controller::stopNavigation,
-                                modifier = Modifier.weight(1f).testTag("location_navigate"),
+                                modifier = Modifier.weight(1f).height(44.dp).testTag("location_navigate"),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             ) {
-                                Text(stringResource(R.string.location_stop_navigation), maxLines = 1)
+                                Icon(Icons.Outlined.Close, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.location_stop_navigation),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     } else {

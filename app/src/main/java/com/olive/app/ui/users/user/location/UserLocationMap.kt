@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.BuildConfig
@@ -107,6 +108,7 @@ internal fun InteractiveLocationMap(
     onToggleHeadingUp: (() -> Unit)? = null,
     compassEnabled: Boolean = true,
     fitSupportServices: Boolean = false,
+    bottomControlsPadding: Dp = 28.dp,
     onUserGesture: (() -> Unit)? = null,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
@@ -336,7 +338,7 @@ internal fun InteractiveLocationMap(
     }
 
     BoxWithConstraints(modifier.semantics { contentDescription = description }) {
-        val compactHeight = maxHeight < 310.dp
+        val compactHeight = maxHeight < 310.dp || (maxHeight - bottomControlsPadding) < 250.dp
         key(attempt) {
             AndroidView(
                 factory = { context ->
@@ -555,7 +557,7 @@ internal fun InteractiveLocationMap(
 
                     if (compactHeight) {
                         Row(
-                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 28.dp),
+                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = bottomControlsPadding),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             if (showCompassControl) CompassFab()
@@ -564,7 +566,7 @@ internal fun InteractiveLocationMap(
                         }
                     } else {
                         Column(
-                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 28.dp),
+                            Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = bottomControlsPadding),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             RecenterFab()
