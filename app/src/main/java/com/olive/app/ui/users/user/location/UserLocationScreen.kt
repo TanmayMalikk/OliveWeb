@@ -65,11 +65,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.NearbySupportService
 import com.olive.app.data.location.supportDistanceMeters
 import com.olive.app.data.messaging.Friend
@@ -92,16 +94,63 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-private fun PrivateRouteControls(controller: LocationMapController, state: LocationMapState) {
-    if (state.navigating) {
-        OutlinedButton(onClick = controller::stopNavigation, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.location_stop_navigation))
-        }
-        state.privateDestination?.let { destination ->
-            Text(destination.name, style = MaterialTheme.typography.labelLarge)
+private fun PrivateRouteControls(
+    controller: LocationMapController,
+    state: LocationMapState,
+    displayedOwn: MapLocationPoint?,
+    onOpenFullScreen: () -> Unit,
+) {
+    if (!state.navigating) return
+    Surface(
+        Modifier.fillMaxWidth().testTag("active_route_card"),
+        shape = RoundedCornerShape(18.dp),
+        color = SoftCardSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            state.privateDestination?.let { destination ->
+                Text(
+                    destination.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             state.route?.let { route ->
-                state.ownPoint?.let { origin -> route.nextDirection(origin.latitude, origin.longitude) }
-                    ?.let { Text(stringResource(R.string.location_next_direction, it.text)) }
+                val progress = displayedOwn?.let { route.progress(it.latitude, it.longitude) }
+                Text(
+                    stringResource(
+                        R.string.location_route_summary,
+                        formatRouteDistance(progress?.distanceMeters ?: route.distanceMeters),
+                        formatRouteDuration(progress?.durationSeconds ?: route.durationSeconds),
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = OliveGreen,
+                )
+                displayedOwn?.let { origin -> route.nextDirection(origin.latitude, origin.longitude) }
+                    ?.let {
+                        Text(
+                            stringResource(R.string.location_next_direction, it.text),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+            }
+            if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onOpenFullScreen,
+                    modifier = Modifier.weight(1f).testTag("location_full_screen_navigation"),
+                ) {
+                    Icon(Icons.Outlined.Fullscreen, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.location_full_screen_navigation), maxLines = 1)
+                }
+                Button(
+                    onClick = controller::stopNavigation,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text(stringResource(R.string.location_stop_navigation), maxLines = 1)
+                }
             }
         }
     }
@@ -289,25 +338,30 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     Column(
         Modifier.fillMaxSize()
             .then(if (profile.role == AccountRole.USER) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .then(if (profile.role == AccountRole.USER) Modifier.padding(bottom = 88.dp) else Modifier),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("location_back")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ui_previous_safe_page))
             }
-            Text(
-                stringResource(R.string.location_map),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() },
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.location_map),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    stringResource(if (profile.role == AccountRole.USER) R.string.location_map_user_help else R.string.location_map_contact_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Text(
-            stringResource(if (profile.role == AccountRole.USER) R.string.location_map_user_help else R.string.location_map_contact_help),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Muted,
-        )
         if (foregroundDenied) Button(
             onClick = { permissionScope.launch { if (requestMapAccess(retry = true)) controller.open(configuration) { true } } },
             modifier = Modifier.fillMaxWidth().testTag("map_allow_location"),
@@ -371,22 +425,29 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                 onToggleHeadingUp = { headingUp = !headingUp },
                 onOpenDirectoryList = { showDirectoryList = true },
             )
-            PrivateRouteControls(controller, state)
-            if (state.navigating) OutlinedButton(onClick = { fullScreenMap = true }) {
-                Text(stringResource(R.string.location_full_screen_navigation))
-            }
+            PrivateRouteControls(
+                controller = controller,
+                state = state,
+                displayedOwn = displayedOwn,
+                onOpenFullScreen = { fullScreenMap = true },
+            )
             Surface(
                 Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
+                shape = RoundedCornerShape(18.dp),
                 color = SoftCardSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.share_live_location_with), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.location_contacts_selected, state.selected.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                    )
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.share_live_location_with), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.location_contacts_selected, state.selected.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Muted,
+                            )
+                        }
+                    }
                     if (session.messages.loadingIndex) LoadingSkeleton(SkeletonLayout.Contacts, rows = 1)
                     else LocationShareFriendPicker(
                         accountId = uid,
@@ -401,32 +462,32 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                         style = MaterialTheme.typography.bodySmall,
                         color = OliveGreen,
                     )
+                    if (!state.liveActive) Button(
+                        onClick = { durationDialog = true },
+                        enabled = state.selected.isNotEmpty() && !state.working && !session.localMode,
+                        modifier = Modifier.fillMaxWidth().testTag("start_location_sharing"),
+                    ) {
+                        Icon(Icons.Outlined.LocationOn, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.start_sharing_location))
+                    } else Button(
+                        onClick = controller::stopSharing,
+                        modifier = Modifier.fillMaxWidth().testTag("stop_location_sharing"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    ) { Text(stringResource(R.string.stop_sharing_location)) }
+                    if (session.localMode) Text(
+                        stringResource(R.string.location_firebase_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
                 }
             }
-            if (!state.liveActive) Button(
-                onClick = { durationDialog = true },
-                enabled = state.selected.isNotEmpty() && !state.working && !session.localMode,
-                modifier = Modifier.fillMaxWidth().testTag("start_location_sharing"),
-            ) {
-                Icon(Icons.Outlined.LocationOn, null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.start_sharing_location))
-            } else Button(
-                onClick = controller::stopSharing,
-                modifier = Modifier.fillMaxWidth().testTag("stop_location_sharing"),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(R.string.stop_sharing_location)) }
             if (durationDialog) ShareDurationDialog(
                 onDismiss = { durationDialog = false },
                 onSelected = { durationMillis ->
                     durationDialog = false
                     controller.startSharing(configuration, durationMillis, requestPermission, permissionRequired, startFailed)
                 },
-            )
-            if (session.localMode) Text(
-                stringResource(R.string.location_firebase_required),
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
             )
         } else {
             Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = SoftCardSurface) {

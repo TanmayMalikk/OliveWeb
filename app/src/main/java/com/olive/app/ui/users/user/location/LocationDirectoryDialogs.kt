@@ -1,7 +1,6 @@
 // Safe-app users: directory map filter bar, place picker, and detail dialogs for map view.
 package com.olive.app.ui.users.user.location
 
-import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +23,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -67,7 +67,12 @@ internal fun DirectoryMapFilterRow(
             FilterChip(
                 selected = showSavedOnly,
                 onClick = onToggleSavedOnly,
-                label = { Text(stringResource(R.string.support_map_filter_saved_only, savedMappedCount)) },
+                label = {
+                    Text(
+                        stringResource(R.string.support_map_filter_saved_only, savedMappedCount),
+                        maxLines = 1,
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         imageVector = if (showSavedOnly) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
@@ -85,7 +90,8 @@ internal fun DirectoryMapFilterRow(
                         stringResource(
                             if (headingUp) R.string.location_compass_heading_up
                             else R.string.location_compass_north_up
-                        )
+                        ),
+                        maxLines = 1,
                     )
                 },
                 leadingIcon = {
@@ -94,20 +100,28 @@ internal fun DirectoryMapFilterRow(
                 modifier = Modifier.testTag("map_heading_chip"),
             )
             if (visibleCount > 0) {
-                OutlinedButton(
+                AssistChip(
                     onClick = onOpenDirectoryList,
-                    modifier = Modifier.testTag("nearby_support_list"),
-                ) {
-                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        stringResource(
-                            if (showSavedOnly) R.string.support_saved_map_locations
-                            else R.string.support_directory_map_locations,
-                            visibleCount,
+                    label = {
+                        Text(
+                            stringResource(
+                                if (showSavedOnly) R.string.support_saved_map_locations
+                                else R.string.support_directory_map_locations,
+                                visibleCount,
+                            ),
+                            maxLines = 1,
                         )
-                    )
-                }
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = OliveGreen,
+                        )
+                    },
+                    modifier = Modifier.testTag("nearby_support_list"),
+                )
             }
         }
         if (showSavedOnly && visibleCount == 0) {

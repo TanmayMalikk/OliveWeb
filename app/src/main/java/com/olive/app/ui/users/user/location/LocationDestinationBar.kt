@@ -1,17 +1,17 @@
 // Safe-app users: provides free-use GPS destination entry with 50ms/as-you-type autofill suggestions.
 package com.olive.app.ui.users.user.location
 
-import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,14 +23,17 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -53,7 +57,6 @@ import com.olive.app.R
 import com.olive.app.data.location.DestinationAutocompleteClient
 import com.olive.app.data.location.DestinationSuggestion
 import com.olive.app.data.location.DestinationSuggestionKind
-import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.RouteProfile
 import com.olive.app.data.location.localDestinationSuggestions
 import com.olive.app.data.location.parseCoordinates
@@ -61,7 +64,6 @@ import com.olive.app.data.safety.HotlineResource
 import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.shared.SoftCardSurface
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
@@ -69,7 +71,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Free-use GPS destination card accepting arbitrary addresses or latitude/longitude coordinates
+ * Free-use GPS destination bar accepting arbitrary addresses or latitude/longitude coordinates
  * with immediate local suggestions + 50ms debounced remote autocomplete.
  */
 @Composable
@@ -189,143 +191,187 @@ internal fun FreeUseGpsDestinationCard(
         }
     }
 
-    Surface(
+    Column(
         Modifier.fillMaxWidth().testTag("map_gps_destination_card"),
-        shape = MaterialTheme.shapes.large,
-        color = SoftCardSurface,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.location_gps_destination_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (state.privateDestination != null && !state.navigating) {
-                    TextButton(
-                        onClick = {
-                            query = ""
-                            resolveError = null
-                            controller.stopNavigation()
-                        },
-                    ) {
-                        Text(stringResource(R.string.location_gps_clear_destination))
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = state.routeProfile == RouteProfile.DRIVING,
-                    onClick = { controller.setRouteProfile(RouteProfile.DRIVING) },
-                    enabled = !state.navigating,
-                    label = { Text(stringResource(R.string.location_route_driving)) },
-                    leadingIcon = { Icon(Icons.Outlined.DirectionsCar, null, Modifier.size(16.dp)) },
-                    modifier = Modifier.testTag("map_route_profile_driving"),
-                )
-                FilterChip(
-                    selected = state.routeProfile == RouteProfile.WALKING,
-                    onClick = { controller.setRouteProfile(RouteProfile.WALKING) },
-                    enabled = !state.navigating,
-                    label = { Text(stringResource(R.string.location_route_walking)) },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, null, Modifier.size(16.dp)) },
-                    modifier = Modifier.testTag("map_route_profile_walking"),
-                )
-            }
-            OutlinedTextField(
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 2.dp,
+        ) {
+            TextField(
                 value = query,
                 onValueChange = { next ->
                     suppressNextAutocomplete = false
                     resolveError = null
                     query = next.take(180)
                 },
-                label = { Text(stringResource(R.string.location_gps_destination_hint)) },
-                leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.location_gps_destination_hint),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Muted,
+                    )
+                },
+                leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Muted) },
                 trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = ""; suggestions = emptyList(); resolveError = null }) {
-                            Icon(Icons.Outlined.Clear, stringResource(R.string.location_gps_clear_destination))
+                    Row(
+                        modifier = Modifier.padding(end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = { query = ""; suggestions = emptyList(); resolveError = null },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Clear,
+                                    stringResource(R.string.location_gps_clear_destination),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                        if (query.isNotBlank() && !state.navigating) {
+                            FilledIconButton(
+                                onClick = { submitFreeText() },
+                                enabled = !state.routeWorking,
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = OliveGreen,
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.size(36.dp).testTag("map_gps_start_route"),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Navigation,
+                                    stringResource(R.string.location_gps_start_route),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         }
                     }
                 },
                 singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { submitFreeText() }),
                 modifier = Modifier.fillMaxWidth().testTag("map_gps_destination_input"),
             )
-            if (searchingRemote && suggestions.isEmpty()) {
-                Text(
-                    stringResource(R.string.location_gps_searching),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Muted,
-                )
-            }
-            if (suggestions.isNotEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp,
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(
+                selected = state.routeProfile == RouteProfile.DRIVING,
+                onClick = { controller.setRouteProfile(RouteProfile.DRIVING) },
+                enabled = !state.navigating,
+                label = { Text(stringResource(R.string.location_route_driving), maxLines = 1) },
+                leadingIcon = { Icon(Icons.Outlined.DirectionsCar, null, Modifier.size(16.dp)) },
+                modifier = Modifier.testTag("map_route_profile_driving"),
+            )
+            FilterChip(
+                selected = state.routeProfile == RouteProfile.WALKING,
+                onClick = { controller.setRouteProfile(RouteProfile.WALKING) },
+                enabled = !state.navigating,
+                label = { Text(stringResource(R.string.location_route_walking), maxLines = 1) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, null, Modifier.size(16.dp)) },
+                modifier = Modifier.testTag("map_route_profile_walking"),
+            )
+            Spacer(Modifier.weight(1f))
+            if (state.privateDestination != null && !state.navigating) {
+                TextButton(
+                    onClick = {
+                        query = ""
+                        resolveError = null
+                        controller.stopNavigation()
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 ) {
-                    Column {
-                        suggestions.forEachIndexed { index, item ->
-                            if (index > 0) HorizontalDivider()
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        query = item.title
-                                        startRouteTo(item.title, item.latitude, item.longitude)
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                                    .testTag("map_gps_suggestion_$index"),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(
-                                    imageVector = when (item.kind) {
-                                        DestinationSuggestionKind.Coordinates -> Icons.Outlined.MyLocation
-                                        DestinationSuggestionKind.DirectoryPlace -> Icons.Outlined.LocationOn
-                                        DestinationSuggestionKind.Address -> Icons.Outlined.Navigation
-                                    },
-                                    contentDescription = null,
-                                    tint = if (item.kind == DestinationSuggestionKind.DirectoryPlace) OliveGreen
-                                    else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
+                    Text(stringResource(R.string.location_gps_clear_destination), maxLines = 1)
+                }
+            }
+        }
+
+        if (searchingRemote && suggestions.isEmpty()) {
+            Text(
+                stringResource(R.string.location_gps_searching),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
+
+        if (suggestions.isNotEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 4.dp,
+            ) {
+                Column {
+                    suggestions.forEachIndexed { index, item ->
+                        if (index > 0) HorizontalDivider()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    query = item.title
+                                    startRouteTo(item.title, item.latitude, item.longitude)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .testTag("map_gps_suggestion_$index"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                imageVector = when (item.kind) {
+                                    DestinationSuggestionKind.Coordinates -> Icons.Outlined.MyLocation
+                                    DestinationSuggestionKind.DirectoryPlace -> Icons.Outlined.LocationOn
+                                    DestinationSuggestionKind.Address -> Icons.Outlined.Navigation
+                                },
+                                contentDescription = null,
+                                tint = if (item.kind == DestinationSuggestionKind.DirectoryPlace) OliveGreen
+                                else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    item.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                Column(Modifier.weight(1f)) {
+                                if (item.subtitle.isNotBlank()) {
                                     Text(
-                                        item.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
+                                        item.subtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Muted,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    if (item.subtitle.isNotBlank()) {
-                                        Text(
-                                            item.subtitle,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Muted,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            resolveError?.let { AccessibleMessage(it) }
-            if (query.isNotBlank() && !state.navigating) {
-                Button(
-                    onClick = { submitFreeText() },
-                    enabled = !state.routeWorking,
-                    modifier = Modifier.fillMaxWidth().testTag("map_gps_start_route"),
-                ) {
-                    Icon(Icons.Outlined.Navigation, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.location_gps_start_route))
-                }
-            }
         }
+
+        resolveError?.let { AccessibleMessage(it) }
     }
 }
