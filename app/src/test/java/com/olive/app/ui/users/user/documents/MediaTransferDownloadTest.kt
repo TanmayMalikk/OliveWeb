@@ -158,7 +158,7 @@ class MediaTransferDownloadTest {
     }
 
     @Test
-    fun missingDeviceEnvelopeCanUseAccountRecoveryButUnavailableKeysNeverExposePlaintext() = runBlocking<Unit> {
+    fun missingDeviceAndAccountEnvelopesNeverExposePlaintext() = runBlocking<Unit> {
         Fixture().use { f ->
             f.ticket()
             val missing = f.document.copy(wrappedKeys = emptyMap())
@@ -167,11 +167,10 @@ class MediaTransferDownloadTest {
             assertEquals(MediaAccessError.KEY_UNAVAILABLE, failure.reason)
             val recoverable = missing.copy(accountRecoveryReady = true)
             `when`(f.cache.availability("owner", recoverable)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
-            `when`(f.repository.recoverDocumentKey("doc")).thenReturn(f.key)
-            val opened = f.controller.downloadFile(recoverable, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
-            verify(f.repository).recoverDocumentKey("doc")
-            opened.delete()
+            val unavailable = assertThrows(MediaAccessException::class.java) {
+                runBlocking { f.controller.downloadFile(recoverable, "owner") }
+            }
+            assertEquals(MediaAccessError.KEY_UNAVAILABLE, unavailable.reason)
         }
     }
 }

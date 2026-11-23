@@ -30,8 +30,13 @@ class SafetyDocumentGrantSdkTest {
                 "encrypted_metadata" to EncryptionUtils.encryptText("{\"name\":\"Synthetic.pdf\",\"mimeType\":\"application/pdf\"}",key))
             db.records["messageDirectory/friend_fixture"]=mapOf("uid" to "friend","publicKey" to public)
             db.records["messageDirectory/friend_fixture/devices/phone"]=mapOf("uid" to "friend","deviceId" to "phone","publicKey" to public,"mgf1Digest" to "SHA-1")
+            db.records["accountKeyDirectories/owner"]=accountDirectory("owner")
+            db.records["accountKeyDirectories/friend"]=accountDirectory("friend")
             doc=runBlocking { repo.getFor("owner","doc") }
         }
+        private fun accountDirectory(uid:String)=mapOf("ownerUid" to uid,
+            "keyId" to "123e4567-e89b-42d3-a456-426614174000","epoch" to 1L,
+            "algorithm" to "RSA-OAEP-256","publicKey" to public)
         override fun close(){ keys.close() }
     }
     @Test
@@ -43,7 +48,8 @@ class SafetyDocumentGrantSdkTest {
             assertEquals(setOf("owner","friend"),accounts.keys)
             assertArrayEquals(f.key.encoded,KeyManager.unwrapKey(accounts["friend"] as String).encoded)
             assertArrayEquals(f.key.encoded,KeyManager.unwrapKey(devices["friend--phone"] as String).encoded)
-            assertEquals(listOf("friend"),update.arguments[3])
+            assertEquals(setOf("owner","friend"),(update.arguments[3] as Map<*,*>).keys)
+            assertEquals(listOf("friend"),update.arguments[4])
         }
     }
     @Test
@@ -53,7 +59,7 @@ class SafetyDocumentGrantSdkTest {
             assertEquals(1,mockingDetails(f.media).invocations.count { it.method.name=="updatePlanAccess" })
             f.repo.grantAccess(f.doc,"owner","friend","friend_fixture",false)
             val independent=mockingDetails(f.media).invocations.single { it.method.name=="updateAccess" }
-            assertEquals(listOf("friend"),independent.arguments[3])
+            assertEquals(listOf("friend"),independent.arguments[4])
             f.db.records["files/doc"]=f.db.records.getValue("files/doc")+mapOf("allowed_users" to listOf("owner","friend"),"device_wrapped_keys" to mapOf("friend--phone" to "existing"))
             clearInvocations(f.media)
             f.repo.grantAccess(f.doc,"owner","friend","friend_fixture",true)

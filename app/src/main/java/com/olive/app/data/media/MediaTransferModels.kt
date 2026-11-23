@@ -4,6 +4,7 @@ package com.olive.app.data.media
 import com.olive.app.data.messaging.OutgoingMessage
 import org.json.JSONArray
 import org.json.JSONObject
+import com.olive.app.security.AccountKeysetWrappedKey
 
 /** A requested send waiting for the upload service to assign the encrypted media ID. */
 data class PendingVoiceMessage(
@@ -90,6 +91,7 @@ data class PreparedEncryptedMedia(
     val kind:MediaKind,
     val ocrReview:OcrReview,
     val deviceWrappedKeys:Map<String,String> = emptyMap(),
+    val accountWrappedKeys:Map<String,AccountKeysetWrappedKey> = emptyMap(),
 )
 
 /**
@@ -131,6 +133,7 @@ data class MediaUploadJob(
         put("encryptedMetadata",source.encryptedMetadata);put("wrappedKeys",JSONObject(source.wrappedKeys))
         put("allowedUsers",JSONArray(source.allowedUsers));put("encryptionVersion",source.encryptionVersion)
         put("deviceWrappedKeys",JSONObject(source.deviceWrappedKeys))
+        put("accountWrappedKeys",JSONObject(source.accountWrappedKeys.mapValues { it.value.toJson() }))
         put("kind",source.kind.name);put("ocrReview",source.ocrReview.name);put("status",status.name)
         mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
         put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
@@ -153,13 +156,17 @@ data class MediaUploadJob(
             val deviceWrapped=value.optJSONObject("deviceWrappedKeys")?.let { json ->
                 json.keys().asSequence().associateWith(json::getString)
             }.orEmpty()
+            val accountWrapped=value.optJSONObject("accountWrappedKeys")?.let { json ->
+                json.keys().asSequence().associateWith { AccountKeysetWrappedKey.fromJson(json.getJSONObject(it)) }
+            }.orEmpty()
             val parts=value.optJSONObject("completedParts")?.let { json ->
                 json.keys().asSequence().associate { it.toInt() to json.getString(it) }
             }.orEmpty()
             val source=PreparedEncryptedMedia(value.getString("filePath"),value.getLong("ciphertextSize"),
                 value.getString("ciphertextSha256"),value.getString("encryptedMetadata"),wrapped,allowed,
                 value.optInt("encryptionVersion",1),MediaKind.valueOf(value.getString("kind")),
-                OcrReview.valueOf(value.optString("ocrReview",OcrReview.NOT_RUN.name)),deviceWrapped)
+                OcrReview.valueOf(value.optString("ocrReview",OcrReview.NOT_RUN.name)),deviceWrapped,
+                accountWrapped)
             return MediaUploadJob(value.getString("id"),value.getString("ownerUid"),source,
                 MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
                 value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),
@@ -191,6 +198,7 @@ data class CloudMediaRecord(
     val wrappedKeys:Map<String,String>,val allowedUsers:List<String>,val ciphertextSize:Long,
     val ciphertextSha256:String,val encryptionVersion:Int,val createdAt:Long,
     val deviceWrappedKeys:Map<String,String> = emptyMap(),
+    val accountWrappedKeys:Map<String,AccountKeysetWrappedKey> = emptyMap(),
 )
 
 /**

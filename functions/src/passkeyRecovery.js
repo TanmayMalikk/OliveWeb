@@ -16,12 +16,24 @@ const ENVELOPE_SALT_BYTES = 32;
 const ENVELOPE_IV_BYTES = 12;
 const ENVELOPE_CIPHERTEXT_BYTES = 48;
 const MAX_CREDENTIAL_BYTES = 4096;
+const RECENT_AUTHENTICATION_MS = 5 * 60 * 1000;
 const ALLOWED_TRANSPORTS = new Set(["ble", "hybrid", "internal", "nfc", "usb"]);
 const callableOptions = {enforceAppCheck: true, invoker: "public"};
 
 function authenticatedUid(request) {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in first.");
   return request.auth.uid;
+}
+
+// Removing a recovery factor can permanently affect access to encrypted data.
+// The Firebase token carries the sign-in time; force-refreshing a token does not bypass this check.
+function requireRecentAuthentication(request, now = Date.now()) {
+  const authTimeSeconds = request.auth?.token?.auth_time;
+  if (!Number.isFinite(authTimeSeconds) ||
+      now - authTimeSeconds * 1000 > RECENT_AUTHENTICATION_MS ||
+      authTimeSeconds * 1000 > now + 60 * 1000) {
+    throw new HttpsError("failed-precondition", "Sign in again before removing a recovery passkey.");
+  }
 }
 
 function base64Bytes(value, expectedSize) {
@@ -70,10 +82,15 @@ function recoveryEnvelope(value, uid, id) {
 }
 
 function credentialRecord(credential, uid, registrationInfo) {
-  const id = credentialId(credential?.id);
-  const publicKey = credential?.publicKey;
+  const rawId = credential?.id ?? credential?.credentialId;
+  const id = credentialId(rawId);
+  const storedPublicKey = credential?.publicKey;
+  const publicKey = storedPublicKey instanceof Uint8Array ? storedPublicKey :
+    typeof storedPublicKey?.toUint8Array === "function" ? storedPublicKey.toUint8Array() : null;
   const counter = credential?.counter;
-  if (!id || !(publicKey instanceof Uint8Array) || publicKey.length < 16 ||
+  if (!id || (credential?.id != null && credential?.credentialId != null &&
+      credential.id !== credential.credentialId) ||
+      !(publicKey instanceof Uint8Array) || publicKey.length < 16 ||
       publicKey.length > MAX_CREDENTIAL_BYTES || !Number.isSafeInteger(counter) || counter < 0) {
     throw new HttpsError("invalid-argument", "Invalid passkey credential.");
   }
@@ -123,10 +140,12 @@ function validChallenge(snapshot, uid, action) {
   return challenge;
 }
 
-async function consumeChallenge(transaction, reference, uid, action) {
-  const challenge = validChallenge(await transaction.get(reference), uid, action);
+function readChallenge(snapshot, uid, action) {
+  return validChallenge(snapshot, uid, action);
+}
+
+function consumeChallenge(transaction, reference) {
   transaction.delete(reference);
-  return challenge;
 }
 
 function registrationOptions(uid, credentials) {
@@ -158,10 +177,18 @@ exports.passkeyRecoveryListCredentials = onCall(callableOptions, async (request)
 
 exports.passkeyRecoveryRemoveCredential = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
+  requireRecentAuthentication(request);
   const id = requiredCredentialId(request.data?.credentialId);
   const reference = root(uid).collection("credentials").doc(id);
   await db.runTransaction(async (transaction) => {
-    storedCredential(await transaction.get(reference), uid);
+    const [credential, credentials] = await Promise.all([
+      transaction.get(reference),
+      transaction.get(root(uid).collection("credentials")),
+    ]);
+    storedCredential(credential, uid);
+    if (credentials.size <= 1) {
+      throw new HttpsError("failed-precondition", "Add another recovery passkey before removing the last one.");
+    }
     transaction.delete(reference);
   });
   return {removed: true, credentialId: id};
@@ -219,10 +246,14 @@ exports.passkeyRecoveryContinueEnrollment = onCall(callableOptions, async (reque
   const proofReference = challengeReference(uid, proofChallengeId);
   const expiresAt = new Date(Date.now() + CHALLENGE_LIFETIME_MS);
   await db.runTransaction(async (transaction) => {
-    await consumeChallenge(transaction, reference, uid, "REGISTER");
     const credentialRef = root(uid).collection("credentials").doc(credential.credentialId);
-    const prior = await transaction.get(credentialRef);
+    const [challenge, prior] = await Promise.all([
+      transaction.get(reference),
+      transaction.get(credentialRef),
+    ]);
+    readChallenge(challenge, uid, "REGISTER");
     if (prior.exists) throw new HttpsError("already-exists", "This passkey is already registered.");
+    consumeChallenge(transaction, reference);
     transaction.create(proofReference, {
       ownerUid: uid,
       action: "ENROLL_PROOF",
@@ -282,10 +313,14 @@ exports.passkeyRecoveryCompleteEnrollment = onCall(callableOptions, async (reque
   }
   const envelope = recoveryEnvelope(request.data?.envelope, uid, credential.credentialId);
   await db.runTransaction(async (transaction) => {
-    await consumeChallenge(transaction, reference, uid, "ENROLL_PROOF");
     const credentialRef = root(uid).collection("credentials").doc(credential.credentialId);
-    const prior = await transaction.get(credentialRef);
+    const [challenge, prior] = await Promise.all([
+      transaction.get(reference),
+      transaction.get(credentialRef),
+    ]);
+    readChallenge(challenge, uid, "ENROLL_PROOF");
     if (prior.exists) throw new HttpsError("already-exists", "This passkey is already registered.");
+    consumeChallenge(transaction, reference);
     transaction.create(credentialRef, {
       ...credential,
       counter: verification.authenticationInfo.newCounter,
@@ -355,10 +390,15 @@ exports.passkeyRecoveryCompleteUnlock = onCall(callableOptions, async (request) 
   }
   let result;
   await db.runTransaction(async (transaction) => {
-    await consumeChallenge(transaction, reference, uid, "UNLOCK");
     const credentialRef = root(uid).collection("credentials").doc(stored.credentialId);
-    const current = storedCredential(await transaction.get(credentialRef), uid);
+    const [challengeSnapshot, credentialSnapshot] = await Promise.all([
+      transaction.get(reference),
+      transaction.get(credentialRef),
+    ]);
+    readChallenge(challengeSnapshot, uid, "UNLOCK");
+    const current = storedCredential(credentialSnapshot, uid);
     if (current.counter !== stored.counter) throw new HttpsError("aborted", "Passkey state changed. Start again.");
+    consumeChallenge(transaction, reference);
     transaction.update(credentialRef, {
       counter: verification.authenticationInfo.newCounter,
       backedUp: verification.authenticationInfo.credentialBackedUp,
@@ -375,4 +415,6 @@ exports._test = {
   rejectPrfResult,
   requiredCredentialId,
   credentialSummary,
+  requireRecentAuthentication,
+  readChallenge,
 };

@@ -17,6 +17,8 @@ import {
 } from "../domain/DomainModels";
 import { SessionContext, useSession, type SessionValue } from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
+import { accountKeysetSession } from "../services/AccountService";
+import { recoverBrowserAccountKeyset } from "../services/BrowserAccountKeysetRecovery";
 export { useSession };
 
 // Converts Firestore permission errors into a clear user-facing explanation.
@@ -409,6 +411,14 @@ export function SessionProvider({
     noteInteraction();
   }
 
+  // A recovered private key remains non-extractable and is kept only in this browser tab.
+  async function recoverEncryptedAccess() {
+    const uid = accounts.identity?.uid;
+    if (!cloudMode || !uid) throw new Error("Sign in before recovering encrypted access.");
+    await recoverBrowserAccountKeyset(uid);
+    setMessage("Encrypted documents and messages are unlocked for this browser tab.");
+  }
+
   // Saves a note or history entry, then refreshes the screen with the new record.
   async function record(category: Category, value: Event | Entry) {
     const token = epoch.current;
@@ -474,7 +484,8 @@ export function SessionProvider({
         path, go, phase, personalLink, hasEntryToken: Boolean(pendingEntry.current),
         profile, history, enrollment, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
-        beginEntry, quickExit, unlock, saveProfile, saveEntry,
+        beginEntry, quickExit, unlock, recoverEncryptedAccess,
+        hasEncryptedAccess: Boolean(accounts.identity && accountKeysetSession.current(accounts.identity.uid)), saveProfile, saveEntry,
         record, refresh, signOut, idleSeconds, idleTimeoutSeconds, setIdleTimeoutSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >

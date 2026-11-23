@@ -2,6 +2,7 @@ package com.olive.app.data
 
 import android.content.Context
 import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.safety.DocumentIndexStore
 import com.olive.app.data.safety.DocumentListSnapshot
 import com.olive.app.data.safety.DocumentListSource
@@ -48,6 +49,7 @@ class DocumentIndexStoreTest {
         val alice = store.read(ALICE)
         assertEquals(listOf("one"), alice.documents.map { it.id })
         assertEquals(setOf(ALICE), alice.documents.single().wrappedKeys.keys)
+        assertEquals(setOf(ALICE), alice.documents.single().accountWrappedKeys.keys)
         assertTrue(alice.documents.single().deviceWrappedKeys.keys.all { it.startsWith("$ALICE--") })
         assertFalse(alice.documents.single().deviceWrappedKeys.keys.any { it.startsWith("$BOB--") })
         assertTrue(alice.documents.single().evidence)
@@ -121,9 +123,17 @@ class DocumentIndexStoreTest {
         ciphertextSha256 = "a".repeat(64),
         encryptionVersion = 2,
         deviceWrappedKeys = mapOf("$ALICE--phone" to "device-a", "$BOB--phone" to "device-b"),
+        accountWrappedKeys = mapOf(
+            ALICE to accountWrapper("123e4567-e89b-42d3-a456-426614174000", "account-a"),
+            BOB to accountWrapper("223e4567-e89b-42d3-a456-426614174000", "account-b"),
+        ),
         evidence = true,
         tags = listOf("Safety Plan"),
     ).also { require(viewer in it.allowedUsers) }
+
+    private fun accountWrapper(keyId:String,wrappedKey:String)=AccountKeysetWrappedKey(
+        keyId,1,"RSA-OAEP-256",wrappedKey,
+    )
 
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
         var documents = emptyList<SafetyDocument>()

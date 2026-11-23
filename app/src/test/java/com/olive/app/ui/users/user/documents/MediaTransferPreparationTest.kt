@@ -34,6 +34,7 @@ class MediaTransferPreparationTest {
             `when`(work.getWorkInfosForUniqueWorkFlow(anyString())).thenReturn(workerUpdates)
             controller=MediaTransferController(app,session.scope,mock(MediaTicketDataSource::class.java),store,
                 preprocessor=MediaPreprocessor { input,mime,_ -> ProcessedMedia(input,mime) },
+                accountKeysetProvider={ uid -> AccountKeysetEnvelope.create(uid,AccountRecoveryKey.generate()) },
                 preparationFailureResolver={ _,failure,_ -> failure.message ?: "Preparation failed" })
         }
         fun source()=File.createTempFile("synthetic-", ".txt",app.cacheDir).apply { writeText("Synthetic private attachment") }

@@ -3,7 +3,6 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
-import android.util.Base64
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -22,7 +21,6 @@ import com.olive.app.data.messaging.OutgoingAttachment
 import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.data.safety.SafetyPlanSyncWorker
-import com.olive.app.security.KeyManager
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -40,13 +38,13 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
+import com.olive.app.security.AccountKeysetWrappedKey
+import com.olive.app.security.KeyManager
 import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
-import javax.crypto.SecretKey
-import javax.crypto.spec.SecretKeySpec
 
 
 /**
@@ -318,13 +316,12 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
-    suspend fun recoverDocumentKey(mediaId: String): SecretKey = error("Document recovery is unavailable")
-    suspend fun storeDocumentKey(mediaId: String, key: SecretKey) = Unit
     /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
     suspend fun updateAccess(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
@@ -332,6 +329,7 @@ interface MediaTicketDataSource {
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
     suspend fun shareInChat(
         mediaId:String,
@@ -339,6 +337,7 @@ interface MediaTicketDataSource {
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) { error("Chat attachment sharing is unavailable") }
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
@@ -364,6 +363,21 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
     return false
 }
 
+/** Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key. */
+internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
+    require(source.allowedUsers.toSet()==source.accountWrappedKeys.keys) {
+        "Every authorized account requires an account-keyset wrapper"
+    }
+    mapOf(
+        "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
+        "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
+        "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
+        "deviceWrappedKeys" to source.deviceWrappedKeys,
+        "accountWrappedKeys" to source.accountWrappedKeys.mapValues { it.value.toMap() },
+        "encryptionVersion" to source.encryptionVersion,
+    )
+}
+
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
  *
@@ -371,7 +385,7 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
  * - called by [MediaUploadWorker] for upload session/ticket/finalization operations;
  * - called by `MediaTransferController` for download tickets;
  * - delegates authorization and R2 signing to `functions/src/mediaTickets.js`;
- * - never accepts plaintext file content; only transfer facts and the account recovery key cross it.
+ * - never accepts plaintext file content or raw AES keys; only ciphertext facts and opaque wrappers cross it.
  *
  * Every returned URL is locally constrained to HTTPS on Cloudflare's R2 hostname before OkHttp sees
  * it. This limits the impact of a malformed or compromised callable response.
@@ -384,48 +398,15 @@ class MediaRepository(
     // Requests short-lived upload URLs for one encrypted file.
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
         val source=job.source
-        val wrapped = source.wrappedKeys.getValue(job.ownerUid)
-        val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
-        val metadata = org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata, key))
-        val emergencyId = Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
+        val wrapped=source.wrappedKeys.getValue(job.ownerUid)
+        val key=KeyManager.unwrapKey(wrapped,source.encryptionVersion)
+        val metadata=org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata,key))
+        val emergencyId=Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
             .matchEntire(metadata.optString("name"))?.groupValues?.get(1)
-        if (emergencyId != null) call(
-            "emergencyAttachUpload", mapOf("id" to emergencyId, "jobId" to job.id)
-        )
-        val result=call("mediaCreateUpload",mapOf(
-            "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
-            "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
-            "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
-            "deviceWrappedKeys" to source.deviceWrappedKeys,
-            "encryptionVersion" to source.encryptionVersion,
-            "recoveryKeyToSeal" to encodeRecoveryKey(key),
-        ))
+        if(emergencyId!=null) call("emergencyAttachUpload",mapOf("id" to emergencyId,"jobId" to job.id))
+        val result=call("mediaCreateUpload",mediaCreateUploadRequest(job))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
-    }
-
-    override suspend fun recoverDocumentKey(mediaId: String): SecretKey {
-        val result = call("mediaAccountAccessKey", mapOf("mediaId" to mediaId))
-        val raw = Base64.decode(result.string("accountAccessKey"), Base64.DEFAULT)
-        return try {
-            require(raw.size == 32) { "Invalid document recovery key" }
-            SecretKeySpec(raw, "AES")
-        } finally {
-            raw.fill(0)
-        }
-    }
-
-    override suspend fun storeDocumentKey(mediaId: String, key: SecretKey) {
-        call("mediaStoreAccountAccessKey", mapOf("mediaId" to mediaId, "recoveryKeyToSeal" to encodeRecoveryKey(key)))
-    }
-
-    private fun encodeRecoveryKey(key: SecretKey): String {
-        val raw = key.encoded
-        return try {
-            Base64.encodeToString(raw, Base64.NO_WRAP)
-        } finally {
-            raw.fill(0)
-        }
     }
 
     // Requests a protected upload ticket for an encrypted media file.
@@ -468,15 +449,18 @@ class MediaRepository(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String>,
         revokeIndependentRecipients:List<String>,
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
+        require(accountWrappedKeys.keys==wrappedKeys.keys)
         return call("mediaUpdateAccess",mapOf(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
             "grantIndependentRecipients" to grantIndependentRecipients,
             "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
@@ -486,10 +470,12 @@ class MediaRepository(
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = call("mediaUpdateAccess", mapOf(
         "mediaId" to mediaId,
         "wrappedKeys" to wrappedKeys,
         "deviceWrappedKeys" to deviceWrappedKeys,
+        "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         "forPlan" to true,
     )).record()
 
@@ -499,6 +485,7 @@ class MediaRepository(
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) {
         call("mediaShareInChat",mapOf(
             "mediaId" to mediaId,
@@ -509,6 +496,7 @@ class MediaRepository(
             "recipientUids" to recipientUids,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         ))
     }
 
@@ -578,6 +566,11 @@ private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error
 private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? Map<*,*>)?.entries?.associate { entry ->
     (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
 }.orEmpty()
+private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetWrappedKey> =
+    (get(name) as? Map<*,*>)?.entries?.associate { entry ->
+        (entry.key as? String ?: error("Invalid $name key")) to
+            AccountKeysetWrappedKey.fromMap(entry.value as? Map<*,*> ?: error("Invalid $name value"))
+    }.orEmpty()
 // Encrypted media: Reads the list of account IDs allowed to open a downloaded file.
 // Suppressing SameParameterValue, linter believes name is always 'allowedUsers'
 // That is the default value for stringlist function call.
@@ -587,7 +580,7 @@ private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsIn
 private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),
     string("encryptedMetadata"),stringMap("wrappedKeys"),stringList("allowedUsers"),long("ciphertextSize"),
     string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"),
-    stringMap("deviceWrappedKeys"))
+    stringMap("deviceWrappedKeys"),accountWrappedKeyMap("accountWrappedKeys"))
 
 /** Deletes expired, unpinned upload-reuse ciphertext even if no document screen is opened. */
 class OfflineMediaCleanupWorker(context: Context, parameters: WorkerParameters) :

@@ -126,6 +126,39 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
     }
 
+    // Public wrapping keys are separate from ARK-encrypted private-key envelopes. Authenticated
+    // clients may fetch an exact account key while directory enumeration remains prohibited.
+    function validAccountKeyDirectory(data, uid) {
+      return data.keys().hasOnly(['ownerUid','keyId','epoch','algorithm','publicKey','updatedAt'])
+        && data.ownerUid == uid
+        && data.keyId is string && data.keyId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        && data.epoch is int && data.epoch == 1
+        && data.algorithm == 'RSA-OAEP-256'
+        && data.publicKey is string && data.publicKey.size() >= 400 && data.publicKey.size() <= 1024
+        && data.updatedAt is timestamp;
+    }
+
+    function matchesAccountKeyset(data, uid) {
+      let keyset = getAfter(/databases/$(database)/documents/accountKeysets/$(uid)).data;
+      return keyset.accountId == uid
+        && data.keyId == keyset.keyId
+        && data.epoch == keyset.epoch
+        && data.algorithm == keyset.algorithm
+        && data.publicKey == keyset.publicKey;
+    }
+
+    match /accountKeyDirectories/{uid} {
+      allow get: if signedIn() && validAccountKeyDirectory(resource.data, uid);
+      allow list, delete: if false;
+      allow create: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
+        && matchesAccountKeyset(request.resource.data, uid);
+      allow update: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && matchesAccountKeyset(request.resource.data, uid);
+    }
+
     // Passkey verifier material, short-lived challenges, and ARK ciphertext envelopes are owned
     // exclusively by callable functions. An encrypted envelope is released only after a verified,
     // user-present passkey assertion, never through a direct Firestore read.
@@ -350,7 +383,7 @@ service cloud.firestore {
           && (!data.keys().hasAny(['evidence']) || data.evidence is bool);
       }
       function validEncryptedMedia(data, id) {
-        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
+        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','account_wrapped_keys','allowed_users',
             'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready','emergency_id'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
@@ -358,6 +391,9 @@ service cloud.firestore {
           && data.encrypted_metadata.size() <= 65536
           && data.wrapped_keys is map
           && (!data.keys().hasAny(['device_wrapped_keys']) || data.device_wrapped_keys is map)
+          && (!data.keys().hasAny(['account_wrapped_keys']) || (data.account_wrapped_keys is map
+            && data.account_wrapped_keys.keys().hasAll(data.allowed_users)
+            && data.account_wrapped_keys.keys().hasOnly(data.allowed_users)))
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
           && data.allowed_users.hasAny([data.owner_id])
@@ -599,7 +635,7 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','requestSource','sourceConversationId','supportConversationId'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','accountRoomKeys','requestSource','sourceConversationId','supportConversationId'])
         && data.friendshipId == conversationId
         && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT', 'SUPPORT_BUTTON'])
         && (!data.keys().hasAny(['sourceConversationId']) || data.sourceConversationId is string)
@@ -655,6 +691,27 @@ service cloud.firestore {
         && validAdditionalConversationKeys(data);
     }
 
+    function validAccountRoomKey(data, uid) {
+      return !(uid in data.accountRoomKeys) || (
+        data.accountRoomKeys[uid] is map
+        && data.accountRoomKeys[uid].keys().hasOnly(['keyId','epoch','algorithm','wrappedKey'])
+        && data.accountRoomKeys[uid].keyId == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.keyId
+        && data.accountRoomKeys[uid].epoch == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.epoch
+        && data.accountRoomKeys[uid].algorithm == 'RSA-OAEP-256'
+        && data.accountRoomKeys[uid].wrappedKey is string
+        && data.accountRoomKeys[uid].wrappedKey.size() > 0
+        && data.accountRoomKeys[uid].wrappedKey.size() <= 768
+      );
+    }
+
+    function validAccountRoomKeys(data) {
+      return data.accountRoomKeys is map
+        && data.accountRoomKeys.keys().hasOnly(data.participantIds)
+        && data.accountRoomKeys.size() <= 25
+        && (data.participantIds.size() < 1 || validAccountRoomKey(data, data.participantIds[0]))
+        && (data.participantIds.size() < 2 || validAccountRoomKey(data, data.participantIds[1]));
+    }
+
     match /conversations/{conversationId} {
       // Collection listeners must constrain participantIds to the authenticated UID.
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
@@ -666,7 +723,7 @@ service cloud.firestore {
       allow list: if signedIn()
         && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data)
-        && !request.resource.data.keys().hasAny(['type'])
+        && !request.resource.data.keys().hasAny(['type','accountRoomKeys'])
         && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
@@ -684,6 +741,8 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAny(['lastMessageId']) || request.resource.data.lastMessageId == '')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
             && validConversationKeys(request.resource.data))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountRoomKeys','updatedAt'])
+            && validAccountRoomKeys(request.resource.data))
         );
       allow delete: if false;
 

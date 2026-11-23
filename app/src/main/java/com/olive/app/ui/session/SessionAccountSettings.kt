@@ -630,6 +630,36 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
             state.accountRole == AccountRole.USER
     }
 
+    /** Ensures media encryption has a stable account public key without unlocking private material. */
+    internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope {
+        with(runtime) {
+            withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
+                runCatching { accountKeysetRepository?.publish(local) }
+                return local
+            }
+            accountKeysetRepository?.fetch(uid)?.let { remote ->
+                runCatching { accountKeysetRepository?.publish(remote) }
+                return remote
+            }
+            val token = epoch
+            check(currentRecoverySession(uid, token)) { "Account session changed" }
+            accountRecoveryKey(uid, token)
+            return withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
+                ?: error("Account recovery keyset was not stored")
+        }
+    }
+
+    /** Unlocks account private material only in client memory for one media-key operation. */
+    internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset {
+        with(runtime) {
+            val token = epoch
+            check(currentRecoverySession(uid, token)) { "Account session changed" }
+            val envelope = ensureAccountKeysetForMedia(uid)
+            val recoveryKey = accountRecoveryKey(uid, token)
+            return withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
+        }
+    }
+
 }
 
 // Signed-in users: records safe-app activity for the account.

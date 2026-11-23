@@ -73,6 +73,26 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Recovers an authorized room key outside the short online/cache timeout. */
+    internal suspend fun recoverRoomKey(conversation: ChatConversation): javax.crypto.SecretKey {
+        with(runtime) {
+            val device = enrollment ?: error("No active account")
+            val secure = secureChatRepository ?: error("Secure messaging unavailable")
+            val keyset = settings.unlockAccountKeysetForMedia(device.uid)
+            val recovered = secure.existingRoomKey(conversation.id, device.uid, keyset)
+                ?: error("Account room key unavailable")
+            // Rewrap for this device so later opens use the normal device-key path.
+            try {
+                secure.shareWithRegisteredDevices(conversation, recovered)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Recovery can open this session even if durable device approval must retry later.
+            }
+            return recovered
+        }
+    }
+
     // Shares the selected item for session secure sharing.
     fun share(entry: PrivateEntry) {
         with(runtime) {

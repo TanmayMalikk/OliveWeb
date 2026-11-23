@@ -474,13 +474,15 @@
     <string name="passkey_recovery_setup_failed">No se pudo agregar la llave de recuperación. Comprueba la conexión y el proveedor de credenciales e inténtalo de nuevo.</string>
     <string name="passkey_recovery_remove">Eliminar llave</string>
     <string name="passkey_recovery_removed">Se eliminó la llave de recuperación.</string>
-    <string name="passkey_recovery_remove_failed">No se pudo eliminar la llave de recuperación. Comprueba la conexión e inténtalo de nuevo.</string>
+    <string name="passkey_recovery_remove_failed">No se pudo eliminar la llave de recuperación. Por seguridad, vuelve a iniciar sesión e inténtalo de nuevo.</string>
     <string name="passkey_recovery_none">No hay llaves de recuperación registradas.</string>
     <string name="passkey_recovery_synced_factor">Llave de recuperación sincronizada</string>
     <string name="passkey_recovery_device_factor">Llave de recuperación del dispositivo</string>
     <string name="passkey_recovery_list_unavailable">No se pudieron comprobar las llaves de recuperación. Conéctate a Internet y vuelve a abrir la configuración.</string>
     <string name="passkey_recovery_remove_confirm_title">¿Eliminar esta llave de recuperación?</string>
     <string name="passkey_recovery_remove_confirm_help">Esta llave ya no podrá restaurar tu clave de cifrado. Las demás llaves de recuperación registradas no cambiarán.</string>
+    <string name="passkey_recovery_remove_last_title">Conserva esta llave de recuperación</string>
+    <string name="passkey_recovery_remove_last_help">Esta es tu última llave de recuperación. Agrega otra antes de eliminarla o podrías perder permanentemente el acceso a los datos cifrados en un dispositivo nuevo.</string>
     <string name="voice_message">Mensaje de voz</string>
     <string name="voice_record">Grabar un mensaje de voz</string>
     <string name="voice_recording">Grabando</string>

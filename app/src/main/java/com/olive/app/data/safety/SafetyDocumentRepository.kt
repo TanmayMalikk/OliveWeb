@@ -12,6 +12,7 @@ import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import java.io.File
@@ -27,8 +28,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
@@ -42,6 +41,7 @@ data class SafetyDocument(
     val deviceWrappedKeys: Map<String, String> = emptyMap(), val evidence: Boolean = false,
     val tags: List<String> = emptyList(),
     val accountRecoveryReady: Boolean = false,
+    val accountWrappedKeys: Map<String, AccountKeysetWrappedKey> = emptyMap(),
 )
 
 enum class DocumentListSource { LOCAL_INDEX, FIRESTORE_CACHE, SERVER }
@@ -106,7 +106,6 @@ interface SafetyDocumentDataSource {
     suspend fun getFor(uid: String, id: String): SafetyDocument
     /** Returns encrypted-at-rest index metadata without contacting Firebase. */
     fun cachedFor(uid: String, id: String): SafetyDocument? = null
-    suspend fun upgradeOwnedRecoveryKeys(uid: String) = Unit
     // Wraps the document key for new recipients before sharing it.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) {
@@ -199,24 +198,6 @@ class SafetyDocumentRepository(
         }
     }
 
-    override suspend fun upgradeOwnedRecoveryKeys(uid: String) {
-        val rows = firestore.collection("files").whereArrayContains("allowed_users", uid)
-            .get(Source.SERVER).await().documents
-        for (row in rows) {
-            if (row.getString("owner_id") != uid || row.getBoolean("account_recovery_ready") == true) continue
-            val document = documentFrom(row, uid) ?: continue
-            if (document.objectKey.isBlank()) continue
-            val key = runCatching { unwrapDocumentKey(document, uid) }.getOrNull() ?: continue
-            try {
-                media.storeDocumentKey(document.id, key)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // The next online session or document list can retry the upgrade.
-            }
-        }
-    }
-
     // Adds encrypted document access for each selected recipient.
     override suspend fun share(
         document: SafetyDocument,
@@ -228,7 +209,7 @@ class SafetyDocumentRepository(
         if (current.objectKey.isNotBlank()) {
             val access = encryptedAccess(current, ownerUid, recipients)
             media.updateAccess(
-                current.id, access.accountKeys, access.deviceKeys,
+                current.id, access.accountKeys, access.deviceKeys, access.accountKeysetKeys,
                 grantIndependentRecipients = recipients.keys.toList(),
             )
             return
@@ -261,9 +242,12 @@ class SafetyDocumentRepository(
         val access = if (current.objectKey.isNotBlank()) {
             encryptedAccess(current, outgoing.ownerUid, recipients)
         } else {
-            EncryptedAccess(emptyMap(), emptyMap())
+            EncryptedAccess(emptyMap(), emptyMap(), emptyMap())
         }
-        media.shareInChat(current.id, outgoing, recipients.keys.toList(), access.accountKeys, access.deviceKeys)
+        media.shareInChat(
+            current.id,outgoing,recipients.keys.toList(),access.accountKeys,access.deviceKeys,
+            access.accountKeysetKeys,
+        )
     }
 
     // Wraps the document key for another approved account without exposing the raw key.
@@ -285,13 +269,20 @@ class SafetyDocumentRepository(
                 media.updatePlanAccess(current.id, mapOf(
                     ownerUid to checkNotNull(current.wrappedKeys[ownerUid]),
                     recipientUid to recipient.accountKey,
-                ), recipient.deviceKeys)
+                ), recipient.deviceKeys, mapOf(
+                    ownerUid to (current.accountWrappedKeys[ownerUid]
+                        ?: accountKeysetAccess(documentKey,ownerUid)),
+                    recipientUid to recipient.accountKeysetKey,
+                ))
                 return
             }
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
+            val accountWrapped = current.accountWrappedKeys + (recipientUid to recipient.accountKeysetKey) +
+                (ownerUid to (current.accountWrappedKeys[ownerUid]
+                    ?: accountKeysetAccess(documentKey,ownerUid)))
             media.updateAccess(
-                current.id, wrapped, devices,
+                current.id, wrapped, devices, accountWrapped,
                 grantIndependentRecipients = listOf(recipientUid),
             )
             return
@@ -317,8 +308,12 @@ class SafetyDocumentRepository(
             val wrapped = document.wrappedKeys - recipientUid
             require(ownerUid in wrapped) { "The owner encryption key cannot be removed" }
             val devices = retainAuthorizedDeviceKeys(document.deviceWrappedKeys, wrapped.keys)
+            val documentKey=unwrapDocumentKey(document,ownerUid)
+            val accountWrapped=wrapped.keys.associateWith { uid ->
+                document.accountWrappedKeys[uid] ?: accountKeysetAccess(documentKey,uid)
+            }
             media.updateAccess(
-                document.id, wrapped, devices,
+                document.id, wrapped, devices, accountWrapped,
                 revokeIndependentRecipients = listOf(recipientUid),
             )
             return
@@ -377,20 +372,9 @@ class SafetyDocumentRepository(
         username: String,
     ) {
         if (document.objectKey.isBlank() || currentUid !in document.allowedUsers) return
-        if (document.accountRecoveryReady) return
         val documentKey = runCatching {
             unwrapDocumentKey(document, currentUid)
         }.getOrNull() ?: return
-        if (document.ownerUid == currentUid) {
-            try {
-                media.storeDocumentKey(document.id, documentKey)
-                return
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // Continue serving the legacy device-key flow until recovery is deployed.
-            }
-        }
         val normalized = username.trim().lowercase()
         if (!normalized.matches(Regex("[a-z0-9_]{4,24}"))) return
         val directory = firestore.collection("messageDirectory").document(normalized)
@@ -427,11 +411,13 @@ class SafetyDocumentRepository(
     private data class EncryptedAccess(
         val accountKeys: Map<String, String>,
         val deviceKeys: Map<String, String>,
+        val accountKeysetKeys: Map<String, AccountKeysetWrappedKey>,
     )
 
     private data class RecipientAccess(
         val accountKey: String,
         val deviceKeys: Map<String, String>,
+        val accountKeysetKey: AccountKeysetWrappedKey,
     )
 
     /** Re-wraps the document key for the exact final recipient set using registered device keys. */
@@ -444,19 +430,26 @@ class SafetyDocumentRepository(
             ?: error("The owner account encryption key is unavailable")
         val documentKey = unwrapDocumentKey(document, ownerUid)
         val accountKeys = mutableMapOf(ownerUid to ownerWrapped)
+        val accountKeysetKeys = mutableMapOf(
+            ownerUid to (document.accountWrappedKeys[ownerUid]
+                ?: accountKeysetAccess(documentKey,ownerUid)),
+        )
         val deviceKeys = retainAuthorizedDeviceKeys(document.deviceWrappedKeys, setOf(ownerUid)).toMutableMap()
         recipients.forEach { (uid, username) ->
             require(uid != ownerUid) { "The owner cannot be added as a recipient" }
             if (username.isBlank() && document.wrappedKeys[uid] != null) {
                 accountKeys[uid] = checkNotNull(document.wrappedKeys[uid])
+                accountKeysetKeys[uid] = document.accountWrappedKeys[uid]
+                    ?: accountKeysetAccess(documentKey,uid)
                 deviceKeys.putAll(retainAuthorizedDeviceKeys(document.deviceWrappedKeys, setOf(uid)))
             } else {
                 val recipient = recipientAccess(documentKey, uid, username)
                 accountKeys[uid] = recipient.accountKey
+                accountKeysetKeys[uid] = recipient.accountKeysetKey
                 deviceKeys.putAll(recipient.deviceKeys)
             }
         }
-        return EncryptedAccess(accountKeys, deviceKeys)
+        return EncryptedAccess(accountKeys, deviceKeys, accountKeysetKeys)
     }
 
     /** Wraps the document key for both the directory identity and every registered recipient device. */
@@ -492,6 +485,23 @@ class SafetyDocumentRepository(
         return RecipientAccess(
             KeyManager.wrapKey(documentKey, KeyManager.decodePublicKey(encodedAccountKey), accountDigest),
             devices.associate { it.first to it.second },
+            accountKeysetAccess(documentKey,uid),
+        )
+    }
+
+    /** Wraps a document key with the recipient's public account key; no private material is read. */
+    private suspend fun accountKeysetAccess(documentKey:SecretKey,uid:String):AccountKeysetWrappedKey {
+        val row=firestore.collection("accountKeyDirectories").document(uid).get(Source.SERVER).await()
+        require(row.exists() && row.getString("ownerUid")==uid) {
+            "The recipient must enable encrypted account recovery before files can be shared"
+        }
+        val keyId=row.getString("keyId").orEmpty()
+        val epoch=row.getLong("epoch") ?: 0
+        val algorithm=row.getString("algorithm").orEmpty()
+        val publicKey=row.getString("publicKey").orEmpty()
+        return AccountKeysetWrappedKey(
+            keyId,epoch,algorithm,
+            KeyManager.wrapForAccountKeyset(documentKey,KeyManager.decodePublicKey(publicKey)),
         )
     }
 
@@ -499,11 +509,8 @@ class SafetyDocumentRepository(
     private suspend fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
         val candidates = documentKeyCandidates(document, uid, KeyManager.deviceId())
         val key = runCatching { KeyManager.unwrapFirst(candidates, document.encryptionVersion) }.getOrNull()
-        return key ?: if (document.accountRecoveryReady) media.recoverDocumentKey(document.id)
-        else error("The document encryption key is unavailable")
+        return key ?: error("The document encryption key is unavailable")
     }
-
-    private val recoveryRequests = Semaphore(6)
 
     private suspend fun resolveDocuments(rows: List<DocumentSnapshot>, uid: String): List<SafetyDocument> =
         coroutineScope {
@@ -513,15 +520,7 @@ class SafetyDocumentRepository(
 
     private suspend fun resolveDocument(row: DocumentSnapshot, uid: String): SafetyDocument? {
         val local = documentFrom(row, uid) ?: return null
-        if (!local.accountRecoveryReady || local.name != "Encrypted document" || uid !in local.allowedUsers) return local
-        return try {
-            val key = recoveryRequests.withPermit { media.recoverDocumentKey(local.id) }
-            documentFrom(row, uid, key) ?: local
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            local
-        }
+        return local
     }
 
     // Converts a stored document record into the model shown by the Safe App.
@@ -531,6 +530,11 @@ class SafetyDocumentRepository(
         val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
         val wrapped = row.get("wrapped_keys").cloudStringMap().orEmpty()
         val deviceWrapped = row.get("device_wrapped_keys").cloudStringMap().orEmpty()
+        val accountWrapped = (row.get("account_wrapped_keys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
+            val id = uid as? String ?: return@mapNotNull null
+            val fields = value as? Map<*, *> ?: return@mapNotNull null
+            runCatching { id to AccountKeysetWrappedKey.fromMap(fields) }.getOrNull()
+        }?.toMap().orEmpty()
         val deviceKey = "$viewerUid--${KeyManager.deviceId()}"
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
             val key = recovered ?: KeyManager.unwrapFirst(
@@ -565,6 +569,7 @@ class SafetyDocumentRepository(
             evidence = row.getBoolean("evidence") ?: false,
             tags = documentTagsFrom(metadata),
             accountRecoveryReady = row.getBoolean("account_recovery_ready") == true,
+            accountWrappedKeys = accountWrapped,
         )
     }
 
@@ -594,8 +599,6 @@ class IndexedSafetyDocumentRepository(
             cached.lastSyncedAt ?: clock(),
         )
     }
-
-    override suspend fun upgradeOwnedRecoveryKeys(uid: String) = remote.upgradeOwnedRecoveryKeys(uid)
 
     override suspend fun listFor(uid: String): DocumentListSnapshot = try {
         persist(uid, remote.listFor(uid))

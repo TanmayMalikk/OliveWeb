@@ -519,13 +519,15 @@
     <string name="passkey_recovery_setup_failed">The recovery passkey could not be added. Check your connection and credential provider, then retry.</string>
     <string name="passkey_recovery_remove">Remove passkey</string>
     <string name="passkey_recovery_removed">Recovery passkey removed.</string>
-    <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. Check your connection and retry.</string>
+    <string name="passkey_recovery_remove_failed">The recovery passkey could not be removed. For security, sign in again and retry.</string>
     <string name="passkey_recovery_none">No recovery passkeys are enrolled.</string>
     <string name="passkey_recovery_synced_factor">Synced recovery passkey</string>
     <string name="passkey_recovery_device_factor">Device recovery passkey</string>
     <string name="passkey_recovery_list_unavailable">Recovery passkeys could not be checked. Connect to the internet and reopen settings.</string>
     <string name="passkey_recovery_remove_confirm_title">Remove this recovery passkey?</string>
     <string name="passkey_recovery_remove_confirm_help">This passkey will no longer restore your encryption key. Other enrolled recovery passkeys are not changed.</string>
+    <string name="passkey_recovery_remove_last_title">Keep this recovery passkey</string>
+    <string name="passkey_recovery_remove_last_help">This is your last recovery passkey. Add another recovery passkey before removing it, or you could permanently lose access to encrypted data on a new device.</string>
     <string name="dob_date_range_error">Enter a date between today and 130 years ago.</string>
     <string name="dob_picker_title">Choose date of birth</string>
     <string name="dob_pick_year_range">Choose a year range</string>

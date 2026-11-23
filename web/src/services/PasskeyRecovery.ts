@@ -41,6 +41,88 @@ export interface UnlockedAccountKeyset {
   privateKey: CryptoKey;
 }
 
+export interface AccountWrappedKey {
+  keyId: string;
+  epoch: number;
+  algorithm: "RSA-OAEP-256";
+  wrappedKey: string;
+}
+
+interface AccountKeyDirectory {
+  ownerUid: string;
+  keyId: string;
+  epoch: number;
+  algorithm: "RSA-OAEP-256";
+  publicKey: string;
+}
+
+/** Owns the account-keyset wrapper format shared by media and chat payload keys. */
+export const accountKeysetWrappers = {
+  parse(value: unknown): AccountWrappedKey | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const candidate = value as Partial<AccountWrappedKey>;
+    return validKeyId(candidate.keyId ?? "") && Number.isSafeInteger(candidate.epoch) &&
+      candidate.epoch! >= 1 && candidate.algorithm === "RSA-OAEP-256" &&
+      typeof candidate.wrappedKey === "string" && candidate.wrappedKey.length > 0 &&
+      candidate.wrappedKey.length <= 768
+      ? candidate as AccountWrappedKey
+      : null;
+  },
+
+  async wrap(accountId: string, rawKey: Uint8Array, value: unknown): Promise<AccountWrappedKey> {
+    validateLength(rawKey, 32, "Invalid content key.");
+    const directory = parseAccountKeyDirectory(value);
+    if (directory.ownerUid !== accountId) {
+      throw new PasskeyRecoveryError("The account key directory does not match this account.");
+    }
+    try {
+      const publicKey = await crypto.subtle.importKey(
+        "spki",
+        fromBase64(directory.publicKey) as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["encrypt"],
+      );
+      const wrappedKey = await crypto.subtle.encrypt(
+        { name: "RSA-OAEP" },
+        publicKey,
+        rawKey as BufferSource,
+      );
+      return {
+        keyId: directory.keyId,
+        epoch: directory.epoch,
+        algorithm: directory.algorithm,
+        wrappedKey: toBase64(new Uint8Array(wrappedKey)),
+      };
+    } catch (error) {
+      if (error instanceof PasskeyRecoveryError) throw error;
+      throw new PasskeyRecoveryError("Could not wrap the content key for this account.", error);
+    }
+  },
+
+  async unwrap(
+    accountId: string,
+    value: unknown,
+    keyset: UnlockedAccountKeyset | null,
+  ): Promise<Uint8Array | null> {
+    const wrapper = this.parse(value);
+    if (!wrapper || !keyset || keyset.accountId !== accountId ||
+        wrapper.keyId !== keyset.keyId || wrapper.epoch !== keyset.epoch) return null;
+    try {
+      const raw = new Uint8Array(await crypto.subtle.decrypt(
+        { name: "RSA-OAEP" },
+        keyset.privateKey,
+        fromBase64(wrapper.wrappedKey) as BufferSource,
+      ));
+      if (raw.byteLength === 32) return raw;
+      raw.fill(0);
+      return null;
+    } catch {
+      return null;
+    }
+  },
+};
+
 export interface PrfClientExtensionResults {
   prf?: {
     results?: {
@@ -275,6 +357,20 @@ function validAccountId(value: string): boolean {
 
 function validKeyId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value);
+}
+
+function parseAccountKeyDirectory(value: unknown): AccountKeyDirectory {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new PasskeyRecoveryError("Invalid account key directory.");
+  }
+  const candidate = value as Partial<AccountKeyDirectory>;
+  if (!validAccountId(candidate.ownerUid ?? "") || !validKeyId(candidate.keyId ?? "") ||
+      !Number.isSafeInteger(candidate.epoch) || candidate.epoch! < 1 ||
+      candidate.algorithm !== "RSA-OAEP-256" ||
+      typeof candidate.publicKey !== "string" || !candidate.publicKey) {
+    throw new PasskeyRecoveryError("Invalid account key directory.");
+  }
+  return candidate as AccountKeyDirectory;
 }
 
 function toBase64(value: Uint8Array): string {

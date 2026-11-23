@@ -61,6 +61,38 @@ test("passkey recovery credential records preserve only public verifier material
   });
 });
 
+test("passkey recovery accepts Firestore byte wrappers without weakening public-key validation", () => {
+  const publicKey = new Uint8Array(77).fill(6);
+  const record = recovery.credentialRecord({
+    id: "credential_abcdefghijklmnop",
+    publicKey: {toUint8Array: () => publicKey},
+    counter: 0,
+    transports: ["internal"],
+  }, "uid-a", {});
+  assert.deepEqual(record.publicKey, Buffer.from(publicKey));
+  for (const value of [null, {}, {toUint8Array: () => "not-bytes"}, {toUint8Array: () => new Uint8Array(15)}]) {
+    assert.throws(() => recovery.credentialRecord({
+      id: "credential_abcdefghijklmnop",
+      publicKey: value,
+      counter: 0,
+      transports: [],
+    }, "uid-a", {}));
+  }
+  assert.throws(() => recovery.credentialRecord({
+    id: "credential_abcdefghijklmnop",
+    credentialId: "credential_different_abcdefghijk",
+    publicKey,
+    counter: 0,
+    transports: [],
+  }, "uid-a", {}));
+  assert.equal(recovery.credentialRecord({
+    credentialId: "credential_abcdefghijklmnop",
+    publicKey,
+    counter: 0,
+    transports: [],
+  }, "uid-a", {}).credentialId, "credential_abcdefghijklmnop");
+});
+
 test("passkey recovery rejects malformed credential data across repeated input classes", () => {
   for (let iteration = 0; iteration < 300; iteration += 1) {
     assert.throws(() => recovery.credentialRecord({
@@ -109,5 +141,15 @@ test("passkey recovery rejects malformed factor IDs across input classes", () =>
       recovery.requiredCredentialId(`credential_${iteration.toString().padStart(16, "0")}`),
       `credential_${iteration.toString().padStart(16, "0")}`,
     );
+  }
+});
+
+test("passkey recovery requires a recent signed-in session before factor removal", () => {
+  const now = 1_700_000_000_000;
+  assert.doesNotThrow(() => recovery.requireRecentAuthentication({
+    auth: {token: {auth_time: Math.floor((now - 299_000) / 1000)}},
+  }, now));
+  for (const authTime of [undefined, Math.floor((now - 301_000) / 1000), Math.floor((now + 61_000) / 1000)]) {
+    assert.throws(() => recovery.requireRecentAuthentication({auth: {token: {auth_time: authTime}}}, now));
   }
 });

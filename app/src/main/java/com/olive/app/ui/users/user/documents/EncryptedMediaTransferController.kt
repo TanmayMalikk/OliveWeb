@@ -15,6 +15,7 @@ import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.media.MAX_MEDIA_CIPHERTEXT_BYTES
 import com.olive.app.data.media.PendingVoiceMessage
 import com.olive.app.data.media.MediaKind
@@ -37,6 +38,8 @@ import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.OnDeviceMediaPreprocessor
 import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.UnlockedAccountKeyset
 import com.olive.app.security.KeyManager
 import com.olive.app.security.MediaCipher
 import java.io.File
@@ -86,6 +89,8 @@ internal class MediaTransferController(
     private val offlineCache:OfflineMediaCache=OfflineMediaCache(context),
     private val client:OkHttpClient=OkHttpClient(),
     private val preprocessor:MediaPreprocessor=OnDeviceMediaPreprocessor(context.applicationContext),
+    private val accountKeysetProvider:suspend (String)->AccountKeysetEnvelope?={ null },
+    private val accountKeysetUnlocker:suspend (String)->UnlockedAccountKeyset?={ null },
     private val preparationFailureResolver:(Context,Throwable,MediaKind)->String=::preparationFailureMessage,
 ):MediaTransferOperations {
     private val applicationContext=context.applicationContext
@@ -444,6 +449,8 @@ internal class MediaTransferController(
         ocr:DocumentOcrMetadata?=null,
         tags:Set<String> = emptySet(),
     ):MediaUploadJob {
+        val accountKeyset=accountKeysetProvider(owner.uid)
+            ?: error("Set up account recovery before uploading encrypted media")
         val jobId=UUID.randomUUID().toString()
         val folder=File(applicationContext.noBackupFilesDir,"media-outbox").apply { mkdirs() }
         val target=File(folder,"$jobId.olive")
@@ -477,15 +484,21 @@ internal class MediaTransferController(
                     put("ocrSuccessful",it.successful)
                 }
             }.toString()
-            // The file remains ciphertext in R2. A callable-only recovery copy lets this account
-            // reopen it from an emergency browser without requiring approval from the first phone.
+            // Device and account wrappers are parallel encrypted copies of this AES key. Firebase
+            // receives neither the raw key nor a wrapper it can decrypt.
             val publicKey=KeyManager.getOrCreatePublicKey()
             val ownerWrapped=KeyManager.wrapKey(key,publicKey)
             val wrapped=mapOf(owner.uid to ownerWrapped)
             val deviceWrapped=mapOf("${owner.uid}--${KeyManager.deviceId(publicKey)}" to ownerWrapped)
+            val accountWrapped=mapOf(owner.uid to AccountKeysetWrappedKey(
+                accountKeyset.keyId,accountKeyset.epoch,"RSA-OAEP-256",
+                KeyManager.wrapForAccountKeyset(
+                    key,KeyManager.decodePublicKey(accountKeyset.publicKeyBase64),
+                ),
+            ))
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
-                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped,accountWrapped)
             return MediaUploadJob(jobId,owner.uid,prepared,
                 attachToSafetyPlan = tags.any { it.startsWith("safety-plan:") })
         } catch (failure: Throwable) {
@@ -580,10 +593,13 @@ internal class MediaTransferController(
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
-            .getOrElse {
-                if (!document.accountRecoveryReady) throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it)
-                requireNetwork(MediaAccessError.NETWORK_REQUIRED)
-                repository.recoverDocumentKey(document.id)
+            .getOrElse { deviceFailure ->
+                val accountWrapper=document.accountWrappedKeys[viewerUid]
+                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrNull()
+                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                runCatching { accountWrapper.unwrap(keyset) }
+                    .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
             }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }

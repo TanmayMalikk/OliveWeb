@@ -15,6 +15,7 @@ import javax.crypto.SecretKey
 import java.util.UUID
 import android.content.Context
 import com.olive.app.data.account.PrivateEntry
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import org.json.JSONArray
@@ -484,6 +485,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("objectKey", objectKey.take(1024))
         .put("encryptedMetadata", encryptedMetadata.take(64 * 1024))
         .put("viewerWrappedKey", wrappedKeys[viewerUid].orEmpty())
+        .put("viewerAccountWrappedKey", accountWrappedKeys[viewerUid]?.toJson())
         .put("deviceWrappedKeys", JSONObject(viewerDeviceKeys))
         .put("ciphertextSize", ciphertextSize)
         .put("ciphertextSha256", ciphertextSha256.lowercase())
@@ -505,6 +507,9 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
     }.distinct()
     require(viewerUid in allowed && allowed.size <= 25)
     val accountKey = optString("viewerWrappedKey").takeIf(String::isNotBlank)
+    val accountWrappedKey = optJSONObject("viewerAccountWrappedKey")?.let {
+        AccountKeysetWrappedKey.fromJson(it)
+    }
     val deviceKeys = optJSONObject("deviceWrappedKeys")?.let { json ->
         json.keys().asSequence().filter { it.startsWith("$viewerUid--") }
             .associateWith(json::getString)
@@ -539,6 +544,7 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         deviceWrappedKeys = deviceKeys,
         evidence = optBoolean("evidence"),
         tags = tags,
+        accountWrappedKeys = accountWrappedKey?.let { mapOf(viewerUid to it) }.orEmpty(),
     )
 }
 

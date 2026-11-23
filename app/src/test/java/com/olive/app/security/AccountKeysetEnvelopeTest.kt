@@ -84,6 +84,23 @@ class AccountKeysetEnvelopeTest {
     }
 
     @Test
+    fun `media account wrapper requires its exact recovered keyset`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val envelope = AccountKeysetEnvelope.create("account-a", recoveryKey)
+        val unlocked = envelope.unlock("account-a", recoveryKey)
+        val fileKey = EncryptionUtils.generateSymmetricKey()
+        val wrapper = AccountKeysetWrappedKey(
+            envelope.keyId,envelope.epoch,"RSA-OAEP-256",
+            KeyManager.wrapForAccountKeyset(fileKey,unlocked.publicKey),
+        )
+
+        assertEquals(fileKey.encoded.toList(),wrapper.unwrap(unlocked).encoded.toList())
+        assertThrows(IllegalArgumentException::class.java) {
+            wrapper.copy(keyId="223e4567-e89b-42d3-a456-426614174000").unwrap(unlocked)
+        }
+    }
+
+    @Test
     fun `Android passkey envelope matches the web recovery format`() {
         val recoveryKey = AccountRecoveryKey.fromEncoded(ByteArray(32) { 9 })
         val envelope = PasskeyRecoveryEnvelope.create(

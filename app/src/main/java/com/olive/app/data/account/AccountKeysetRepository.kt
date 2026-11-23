@@ -32,7 +32,18 @@ internal class AccountKeysetRepository(
             "ciphertext" to envelope.ciphertextBase64,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
-        firestore.collection(COLLECTION).document(envelope.accountId).set(payload).await()
+        val directory = mapOf(
+            "ownerUid" to envelope.accountId,
+            "keyId" to envelope.keyId,
+            "epoch" to envelope.epoch,
+            "algorithm" to envelope.algorithm,
+            "publicKey" to envelope.publicKeyBase64,
+            "updatedAt" to FieldValue.serverTimestamp(),
+        )
+        firestore.batch().apply {
+            set(firestore.collection(COLLECTION).document(envelope.accountId), payload)
+            set(firestore.collection(DIRECTORY).document(envelope.accountId), directory)
+        }.commit().await()
     }
 
     /** Fetches the latest envelope from the server, bypassing Firestore's cache for recovery. */
@@ -53,6 +64,7 @@ internal class AccountKeysetRepository(
 
     companion object {
         private const val COLLECTION = "accountKeysets"
+        private const val DIRECTORY = "accountKeyDirectories"
     }
 }
 

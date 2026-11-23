@@ -11,6 +11,7 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
 import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.KeyManager
 import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.runBlocking
@@ -36,6 +37,7 @@ class MediaRepositorySdkTest {
         "mediaId" to "media", "ownerUid" to "owner", "objectKey" to "encrypted/object",
         "encryptedMetadata" to "locked-details", "wrappedKeys" to mapOf("owner" to "key"),
         "deviceWrappedKeys" to mapOf("owner--phone" to "device"), "allowedUsers" to listOf("owner"),
+        "accountWrappedKeys" to mapOf("owner" to accountWrapper().toMap()),
         "ciphertextSize" to 500L, "ciphertextSha256" to "hash", "encryptionVersion" to 2, "createdAt" to 123L,
     )
 
@@ -80,19 +82,21 @@ class MediaRepositorySdkTest {
     fun uploadCompletionAndAccessUpdatesUseDistinctGrantSources() = runBlocking<Unit> {
         val complete = repository.completeUpload("job", listOf(MediaCompletedPart(2, "etag-two"), MediaCompletedPart(1, "etag-one")))
         assertEquals(CloudMediaRecord("media", "owner", "encrypted/object", "locked-details",
-            mapOf("owner" to "key"), listOf("owner"), 500, "hash", 2, 123, mapOf("owner--phone" to "device")), complete)
+            mapOf("owner" to "key"), listOf("owner"), 500, "hash", 2, 123,
+            mapOf("owner--phone" to "device"), mapOf("owner" to accountWrapper())), complete)
         assertEquals(listOf(mapOf("partNumber" to 2, "etag" to "etag-two"), mapOf("partNumber" to 1, "etag" to "etag-one")),
             requests.single().second["parts"])
         val keys = mapOf("owner" to "owner-key", "friend" to "friend-key")
-        repository.updateAccess("media", keys, emptyMap(), listOf("friend"), emptyList())
+        val accountKeys = keys.mapValues { accountWrapper() }
+        repository.updateAccess("media", keys, emptyMap(), accountKeys, listOf("friend"), emptyList())
         assertEquals(listOf("friend"), requests.last().second["grantIndependentRecipients"])
         assertEquals(emptyList<String>(), requests.last().second["revokeIndependentRecipients"])
-        repository.updatePlanAccess("media", keys, emptyMap())
+        repository.updatePlanAccess("media", keys, emptyMap(), accountKeys)
         assertEquals(true, requests.last().second["forPlan"])
         assertFalse(requests.last().second.containsKey("grantIndependentRecipients"))
         repository.updateDeviceKeys("media", mapOf("friend--web" to "wrapped"))
         assertEquals("mediaUpdateDeviceKeys", requests.last().first)
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.updateAccess("media", emptyMap(), emptyMap()) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.updateAccess("media", emptyMap(), emptyMap(), emptyMap()) } }
         assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.updateDeviceKeys("media", emptyMap()) } }
     }
 
@@ -108,18 +112,6 @@ class MediaRepositorySdkTest {
         ), requests)
         verify(user, times(3)).getIdToken(false)
         verify(check, times(3)).getAppCheckToken(false)
-    }
-
-    @Test
-    fun documentRecoveryRequiresAFullAes256Key() = runBlocking<Unit> {
-        val raw = ByteArray(32) { it.toByte() }
-        responses["mediaAccountAccessKey"] = mapOf("accountAccessKey" to Base64.encodeToString(raw, Base64.NO_WRAP))
-        assertArrayEquals(raw, repository.recoverDocumentKey("media").encoded)
-        responses["mediaAccountAccessKey"] = mapOf("accountAccessKey" to Base64.encodeToString(ByteArray(16), Base64.NO_WRAP))
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.recoverDocumentKey("media") } }
-        val key = EncryptionUtils.generateSymmetricKey()
-        repository.storeDocumentKey("media", key)
-        assertArrayEquals(key.encoded, Base64.decode(requests.last().second["recoveryKeyToSeal"] as String, Base64.DEFAULT))
     }
 
     @Test
@@ -145,7 +137,8 @@ class MediaRepositorySdkTest {
             val wrapped = KeyManager.wrapKey(key, KeyManager.getOrCreatePublicKey())
             val source = PreparedEncryptedMedia("local-only", 500, "hash", metadata,
                 mapOf("owner" to wrapped), listOf("owner"), KeyManager.CURRENT_KEY_WRAP_VERSION,
-                MediaKind.DOCUMENT, OcrReview.NOT_APPLICABLE)
+                MediaKind.DOCUMENT, OcrReview.NOT_APPLICABLE,
+                accountWrappedKeys = mapOf("owner" to accountWrapper()))
             responses["mediaCreateUpload"] = mapOf("mediaId" to "media", "objectKey" to "server/object", "mode" to "SINGLE", "partSize" to 500)
             val session = repository.createUpload(MediaUploadJob("job", "owner", source))
             assertEquals("server/object", session.objectKey)
@@ -153,7 +146,16 @@ class MediaRepositorySdkTest {
             assertEquals("emergencyAttachUpload" to mapOf("id" to emergency, "jobId" to "job"), requests.first())
             assertEquals("mediaCreateUpload", requests.last().first)
             assertFalse(requests.last().second.containsKey("filePath"))
-            assertArrayEquals(key.encoded, Base64.decode(requests.last().second["recoveryKeyToSeal"] as String, Base64.DEFAULT))
+            assertFalse(requests.last().second.containsKey("recoveryKeyToSeal"))
+            assertEquals(accountWrapper().toMap(),
+                (requests.last().second["accountWrappedKeys"] as Map<*, *>)["owner"])
         }
     }
+
+    private fun accountWrapper() = AccountKeysetWrappedKey(
+        keyId = "123e4567-e89b-42d3-a456-426614174000",
+        epoch = 1,
+        algorithm = "RSA-OAEP-256",
+        wrappedKey = "opaque-wrapper",
+    )
 }

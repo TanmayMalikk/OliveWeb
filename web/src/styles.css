@@ -444,6 +444,21 @@ th {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.account-recovery-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem auto 0;
+  width: min(72rem, calc(100% - 2rem));
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--soft);
+}
+.account-recovery-notice h2,
+.account-recovery-notice p { margin: 0; }
+.account-recovery-notice p { margin-top: 0.3rem; }
 @media (max-width: 48rem) {
   .site-header nav {
     gap: 0.8rem;
@@ -466,6 +481,7 @@ th {
   .page-width {
     width: calc(100% - 2rem);
   }
+  .account-recovery-notice { align-items: stretch; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

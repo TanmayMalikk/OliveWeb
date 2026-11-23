@@ -49,7 +49,11 @@ internal class SessionViewModel @JvmOverloads constructor(
 
     // Document and map screens keep their own feature controllers.
     internal val media = runtime.mediaRepository?.let {
-        MediaTransferController(application, viewModelScope, it, offlineCache = runtime.offlineMediaCache)
+        MediaTransferController(
+            application,viewModelScope,it,offlineCache=runtime.offlineMediaCache,
+            accountKeysetProvider=runtime.settings::ensureAccountKeysetForMedia,
+            accountKeysetUnlocker=runtime.settings::unlockAccountKeysetForMedia,
+        )
     }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
