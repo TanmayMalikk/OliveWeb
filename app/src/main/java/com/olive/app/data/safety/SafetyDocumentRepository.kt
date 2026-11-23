@@ -92,6 +92,26 @@ internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
     }.distinct()
 }
 
+/**
+ * Applies authenticated private metadata after the document key is recovered on-device.
+ *
+ * @param metadata Decrypted JSON authenticated by the document's AES-GCM key.
+ * @return A viewer-ready copy without persisting plaintext metadata.
+ */
+internal fun SafetyDocument.withDecryptedMetadata(metadata: JSONObject): SafetyDocument {
+    val ocr = documentOcrMetadataFrom(metadata)
+    return copy(
+        name = (metadata.opt("name") as? String)?.trim()?.take(160)
+            ?.takeIf(String::isNotBlank) ?: name,
+        mimeType = (metadata.opt("mimeType") as? String)?.trim()?.take(120)
+            ?.takeIf(String::isNotBlank) ?: mimeType,
+        ocrText = ocr?.text ?: ocrText,
+        ocrConfidence = ocr?.confidence ?: ocrConfidence,
+        ocrSuccessful = ocr?.successful ?: ocrSuccessful,
+        tags = if (metadata.has("tags")) documentTagsFrom(metadata) else tags,
+    )
+}
+
 interface SafetyDocumentDataSource {
     // Lists every safety document this account is allowed to open.
     suspend fun listFor(uid: String): DocumentListSnapshot

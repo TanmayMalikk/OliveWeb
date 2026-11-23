@@ -16,6 +16,7 @@ import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.OcrReview
 import com.olive.app.ui.users.user.documents.MediaTransferOperations
+import com.olive.app.ui.users.user.documents.OpenedMedia
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.documents.mediaFailureResource
 import com.olive.app.ui.session.PasskeyRecoveryStage
@@ -135,7 +136,7 @@ class DocumentControllerMediaRoutingTest {
         )
         controller.prepare(VIEWER_UID)
 
-        controller.download(document) {}
+        controller.download(document) { _, _ -> }
         assertEquals(setOf(document.id), controller.state.openingDocumentIds)
         release.complete(Unit)
         assertTrue(controller.state.openingDocumentIds.isEmpty())
@@ -418,13 +419,13 @@ class DocumentControllerMediaRoutingTest {
             onFailure: (String) -> Unit,
         ) = Unit
         // Checks the download file step with the test's sample data.
-        override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
+        override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia {
             downloadCount++
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
             release?.await()
             failure?.let { throw it }
-            return file
+            return OpenedMedia(document, file)
         }
         override suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String) = Unit
         override suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String) = Unit

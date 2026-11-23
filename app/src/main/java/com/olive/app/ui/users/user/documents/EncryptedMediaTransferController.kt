@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.withDecryptedMetadata
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.security.AccountKeysetWrappedKey
@@ -53,6 +54,8 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal data class OpenedMedia(val document: SafetyDocument, val file: File)
+
 internal interface MediaTransferOperations {
     // Watches pending uploads for this account and reports progress to the screen.
     fun observeUploads(ownerUid: String)
@@ -72,7 +75,7 @@ internal interface MediaTransferOperations {
         onQueued: (String) -> Unit, onFailure: (String) -> Unit,
     )
     // Downloads, checks, and decrypts one allowed media file.
-    suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File
+    suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia
     suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String)
     suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String)
     fun onDocumentSnapshot(viewerUid: String, documents: List<SafetyDocument>, serverConfirmed: Boolean)
@@ -247,7 +250,7 @@ internal class MediaTransferController(
     }
 
     /** Downloads and decrypts an R2-backed document for the authenticated viewer. */
-    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
+    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):OpenedMedia {
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
         state=MediaTransferState.Preparing("downloading")
         return try {
@@ -524,8 +527,14 @@ internal class MediaTransferController(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    /** Executes the encrypted download workflow without exposing plaintext to Firebase or R2. */
-    private suspend fun downloadEncrypted(document:SafetyDocument,viewerUid:String):File {
+    /**
+     * Opens verified cached ciphertext or downloads it before local decryption.
+     *
+     * @param document Encrypted media record authorized for the active account.
+     * @param viewerUid Active Firebase account identifier.
+     * @return Authenticated plaintext and its locally recovered private metadata.
+     */
+    private suspend fun downloadEncrypted(document:SafetyDocument,viewerUid:String):OpenedMedia {
         offlineCache.verifiedCiphertext(viewerUid, document)?.let {
             return decryptCiphertext(it, document, viewerUid)
         }
@@ -589,7 +598,15 @@ internal class MediaTransferController(
         }
     }
 
-    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File = withContext(Dispatchers.IO) {
+    /**
+     * Recovers the media key, authenticates private metadata, and decrypts a temporary preview.
+     *
+     * @param encrypted Verified ciphertext stored in app-private storage.
+     * @param document Server-visible authorization data and encrypted private metadata.
+     * @param viewerUid Active Firebase account identifier.
+     * @return Viewer-ready metadata and an app-private temporary plaintext file.
+     */
+    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):OpenedMedia = withContext(Dispatchers.IO) {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
@@ -605,8 +622,16 @@ internal class MediaTransferController(
                 runCatching { accountWrapper.unwrap(keyset) }
                     .getOrElse { throw MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED,it) }
             }
+        val resolvedDocument = try {
+            if (document.encryptedMetadata.isBlank()) document else document.withDecryptedMetadata(
+                JSONObject(EncryptionUtils.decryptText(document.encryptedMetadata, key)),
+            )
+        } catch (failure: Exception) {
+            throw MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure)
+        }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
-        val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+        val extension=resolvedDocument.name.substringAfterLast('.',"")
+            .takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
         val partial = File.createTempFile("preview-", ".part", opened)
         val target = File(opened, partial.nameWithoutExtension + (extension?.let { ".$it" } ?: ".preview"))
         try {
@@ -614,7 +639,7 @@ internal class MediaTransferController(
                 MediaCipher.decrypt(input,output,key)
             } }
             check(partial.renameTo(target))
-            return@withContext target
+            return@withContext OpenedMedia(resolvedDocument, target)
         } catch(failure:Exception) {
             partial.delete()
             if (failure is MediaAccessException) throw failure

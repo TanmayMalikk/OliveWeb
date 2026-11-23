@@ -187,16 +187,17 @@ internal class SafetyDocumentsController(
     }
 
     // Downloads and decrypts an allowed document, then opens its in-app viewer.
-    fun download(document: SafetyDocument, onReady: (File) -> Unit) {
+    fun download(document: SafetyDocument, onReady: (SafetyDocument, File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         if (!beginOpening(document.id)) return
         val token = generation
         scope.launch {
             try {
                 runCatching { openDocument(document, viewerUid) }
-                    .onSuccess { file ->
-                        if (token == generation && state.ownerUid == viewerUid) onReady(file)
-                        else file.delete()
+                    .onSuccess { opened ->
+                        if (token == generation && state.ownerUid == viewerUid) {
+                            onReady(opened.document, opened.file)
+                        } else opened.file.delete()
                     }
                     .onFailure { failure ->
                         if (failure is CancellationException) throw failure
@@ -233,9 +234,10 @@ internal class SafetyDocumentsController(
                         source.getFor(viewerUid, documentId)
                     } else source.cachedFor(viewerUid, documentId)
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
-                    val file = openDocument(document, viewerUid)
-                    if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                    else file.delete()
+                    val opened = openDocument(document, viewerUid)
+                    if (token == generation && state.ownerUid == viewerUid) {
+                        onReady(opened.document, opened.file)
+                    } else opened.file.delete()
                 }.onFailure { failure ->
                     if (failure is CancellationException) throw failure
                     if (token == generation) {
@@ -350,8 +352,11 @@ internal class SafetyDocumentsController(
                 val relevant = available.filter { it.id in relevantIds }
                 val files = linkedMapOf<String, EmergencyReportMedia>()
                 relevant.forEach { document ->
-                    val file = runCatching { openDocument(document, ownerUid) }.getOrNull()
-                    files[document.id] = EmergencyReportMedia(document, file)
+                    val opened = runCatching { openDocument(document, ownerUid) }.getOrNull()
+                    files[document.id] = EmergencyReportMedia(
+                        opened?.document ?: document,
+                        opened?.file,
+                    )
                 }
                 withContext(Dispatchers.IO) {
                     renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
@@ -487,11 +492,11 @@ internal class SafetyDocumentsController(
     }
 
     // Opens a saved document after its encrypted content is ready.
-    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
+    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): OpenedMedia =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
         } else {
-            checkNotNull(repository).download(applicationContext, document)
+            OpenedMedia(document, checkNotNull(repository).download(applicationContext, document))
         }
 
     private fun beginOpening(documentId: String): Boolean {

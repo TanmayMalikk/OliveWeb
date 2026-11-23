@@ -195,8 +195,8 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                     offline = mediaController?.offlineCopies?.get(file.id)
                         ?: OfflineMediaAvailability.NOT_CACHED,
                     onOpen = {
-                    controller.download(file) { local ->
-                        opened = file to local
+                    controller.download(file) { resolved, local ->
+                        opened = resolved to local
                     }
                 }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
                     onMakeOffline = { controller.makeAvailableOffline(file) },

@@ -8,6 +8,7 @@ import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,12 +69,12 @@ class MediaTransferDownloadTest {
         Fixture().use { f ->
             f.ticket()
             val opened = f.controller.downloadFile(f.document, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
-            assertTrue(opened.name.endsWith(".pdf"))
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
+            assertTrue(opened.file.name.endsWith(".pdf"))
             assertEquals(MediaTransferState.Idle, f.controller.state)
             assertEquals(1, f.requests)
             verify(f.cache).retainRecentDownloaded(eq("owner") ?: "", eq(f.document) ?: f.document, any<File>() ?: f.encrypted)
-            opened.delete()
+            opened.file.delete()
         }
     }
 
@@ -83,10 +84,10 @@ class MediaTransferDownloadTest {
             f.online = false
             `when`(f.cache.verifiedCiphertext("owner", f.document)).thenReturn(f.encrypted)
             val opened = f.controller.downloadFile(f.document, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
             assertEquals(0, f.requests)
             verifyNoInteractions(f.repository)
-            opened.delete()
+            opened.file.delete()
         }
     }
 
@@ -102,7 +103,18 @@ class MediaTransferDownloadTest {
                 "RSA-OAEP-256",
                 KeyManager.wrapForAccountKeyset(f.key, recoveredKeyset.publicKey),
             )
+            val encryptedMetadata = EncryptionUtils.encryptText(
+                JSONObject()
+                    .put("name", "recovered-report.pdf")
+                    .put("mimeType", "application/pdf")
+                    .put("tags", org.json.JSONArray().put("recovered"))
+                    .toString(),
+                f.key,
+            )
             val freshDeviceDocument = f.document.copy(
+                name = "Encrypted document",
+                mimeType = "application/octet-stream",
+                encryptedMetadata = encryptedMetadata,
                 wrappedKeys = emptyMap(),
                 deviceWrappedKeys = emptyMap(),
                 accountRecoveryReady = true,
@@ -126,8 +138,40 @@ class MediaTransferDownloadTest {
 
             val opened = controller.downloadFile(freshDeviceDocument, "owner")
 
-            assertArrayEquals(f.plaintext, opened.readBytes())
-            opened.delete()
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
+            assertEquals("recovered-report.pdf", opened.document.name)
+            assertEquals("application/pdf", opened.document.mimeType)
+            assertEquals(listOf("recovered"), opened.document.tags)
+            assertTrue(opened.file.name.endsWith(".pdf"))
+            opened.file.delete()
+        }
+    }
+
+    @Test
+    fun corruptedPrivateMetadataNeverReturnsAPlaintextPreview() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val valid = EncryptionUtils.encryptText(
+                JSONObject().put("name", "report.pdf").put("mimeType", "application/pdf").toString(),
+                f.key,
+            )
+            val corrupted = valid.dropLast(1) + if (valid.last() == 'A') "B" else "A"
+            val document = f.document.copy(
+                name = "Encrypted document",
+                mimeType = "application/octet-stream",
+                encryptedMetadata = corrupted,
+            )
+            `when`(f.cache.availability("owner", document))
+                .thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.ticket()
+            val folder = File(f.app.cacheDir, "opened-documents")
+            val before = folder.listFiles().orEmpty().map(File::getName).toSet()
+
+            val failure = assertThrows(MediaAccessException::class.java) {
+                runBlocking { f.controller.downloadFile(document, "owner") }
+            }
+
+            assertEquals(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure.reason)
+            assertEquals(before, folder.listFiles().orEmpty().map(File::getName).toSet())
         }
     }
 
