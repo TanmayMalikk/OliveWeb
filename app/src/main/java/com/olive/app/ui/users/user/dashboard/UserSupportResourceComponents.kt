@@ -62,6 +62,7 @@ import com.olive.app.data.safety.HotlineResourceKind
 import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.Paper
 
 internal enum class HotlineTab {
     All,
@@ -169,7 +170,8 @@ internal fun HotlineResourceCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = kindColor.copy(alpha = 0.14f),
+                    color = Paper,
+                    border = BorderStroke(1.dp, kindColor.copy(alpha = 0.4f)),
                 ) {
                     Text(
                         text = hotlineKindLabel(resource.kind),
@@ -350,7 +352,8 @@ private fun HotlineAlwaysOpenBadge() {
     )
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = OliveGreen.copy(alpha = 0.14f),
+        color = Paper,
+        border = BorderStroke(1.dp, OliveGreen.copy(alpha = 0.4f)),
         modifier = Modifier.semantics { contentDescription = description },
     ) {
         Row(

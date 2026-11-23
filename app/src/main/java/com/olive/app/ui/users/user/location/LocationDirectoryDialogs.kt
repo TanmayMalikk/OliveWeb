@@ -66,6 +66,7 @@ import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OliveOutline
+import com.olive.app.ui.shared.PaleOlive
 import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.users.user.dashboard.hotlineKindLabel
 import com.olive.app.ui.users.user.dashboard.hotlineRegionName
@@ -287,12 +288,12 @@ internal fun DirectoryPlaceDetailDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
                         shape = MaterialTheme.shapes.small,
-                        color = OliveGreen.copy(alpha = 0.14f),
+                        color = PaleOlive,
                     ) {
                         Text(
                             hotlineKindLabel(resource.kind),
                             style = MaterialTheme.typography.labelMedium,
-                            color = OliveGreen,
+                            color = Ink,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                     }

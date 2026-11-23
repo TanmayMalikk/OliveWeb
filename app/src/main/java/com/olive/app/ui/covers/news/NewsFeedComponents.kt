@@ -100,7 +100,7 @@ internal fun NewsCategoryChips(
                 onClick = { onSelectCategory(category) },
                 shape = RoundedCornerShape(18.dp),
                 color = if (isSelected) OliveGreen else WarmWhite,
-                contentColor = if (isSelected) Cream else DarkOlive,
+                contentColor = if (isSelected) Cream else Ink,
                 border = BorderStroke(1.dp, if (isSelected) OliveGreen else SoftGray),
                 modifier = Modifier.height(34.dp).testTag("news_category_$category")
             ) {
@@ -415,7 +415,7 @@ internal fun NewsHeroCard(
                         Text(
                             text = uiText(R.string.news_top_story),
                             color = Cream,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.8.sp
                         )
@@ -500,8 +500,8 @@ internal fun NewsHeroCard(
                         Text(
                             text = topic,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = DarkOlive,
-                            fontSize = 12.sp,
+                            color = Ink,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }

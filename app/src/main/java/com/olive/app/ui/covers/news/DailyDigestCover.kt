@@ -309,7 +309,7 @@ internal fun NewsCover(
                                 onClick = { scope = NewsScope.LOCAL },
                                 shape = RoundedCornerShape(16.dp),
                                 color = if (scope == NewsScope.LOCAL) OliveGreen else Color.Transparent,
-                                contentColor = if (scope == NewsScope.LOCAL) Cream else DarkOlive,
+                                contentColor = if (scope == NewsScope.LOCAL) Cream else Ink,
                                 modifier = Modifier.height(32.dp).testTag("news_scope_local")
                             ) {
                                 Row(
@@ -317,11 +317,11 @@ internal fun NewsCover(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(13.dp))
+                                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(14.dp))
                                     Text(
                                         uiText(R.string.local),
-                                        fontSize = 12.sp,
-                                        fontWeight = if (scope == NewsScope.LOCAL) FontWeight.Bold else FontWeight.Medium
+                                        fontSize = 13.sp,
+                                        fontWeight = if (scope == NewsScope.LOCAL) FontWeight.Bold else FontWeight.SemiBold
                                     )
                                 }
                             }
@@ -329,7 +329,7 @@ internal fun NewsCover(
                                 onClick = { scope = NewsScope.GLOBAL },
                                 shape = RoundedCornerShape(16.dp),
                                 color = if (scope == NewsScope.GLOBAL) OliveGreen else Color.Transparent,
-                                contentColor = if (scope == NewsScope.GLOBAL) Cream else DarkOlive,
+                                contentColor = if (scope == NewsScope.GLOBAL) Cream else Ink,
                                 modifier = Modifier.height(32.dp).testTag("news_scope_global")
                             ) {
                                 Row(
@@ -337,11 +337,11 @@ internal fun NewsCover(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Outlined.Public, null, Modifier.size(13.dp))
+                                    Icon(Icons.Outlined.Public, null, Modifier.size(14.dp))
                                     Text(
                                         uiText(R.string.global),
-                                        fontSize = 12.sp,
-                                        fontWeight = if (scope == NewsScope.GLOBAL) FontWeight.Bold else FontWeight.Medium
+                                        fontSize = 13.sp,
+                                        fontWeight = if (scope == NewsScope.GLOBAL) FontWeight.Bold else FontWeight.SemiBold
                                     )
                                 }
                             }

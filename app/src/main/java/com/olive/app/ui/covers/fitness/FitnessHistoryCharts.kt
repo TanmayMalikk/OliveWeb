@@ -44,6 +44,7 @@ import com.olive.app.ui.shared.CarbohydrateGold
 import com.olive.app.ui.shared.DistanceGreen
 import com.olive.app.ui.shared.EatenBrown
 import com.olive.app.ui.shared.FatPlum
+import com.olive.app.ui.shared.FatPlumLight
 import com.olive.app.ui.shared.FitnessDarkCard
 import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.LightSage
@@ -568,7 +569,7 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
                     DashboardMetric(
                         burned.roundToInt().toString(),
                         stringResource(R.string.fitness_kilocalories_unit),
-                        FatPlum,
+                        FatPlumLight,
                     )
                 }
                 ActivityProgressRings(progress)
@@ -607,7 +608,7 @@ private fun ActivityProgressRings(progress: Float) {
         val centre = Offset(size.width / 2f, size.height / 2f)
         val widths = floatArrayOf(11.dp.toPx(), 10.dp.toPx(), 9.dp.toPx())
         val radii = floatArrayOf(size.minDimension * 0.43f, size.minDimension * 0.32f, size.minDimension * 0.21f)
-        val colours = listOf(ProteinLime, CarbohydrateBlue, FatPlum)
+        val colours = listOf(ProteinLime, CarbohydrateBlue, FatPlumLight)
         radii.indices.forEach { index ->
             drawCircle(
                 color = Paper.copy(alpha = 0.12f),

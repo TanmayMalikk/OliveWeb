@@ -307,7 +307,7 @@ internal fun SafetyPlanScreen(
                             onClick = { leaveEditor(); scope.launch { state.animateScrollToItem(index + 1) } },
                             enabled = plan != null,
                             colors = if (complete) ButtonDefaults.outlinedButtonColors(
-                                containerColor = SageGreen, contentColor = DarkOlive
+                                containerColor = SageGreen, contentColor = Ink
                             ) else ButtonDefaults.outlinedButtonColors(),
                             modifier = Modifier.testTag("safety_jump_$section")
                                 .semantics { if (complete) stateDescription = completeLabel }

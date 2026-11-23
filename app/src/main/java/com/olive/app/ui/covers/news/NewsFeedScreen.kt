@@ -337,20 +337,20 @@ private fun NewsSavedToggle(
                     onClick = { onToggle(false) },
                     shape = RoundedCornerShape(14.dp),
                     color = if (!showHistory) OliveGreen else Color.Transparent,
-                    contentColor = if (!showHistory) Cream else DarkOlive,
-                    modifier = Modifier.weight(1f).height(28.dp).testTag("news_saved_bookmarks")
+                    contentColor = if (!showHistory) Cream else Ink,
+                    modifier = Modifier.weight(1f).height(34.dp).testTag("news_saved_bookmarks")
                 ) {
                     Row(
                         Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Outlined.Bookmark, null, Modifier.size(13.dp))
+                        Icon(Icons.Outlined.Bookmark, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             uiText(R.string.news_bookmarks),
-                            fontSize = 11.sp,
-                            fontWeight = if (!showHistory) FontWeight.Bold else FontWeight.Medium
+                            fontSize = 13.sp,
+                            fontWeight = if (!showHistory) FontWeight.Bold else FontWeight.SemiBold
                         )
                     }
                 }
@@ -358,20 +358,20 @@ private fun NewsSavedToggle(
                     onClick = { onToggle(true) },
                     shape = RoundedCornerShape(14.dp),
                     color = if (showHistory) OliveGreen else Color.Transparent,
-                    contentColor = if (showHistory) Cream else DarkOlive,
-                    modifier = Modifier.weight(1f).height(28.dp).testTag("news_saved_history")
+                    contentColor = if (showHistory) Cream else Ink,
+                    modifier = Modifier.weight(1f).height(34.dp).testTag("news_saved_history")
                 ) {
                     Row(
                         Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Outlined.History, null, Modifier.size(13.dp))
+                        Icon(Icons.Outlined.History, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             uiText(R.string.news_history),
-                            fontSize = 11.sp,
-                            fontWeight = if (showHistory) FontWeight.Bold else FontWeight.Medium
+                            fontSize = 13.sp,
+                            fontWeight = if (showHistory) FontWeight.Bold else FontWeight.SemiBold
                         )
                     }
                 }

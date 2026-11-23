@@ -87,6 +87,7 @@ import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OliveOutline
 import com.olive.app.ui.shared.OlivePrivateLayout
+import com.olive.app.ui.shared.PaleOlive
 import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import kotlin.math.ceil
@@ -403,8 +404,8 @@ internal fun TripSummaryMetrics(
             }
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                color = OliveGreen.copy(alpha = 0.12f),
-                contentColor = OliveGreen,
+                color = PaleOlive,
+                contentColor = Ink,
             ) {
                 Row(
                     Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

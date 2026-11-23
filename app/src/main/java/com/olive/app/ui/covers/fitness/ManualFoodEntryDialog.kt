@@ -62,6 +62,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.olive.app.R
 import com.olive.app.ocr.PaddleOcrManager
 import com.olive.app.ui.shared.LoadingSkeleton
+import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.SkeletonLayout
 import java.io.File
 import java.util.UUID
@@ -89,7 +90,7 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
     var scanning by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf<Int?>(null) }
     // Empty labels stay visually lighter than entered values; the outline identifies missing inputs.
-    val hintColor = Color(0xFF6B7268)
+    val hintColor = Muted
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedLabelColor = hintColor,
         focusedLabelColor = hintColor,

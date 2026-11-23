@@ -495,6 +495,10 @@ internal fun SharedMediaMessage(
                 else session.documents.makeAvailableOffline(document)
             },
             enabled = offline != OfflineMediaAvailability.SAVING,
+            colors = if (mine && !onLightSurface) ButtonDefaults.textButtonColors(
+                contentColor = Paper,
+                disabledContentColor = PaleOlive,
+            ) else ButtonDefaults.textButtonColors(),
             modifier = Modifier.testTag("shared_media_offline_$id"),
         ) {
             Text(stringResource(when {
@@ -509,9 +513,13 @@ internal fun SharedMediaMessage(
         )
     }
     error?.let {
-        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+        Text(
+            it,
+            color = if (mine && !onLightSurface) OliveErrorContainer else MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                .testTag("shared_media_error_$id"))
+                .testTag("shared_media_error_$id"),
+        )
     }
     }
 }
