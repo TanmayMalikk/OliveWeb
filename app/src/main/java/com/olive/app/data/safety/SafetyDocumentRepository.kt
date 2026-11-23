@@ -43,6 +43,7 @@ data class SafetyDocument(
     val tags: List<String> = emptyList(),
     val accountRecoveryReady: Boolean = false,
     val accountWrappedKeys: Map<String, AccountKeysetWrappedKey> = emptyMap(),
+    val chatOnly: Boolean = false,
 )
 
 enum class DocumentListSource { LOCAL_INDEX, FIRESTORE_CACHE, SERVER }
@@ -115,6 +116,35 @@ internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
         }
     }.distinct()
 }
+
+/**
+ * Returns whether decrypted metadata identifies chat-only media (such as a voice message) that
+ * belongs in conversation timelines rather than document storage.
+ *
+ * @param chatOnly Explicit chat-only flag parsed from encrypted metadata.
+ * @param name Display name of the decrypted file.
+ * @param mimeType MIME content type of the decrypted file.
+ * @return `true` if the item should be excluded from document storage lists.
+ */
+internal fun isChatOnlyMediaMetadata(
+    chatOnly: Boolean,
+    name: String,
+    mimeType: String,
+): Boolean {
+    if (chatOnly) return true
+    val normalizedMime = mimeType.substringBefore(';').trim().lowercase()
+    val normalizedName = name.trim().lowercase()
+    return normalizedMime.startsWith("audio/") &&
+        (normalizedName == "voice message" || normalizedName.startsWith("voice message."))
+}
+
+/**
+ * Returns whether this record represents chat-only media excluded from document storage.
+ *
+ * @return `true` if this document is a chat voice message or other chat-only item.
+ */
+internal fun SafetyDocument.isChatOnlyMedia(): Boolean =
+    isChatOnlyMediaMetadata(chatOnly, name, mimeType)
 
 interface SafetyDocumentDataSource {
     /**
@@ -498,6 +528,7 @@ class SafetyDocumentRepository(
         }
     }
 
+    /** Ensures every target chat recipient has decryption access and wrapped keys for [documentId]. */
     override suspend fun ensureChatMediaAccess(
         documentId: String,
         callerUid: String,
@@ -878,6 +909,7 @@ class SafetyDocumentRepository(
             tags = documentTagsFrom(metadata),
             accountRecoveryReady = row.getBoolean("account_recovery_ready") == true,
             accountWrappedKeys = accountWrapped,
+            chatOnly = metadata?.optBoolean("chatOnly", false) == true,
         )
     }
 
@@ -1031,6 +1063,7 @@ class IndexedSafetyDocumentRepository(
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) =
         remote.revokeAccess(documentId, ownerUid, recipientUid)
 
+    /** Ensures every target chat recipient has decryption access to [documentId]. */
     override suspend fun ensureChatMediaAccess(
         documentId: String,
         callerUid: String,

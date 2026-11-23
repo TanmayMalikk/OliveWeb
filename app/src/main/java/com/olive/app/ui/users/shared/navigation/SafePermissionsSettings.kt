@@ -5,6 +5,8 @@ import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.oliveErrorShake
+import com.olive.app.ui.shared.rememberFieldErrorShakeTrigger
 import android.Manifest
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
@@ -696,6 +698,7 @@ internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
  * @param error Throwable or error message describing a failure, or null when not provided.
  * @param onFocus Callback invoked when focus changes or occurs.
  * @param newPassword Whether to apply new password.
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
  * @param onChange Callback invoked when the value or observed state changes.
  */
 @Composable
@@ -711,9 +714,11 @@ internal fun Field(
     error: String? = null,
     onFocus: (() -> Unit)? = null,
     newPassword: Boolean = false,
+    shakeTrigger: Int = 0,
     onChange: (String) -> Unit
 ) {
     val uiText = rememberResourceText()
+    val effectiveShake = rememberFieldErrorShakeTrigger(error, shakeTrigger)
     var secretVisible by rememberSaveable(tag) { mutableStateOf(false) }
     val secretDescription = when {
         numeric -> uiText(R.string.a11y_pin)
@@ -730,7 +735,7 @@ internal fun Field(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth().testTag(tag).semantics {
+        modifier = Modifier.fillMaxWidth().testTag(tag).oliveErrorShake(effectiveShake).semantics {
             error?.let { error(it) }
             autofillType?.let { contentType = it }
         }

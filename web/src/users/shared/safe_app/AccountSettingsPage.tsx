@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { idleTimeoutOptions } from "../../../session/useSessionSecurity";
-import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { issueEntryLink, savedEntryLink } from "../../../services/PrivateEntryLinks";
@@ -92,14 +92,21 @@ export default function Settings() {
       <section className="panel">
         <h2>Account password</h2>
         <Form
-          onSubmit={async (data) => {
+          onSubmit={async (data, form) => {
             await s.perform(async () => {
               const next = String(data.get("next"));
-              if (!validPassword(next) || next !== data.get("confirmation"))
+              if (!validPassword(next) || next !== data.get("confirmation")) {
+                shakeNamedFields(form, ["next", "confirmation"]);
                 throw new Error(
                   "Use matching 8–24 character passwords with a letter, number, and special character.",
                 );
-              await accounts.changePassword(String(data.get("current")), next);
+              }
+              try {
+                await accounts.changePassword(String(data.get("current")), next);
+              } catch (failure) {
+                shakeNamedFields(form, ["current"]);
+                throw failure;
+              }
               await s.record("settings", newEvent("Changed account password"));
               s.clearMessage();
               setNotice("Password updated.");
@@ -139,16 +146,23 @@ export default function Settings() {
           <section className="panel">
             <h2>Browser PIN</h2>
             <Form
-              onSubmit={async (data) => {
+              onSubmit={async (data, form) => {
                 await s.perform(async () => {
                   const next = String(data.get("next"));
-                  if (!validPin(next) || next !== data.get("confirmation"))
+                  if (!validPin(next) || next !== data.get("confirmation")) {
+                    shakeNamedFields(form, ["next", "confirmation"]);
                     throw new Error("Enter matching PINs with 4–6 digits.");
-                  await accounts.changePin(
-                    String(data.get("current")),
-                    next,
-                    p,
-                  );
+                  }
+                  try {
+                    await accounts.changePin(
+                      String(data.get("current")),
+                      next,
+                      p,
+                    );
+                  } catch (failure) {
+                    shakeNamedFields(form, ["current"]);
+                    throw failure;
+                  }
                   await s.record("settings", newEvent("Changed browser PIN"));
                   setNotice("Browser PIN updated.");
                 });
@@ -191,15 +205,22 @@ export default function Settings() {
               Change the phrase that opens the private entry prompt on Android. The web uses your personal link.
             </p>
             <Form
-              onSubmit={async (data) => {
+              onSubmit={async (data, form) => {
                 await s.perform(async () => {
                   const value = String(data.get("trigger"));
-                  if (value.trim().length < 3 || value.trim().length > 64)
+                  if (value.trim().length < 3 || value.trim().length > 64) {
+                    shakeNamedFields(form, ["trigger"]);
                     throw new Error("Choose 3–64 characters.");
-                  await s.saveProfile(
-                    { ...p, triggerHash: await triggerHash(value) },
-                    "Updated private entry trigger",
-                  );
+                  }
+                  try {
+                    await s.saveProfile(
+                      { ...p, triggerHash: await triggerHash(value) },
+                      "Updated private entry trigger",
+                    );
+                  } catch (failure) {
+                    shakeNamedFields(form, ["trigger"]);
+                    throw failure;
+                  }
                   setNotice("Cover trigger updated.");
                 });
               }}

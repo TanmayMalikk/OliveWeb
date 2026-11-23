@@ -277,6 +277,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         }
     }
 
+    /** Unwraps and decrypts shared private entries visible to [currentUid]. */
     private fun decodeSharedEntriesSnapshot(
         documents: List<DocumentSnapshot>,
         currentUid: String,
@@ -748,6 +749,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("encryptionVersion", encryptionVersion)
         .put("accountRecoveryReady", accountRecoveryReady)
         .put("evidence", evidence)
+        .put("chatOnly", chatOnly)
         .put("tags", JSONArray(tags.distinct().take(20)))
         .apply {
             ocrText?.take(MAX_OCR_TEXT)?.let { put("ocrText", it) }
@@ -808,6 +810,7 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         evidence = optBoolean("evidence"),
         tags = tags,
         accountWrappedKeys = accountWrappedKey?.let { mapOf(viewerUid to it) }.orEmpty(),
+        chatOnly = optBoolean("chatOnly"),
     )
 }
 

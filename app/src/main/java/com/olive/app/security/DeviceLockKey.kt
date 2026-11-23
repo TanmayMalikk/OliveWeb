@@ -92,6 +92,7 @@ internal class DeviceLockKey(private val namespace: String) {
 internal interface DeviceAuthenticationChallenge {
     val enrolling: Boolean
     val promptCipher: Cipher?
+    /** Creates an unlocked cipher used for legacy pre-API-30 authentication prompts. */
     fun legacyCipher(): Cipher
 }
 
@@ -456,6 +457,7 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         private val activeInstances =
             java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<EncryptedVault>>()
 
+        /** Tracks an [EncryptedVault] instance so [purgeAll] can clear its cache later. */
         private fun registerInstance(vault: EncryptedVault) {
             activeInstances.add(java.lang.ref.WeakReference(vault))
         }

@@ -52,10 +52,10 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 val nextEmail = email?.let(InputPolicy::normalizedEmail) ?: profile?.email.orEmpty()
                 val nextConsent = if (nextEmail.isBlank()) false else (emailCommunicationConsent ?: (profile?.emailCommunicationConsent == true))
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
-                    message = runtime.application.getString(R.string.ui_profile_required_fields); return
+                    failInput(runtime.application.getString(R.string.ui_profile_required_fields)); return
                 }
                 if (nextEmail.isNotBlank() && !InputPolicy.validEmail(nextEmail)) {
-                    message = runtime.application.getString(R.string.email_invalid_message); return
+                    failInput(runtime.application.getString(R.string.email_invalid_message)); return
                 }
                 val updated = profile?.copy(
                     fullName = fullName.trim(), affectedNames = affected.trim(), abuserName = abuserName.trim(),
@@ -80,8 +80,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 if (screen != SessionScreen.Cover || busy) return
                 history.recordSettingsInteraction("Cover", "Pressed save account settings")
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
-                    message =
-                        runtime.application.getString(R.string.ui_profile_required_fields)
+                    failInput(runtime.application.getString(R.string.ui_profile_required_fields))
                     return
                 }
                 val device = enrollment ?: return
@@ -231,8 +230,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 history.recordSettingsInteraction("Olive Branch", "Pressed change trigger word")
                 val device = enrollment ?: return
                 if (!InputPolicy.validTrigger(trigger) || !InputPolicy.validPin(pin)) {
-                    message =
-                        runtime.application.getString(R.string.enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin)
+                    failInput(runtime.application.getString(R.string.enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_trigger_please_retry)) { token ->
@@ -246,12 +244,9 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
 
                         is PinResult.Rejected -> {
                             attempts = withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if (result.failures >= 5) navigation.quickExit() else message =
-                                runtime.application.resources.getQuantityString(
-                                    R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                                    5 - result.failures,
-                                    5 - result.failures
-                                )
+                            if (result.failures >= 5) navigation.quickExit() else failInput(
+                                runtime.application.resources.getQuantityString(R.plurals.ui_incorrect_pin_value_attempts_remaining, 5 - result.failures, 5 - result.failures)
+                            )
                         }
                     }
                 }
@@ -410,31 +405,19 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 val username = profile?.username ?: return
                 if (currentPassword.isEmpty()) {
-                    message =
-                        runtime.application.getString(R.string.enter_your_current_password)
+                    failInput(runtime.application.getString(R.string.enter_your_current_password))
                     return
                 }
-                if (!InputPolicy.passwordExcludesUsername(
-                        newPassword,
-                        profile?.username ?: coverUsername
-                    )
-                ) {
-                    message =
-                        runtime.application.getString(R.string.password_excludes_username)
+                if (!InputPolicy.passwordExcludesUsername(newPassword, profile?.username ?: coverUsername)) {
+                    failInput(runtime.application.getString(R.string.password_excludes_username))
                     return
                 }
-                if (!InputPolicy.validAccountPassword(
-                        newPassword,
-                        profile?.username ?: coverUsername
-                    )
-                ) {
-                    message =
-                        runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                if (!InputPolicy.validAccountPassword(newPassword, profile?.username ?: coverUsername)) {
+                    failInput(runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character))
                     return
                 }
                 if (newPassword != confirmation) {
-                    message =
-                        runtime.application.getString(R.string.the_new_passwords_do_not_match)
+                    failInput(runtime.application.getString(R.string.the_new_passwords_do_not_match))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_password_check_your_current_password_and_connection)) { token ->
@@ -463,6 +446,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Loads the user's enrolled passkey recovery credentials into session state. */
     fun refreshPasskeyRecovery() = with(runtime) {
         val uid = enrollment?.uid ?: return@with
         val repository = passkeyRecoveryRepository ?: return@with
@@ -472,6 +456,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Enrolls a new passkey recovery factor protecting the user's Account Recovery Key. */
     fun enablePasskeyRecovery() = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -509,6 +494,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Removes an enrolled passkey recovery credential and refreshes the stored list. */
     fun removePasskeyRecovery(credentialId: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -525,11 +511,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Publishes the user's encrypted account keyset envelope to Firestore once per session epoch. */
     private suspend fun publishKeyset(e: AccountKeysetEnvelope) {
         val m = "${e.accountId}:${e.keyId}:${e.epoch}"
         if (m !in publishedKeysets) { runtime.accountKeysetRepository?.publish(e); publishedKeysets.add(m) }
     }
 
+    /** Obtains the unlocked [AccountRecoveryKey], recovering from passkey or provisioning if missing. */
     private suspend fun accountRecoveryKey(
         uid: String, token: Long, ensureRemotePublished: Boolean = false,
     ): AccountRecoveryKey {
@@ -544,6 +532,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         return recoverAccountRecoveryKey(uid, remote, token)
     }
 
+    /** Generates a new Account Recovery Key and envelope, protects it locally, and publishes it. */
     private suspend fun createAccountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val repository = checkNotNull(runtime.accountKeysetRepository)
         val recoveryKey = withContext(Dispatchers.IO) { AccountRecoveryKey.generate() }
@@ -563,6 +552,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         return recoveryKey
     }
 
+    /** Unlocks [keyset] via a passkey PRF assertion and re-wraps the ARK under device authentication. */
     private suspend fun recoverAccountRecoveryKey(
         uid: String,
         keyset: AccountKeysetEnvelope,
@@ -591,6 +581,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Unlocks a local [AccountRecoveryKey] using biometric or device credential authentication. */
     private suspend fun unlockDeviceRecoveryKey(
         uid: String,
         record: AccountRecoveryKeyDeviceRecord,
@@ -607,6 +598,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Wraps and saves a local copy of [recoveryKey] protected by the Android device lock. */
     private suspend fun protectDeviceRecoveryKey(
         uid: String,
         recoveryKey: AccountRecoveryKey,
@@ -628,6 +620,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Requests UI-layer biometric/device lock authentication for [challenge]. */
     private suspend fun requestDeviceAuthentication(
         challenge: DeviceAuthenticationChallenge,
         uid: String,
@@ -643,6 +636,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Requests an Activity-hosted Credential Manager ceremony for passkey recovery. */
     private suspend fun requestPasskey(
         requestJson: String,
         assertion: Boolean,
@@ -661,6 +655,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /** Verifies that the active Safe session, epoch, and user UID still match the started flow. */
     private fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
         epoch == token && state.screen == SessionScreen.Safe && enrollment?.uid == uid &&
             state.accountRole == AccountRole.USER

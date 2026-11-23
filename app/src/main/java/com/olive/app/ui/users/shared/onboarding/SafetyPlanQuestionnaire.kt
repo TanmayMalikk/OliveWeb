@@ -240,6 +240,7 @@ internal fun SafetyPlanQuestionnaireDialog(
     )
 }
 
+/** Renders a titled safety-plan onboarding question block with subtitle and option content. */
 @Composable
 private fun QuestionnaireQuestionSection(
     title: String,
@@ -257,6 +258,7 @@ private fun QuestionnaireQuestionSection(
     }
 }
 
+/** Renders a single radio selection row inside an outlined card. */
 @Composable
 private fun QuestionnaireRadioRow(
     label: String,
@@ -291,6 +293,7 @@ private fun QuestionnaireRadioRow(
     }
 }
 
+/** Renders a toggleable checkbox option row inside an outlined card. */
 @Composable
 private fun QuestionnaireCheckboxRow(
     label: String,
@@ -325,6 +328,7 @@ private fun QuestionnaireCheckboxRow(
     }
 }
 
+/** Maps an [AbuseType] option to its localized label resource ID. */
 private fun abuseTypeLabel(type: AbuseType): Int = when (type) {
     AbuseType.PHYSICAL -> R.string.safety_intake_abuse_physical
     AbuseType.EMOTIONAL_OR_PSYCHOLOGICAL -> R.string.safety_intake_abuse_emotional
@@ -334,6 +338,7 @@ private fun abuseTypeLabel(type: AbuseType): Int = when (type) {
     AbuseType.CULTURAL_OR_IMMIGRATION -> R.string.safety_intake_abuse_cultural
 }
 
+/** Maps an [ImmigrationStatus] option to its localized label resource ID. */
 private fun immigrationLabel(status: ImmigrationStatus): Int = when (status) {
     ImmigrationStatus.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     ImmigrationStatus.CITIZEN -> R.string.safety_intake_immigration_citizen
@@ -343,12 +348,14 @@ private fun immigrationLabel(status: ImmigrationStatus): Int = when (status) {
     ImmigrationStatus.UNDOCUMENTED_OR_UNCERTAIN -> R.string.safety_intake_immigration_uncertain
 }
 
+/** Maps a [DependantNeed] option to its localized label resource ID. */
 private fun dependantLabel(need: DependantNeed): Int = when (need) {
     DependantNeed.CHILDREN -> R.string.safety_intake_dependant_children
     DependantNeed.ELDER_OR_ADULT_DEPENDANT -> R.string.safety_intake_dependant_adult
     DependantNeed.PETS -> R.string.safety_intake_dependant_pets
 }
 
+/** Maps a [FinancialSituation] option to its localized label resource ID. */
 private fun financialLabel(situation: FinancialSituation): Int = when (situation) {
     FinancialSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     FinancialSituation.INDEPENDENT -> R.string.safety_intake_financial_independent
@@ -356,6 +363,7 @@ private fun financialLabel(situation: FinancialSituation): Int = when (situation
     FinancialSituation.NO_INDEPENDENT_ACCESS -> R.string.safety_intake_financial_none
 }
 
+/** Maps a [TransportSituation] option to its localized label resource ID. */
 private fun transportLabel(situation: TransportSituation): Int = when (situation) {
     TransportSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     TransportSituation.OWN_VEHICLE -> R.string.safety_intake_transport_vehicle
@@ -363,6 +371,7 @@ private fun transportLabel(situation: TransportSituation): Int = when (situation
     TransportSituation.NEEDS_RIDE_SUPPORT -> R.string.safety_intake_transport_ride_support
 }
 
+/** Maps a [SafetyCircumstance] option to its localized label resource ID. */
 private fun circumstanceLabel(circumstance: SafetyCircumstance): Int = when (circumstance) {
     SafetyCircumstance.LEGAL_OR_COURT_ORDERS -> R.string.safety_intake_circumstance_legal
     SafetyCircumstance.MARRIAGE_OR_PARENTING -> R.string.safety_intake_circumstance_marriage

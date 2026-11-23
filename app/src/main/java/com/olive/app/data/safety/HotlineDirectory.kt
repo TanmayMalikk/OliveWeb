@@ -181,6 +181,7 @@ class HotlineDirectory private constructor(
     companion object {
         private const val DATASET_DATE = "2026-11-22"
 
+        /** Returns additional searchable keywords associated with a hotline resource kind. */
         private fun kindSearchTerms(kind: HotlineResourceKind): String = when (kind) {
             HotlineResourceKind.Hotline -> "hotline helpline phone"
             HotlineResourceKind.Shelter -> "shelter housing transition house"
@@ -408,14 +409,18 @@ internal object SavedHotlineStore {
     private val updatesMutable = MutableStateFlow(0L)
     val updates: StateFlow<Long> = updatesMutable.asStateFlow()
 
+    /** Returns the private SharedPreferences file backing saved hotline bookmarks. */
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
+    /** Returns the hashed preference key scoped to [uid]. */
     private fun accountKey(uid: String): String = "acct_${sha256Hex("acct:$uid")}"
 
+    /** Computes the account-scoped salted token stored for a saved hotline resource. */
     private fun resourceToken(uid: String, resourceId: String): String =
         sha256Hex("res:$uid:$resourceId")
 
+    /** Reads the set of stored hotline bookmark tokens for [uid]. */
     private fun readTokens(context: Context, uid: String?): Set<String> {
         if (uid.isNullOrBlank()) return emptySet()
         return prefs(context).getStringSet(accountKey(uid), emptySet()).orEmpty().toSet()
@@ -479,6 +484,7 @@ internal object SavedHotlineStore {
         }
     }
 
+    /** Computes a lowercase hexadecimal SHA-256 digest of [value]. */
     private fun sha256Hex(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         val chars = CharArray(digest.size * 2)

@@ -466,6 +466,7 @@ object KeyManager {
         keyWrapVersion: Int? = null,
     ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
 
+    /** Unwraps an RSA-OAEP encrypted symmetric key against candidate private keys and digest profiles. */
     private fun unwrapKey(
         wrappedKeyBase64: String,
         privateKeys: List<PrivateKey>,
@@ -728,6 +729,7 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
     var awaitingCredential: Boolean = false
         private set
 
+    /** Launches the Android Credential Manager prompt for [value] and strips PRF results on completion. */
     fun show(value: PasskeyCredentialRequest) {
         if (request === value) return
         cancel()
@@ -765,6 +767,7 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
         }
     }
 
+    /** Cancels any in-flight passkey credential prompt and resolves it with null. */
     fun cancel() {
         job?.cancel()
         job = null
@@ -773,6 +776,7 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
         awaitingCredential = false
     }
 
+    /** Completes [value] if still active, or wipes any orphaned PRF output bytes. */
     private fun finish(value: PasskeyCredentialRequest, result: PasskeyCredentialResult?) {
         if (request !== value) {
             (result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)

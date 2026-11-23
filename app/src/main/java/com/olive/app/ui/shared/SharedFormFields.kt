@@ -3,6 +3,7 @@ package com.olive.app.ui.shared
 
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +66,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * @param value Input value to store, parse, or format.
  * @param cityOnlyRequired Whether to apply city only required.
  * @param cityError Optional city error supplied to [AddressFields].
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
  * @param onFocus Callback invoked when focus changes or occurs.
  * @param change Action or callback executed for change.
  */
@@ -73,6 +75,7 @@ internal fun AddressFields(
     value: DeliveryAddress,
     cityOnlyRequired: Boolean = false,
     cityError: String? = null,
+    shakeTrigger: Int = 0,
     onFocus: ((String) -> Unit)? = null,
     change: (DeliveryAddress) -> Unit,
 ) {
@@ -95,6 +98,7 @@ internal fun AddressFields(
         onFocus = { onFocus?.invoke("City") },
         cityOnly = true,
         fieldError = cityError,
+        shakeTrigger = shakeTrigger,
         onChange = change,
     )
     AddressTextField(
@@ -153,6 +157,7 @@ private fun AddressTextField(
  * @param onFocus Callback invoked when focus changes or occurs.
  * @param cityOnly Whether to apply city only.
  * @param fieldError Optional field error supplied to [AddressAutocomplete].
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
  * @param onChange Callback invoked when the value or observed state changes.
  */
 @Composable
@@ -162,6 +167,7 @@ private fun AddressAutocomplete(
     onFocus: (() -> Unit)? = null,
     cityOnly: Boolean = false,
     fieldError: String? = null,
+    shakeTrigger: Int = 0,
     onChange: (DeliveryAddress) -> Unit,
 ) {
     val text = rememberResourceText()
@@ -189,6 +195,7 @@ private fun AddressAutocomplete(
                 error = text(R.string.address_suggestions_are_unavailable_continue_entering_your_address)
             }
     }
+    val effectiveShake = rememberFieldErrorShakeTrigger(fieldError ?: error, shakeTrigger)
     OutlinedTextField(
         value = query,
         onValueChange = { typed ->
@@ -201,6 +208,7 @@ private fun AddressAutocomplete(
         singleLine = true,
         label = { Text(label) },
         modifier = Modifier.fillMaxWidth().testTag(if (cityOnly) "address_city" else "address_line1")
+            .oliveErrorShake(effectiveShake)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }
             .keepVisibleWhileTyping(),
         isError = error != null || fieldError != null,
@@ -270,6 +278,7 @@ internal fun rememberBirthdayInput(initialDate: String = "") = rememberSaveable(
  * @param enabled Whether this feature or control is currently enabled.
  * @param showErrors Whether to show errors.
  * @param required Whether to apply required.
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
  * @param onChange Callback invoked when the value or observed state changes.
  */
 @Composable
@@ -279,6 +288,7 @@ internal fun BirthdayPicker(
     enabled: Boolean,
     showErrors: Boolean,
     required: Boolean = true,
+    shakeTrigger: Int = 0,
     onChange: (String) -> Unit,
 ) {
     val uiText = rememberResourceText()
@@ -295,6 +305,7 @@ internal fun BirthdayPicker(
         value.isNotBlank() && date == null -> uiText(R.string.dob_date_range_error)
         else -> null
     }
+    val effectiveShake = rememberFieldErrorShakeTrigger(message, shakeTrigger)
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var open by rememberSaveable { mutableStateOf(false) }
@@ -308,8 +319,10 @@ internal fun BirthdayPicker(
                 open = true
             },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("${tag}_open")
+                .oliveErrorShake(effectiveShake)
                 .semantics { message?.let { error(it) } },
             enabled = enabled,
+            border = if (message != null) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else null,
         ) { Text(dateText ?: uiText(R.string.dob_picker_title)) }
         if (!required && value.isNotBlank()) {
             TextButton(enabled = enabled, onClick = { onChange("") }) { Text(uiText(R.string.dob_clear)) }

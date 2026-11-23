@@ -81,11 +81,27 @@ class MediaTransferPreparationTest {
             f.controller.queueVoiceMessage(source,AccountIdentity("owner","fixture_owner"),voice)
             assertFalse(source.exists())
             val job=f.store.all().single()
-            assertEquals(voice,job.voiceDraft)
-            assertEquals(MediaKind.AUDIO,job.source.kind)
-            assertEquals(OcrReview.NOT_APPLICABLE,job.source.ocrReview)
-            assertTrue(File(job.source.filePath).isFile)
-            File(job.source.filePath).delete()
+            val cipherFile=File(job.source.filePath)
+            try {
+                assertEquals(voice,job.voiceDraft)
+                assertEquals(MediaKind.AUDIO,job.source.kind)
+                assertEquals(OcrReview.NOT_APPLICABLE,job.source.ocrReview)
+                assertTrue(cipherFile.isFile)
+                val key=KeyManager.unwrapKey(job.source.wrappedKeys.getValue("owner"),job.source.encryptionVersion)
+                val metadata=JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,key))
+                assertTrue(metadata.getBoolean("chatOnly"))
+                f.controller.observeUploads("owner")
+                f.session.await { f.controller.uploads.size==1 }
+                val pending=f.controller.uploads.single()
+                assertTrue(pending.chatOnly)
+                assertEquals("chat",pending.voiceConversationId)
+                f.store.write(job.copy(status=MediaTransferStatus.COMPLETE,mediaId="voice-media",voiceDraft=null))
+                f.controller.observeUploads("owner")
+                f.session.await { f.store.get(job.id)==null }
+                assertTrue(f.controller.uploads.isEmpty())
+            } finally {
+                cipherFile.delete()
+            }
         }
     }
 

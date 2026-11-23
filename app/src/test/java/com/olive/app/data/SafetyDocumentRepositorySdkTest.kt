@@ -313,10 +313,36 @@ class SafetyDocumentRepositorySdkTest {
         assertTrue(runCatching { repository.download(context, document.copy(objectKey = "encrypted/file")) }.isFailure)
     }
 
-    private fun encryptedFields(): Map<String, Any> {
-        val metadata = JSONObject().put("name", "Private sample.pdf").put("mimeType", "application/pdf")
+    @Test
+    fun chatOnlyMetadataAndLegacyVoiceNamesAreClassifiedWithoutAffectingNormalAudio() = withDeviceKey {
+        runBlocking {
+            val fields = encryptedFields(
+                name = "Recording.m4a",
+                mimeType = "audio/mp4",
+                chatOnly = true,
+            )
+            reference("voice", fields)
+            val tagged = repository.getFor("owner", "voice")
+            assertTrue(tagged.chatOnly)
+            assertTrue(tagged.isChatOnlyMedia())
+
+            val base = SafetyDocument("id", "owner", "", "Voice message.m4a", "audio/mp4", listOf("owner"))
+            assertTrue(base.isChatOnlyMedia())
+            assertTrue(base.copy(name = "voice message").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Recording.m4a").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Voice message.pdf", mimeType = "application/pdf").isChatOnlyMedia())
+        }
+    }
+
+    private fun encryptedFields(
+        name: String = "Private sample.pdf",
+        mimeType: String = "application/pdf",
+        chatOnly: Boolean = false,
+    ): Map<String, Any> {
+        val metadata = JSONObject().put("name", name).put("mimeType", mimeType)
             .put("tags", org.json.JSONArray(listOf("evidence", "safety")))
             .put("ocrText", "Recognized sample").put("ocrConfidence", .8).put("ocrSuccessful", true)
+            .apply { if (chatOnly) put("chatOnly", true) }
         return mapOf(
             "owner_id" to "owner", "object_key" to "encrypted/file", "allowed_users" to listOf("owner", "trusted"),
             "account_recovery_ready" to true, "evidence" to true, "encrypted_metadata" to EncryptionUtils.encryptText(metadata.toString(), key),

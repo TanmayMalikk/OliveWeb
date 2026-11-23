@@ -519,6 +519,7 @@ class SecureChatRepository(
     private fun DocumentSnapshot.roomKeys() =
         get("roomKeys").cloudStringMap()
 
+    /** Reads and parses account-keyset wrapped room keys from the conversation document. */
     private fun DocumentSnapshot.accountRoomKeys(): Map<String, AccountKeysetWrappedKey> =
         (get("accountRoomKeys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
             val id = uid as? String ?: return@mapNotNull null

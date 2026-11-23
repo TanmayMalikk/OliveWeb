@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Newspaper
-import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -99,17 +98,42 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var affected by remember { mutableStateOf(profile.affectedNames) }
     var abuserName by remember { mutableStateOf(profile.abuserName) }
     var birthday by rememberBirthdayInput(profile.dob)
-    var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
+    var showProfileErrors by remember(profile) { mutableStateOf(false) }
+    var profileShake by remember { mutableIntStateOf(0) }
     var email by remember(profile.email) { mutableStateOf(profile.email) }
     var emailConsent by remember(profile.emailCommunicationConsent) { mutableStateOf(profile.emailCommunicationConsent) }
-    var showEmailErrors by remember(profile.email) { mutableStateOf(false) }
     var situation by remember { mutableStateOf(profile.situation) }
     var address by remember { mutableStateOf(profile.address) }
     var trigger by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var triggerErrors by remember { mutableStateOf(false) }
+    var triggerShake by remember { mutableIntStateOf(0) }
+    var pendingTriggerCheck by remember { mutableStateOf(false) }
+    var triggerPinRejected by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var passwordErrors by remember { mutableStateOf(false) }
+    var passwordShake by remember { mutableIntStateOf(0) }
+    var pendingPasswordCheck by remember { mutableStateOf(false) }
+    var currentPasswordRejected by remember { mutableStateOf(false) }
+    val sessionErrorVersion = session.inputErrorVersion
+    var lastSeenErrorVersion by remember { mutableIntStateOf(sessionErrorVersion) }
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            if (pendingPasswordCheck) {
+                currentPasswordRejected = true
+                pendingPasswordCheck = false
+                passwordErrors = true
+            }
+            if (pendingTriggerCheck) {
+                triggerPinRejected = true
+                pendingTriggerCheck = false
+                triggerErrors = true
+            }
+        }
+    }
     var recoveryCredentialToRemove by remember { mutableStateOf<String?>(null) }
     val cacheUid = session.coverAccountId
     val recoveryCredentials = session.passkeyRecoveryCredentials
@@ -169,12 +193,17 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 uiText(R.string.full_name_required),
                                 fullName,
                                 "settings_full_name",
+                                error = if (showProfileErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                                shakeTrigger = profileShake,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused full name"
                                     )
-                                }) { fullName = it.take(120) }
+                                }) {
+                                    fullName = it.take(120)
+                                    showProfileErrors = false
+                                }
                             // User accounts can edit cover and private-entry settings here.
                             if (userRole) {
                                 Field(
@@ -198,19 +227,20 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                         )
                                     }) { abuserName = it.take(120) }
                             }
-                            BirthdayPicker(birthday, "settings_dob", !session.busy, showBirthdayErrors) { birthday = it }
+                            BirthdayPicker(birthday, "settings_dob", !session.busy, showProfileErrors, shakeTrigger = profileShake) { birthday = it }
                             EmailConsentSection(
                                 email = email,
                                 consent = emailConsent,
                                 enabled = !session.busy,
-                                showErrors = showEmailErrors,
+                                showErrors = showProfileErrors,
                                 requireConsentWhenEntered = false,
                                 emailTag = "settings_email",
                                 consentTag = "settings_email_consent",
+                                shakeTrigger = profileShake,
                                 onEmailChange = {
                                     email = it
                                     if (it.isBlank()) emailConsent = false
-                                    showEmailErrors = false
+                                    showProfileErrors = false
                                 },
                                 onConsentChange = { emailConsent = it },
                                 onFocusEmail = { session.recordSettingsInteraction("Olive Branch", "Focused email") },
@@ -233,16 +263,38 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             AddressFields(
                                 address,
                                 cityOnlyRequired = true,
+                                cityError = if (showProfileErrors && !address.locationValid) uiText(R.string.ui_city_required) else null,
+                                shakeTrigger = profileShake,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused address: $it"
                                     )
-                                }) { address = it }
+                                }) {
+                                    address = it
+                                    showProfileErrors = false
+                                }
                             Button(onClick = save@{
-                                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                                showEmailErrors = email.isNotBlank() && !InputPolicy.validEmail(email)
-                                if (showBirthdayErrors || showEmailErrors) return@save
+                                val invalidDob = !InputPolicy.validDob(birthday)
+                                val invalidEmail = email.isNotBlank() && !InputPolicy.validEmail(email)
+                                val invalidProfile = fullName.isBlank() || invalidDob || invalidEmail || !address.locationValid
+                                showProfileErrors = invalidProfile
+                                if (invalidProfile) {
+                                    profileShake += 1
+                                    if (!invalidDob && !invalidEmail) {
+                                        session.saveSettings(
+                                            fullName,
+                                            affected,
+                                            abuserName,
+                                            birthday,
+                                            situation,
+                                            address,
+                                            email = email,
+                                            emailCommunicationConsent = email.isNotBlank() && emailConsent,
+                                        )
+                                    }
+                                    return@save
+                                }
                                 session.saveSettings(
                                     fullName,
                                     affected,
@@ -263,6 +315,19 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     SettingsCategory.Password -> {
                         SettingsSection(uiText(R.string.change_account_password)) {
                             Text(stringResource(R.string.your_username_cannot_be_changed))
+                            val currentPasswordError = when {
+                                currentPasswordRejected -> uiText(R.string.ui_incorrect_password)
+                                passwordErrors && currentPassword.isEmpty() -> uiText(R.string.enter_your_current_password)
+                                else -> null
+                            }
+                            val newPasswordError = when {
+                                !passwordErrors -> null
+                                !InputPolicy.passwordExcludesUsername(newPassword, profile.username) -> uiText(R.string.password_excludes_username)
+                                !InputPolicy.validAccountPassword(newPassword, profile.username) -> uiText(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                                else -> null
+                            }
+                            val confirmPasswordError = if (passwordErrors && confirmPassword != newPassword) uiText(R.string.the_new_passwords_do_not_match) else null
+                            val passwordShakeTrigger = passwordShake + sessionErrorVersion
                             Field(
                                 uiText(R.string.current_password),
                                 currentPassword,
@@ -270,12 +335,18 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = currentPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused current password"
                                     )
-                                }) { currentPassword = it.take(24) }
+                                }) {
+                                    currentPassword = it.take(24)
+                                    currentPasswordRejected = false
+                                    passwordErrors = false
+                                }
                             Field(
                                 uiText(R.string.new_password),
                                 newPassword,
@@ -283,12 +354,17 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = newPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused new password"
                                     )
-                                }) { newPassword = it.take(24) }
+                                }) {
+                                    newPassword = it.take(24)
+                                    passwordErrors = false
+                                }
                             Field(
                                 uiText(R.string.confirm_new_password),
                                 confirmPassword,
@@ -296,13 +372,28 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = confirmPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused password confirmation"
                                     )
-                                }) { confirmPassword = it.take(24) }
+                                }) {
+                                    confirmPassword = it.take(24)
+                                    passwordErrors = false
+                                }
                             Button(onClick = {
+                                currentPasswordRejected = false
+                                val validLocal = currentPassword.isNotEmpty() &&
+                                    InputPolicy.validAccountPassword(newPassword, profile.username) &&
+                                    confirmPassword == newPassword
+                                passwordErrors = !validLocal
+                                if (!validLocal) {
+                                    passwordShake += 1
+                                } else {
+                                    pendingPasswordCheck = true
+                                }
                                 session.changePassword(
                                     currentPassword,
                                     newPassword,
@@ -322,31 +413,58 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 SafeEntryPinSettings(session, entryPinDraft)
                             }
                             SettingsSection(uiText(R.string.change_trigger_word)) {
+                                val triggerError = if (triggerErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null
+                                val triggerPinError = when {
+                                    triggerPinRejected -> uiText(R.string.enter_your_4_6_digit_pin)
+                                    triggerErrors && !session.account.usesDeviceLock && !InputPolicy.validPin(pin) -> uiText(R.string.ui_invalid_pin)
+                                    else -> null
+                                }
+                                val triggerShakeTrigger = triggerShake + sessionErrorVersion
                                 Text(stringResource(if (session.account.usesDeviceLock) R.string.entry_verify_trigger else R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))
                                 Field(
                                     uiText(R.string.new_trigger_word_or_phrase),
                                     trigger,
                                     "settings_trigger",
                                     secret = true,
+                                    error = triggerError,
+                                    shakeTrigger = triggerShakeTrigger,
                                     onFocus = {
                                         session.recordSettingsInteraction(
                                             "Olive Branch",
                                             "Focused trigger word"
                                         )
-                                    }) { trigger = it.take(64) }
+                                    }) {
+                                        trigger = it.take(64)
+                                        triggerErrors = false
+                                    }
                                 if (!session.account.usesDeviceLock) Field(
                                     uiText(R.string.current_pin),
                                     pin,
                                     "settings_pin",
                                     secret = true,
                                     numeric = true,
+                                    error = triggerPinError,
+                                    shakeTrigger = triggerShakeTrigger,
                                     onFocus = {
                                         session.recordSettingsInteraction(
                                             "Olive Branch",
                                             "Focused trigger-change PIN"
                                         )
-                                    }) { pin = it.filter { c -> c in '0'..'9' }.take(6) }
+                                    }) {
+                                        pin = it.filter { c -> c in '0'..'9' }.take(6)
+                                        triggerPinRejected = false
+                                        triggerErrors = false
+                                    }
                                 Button(onClick = {
+                                    triggerPinRejected = false
+                                    val validLocal = InputPolicy.validTrigger(trigger) &&
+                                        (session.account.usesDeviceLock || InputPolicy.validPin(pin))
+                                    triggerErrors = !validLocal
+                                    if (!validLocal) {
+                                        triggerShake += 1
+                                    } else if (!session.account.usesDeviceLock) {
+                                        pendingTriggerCheck = true
+                                    }
                                     if (session.account.usesDeviceLock) session.account.changeDeviceLockTrigger(trigger) else session.changeTrigger(
                                         trigger,
                                         pin
@@ -602,7 +720,6 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
     CoverType.entries.forEach { type ->
         val isSelected = selected == type
         val label = when (type) {
-            CoverType.GAME -> uiText(R.string.game_cover_app_olive_tap)
             CoverType.NEWS -> uiText(R.string.news_app_daily_digest)
             CoverType.FITNESS -> uiText(R.string.fitness_cover_choice)
         }
@@ -630,7 +747,6 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
                 when (type) {
                     CoverType.NEWS -> Icons.Outlined.Newspaper
                     CoverType.FITNESS -> Icons.Outlined.FitnessCenter
-                    CoverType.GAME -> Icons.Outlined.SportsEsports
                 }, null, Modifier.size(20.dp).testTag("cover_choice_icon_${type.name.lowercase()}")
             )
             Spacer(Modifier.width(8.dp))

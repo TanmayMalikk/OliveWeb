@@ -288,3 +288,121 @@ it("reports missing recordings and storage errors without producing a preview", 
   await expect(openBrowserDocument(unlocked)).rejects.toThrow("could not reach encrypted storage");
   await expect(openBrowserDocument(unlocked)).rejects.toThrow("Cloud download failed (503)");
 });
+
+it("tags voice uploads as chat-only in encrypted metadata without exposing metadata in plaintext", async () => {
+  const keyId = "123e4567-e89b-42d3-a456-426614174000";
+  const pair = await crypto.subtle.generateKey(
+    { name: "RSA-OAEP", modulusLength: 3072, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["encrypt", "decrypt"],
+  );
+  const publicKey = toBase64(new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey)));
+  mocks.getDoc.mockImplementation(async (reference: string) => reference.includes("accountKeyDirectories")
+    ? { get: (field: string) => ({ ownerUid: owner.uid, keyId, epoch: 1, algorithm: "RSA-OAEP-256", publicKey })[field] }
+    : { get: (field: string) => ({ uid: owner.uid, publicKey })[field] });
+  mocks.getDocs.mockResolvedValue({ docs: [{ data: () => ({
+    uid: owner.uid, deviceId: "new-browser", publicKey, mgf1Digest: "SHA-256",
+  }) }] });
+  mocks.callable.mockImplementation(async (name: string) => {
+    if (name === "mediaCreateUpload") return { data: { mediaId: "voice-upload", mode: "SINGLE", partSize: 0 } };
+    if (name === "mediaUploadPartTicket") return { data: { url: "https://storage.example.test/upload" } };
+    return { data: {} };
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+
+  await expect(uploadBrowserDocument(
+    new File([new Uint8Array([9, 8, 7])], "Voice message.webm", { type: "audio/webm;codecs=opus" }),
+    owner,
+    undefined,
+    { chatOnly: true },
+  )).resolves.toBe("voice-upload");
+
+  const create = mocks.callable.mock.calls.find(([name]) => name === "mediaCreateUpload")?.[1] as {
+    encryptedMetadata: string;
+    deviceWrappedKeys: Record<string, string>;
+  };
+  const wrappedBytes = Uint8Array.from(atob(create.deviceWrappedKeys[`${owner.uid}--new-browser`]), (c) => c.charCodeAt(0));
+  const rawAes = new Uint8Array(await crypto.subtle.decrypt({ name: "RSA-OAEP" }, pair.privateKey, wrappedBytes));
+  const aesKey = await importKey(rawAes);
+  const metaBytes = Uint8Array.from(atob(create.encryptedMetadata), (c) => c.charCodeAt(0));
+  const decodedMeta = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: metaBytes.slice(0, 12), tagLength: 128 },
+    aesKey,
+    metaBytes.slice(12),
+  )));
+  expect(decodedMeta).toMatchObject({
+    name: "Voice message.webm",
+    mimeType: "audio/webm;codecs=opus",
+    kind: "AUDIO",
+    ocrReview: "NOT_APPLICABLE",
+    chatOnly: true,
+  });
+});
+
+it("excludes chat-only and legacy voice messages from document lists while still opening voice messages in chat", async () => {
+  const keyId = "123e4567-e89b-42d3-a456-426614174000";
+  const pair = await crypto.subtle.generateKey(
+    { name: "RSA-OAEP", modulusLength: 3072, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["encrypt", "decrypt"],
+  );
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const key = await importKey(raw);
+  const encoder = new TextEncoder();
+  const accountWrapper = toBase64(new Uint8Array(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pair.publicKey, raw)));
+  mocks.keyset.mockReturnValue({
+    accountId: owner.uid, keyId, epoch: 1, publicKey: pair.publicKey, privateKey: pair.privateKey,
+  });
+  async function encrypted(value: string, header: number[] = []) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const body = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(value));
+    return Uint8Array.from([...header, ...iv, ...new Uint8Array(body)]);
+  }
+  const voiceCipher = await encrypted("voice-audio", [0x4f, 0x4c, 0x56, 0x4d, 1, 12]);
+  const voiceDigest = new Uint8Array(await crypto.subtle.digest("SHA-256", voiceCipher));
+  const makeRow = async (id: string, meta: Record<string, unknown>) => {
+    const encryptedMetadata = toBase64(await encrypted(JSON.stringify(meta)));
+    return {
+      id,
+      data: () => ({
+        owner_id: owner.uid,
+        object_key: `users/${owner.uid}/media/${id}`,
+        encrypted_metadata: encryptedMetadata,
+        ciphertext_size: voiceCipher.length,
+        ciphertext_sha256: [...voiceDigest].map((byte) => byte.toString(16).padStart(2, "0")).join(""),
+        wrapped_keys: { [owner.uid]: "android-only" },
+        account_wrapped_keys: { [owner.uid]: { keyId, epoch: 1, algorithm: "RSA-OAEP-256", wrappedKey: accountWrapper } },
+      }),
+    };
+  };
+  const docRow = await makeRow("doc-1", { name: "plan.pdf", mimeType: "application/pdf" });
+  const taggedVoiceRow = await makeRow("voice-tagged", { name: "Audio.m4a", mimeType: "audio/mp4", chatOnly: true });
+  const legacyVoiceRow = await makeRow("voice-legacy", { name: "Voice message.m4a", mimeType: "audio/mp4" });
+  const manualAudioRow = await makeRow("manual-audio", { name: "Recording.m4a", mimeType: "audio/mp4" });
+
+  mocks.getDocs.mockResolvedValue({ docs: [docRow, taggedVoiceRow, legacyVoiceRow, manualAudioRow] });
+  const listed = await listBrowserDocuments(owner);
+  expect(listed.map((d) => d.id)).toEqual(["doc-1", "manual-audio"]);
+
+  const unsubscribe = vi.fn();
+  mocks.snapshot.mockReturnValue(unsubscribe);
+  const update = vi.fn();
+  const stop = await observeBrowserDocuments(owner, update, vi.fn());
+  const [, emit] = mocks.snapshot.mock.calls[0];
+  emit({ docs: [docRow, taggedVoiceRow, legacyVoiceRow, manualAudioRow] });
+  await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+  expect(update.mock.calls[0][0].map((d: BrowserDocument) => d.id)).toEqual(["doc-1", "manual-audio"]);
+  stop();
+
+  mocks.serverRow.mockResolvedValue({ id: taggedVoiceRow.id, exists: () => true, data: taggedVoiceRow.data });
+  mocks.callable.mockResolvedValue({ data: { url: "https://storage.example.test/voice" } });
+  const fetchBlob = globalThis.fetch;
+  vi.stubGlobal("fetch", (url: string) =>
+    url.startsWith("blob:") ? fetchBlob(url) : Promise.resolve(new Response(voiceCipher)));
+  const url = await openVoiceMessage("voice-tagged", owner);
+  try {
+    expect(await (await fetch(url)).text()).toBe("voice-audio");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+});

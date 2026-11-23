@@ -116,6 +116,7 @@ internal fun FreeUseGpsDestinationCard(
     val coordSubtitle = stringResource(R.string.location_gps_coordinates_hint)
     val noMatchMessage = stringResource(R.string.location_gps_no_match)
 
+    /** Clears transient autocomplete suggestions and begins or queues navigation to ([lat], [lon]). */
     fun startRouteTo(title: String, lat: Double, lon: Double) {
         suppressNextAutocomplete = true
         suggestions = emptyList()
@@ -175,6 +176,7 @@ internal fun FreeUseGpsDestinationCard(
         }
     }
 
+    /** Resolves and starts routing to the top suggestion or geocoded match for the current query. */
     fun submitFreeText() {
         val currentQuery = query.trim()
         if (currentQuery.isEmpty()) return
@@ -444,6 +446,7 @@ internal fun rememberDeviceHeadingState(
     }
     val latestDeclination by rememberUpdatedState(declinationDegrees)
 
+    /** Smooths incoming GPS or compass azimuth readings and updates heading state above 1.5 degrees. */
     fun publishIfChanged(rawCompass: Float?) {
         val candidate = selectPreferredHeading(latestGpsBearing, latestGpsSpeed, rawCompass) ?: return
         val current = headingState.value
@@ -482,6 +485,7 @@ internal fun rememberDeviceHeadingState(
                 val remappedMatrix = FloatArray(9)
                 var lastEmitElapsedMs = 0L
 
+                /** Remaps sensor rotation matrices to match the current screen orientation. */
                 fun remapForDisplay(input: FloatArray): FloatArray = when (latestDisplayRotation) {
                     AndroidSurface.ROTATION_90 -> {
                         SensorManager.remapCoordinateSystem(input, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix)
@@ -499,6 +503,7 @@ internal fun rememberDeviceHeadingState(
                 }
 
                 val listener = object : SensorEventListener {
+                    /** Throttles orientation sensor updates and computes tilt-invariant true-north heading. */
                     override fun onSensorChanged(event: SensorEvent) {
                         val now = SystemClock.elapsedRealtime()
                         when (event.sensor.type) {
@@ -531,6 +536,7 @@ internal fun rememberDeviceHeadingState(
                         publishIfChanged(trueAzimuth)
                     }
 
+                    /** Ignores sensor accuracy changes for the compass azimuth listener. */
                     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
                 }
 

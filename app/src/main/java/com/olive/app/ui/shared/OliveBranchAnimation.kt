@@ -486,7 +486,6 @@ internal fun CoverType.localizedTitle(text: ResourceText) = text(
     when (this) {
         CoverType.NEWS -> R.string.ui_daily_digest
         CoverType.FITNESS -> R.string.fitness_tracker
-        CoverType.GAME -> R.string.ui_game
     }
 )
 

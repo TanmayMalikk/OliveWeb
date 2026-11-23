@@ -11,7 +11,7 @@ import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
-import { Button, Field, Form } from "./components/SharedComponents";
+import { Button, Field, Form, shakeFormElement, shakeNamedFields } from "./components/SharedComponents";
 import PublicCoverPage from "./public/PublicCoverPage";
 import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
@@ -39,10 +39,14 @@ function PinGate() {
         <h1 id="pin-heading">Unlock Safe Space</h1>
         <p>Enter your browser PIN to continue.</p>
         <Form
-          onSubmit={async () => {
+          onSubmit={async (_data, form) => {
             await s.perform(async () => {
               try {
                 await s.unlock(pin);
+              } catch (failure) {
+                shakeNamedFields(form, ["pin"]);
+                shakeFormElement(form.querySelector(".pin-dots"));
+                throw failure;
               } finally {
                 setPin("");
               }
@@ -59,6 +63,7 @@ function PinGate() {
           </div>
           <Field
             label="Browser PIN"
+            name="pin"
             type="password"
             value={pin}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

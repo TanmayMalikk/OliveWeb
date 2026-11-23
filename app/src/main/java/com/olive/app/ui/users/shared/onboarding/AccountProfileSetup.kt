@@ -12,6 +12,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.account.CoverPicker
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
@@ -100,6 +101,18 @@ private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (Str
 
 /**
  * Renders the optional contact email field and explicit email communication consent checkbox.
+ *
+ * @param email Current email value entered by the user.
+ * @param consent Whether the user agreed to email communications.
+ * @param enabled Whether edits are currently permitted.
+ * @param showErrors Whether field-level validation errors are currently visible.
+ * @param requireConsentWhenEntered Whether non-blank email requires checked consent.
+ * @param emailTag Test tag for the email field.
+ * @param consentTag Test tag for the consent row.
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
+ * @param onEmailChange Callback invoked when email text changes.
+ * @param onConsentChange Callback invoked when consent checkbox toggles.
+ * @param onFocusEmail Callback invoked when email field gains focus.
  */
 @Composable
 internal fun EmailConsentSection(
@@ -110,6 +123,7 @@ internal fun EmailConsentSection(
     requireConsentWhenEntered: Boolean,
     emailTag: String,
     consentTag: String,
+    shakeTrigger: Int = 0,
     onEmailChange: (String) -> Unit,
     onConsentChange: (Boolean) -> Unit,
     onFocusEmail: () -> Unit = {},
@@ -117,18 +131,26 @@ internal fun EmailConsentSection(
     val uiText = rememberResourceText()
     val invalidEmail = showErrors && email.isNotBlank() && !InputPolicy.validEmail(email)
     val missingConsent = requireConsentWhenEntered && showErrors && email.isNotBlank() && !consent
+    val consentErrorText = if (missingConsent) uiText(R.string.email_consent_required) else null
+    val consentShake = rememberFieldErrorShakeTrigger(consentErrorText, shakeTrigger)
     Field(
         uiText(R.string.email_optional),
         email,
         emailTag,
         enabled = enabled,
         error = if (invalidEmail) uiText(R.string.email_invalid_message) else null,
+        shakeTrigger = shakeTrigger,
         onFocus = onFocusEmail,
     ) { onEmailChange(it.take(254)) }
     if (email.isNotBlank()) {
+        val consentBorder = if (missingConsent) {
+            Modifier.border(1.5.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small).padding(horizontal = 8.dp, vertical = 4.dp)
+        } else Modifier
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = 48.dp)
+                .oliveErrorShake(consentShake)
+                .then(consentBorder)
                 .toggleable(
                     value = consent,
                     enabled = enabled,
@@ -202,6 +224,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
         )
     var page by rememberSaveable(existing?.username, safeContact) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val validation = ProfileSetupValidation(
         safeContact,
         fullName,
@@ -294,13 +317,14 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         fullName,
                         "full_name",
                         enabled = !session.account.busy,
-                        error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null
+                        error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         fullName = it.take(120)
                         showErrors = false
                     }
                     BirthdayPicker(
-                        birthday, "dob", !session.account.busy, showErrors,
+                        birthday, "dob", !session.account.busy, showErrors, shakeTrigger = shakeAttempt,
                     ) { birthday = it }
                     EmailConsentSection(
                         email = email,
@@ -310,6 +334,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         requireConsentWhenEntered = true,
                         emailTag = "setup_email",
                         consentTag = "setup_email_consent",
+                        shakeTrigger = shakeAttempt,
                         onEmailChange = {
                             email = it
                             if (it.isBlank()) emailConsent = false
@@ -349,7 +374,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     AddressFields(
                         address,
                         cityOnlyRequired = true,
-                        cityError = if (showErrors && !address.locationValid) uiText(R.string.ui_city_required) else null
+                        cityError = if (showErrors && !address.locationValid) uiText(R.string.ui_city_required) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         address = it
                         showErrors = false
@@ -368,7 +394,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         secret = true,
                         showSecretToggle = true,
                         enabled = !session.account.busy,
-                        error = if (showErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null
+                        error = if (showErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         trigger = it.take(64)
                         showErrors = false
@@ -433,7 +460,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         contactName,
                         "setup_contact_name",
                         enabled = !session.account.busy && contacts.size < 25,
-                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null
+                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         contactName = it.take(120)
                         showErrors = false
@@ -443,7 +471,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         contactDetails,
                         "setup_contact_details",
                         enabled = !session.account.busy && contacts.size < 25,
-                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null
+                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         contactDetails = it.take(200)
                         showErrors = false
@@ -491,6 +520,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 if (finalProfilePage || validation.isPageValid(page)) {
                     showErrors = false
                     if (finalProfilePage) saveProfile() else page++
+                } else {
+                    shakeAttempt += 1
                 }
             },
             last = last,

@@ -1060,6 +1060,7 @@ data class MediaUploadPresentation(
     val error:String?,
     val createdAt:Long,
     val voiceConversationId: String? = null,
+    val chatOnly: Boolean = false,
 ) {
     /** A bounded fraction suitable for a determinate progress indicator. */
     val progress:Float? get()=totalBytes.takeIf { it>0 }?.let {

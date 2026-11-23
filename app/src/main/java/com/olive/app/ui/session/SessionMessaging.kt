@@ -510,21 +510,21 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
         if (!organizationEmail && !validUsername) {
             state.credentialFieldError = CredentialFieldError.InvalidUsername
-            state.message = runtime.application.getString(R.string.ui_invalid_username_10e538)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_username_10e538))
             return false
         }
         if (create && !InputPolicy.passwordExcludesUsername(password, username)) {
-            state.message = runtime.application.getString(R.string.password_excludes_username)
+            state.failInput(runtime.application.getString(R.string.password_excludes_username))
             return false
         }
         if (create && !InputPolicy.validAccountPassword(password, username)) {
             state.credentialFieldError = CredentialFieldError.InvalidPassword
-            state.message = runtime.application.getString(R.string.ui_invalid_password_a2df22)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_password_a2df22))
             return false
         }
         if (password.isEmpty()) {
             state.credentialFieldError = CredentialFieldError.IncorrectPassword
-            state.message = runtime.application.getString(R.string.ui_password_required_ec4e2c)
+            state.failInput(runtime.application.getString(R.string.ui_password_required_ec4e2c))
             return false
         }
         return true
@@ -561,14 +561,16 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             } else {
                 CredentialFieldError.IncorrectPassword
             }
-            runtime.state.message = when {
-                usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
-                incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
-                else -> failure.message?.takeIf { it.isNotBlank() }
-                    ?: runtime.application.getString(
-                        R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
-                    )
-            }
+            runtime.state.failInput(
+                when {
+                    usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
+                    incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
+                    else -> failure.message?.takeIf { it.isNotBlank() }
+                        ?: runtime.application.getString(
+                            R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
+                        )
+                }
+            )
         }
         return true
     }
@@ -597,17 +599,21 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val chosenRole = runtime.state.accountRole
         if (profile == null && !create && chosenRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
-                chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
+                    chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }
         if (profile != null && profile.role != chosenRole) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
-                profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
+                    profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }

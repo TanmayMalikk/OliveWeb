@@ -13,6 +13,8 @@ import androidx.work.WorkManager
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.isChatOnlyMedia
+import com.olive.app.data.safety.isChatOnlyMediaMetadata
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.security.AccountKeysetWrappedKey
@@ -363,8 +365,10 @@ internal class MediaTransferController(
     suspend fun queueVoiceMessage(file: File, owner: AccountIdentity, voice: PendingVoiceMessage) {
         try {
             val job = withContext(Dispatchers.IO) {
-                val job = prepare(file.inputStream(), "Voice message.m4a", "audio/mp4", owner,
-                    MediaKind.AUDIO, OcrReview.NOT_APPLICABLE).copy(voiceDraft = voice)
+                val job = prepare(
+                    file.inputStream(), "Voice message.m4a", "audio/mp4", owner,
+                    MediaKind.AUDIO, OcrReview.NOT_APPLICABLE, chatOnly = true,
+                ).copy(voiceDraft = voice)
                 store.write(job)
                 MediaUploadWorker.enqueue(applicationContext, job.id)
                 job
@@ -423,6 +427,7 @@ internal class MediaTransferController(
         }
     }
 
+    /** Opens a decrypted local preview file immediately for an upload still queued or running. */
     override fun openPendingUpload(jobId: String, viewerUid: String): Pair<SafetyDocument, File>? {
         val job = store.get(jobId) ?: return null
         val target = File(job.source.filePath)
@@ -641,23 +646,35 @@ internal class MediaTransferController(
         val publishedSnapshot=publishedMediaIds
         val jobs=withContext(Dispatchers.IO) {
             val owned=store.all().filter { it.ownerUid==ownerUid }
-            val retired=owned.filter { it.status==MediaTransferStatus.COMPLETE && it.mediaId in publishedSnapshot }
-            // Refresh each pending upload card with its newest background-worker state.
-            retired.forEach { store.remove(it.id) }
-            owned.filterNot { it in retired }.sortedByDescending { it.createdAt }.map { job ->
+            val result=mutableListOf<MediaUploadPresentation>()
+            // Refresh each pending upload card with its newest background-worker state and retire completed ones.
+            for (job in owned.sortedByDescending { it.createdAt }) {
                 val metadata=runCatching {
                     val wrapped=job.source.wrappedKeys[ownerUid] ?: error("Encryption key is unavailable")
                     JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,
                         KeyManager.unwrapKey(wrapped,job.source.encryptionVersion)))
                 }.getOrNull()
+                val name=metadata?.optString("name")?.takeIf(String::isNotBlank) ?: "Encrypted document"
+                val mimeType=metadata?.optString("mimeType")?.takeIf(String::isNotBlank) ?: "application/octet-stream"
+                val chatOnly=job.voiceDraft != null || job.voiceMessage != null || isChatOnlyMediaMetadata(
+                    chatOnly=metadata?.optBoolean("chatOnly",false) == true,
+                    name=name,
+                    mimeType=mimeType,
+                )
+                if (job.status==MediaTransferStatus.COMPLETE && (job.mediaId in publishedSnapshot || chatOnly)) {
+                    store.remove(job.id)
+                    continue
+                }
                 val progress=progressSnapshot[job.id]
-                MediaUploadPresentation(job.id,job.ownerUid,
-                    metadata?.optString("name")?.takeIf(String::isNotBlank) ?: "Encrypted document",
-                    metadata?.optString("mimeType")?.takeIf(String::isNotBlank) ?: "application/octet-stream",
-                    job.status,progress?.first ?: completedBytes(job),progress?.second ?: job.source.ciphertextSize,
-                    job.mediaId,job.error,job.createdAt,
-                    job.voiceDraft?.conversationId ?: job.voiceMessage?.conversationId)
+                result += MediaUploadPresentation(
+                    job.id, job.ownerUid, name, mimeType, job.status,
+                    progress?.first ?: completedBytes(job), progress?.second ?: job.source.ciphertextSize,
+                    job.mediaId, job.error, job.createdAt,
+                    job.voiceDraft?.conversationId ?: job.voiceMessage?.conversationId,
+                    chatOnly = chatOnly,
+                )
             }
+            result
         }
         if(observedOwnerUid==ownerUid) uploads=jobs
         return jobs
@@ -715,12 +732,14 @@ internal class MediaTransferController(
      * @param ocrReview OCR review supplied to [prepare].
      * @param ocr Optional OCR supplied to [prepare].
      * @param tags Collection of tags values to process.
+     * @param chatOnly Whether this upload belongs only in chat timelines and not in document storage.
      * @return The resulting [MediaUploadJob] instance.
      */
     private suspend fun prepare(
         input:InputStream,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,ocrReview:OcrReview,
         ocr:DocumentOcrMetadata?=null,
         tags:Set<String> = emptySet(),
+        chatOnly:Boolean = false,
     ):MediaUploadJob {
         val accountKeyset=accountKeysetProvider(owner.uid)
             ?: error("Set up account recovery before uploading encrypted media")
@@ -747,6 +766,7 @@ internal class MediaTransferController(
                 put("mimeType", processedMimeType.take(120))
                 put("kind", kind.name)
                 put("ocrReview", ocrReview.name)
+                if (chatOnly) put("chatOnly", true)
                 put("tags", JSONArray(
                     tags.asSequence().map(String::trim).filter(String::isNotBlank)
                         .map { it.take(80) }.distinct().take(20).toList()
@@ -833,7 +853,7 @@ internal class MediaTransferController(
      */
     override suspend fun prefetchRecentCiphertext(documents: List<SafetyDocument>, viewerUid: String) {
         val candidates = documents
-            .filter { it.objectKey.isNotBlank() && viewerUid in it.allowedUsers }
+            .filter { it.objectKey.isNotBlank() && viewerUid in it.allowedUsers && !it.isChatOnlyMedia() }
             .take(3)
         if (candidates.isEmpty()) return
         withContext(Dispatchers.IO) {

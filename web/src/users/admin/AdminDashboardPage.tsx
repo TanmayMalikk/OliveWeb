@@ -7,6 +7,7 @@ import {
   Field,
   Form,
   Modal,
+  shakeNamedFields,
 } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
 import {
@@ -198,9 +199,19 @@ export default function AdminPortal() {
           onClose={() => setCreating(false)}
         >
           <Form
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await session.perform(async () => {
-                await createAccount(Object.fromEntries(data.entries()));
+                try {
+                  await createAccount(Object.fromEntries(data.entries()));
+                } catch (failure) {
+                  const msg = failure instanceof Error ? failure.message.toLowerCase() : "";
+                  if (msg.includes("email")) shakeNamedFields(form, ["email"]);
+                  else if (msg.includes("username")) shakeNamedFields(form, ["username"]);
+                  else if (msg.includes("password")) shakeNamedFields(form, ["password"]);
+                  else if (msg.includes("birth") || msg.includes("date")) shakeNamedFields(form, ["dob"]);
+                  else shakeNamedFields(form, ["username", "password"]);
+                  throw failure;
+                }
                 setCreating(false);
                 await refresh();
               });

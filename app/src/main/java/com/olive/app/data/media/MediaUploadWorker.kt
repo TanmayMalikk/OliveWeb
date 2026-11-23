@@ -245,6 +245,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return Result.retry()
     }
 
+    /** Provides the foreground notification used when WorkManager promotes an encrypted upload. */
     override suspend fun getForegroundInfo(): ForegroundInfo {
         val channelId = "olive_upload_channel"
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {

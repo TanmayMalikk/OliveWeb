@@ -392,6 +392,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     }
 }
 
+/** Opens a validated `tel:` dialer or `https://` support website intent outside the app. */
 private fun openHotlineDestination(context: Context, value: String, dial: Boolean): Boolean {
     val uri = value.toUri()
     if (if (dial) uri.scheme != "tel" else uri.scheme != "https" || uri.host.isNullOrBlank()) return false

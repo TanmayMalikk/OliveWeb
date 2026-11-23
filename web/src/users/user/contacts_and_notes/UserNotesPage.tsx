@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Pin, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
-import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { purgeEntry, TRASH_RETENTION_MS, type Entry } from "../../../domain/DomainModels";
 import { formatDateTime } from "../../shared/safe_app/ActivityHistoryPage";
 import { accounts } from "../../../services/AccountService";
@@ -236,7 +236,7 @@ export default function Notes() {
           onClose={() => setEditing(null)}
         >
           <Form
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await s.perform(async () => {
                 const title = String(data.get("title")).trim();
                 const body = String(data.get("body")).trim();
@@ -249,7 +249,10 @@ export default function Notes() {
                 const incidentLatitude = latitudeText ? Number(latitudeText) : Number.NaN;
                 const incidentLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
                 const attachmentIds = data.getAll("attachments").map(String);
-                if (!body) throw new Error("Write something before saving.");
+                if (!body) {
+                  shakeNamedFields(form, ["body"]);
+                  throw new Error("Write something before saving.");
+                }
                 const changes = [
                   ["Title", editing.title, title],
                   ["Body", editing.body, body],

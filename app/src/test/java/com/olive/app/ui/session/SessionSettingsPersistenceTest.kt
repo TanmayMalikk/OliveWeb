@@ -41,10 +41,10 @@ class SessionSettingsPersistenceTest {
     @Test
     fun coverAndContactChangesPersistUnderTheCurrentAccountAndCoverSettingsRemainEditableAfterExit()=runBlocking<Unit> {
         fixture().use { f ->
-            f.runtime.settings.changeCover(CoverType.GAME)
+            f.runtime.settings.changeCover(CoverType.NEWS)
             f.await { !f.runtime.state.busy }
-            assertEquals(CoverType.GAME,f.runtime.store.profile("owner").coverType)
-            assertEquals(CoverType.GAME,f.runtime.state.coverType)
+            assertEquals(CoverType.NEWS,f.runtime.store.profile("owner").coverType)
+            assertEquals(CoverType.NEWS,f.runtime.state.coverType)
             val contact=SafeContact("trusted","Synthetic friend","555-0100",true,"friend")
             f.runtime.settings.saveContacts(listOf(contact))
             f.await { !f.runtime.state.busy }
@@ -54,7 +54,7 @@ class SessionSettingsPersistenceTest {
             f.await { !f.runtime.state.busy }
             assertEquals("Updated cover name",f.runtime.state.coverFullName)
             assertEquals("Calgary",f.runtime.state.deliveryAddress.city)
-            assertEquals(CoverType.GAME,f.runtime.store.profile("owner").coverType)
+            assertEquals(CoverType.NEWS,f.runtime.store.profile("owner").coverType)
         }
     }
     @Test

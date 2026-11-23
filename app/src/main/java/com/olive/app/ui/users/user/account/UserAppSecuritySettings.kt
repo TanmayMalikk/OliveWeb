@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -241,6 +242,7 @@ internal fun TriggerSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
     var trigger by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val valid = InputPolicy.validTrigger(trigger)
     FormColumn {
         Heading(
@@ -255,7 +257,8 @@ internal fun TriggerSetup(session: SessionViewModel) {
             secret = true,
             showSecretToggle = true,
             enabled = !session.busy,
-            error = if (showErrors && !valid) uiText(R.string.ui_invalid_trigger) else null
+            error = if (showErrors && !valid) uiText(R.string.ui_invalid_trigger) else null,
+            shakeTrigger = shakeAttempt
         ) {
             trigger = it.take(64)
             showErrors = false
@@ -267,6 +270,7 @@ internal fun TriggerSetup(session: SessionViewModel) {
             {
                 showErrors = true
                 if (valid) session.account.saveProvisionedTrigger(trigger)
+                else shakeAttempt += 1
             },
             last = true,
             nextTag = "trigger_setup_submit",
@@ -330,22 +334,39 @@ internal fun SafeEntryMethodSettings(session: SessionViewModel) {
     }
     pendingMethod?.let { method ->
         var pin by remember { mutableStateOf("") }
+        var showPinError by remember { mutableStateOf(false) }
+        var localShake by remember { mutableIntStateOf(0) }
+        val errorText = if (showPinError && !InputPolicy.validPin(pin)) stringResource(R.string.ui_invalid_pin) else null
         AlertDialog(
             onDismissRequest = { pendingMethod = null },
             title = { Text(stringResource(R.string.entry_choose_method)) },
             text = {
-                Field(stringResource(R.string.current_device_pin), pin, "current_device_pin",
-                    secret = true, numeric = true, showSecretToggle = true) {
+                Field(
+                    stringResource(R.string.current_device_pin),
+                    pin,
+                    "current_device_pin",
+                    secret = true,
+                    numeric = true,
+                    showSecretToggle = true,
+                    error = errorText,
+                    shakeTrigger = localShake + session.inputErrorVersion,
+                ) {
                     pin = it.filter(Char::isDigit).take(6)
+                    showPinError = false
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        if (!InputPolicy.validPin(pin)) {
+                            showPinError = true
+                            localShake += 1
+                            return@TextButton
+                        }
                         session.account.setSafeEntryMethod(method, pin)
                         pendingMethod = null
                     },
-                    enabled = InputPolicy.validPin(pin) && !session.busy,
+                    enabled = !session.busy,
                     modifier = Modifier.testTag("confirm_entry_method"),
                 ) { Text(stringResource(R.string.next)) }
             },
@@ -365,10 +386,40 @@ internal fun SafeEntryMethodSettings(session: SessionViewModel) {
 @Composable
 internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPinDraft) = with(draft) {
     val text = rememberResourceText()
-    if (session.account.canUseAppPin) Field(
+    var showErrors by remember { mutableStateOf(false) }
+    var shakeAttempt by remember { mutableIntStateOf(0) }
+    var pendingPinCheck by remember { mutableStateOf(false) }
+    var currentPinRejected by remember { mutableStateOf(false) }
+    val sessionErrorVersion = session.inputErrorVersion
+    var lastSeenErrorVersion by remember { mutableIntStateOf(sessionErrorVersion) }
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            if (pendingPinCheck) {
+                currentPinRejected = true
+                pendingPinCheck = false
+                showErrors = true
+            }
+        }
+    }
+    val currentRequired = session.account.canUseAppPin
+    val currentPinError = when {
+        currentPinRejected -> text(R.string.enter_your_4_6_digit_pin)
+        showErrors && currentRequired && !InputPolicy.validPin(currentPin) -> text(R.string.ui_invalid_pin)
+        else -> null
+    }
+    val newPinError = if (showErrors && !InputPolicy.validPin(newPin)) text(R.string.ui_invalid_pin) else null
+    val confirmPinError = if (showErrors && confirmation != newPin) text(R.string.ui_pins_differ) else null
+    val pinShakeTrigger = shakeAttempt + sessionErrorVersion
+    if (currentRequired) Field(
         text(R.string.current_device_pin), currentPin, "current_device_pin",
         secret = true, numeric = true, showSecretToggle = true, enabled = !session.busy,
-    ) { currentPin = it.filter(Char::isDigit).take(6) }
+        error = currentPinError, shakeTrigger = pinShakeTrigger,
+    ) {
+        currentPin = it.filter(Char::isDigit).take(6)
+        currentPinRejected = false
+        showErrors = false
+    }
     Field(
         text(R.string.new_device_pin),
         newPin,
@@ -376,8 +427,13 @@ internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPin
         secret = true,
         numeric = true,
         showSecretToggle = true,
-        enabled = !session.busy
-    ) { newPin = it.filter(Char::isDigit).take(6) }
+        enabled = !session.busy,
+        error = newPinError,
+        shakeTrigger = pinShakeTrigger,
+    ) {
+        newPin = it.filter(Char::isDigit).take(6)
+        showErrors = false
+    }
     Field(
         text(R.string.confirm_new_device_pin),
         confirmation,
@@ -385,14 +441,29 @@ internal fun SafeEntryPinSettings(session: SessionViewModel, draft: SafeEntryPin
         secret = true,
         numeric = true,
         showSecretToggle = true,
-        enabled = !session.busy
-    ) { confirmation = it.filter(Char::isDigit).take(6) }
+        enabled = !session.busy,
+        error = confirmPinError,
+        shakeTrigger = pinShakeTrigger,
+    ) {
+        confirmation = it.filter(Char::isDigit).take(6)
+        showErrors = false
+    }
     /**
      * Validates the form before saving a new backup PIN or entry method.
      *
      * @param usePin Whether to use PIN.
      */
     fun save(usePin: Boolean) {
+        currentPinRejected = false
+        val validLocal = (!currentRequired || InputPolicy.validPin(currentPin)) &&
+            InputPolicy.validPin(newPin) &&
+            confirmation == newPin
+        showErrors = !validLocal
+        if (!validLocal) {
+            shakeAttempt += 1
+        } else {
+            pendingPinCheck = true
+        }
         session.account.saveSafeEntryPin(currentPin, newPin, confirmation, usePin)
         currentPin = ""
         newPin = ""
@@ -448,6 +519,8 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
     var details by remember { mutableStateOf("") }
     var relationship by remember { mutableStateOf("") }
     var linkedUid by remember { mutableStateOf("") }
+    var showErrors by remember { mutableStateOf(false) }
+    var shakeAttempt by remember { mutableIntStateOf(0) }
     FormColumn {
         IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("trusted_contacts_back")) {
             Icon(
@@ -532,6 +605,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                                 contact.details
                             linkedUid = contact.linkedUid
                             relationship = contact.relationship
+                            showErrors = false
                         }, enabled = !session.busy) { Text(stringResource(R.string.edit)) }
                         TextButton(onClick = {
                             session.recordSettingsInteraction(
@@ -546,6 +620,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                                 details = ""
                                 relationship = ""
                                 linkedUid = ""
+                                showErrors = false
                             }
                         }, enabled = !session.busy) { Text(stringResource(R.string.remove)) }
                     }
@@ -565,23 +640,33 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
             name,
             "contact_name",
             enabled = !session.busy,
+            error = if (showErrors && name.isBlank()) uiText(R.string.ui_name_required) else null,
+            shakeTrigger = shakeAttempt,
             onFocus = {
                 session.recordSettingsInteraction(
                     "Olive Branch",
                     "Focused contact name"
                 )
-            }) { name = it.take(120) }
+            }) {
+                name = it.take(120)
+                showErrors = false
+            }
         Field(
             uiText(R.string.phone_or_email),
             details,
             "contact_details",
             enabled = !session.busy,
+            error = if (showErrors && details.isBlank()) uiText(R.string.enter_a_name_and_a_phone_number_or_email) else null,
+            shakeTrigger = shakeAttempt,
             onFocus = {
                 session.recordSettingsInteraction(
                     "Olive Branch",
                     "Focused contact details"
                 )
-            }) { details = it.take(200) }
+            }) {
+                details = it.take(200)
+                showErrors = false
+            }
         Field(uiText(R.string.contact_relationship), relationship, "contact_relationship",
             enabled = !session.busy) { relationship = it.take(120) }
         TrustedContactLinkPicker(
@@ -595,6 +680,8 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
             onClick = {
                 // A trusted contact needs both a name and a phone number or email.
                 if (name.isBlank() || details.isBlank()) {
+                    showErrors = true
+                    shakeAttempt += 1
                     session.account.showError(uiText(R.string.enter_a_name_and_a_phone_number_or_email))
                 } else if (editing == null && profile.contacts.size >= 25) {
                     session.account.showError(uiText(R.string.you_can_save_up_to_25_contacts))
@@ -613,6 +700,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                     details = ""
                     relationship = ""
                     linkedUid = ""
+                    showErrors = false
                 }
             },
             enabled = !session.busy,
@@ -624,6 +712,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
             details = ""
             relationship = ""
             linkedUid = ""
+            showErrors = false
         }) { Text(stringResource(R.string.cancel_edit)) }
     }
 }

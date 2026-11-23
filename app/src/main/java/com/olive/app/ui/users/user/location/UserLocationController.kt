@@ -228,6 +228,7 @@ internal class LocationMapController(
         watchExpiry()
     }
 
+    /** Updates the controller's live own-position marker, trail, bearing, and speed from a GPS fix. */
     private fun applyLocationFix(token: Int, uid: String, youLabel: String, fix: DeviceCoordinates) {
         if (token != generation) return
         val previous = state.ownPoint
@@ -718,6 +719,7 @@ internal const val MAP_ASSET_URL = "https://$MAP_ASSET_HOST/map/map.html"
 private var mapTileClient: OkHttpClient? = null
 private val mapClientLock = Any()
 
+/** Lazily creates and returns the disk-cached OkHttp client used for map tiles and styles. */
 private fun getOrCreateMapClient(context: Context): OkHttpClient {
     return mapTileClient ?: synchronized(mapClientLock) {
         mapTileClient ?: run {
@@ -731,11 +733,13 @@ private fun getOrCreateMapClient(context: Context): OkHttpClient {
     }
 }
 
+/** Returns whether [host] is an allowed remote Mapbox or OpenStreetMap tile host. */
 private fun isMapTileHost(host: String): Boolean =
     host == "api.mapbox.com" ||
         host == "tile.openstreetmap.org" ||
         host.endsWith(".tile.openstreetmap.org")
 
+/** Fetches a remote map style or tile asset via OkHttp, falling back to stale cache offline. */
 private fun fetchCachedMapResource(context: Context, uri: Uri): WebResourceResponse? {
     return try {
         val client = getOrCreateMapClient(context)

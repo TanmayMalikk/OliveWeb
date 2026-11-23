@@ -1,6 +1,11 @@
 // All app roles: draws shared web buttons, fields, and dialogs.
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, Eye, EyeOff, Leaf, X } from "lucide-react";
+import {
+  clearFieldInvalid,
+  shakeFormElement,
+  shouldTriggerControlledFieldShake,
+} from "./FormShake";
 
 // Draws the shared web button style used across every site.
 export function Button({
@@ -36,19 +41,31 @@ export function Field({
   type = "text",
   hint,
   error,
+  shakeTrigger = 0,
   ...props
 }: {
   label: string;
   type?: string;
   hint?: string;
   error?: string;
+  shakeTrigger?: number;
   [key: string]: unknown;
 }) {
   const id = useId();
   const [visible, setVisible] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const lastError = useRef<string | undefined>(error);
+  const lastTrigger = useRef<number>(shakeTrigger);
+  useEffect(() => {
+    if (shouldTriggerControlledFieldShake(lastError.current, error, lastTrigger.current, shakeTrigger)) {
+      shakeFormElement(wrapperRef.current);
+    }
+    lastError.current = error;
+    lastTrigger.current = shakeTrigger;
+  }, [error, shakeTrigger]);
   const secret = type === "password";
   return (
-    <div className="field">
+    <div ref={wrapperRef} className={error ? "field field-invalid" : "field"}>
       <label htmlFor={id}>{label}</label>
       <span className="input-wrap">
         <input
@@ -153,16 +170,25 @@ export function Form({
   children,
   className = "",
 }: {
-  onSubmit: (data: FormData) => Promise<void> | void;
+  onSubmit: (data: FormData, form: HTMLFormElement) => Promise<void> | void;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <form
       className={className}
+      onInvalidCapture={(e: FormEvent<HTMLFormElement>) => {
+        shakeFormElement(e.target as Element);
+      }}
+      onInputCapture={(e: FormEvent<HTMLFormElement>) => {
+        clearFieldInvalid(e.target as Element);
+      }}
+      onChangeCapture={(e: FormEvent<HTMLFormElement>) => {
+        clearFieldInvalid(e.target as Element);
+      }}
       onSubmit={(e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        void onSubmit(new FormData(e.currentTarget));
+        void onSubmit(new FormData(e.currentTarget), e.currentTarget);
       }}
     >
       {children}

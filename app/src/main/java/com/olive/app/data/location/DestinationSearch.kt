@@ -148,6 +148,7 @@ internal fun localDestinationSuggestions(
 internal object DestinationAutocompleteClient {
     private const val MAX_CACHE_ENTRIES = 64
     private val cache = object : LinkedHashMap<String, List<DestinationSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
+        /** Evicts the least-recently-used autocomplete cache entry past [MAX_CACHE_ENTRIES]. */
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<DestinationSuggestion>>): Boolean =
             size > MAX_CACHE_ENTRIES
     }
@@ -238,6 +239,7 @@ internal object DestinationAutocompleteClient {
         }
     }
 
+    /** Constructs a Mapbox forward-geocode v6 URL for [query] with optional proximity coordinates. */
     private fun buildMapboxUrl(
         query: String,
         proximityLatitude: Double?,
@@ -258,6 +260,7 @@ internal object DestinationAutocompleteClient {
         return "https://api.mapbox.com/search/geocode/v6/forward?$params"
     }
 
+    /** Fetches Mapbox autocomplete suggestions asynchronously via the shared OkHttp client. */
     private suspend fun fetchMapboxSuggestionsOkHttp(url: String): List<DestinationSuggestion>? {
         val request = Request.Builder()
             .url(url)
@@ -267,10 +270,12 @@ internal object DestinationAutocompleteClient {
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
+                /** Resumes the coroutine with null when the Mapbox request fails. */
                 override fun onFailure(call: Call, e: IOException) {
                     if (continuation.isActive) continuation.resume(null)
                 }
 
+                /** Parses and resumes Mapbox suggestions when the HTTP response succeeds. */
                 override fun onResponse(call: Call, response: Response) {
                     val result = runCatching {
                         response.use { res ->
@@ -284,6 +289,7 @@ internal object DestinationAutocompleteClient {
         }
     }
 
+    /** Fetches Mapbox autocomplete suggestions via an injected [HttpsURLConnection] factory. */
     private suspend fun fetchMapboxSuggestionsLegacy(
         url: String,
         openConnection: (URL) -> HttpsURLConnection,
@@ -308,6 +314,7 @@ internal object DestinationAutocompleteClient {
         }
     }
 
+    /** Parses Mapbox Geocoding v6 GeoJSON features into validated [DestinationSuggestion] items. */
     internal fun parseMapboxGeocodeV6(raw: String): List<DestinationSuggestion> = runCatching {
         val features = JSONObject(raw).optJSONArray("features") ?: return@runCatching emptyList()
         (0 until features.length()).mapNotNull { index ->
@@ -338,6 +345,7 @@ internal object DestinationAutocompleteClient {
         }
     }.getOrDefault(emptyList())
 
+    /** Builds a quantized cache key combining normalized [query] text and rounded coordinates. */
     private fun cacheKey(query: String, lat: Double?, lon: Double?): String {
         val norm = query.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
         val latBucket = lat?.let { (it * 10.0).roundToLong() }
@@ -345,8 +353,10 @@ internal object DestinationAutocompleteClient {
         return "$norm|$latBucket|$lonBucket"
     }
 
+    /** URL-encodes [value] using UTF-8. */
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 
+    /** Clears all cached destination autocomplete entries. */
     internal fun clearCache() {
         synchronized(cacheLock) { cache.clear() }
     }

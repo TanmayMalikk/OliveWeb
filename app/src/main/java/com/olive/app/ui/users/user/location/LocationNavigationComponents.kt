@@ -454,18 +454,21 @@ internal fun TripSummaryMetrics(
     }
 }
 
+/** Computes normalized [0f..1f] completion ratio along the active route. */
 internal fun routeCompletionProgress(totalMeters: Double, remainingMeters: Double): Float {
     if (!totalMeters.isFinite() || !remainingMeters.isFinite() || totalMeters <= 0.0) return 0f
     val completed = (totalMeters - remainingMeters).coerceIn(0.0, totalMeters)
     return (completed / totalMeters).toFloat()
 }
 
+/** Returns the next navigation instruction following [current], or null at the final leg. */
 internal fun upcomingRouteDirection(route: LocationRoute, current: RouteDirection?): RouteDirection? {
     if (current == null) return null
     val index = route.directions.indexOf(current)
     return if (index in 0 until route.directions.lastIndex) route.directions[index + 1] else null
 }
 
+/** Estimates remaining distance along [route] from ([latitude], [longitude]) to the end of [direction]. */
 internal fun distanceToDirectionMeters(
     route: LocationRoute,
     latitude: Double,
@@ -491,6 +494,7 @@ internal fun distanceToDirectionMeters(
     return sum
 }
 
+/** Formats the estimated arrival clock time from [remainingSeconds] and [nowMillis]. */
 internal fun formatArrivalTime(
     remainingSeconds: Double,
     nowMillis: Long = System.currentTimeMillis(),
@@ -500,6 +504,7 @@ internal fun formatArrivalTime(
     return java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(arrivalMillis))
 }
 
+/** Selects the directional icon matching a turn-by-turn [instruction] text string. */
 private fun maneuverIconFor(instruction: String?): ImageVector {
     val text = instruction?.lowercase().orEmpty()
     return when {

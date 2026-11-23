@@ -61,6 +61,19 @@ class DocumentIndexStoreTest {
     }
 
     @Test
+    fun `index preserves chatOnly flag across reads`() {
+        val store = DocumentIndexStore(FakeJsonVault())
+        store.replace(
+            ALICE,
+            listOf(document("doc", ALICE), document("voice", ALICE).copy(chatOnly = true)),
+            100,
+        )
+        val byId = store.read(ALICE).documents.associateBy(SafetyDocument::id)
+        assertFalse(byId.getValue("doc").chatOnly)
+        assertTrue(byId.getValue("voice").chatOnly)
+    }
+
+    @Test
     fun `firestore cache cannot purge but authoritative server snapshot can`() {
         val index = DocumentIndexStore(FakeJsonVault())
         index.replace(ALICE, listOf(document("kept", ALICE), document("revoked", ALICE)), 100)

@@ -103,6 +103,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Renders the active route progress card with full-screen and stop-navigation controls. */
 @Composable
 private fun PrivateRouteControls(
     controller: LocationMapController,
@@ -178,6 +179,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     LocationMapScreen(session, session.locationMap)
 }
 
+/** Renders the location workspace bound to a specific [LocationMapController] instance. */
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMapController) {
     val context = LocalContext.current
@@ -198,6 +200,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     var offeredBackground by remember(uid) { mutableStateOf(false) }
     val permissionScope = rememberCoroutineScope()
 
+    /** Prompts for location permission when needed and tracks foreground/background prompts. */
     suspend fun requestMapAccess(retry: Boolean = false): Boolean {
         val granted = if (retry || permissionResult == null) requestPermission() else permissionResult == true
         permissionResult = granted
@@ -658,6 +661,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     }
 }
 
+/** Renders the searchable friend picker used to choose live-location recipients. */
 @Composable
 internal fun LocationShareFriendPicker(
     accountId: String,

@@ -72,7 +72,7 @@ class SessionHistoryRefreshTest {
             val runtime = fixture.runtime
             val identity = AccountIdentity("owner", "fixture_owner")
             val profile = UserProfile("fixture_owner", "Remote fixture owner", "", "", "2000-01-01", "English", "", "Calgary",
-                "synthetic-hash", coverType = CoverType.GAME, address = DeliveryAddress(city = "Calgary"))
+                "synthetic-hash", coverType = CoverType.NEWS, address = DeliveryAddress(city = "Calgary"))
             val note = PrivateEntry(title = "Synced fixture entry", body = "Synthetic history")
             val db = FirestoreTestDriver()
             val marker = "accountSync/owner"
@@ -87,7 +87,7 @@ class SessionHistoryRefreshTest {
                 fixture.await { runtime.state.privateEntries.any { it.id == note.id } }
                 assertEquals(profile, runtime.state.profile)
                 assertEquals("Calgary", runtime.state.deliveryAddress.city)
-                assertEquals(CoverType.GAME, runtime.state.coverType)
+                assertEquals(CoverType.NEWS, runtime.state.coverType)
                 assertEquals("synthetic-hash", runtime.enrollment?.triggerHash)
                 db.fail(marker, FirebaseFirestoreException("Synthetic sync failure", FirebaseFirestoreException.Code.UNAVAILABLE))
                 assertEquals("Synthetic sync failure", runtime.state.message)

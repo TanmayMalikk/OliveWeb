@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { accounts, cloudMode } from "../../../services/AccountService";
 import { claimFriendInvite, createFriendInvite, subscribeFriendInvite, type FriendInvite } from "../../../services/FriendInviteService";
 
@@ -8,12 +8,13 @@ export function InviteCodeEntry() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState(false);
-  return <Form onSubmit={async () => {
+  return <Form onSubmit={async (_data, form) => {
     setBusy(true); setFeedback(""); setError(false);
     try {
       const result = await claimFriendInvite(code);
       setCode(""); setFeedback(`Connected with ${result.username}. You can add another code.`);
     } catch (failure) {
+      shakeNamedFields(form, ["inviteCode"]);
       setError(true); setFeedback(failure instanceof Error ? failure.message : "Unable to use this invite. Try again.");
     } finally { setBusy(false); }
   }}>

@@ -57,6 +57,7 @@ internal data class SessionAccountState(
     val coverType: CoverType = CoverType.FITNESS,
     val accountRole: AccountRole = AccountRole.USER,
     val credentialFieldError: CredentialFieldError? = null,
+    val inputErrorVersion: Int = 0,
     val creatingAccount: Boolean = false,
     val passkeyCredentialRequest: PasskeyCredentialRequest? = null,
     val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>? = null,
@@ -211,6 +212,21 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var credentialFieldError: CredentialFieldError?
         get() = accountSnapshot.credentialFieldError
         set(value) = updateAccount { it.copy(credentialFieldError = value) }
+    val inputErrorVersion: Int
+        get() = accountSnapshot.inputErrorVersion
+
+    /**
+     * Advances the input error counter so repeated invalid submissions re-trigger field feedback.
+     */
+    fun recordInputError() = updateAccount { it.copy(inputErrorVersion = it.inputErrorVersion + 1) }
+
+    /**
+     * Sets [message] and increments [inputErrorVersion] atomically when an input attempt fails.
+     *
+     * @param text User-facing error message to announce and display.
+     */
+    fun failInput(text: String) =
+        updateAccount { it.copy(message = text, inputErrorVersion = it.inputErrorVersion + 1) }
     var creatingAccount: Boolean
         get() = accountSnapshot.creatingAccount
         set(value) = updateAccount { it.copy(creatingAccount = value) }

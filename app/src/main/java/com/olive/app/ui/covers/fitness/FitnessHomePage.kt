@@ -164,6 +164,7 @@ internal fun FitnessHomePage(
     }
 }
 
+/** Renders the dismissible onboarding card inviting the user to configure fitness goals. */
 @Composable
 private fun FitnessGoalSetupCard(
     onStartQuestionnaire: () -> Unit,

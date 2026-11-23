@@ -227,7 +227,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 if (device.role != AccountRole.USER || activeTriggerId == null || !device.allowsAppPin()) return
                 if (!InputPolicy.validPin(pin)) {
-                    message = runtime.application.getString(R.string.enter_your_4_6_digit_pin)
+                    failInput(runtime.application.getString(R.string.enter_your_4_6_digit_pin))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
@@ -242,10 +242,12 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                     when (result) {
                         PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, usingAppPin = true)
                         is PinResult.Rejected -> if (result.failures >= 5) navigation.quickExit() else {
-                            message = runtime.application.resources.getQuantityString(
-                                R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                                5 - result.failures,
-                                5 - result.failures
+                            failInput(
+                                runtime.application.resources.getQuantityString(
+                                    R.plurals.ui_incorrect_pin_value_attempts_remaining,
+                                    5 - result.failures,
+                                    5 - result.failures
+                                )
                             )
                         }
                     }
@@ -321,6 +323,7 @@ internal class PasskeyCredentialRequest internal constructor(
     val assertion: Boolean,
 ) {
     internal val result = CompletableDeferred<PasskeyCredentialResult?>()
+    /** Completes the deferred passkey ceremony result with [value] or null on cancellation. */
     fun complete(value: PasskeyCredentialResult?) {
         result.complete(value)
     }
@@ -602,7 +605,7 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                         if (operationJob === runningJob) {
                             operationJob = null
                             busy = false
-                            finalFailure?.let { message = it }
+                            finalFailure?.let { failInput(it) }
                         }
                     }
                 }

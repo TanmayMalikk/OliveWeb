@@ -59,7 +59,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val controller = session.documents
     val state = controller.state
     val mediaController = session.media
-    val uploads = mediaController?.uploads.orEmpty()
+    val uploads = mediaController?.uploads.orEmpty().filterNot(MediaUploadPresentation::chatOnly)
     val preparation = mediaController?.state as? MediaTransferState.Preparing
     val preparing = preparation != null && preparation.stage != "downloading"
     var filter by rememberSaveable { mutableStateOf(DocumentFilter.All) }

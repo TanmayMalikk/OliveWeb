@@ -55,7 +55,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
                     !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    failInput(runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_finish_the_organization_profile_check_the_email_and_try)) { token ->
@@ -99,7 +99,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
                     !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    failInput(runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_update_your_olive_tree_profile)) { token ->
@@ -162,18 +162,19 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
                 if (!InputPolicy.validUsername(value.username)) {
-                    message =
+                    failInput(
                         runtime.application.getString(R.string.ui_use_8_24_letters_numbers_or_underscores_for_the_username)
+                    )
                     return
                 }
                 if (!InputPolicy.passwordExcludesUsername(value.password, value.username)) {
-                    message =
-                        runtime.application.getString(R.string.password_excludes_username)
+                    failInput(runtime.application.getString(R.string.password_excludes_username))
                     return
                 }
                 if (!InputPolicy.validAccountPassword(value.password, value.username)) {
-                    message =
+                    failInput(
                         runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                    )
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
@@ -486,7 +487,7 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         if (!editable()) return
         val device = runtime.enrollment ?: return
         if (method == SafeEntryMethod.APP_PIN && !device.hasAppPin) {
-            runtime.state.message = runtime.application.getString(R.string.entry_set_pin_first)
+            runtime.state.failInput(runtime.application.getString(R.string.entry_set_pin_first))
             return
         }
         change(currentPin, null, method)
@@ -503,13 +504,11 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
     fun savePin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) {
         if (!editable()) return
         if (!InputPolicy.validPin(pin)) {
-            runtime.state.message =
-                runtime.application.getString(R.string.enter_your_4_6_digit_pin)
+            runtime.state.failInput(runtime.application.getString(R.string.enter_your_4_6_digit_pin))
             return
         }
         if (pin != confirmation) {
-            runtime.state.message =
-                runtime.application.getString(R.string.the_new_pins_do_not_match)
+            runtime.state.failInput(runtime.application.getString(R.string.the_new_pins_do_not_match))
             return
         }
         change(currentPin, pin, if (usePin) SafeEntryMethod.APP_PIN else null)
@@ -539,11 +538,11 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
             val verifyPin = device.hasAppPin &&
                     (device.entryMethod == SafeEntryMethod.APP_PIN || !secure)
             if (verifyPin && !InputPolicy.validPin(currentPin)) {
-                state.message = application.getString(R.string.enter_your_4_6_digit_pin)
+                state.failInput(application.getString(R.string.enter_your_4_6_digit_pin))
                 return
             }
             if (!verifyPin && !secure) {
-                state.message = application.getString(R.string.entry_restore_lock)
+                state.failInput(application.getString(R.string.entry_restore_lock))
                 return
             }
             operations.runOperation(
@@ -567,10 +566,12 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                     // Shows the rejection message when the entered PIN does not match.
                     if (result is PinResult.Rejected) {
                         if (result.failures >= 5) navigation.quickExit()
-                        else state.message = application.resources.getQuantityString(
-                            R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                            5 - result.failures,
-                            5 - result.failures
+                        else state.failInput(
+                            application.resources.getQuantityString(
+                                R.plurals.ui_incorrect_pin_value_attempts_remaining,
+                                5 - result.failures,
+                                5 - result.failures
+                            )
                         )
                         return@runOperation
                     }

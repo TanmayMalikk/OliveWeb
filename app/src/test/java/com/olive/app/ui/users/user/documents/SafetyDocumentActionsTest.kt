@@ -307,4 +307,40 @@ class SafetyDocumentActionsTest {
             }
         }
     }
+
+    @Test
+    fun controllerHidesChatOnlyAndLegacyVoiceDocumentsWhilePreservingMediaTrackingAndOpenShared() = runBlocking<Unit> {
+        Fixture().use { t ->
+            val taggedVoice = t.doc.copy(id = "voice-tagged", name = "Audio.m4a", mimeType = "audio/mp4", chatOnly = true)
+            val legacyVoice = t.doc.copy(id = "voice-legacy", name = "Voice message.m4a", mimeType = "audio/mp4")
+            val manualAudio = t.doc.copy(id = "audio-file", name = "Recording.m4a", mimeType = "audio/mp4")
+            val allDocs = listOf(t.doc, taggedVoice, legacyVoice, manualAudio)
+
+            t.snapshot(DocumentListSnapshot(allDocs, DocumentListSource.SERVER, 200))
+
+            assertEquals(listOf("doc", "audio-file"), t.controller.state.files.map(SafetyDocument::id))
+            verify(t.media).acknowledgePublished(setOf("doc", "voice-tagged", "voice-legacy", "audio-file"))
+            verify(t.media).onDocumentSnapshot("owner", allDocs, true)
+
+            `when`(t.repo.listFor("owner")).thenReturn(DocumentListSnapshot(allDocs, DocumentListSource.SERVER, 201))
+            var shared = false
+            t.controller.share(t.doc, "owner", mapOf("friend" to "fixture_friend")) { shared = true }
+            assertTrue(shared)
+            assertEquals(listOf("doc", "audio-file"), t.controller.state.files.map(SafetyDocument::id))
+            verify(t.media, times(2)).onDocumentSnapshot("owner", allDocs, true)
+
+            val openedFile = File.createTempFile("voice-open-", ".m4a", t.f.application.cacheDir).apply { writeText("audio") }
+            try {
+                `when`(t.repo.getFor("owner", "voice-tagged")).thenReturn(taggedVoice)
+                `when`(t.repo.cachedFor("owner", "voice-tagged")).thenReturn(taggedVoice)
+                `when`(t.media.downloadFile(taggedVoice, "owner")).thenReturn(openedFile)
+                var opened: Pair<SafetyDocument, File>? = null
+                t.controller.openShared("owner", "voice-tagged") { doc, file -> opened = doc to file }
+                t.f.await { opened != null }
+                assertEquals("voice-tagged", opened?.first?.id)
+            } finally {
+                openedFile.delete()
+            }
+        }
+    }
 }

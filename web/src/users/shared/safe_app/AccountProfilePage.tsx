@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { BirthdayField } from "../../../components/BirthdayField";
 import { validEmail } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
-import { Button, Field, Form } from "../../../components/SharedComponents";
+import { Button, Field, Form, shakeNamedFields } from "../../../components/SharedComponents";
 export default function Profile() {
   const s = useSession();
   const p = s.profile!;
@@ -17,7 +17,7 @@ export default function Profile() {
   return (
     <Form
       className="panel profile-form"
-      onSubmit={async (data) => {
+      onSubmit={async (data, form) => {
         await s.perform(async () => {
           const next = { ...p };
           for (const key of [
@@ -31,6 +31,7 @@ export default function Profile() {
             next[key] = String(data.get(key) ?? p[key]);
           const cleanEmail = email.trim().toLowerCase();
           if (cleanEmail && !validEmail(cleanEmail)) {
+            shakeNamedFields(form, ["email"]);
             throw new Error("Enter a valid email address.");
           }
           next.email = cleanEmail;
@@ -52,8 +53,15 @@ export default function Profile() {
             !next.fullName.trim() ||
             !next.address.city.trim() ||
             !next.dob
-          )
+          ) {
+            const missing = [
+              !next.fullName.trim() ? "fullName" : "",
+              !next.dob ? "dob" : "",
+              !next.address.city.trim() ? "city" : "",
+            ].filter(Boolean);
+            shakeNamedFields(form, missing);
             throw new Error("Add a name, valid birth date, and city.");
+          }
           await s.saveProfile(next);
         });
       }}

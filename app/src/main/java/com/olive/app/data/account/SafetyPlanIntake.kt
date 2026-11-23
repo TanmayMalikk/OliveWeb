@@ -67,8 +67,10 @@ private open class SafeEnumSerializer<T : Enum<T>>(
 ) : KSerializer<T> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
 
+    /** Serializes the enum entry by its name. */
     override fun serialize(encoder: Encoder, value: T) = encoder.encodeString(value.name)
 
+    /** Deserializes the enum entry, falling back to [defaultValue] when unrecognized. */
     override fun deserialize(decoder: Decoder): T {
         val raw = (decoder as? JsonDecoder)?.let { json ->
             (json.decodeJsonElement() as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -83,9 +85,11 @@ private open class SafeEnumSetSerializer<T : Enum<T>>(
 ) : KSerializer<Set<T>> {
     override val descriptor: SerialDescriptor = SetSerializer(String.serializer()).descriptor
 
+    /** Serializes the enum set as a sorted list of enum names. */
     override fun serialize(encoder: Encoder, value: Set<T>) =
         encoder.encodeSerializableValue(ListSerializer(String.serializer()), value.map { it.name }.sorted())
 
+    /** Deserializes a JSON array of enum names into a set, ignoring unknown entries. */
     override fun deserialize(decoder: Decoder): Set<T> {
         val json = decoder as? JsonDecoder
             ?: return decoder.decodeSerializableValue(ListSerializer(String.serializer())).mapNotNull(parse).toSet()
@@ -97,6 +101,7 @@ private open class SafeEnumSetSerializer<T : Enum<T>>(
     }
 }
 
+/** Returns the enum constant matching [name], or null when unrecognized. */
 private inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
     enumValues<T>().firstOrNull { it.name == name }
 

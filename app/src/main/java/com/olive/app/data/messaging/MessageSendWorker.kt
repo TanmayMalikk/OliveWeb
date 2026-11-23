@@ -25,6 +25,7 @@ import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentRepository
 import com.olive.app.data.safety.callJsonObject
+import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.security.EncryptionUtils
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
@@ -738,7 +739,8 @@ data class OutgoingAttachment(
  * @return `true` if is durable chat attachment, or `false` otherwise.
  */
 internal fun isDurableChatAttachment(document: SafetyDocument, ownerUid: String?) =
-    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank()
+    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank() &&
+        !document.isChatOnlyMedia()
 
 /**
  * Uses the locally opened conversation key without touching Firebase while the device is offline.

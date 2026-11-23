@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
-import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 export default function Contacts() {
   const s = useSession();
   const p = s.profile!;
@@ -62,15 +62,20 @@ export default function Contacts() {
       {editing && (
         <Modal title={editing.name ? "Edit contact" : "A person in your corner"} onClose={() => setEditing(null)}>
           <Form
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await s.perform(async () => {
                 const contact = {
                   ...editing,
                   name: String(data.get("name")).trim(),
                   details: String(data.get("details")).trim(),
                 };
-                if (!contact.name || !contact.details)
+                if (!contact.name || !contact.details) {
+                  shakeNamedFields(
+                    form,
+                    [!contact.name ? "name" : "", !contact.details ? "details" : ""].filter(Boolean),
+                  );
                   throw new Error("Add a name and contact details.");
+                }
                 await s.saveProfile(
                   {
                     ...p,

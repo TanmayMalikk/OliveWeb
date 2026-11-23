@@ -704,6 +704,7 @@ data class AddressSuggestion(
 internal object GeoapifyClient {
     private const val MAX_CACHE_ENTRIES = 64
     private val cache = object : LinkedHashMap<String, List<AddressSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
+        /** Evicts the least-recently-used Geoapify cache entry past [MAX_CACHE_ENTRIES]. */
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<AddressSuggestion>>): Boolean =
             size > MAX_CACHE_ENTRIES
     }
@@ -757,6 +758,7 @@ internal object GeoapifyClient {
         results
     }
 
+    /** Executes a Geoapify autocomplete HTTP request asynchronously via the shared OkHttp client. */
     private suspend fun fetchWithOkHttp(url: String): Pair<Boolean, List<AddressSuggestion>> {
         val request = Request.Builder()
             .url(url)
@@ -766,10 +768,12 @@ internal object GeoapifyClient {
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
+                /** Propagates the HTTP failure exception to the suspended caller. */
                 override fun onFailure(call: Call, e: IOException) {
                     if (continuation.isActive) continuation.resumeWithException(e)
                 }
 
+                /** Parses the HTTP response body into address suggestions and resumes the caller. */
                 override fun onResponse(call: Call, response: Response) {
                     try {
                         val outcome = response.use { res ->
@@ -785,6 +789,7 @@ internal object GeoapifyClient {
         }
     }
 
+    /** Executes a Geoapify autocomplete request using an injected [HttpsURLConnection] factory. */
     private suspend fun fetchWithConnection(
         url: String,
         openConnection: (URL) -> HttpsURLConnection,
@@ -804,6 +809,7 @@ internal object GeoapifyClient {
         }
     }
 
+    /** Clears all cached Geoapify address suggestions. */
     internal fun clearCache() {
         synchronized(cacheLock) { cache.clear() }
     }

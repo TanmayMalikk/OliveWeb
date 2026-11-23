@@ -81,13 +81,13 @@ class SessionNavigationPrivacyTest {
         SessionRuntimeFixture().use { f ->
             val r = f.runtime
             r.state.screen = SessionScreen.Cover
-            r.state.coverType = CoverType.GAME
+            r.state.coverType = CoverType.NEWS
             r.navigation.openScreen(SessionScreen.ReturningCredentials)
             r.navigation.openScreen(SessionScreen.ReturningCredentials)
             assertEquals(1, r.screenHistory.size)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
-            assertEquals(CoverType.GAME, r.state.coverType)
+            assertEquals(CoverType.NEWS, r.state.coverType)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
         }

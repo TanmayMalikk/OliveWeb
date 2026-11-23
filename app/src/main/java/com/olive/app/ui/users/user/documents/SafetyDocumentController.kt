@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentDataSource
+import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.DocumentListSource
@@ -69,6 +70,7 @@ internal class SafetyDocumentsController(
     private var generation = 0
     private var subscription: ChatSubscription? = null
     private var initialLoadTimeout: Job? = null
+    private var allSnapshotDocuments: List<SafetyDocument> = emptyList()
     private val evidenceWrites = mutableMapOf<String, CompletableDeferred<Unit>>()
     private val stateMutableFlow = MutableStateFlow(SafetyDocumentsState())
     val stateFlow: StateFlow<SafetyDocumentsState> = stateMutableFlow.asStateFlow()
@@ -90,6 +92,7 @@ internal class SafetyDocumentsController(
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         evidenceWrites.clear()
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
@@ -107,6 +110,7 @@ internal class SafetyDocumentsController(
             subscription?.close()
             subscription = null
             generation++
+            allSnapshotDocuments = emptyList()
             state = SafetyDocumentsState(ownerUid = ownerUid)
         }
         if (localMode || repository == null) return
@@ -125,11 +129,14 @@ internal class SafetyDocumentsController(
         subscription = repository.observeFor(ownerUid, { snapshot ->
             // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
-                val documents = snapshot.documents.map { incoming ->
-                    if (incoming.id in state.evidenceUpdates) incoming.copy(
-                        evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
-                    ) else incoming
-                }
+                allSnapshotDocuments = snapshot.documents
+                val documents = snapshot.documents
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
+                    .map { incoming ->
+                        if (incoming.id in state.evidenceUpdates) incoming.copy(
+                            evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
+                        ) else incoming
+                    }
                 if (snapshot.source == DocumentListSource.SERVER) {
                     awaitingServer = false
                     initialLoadTimeout?.cancel()
@@ -308,13 +315,17 @@ internal class SafetyDocumentsController(
     fun delete(document: SafetyDocument, ownerUid: String) {
         if (state.ownerUid != ownerUid) return
         val previous = state.files
+        val previousAll = allSnapshotDocuments
+        allSnapshotDocuments = previousAll.filterNot { it.id == document.id }
         state = state.copy(files = previous.filterNot { it.id == document.id }, error = null)
-        media?.onDocumentSnapshot(ownerUid, state.files, true)
+        val reconciled = if (previousAll.isNotEmpty()) allSnapshotDocuments else state.files
+        media?.onDocumentSnapshot(ownerUid, reconciled, true)
         scope.launch {
             runCatching {
                 checkNotNull(repository).delete(document, ownerUid)
             }.onFailure {
                 if (state.ownerUid == ownerUid) {
+                    allSnapshotDocuments = previousAll
                     state = state.copy(files = previous, error = localizedFailure(it))
                 }
             }
@@ -438,7 +449,8 @@ internal class SafetyDocumentsController(
                 val incidents = emergencyIncidents(entries)
                 // A just-selected Evidence checkbox must reach the server before the export rereads it.
                 evidenceWrites.values.toList().forEach { it.await() }
-                val available = repository?.listFor(ownerUid)?.documents ?: state.files
+                val available = (repository?.listFor(ownerUid)?.documents ?: state.files)
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
                 val relevantIds = incidents.flatMapTo(linkedSetOf()) { it.attachmentIds }.apply {
                     addAll(available.filter(SafetyDocument::evidence).map(SafetyDocument::id))
                 }
@@ -559,6 +571,7 @@ internal class SafetyDocumentsController(
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         media?.clearState()
         File(applicationContext.cacheDir, "opened-documents").listFiles()?.forEach(File::delete)
         state = SafetyDocumentsState()
@@ -604,8 +617,13 @@ internal class SafetyDocumentsController(
     private suspend fun refresh(ownerUid: String) {
         val snapshot = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) {
-            state = state.copy(files = snapshot.documents, source = snapshot.source,
-                lastSyncedAt = snapshot.lastSyncedAt, error = null)
+            allSnapshotDocuments = snapshot.documents
+            state = state.copy(
+                files = snapshot.documents.filterNot(SafetyDocument::isChatOnlyMedia),
+                source = snapshot.source,
+                lastSyncedAt = snapshot.lastSyncedAt,
+                error = null,
+            )
             media?.onDocumentSnapshot(ownerUid, snapshot.documents,
                 snapshot.source == DocumentListSource.SERVER)
         }

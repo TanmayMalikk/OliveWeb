@@ -69,12 +69,14 @@ internal class AccountKeysetRepository(
 }
 
 internal fun interface AccountRecoveryCallable {
+    /** Invokes the named recovery Cloud Function with serialized request parameters. */
     suspend fun call(name: String, data: Map<String, Any?>): Any?
 }
 
 private class FirebaseAccountRecoveryCallable(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
 ) : AccountRecoveryCallable {
+    /** Calls the named Firebase callable function and returns its deserialized payload. */
     override suspend fun call(name: String, data: Map<String, Any?>): Any? =
         functions.getHttpsCallable(name).call(data).await().data
 }
@@ -108,11 +110,13 @@ internal class PasskeyRecoveryRepository(
         val backedUp: Boolean,
     )
 
+    /** Starts passkey recovery enrollment and returns WebAuthn registration options. */
     suspend fun beginEnrollment(): RegistrationStart {
         val value = response(callable.call(BEGIN_ENROLLMENT, emptyMap()))
         return RegistrationStart(options(value), challengeId(value))
     }
 
+    /** Submits the WebAuthn registration response and requests PRF assertion options. */
     suspend fun continueEnrollment(challengeId: String, registrationResponseJson: String): AssertionStart {
         val value = response(callable.call(CONTINUE_ENROLLMENT, mapOf(
             "challengeId" to validChallengeId(challengeId),
@@ -121,6 +125,7 @@ internal class PasskeyRecoveryRepository(
         return assertionStart(value)
     }
 
+    /** Completes passkey recovery enrollment by storing the PRF-wrapped recovery envelope. */
     suspend fun completeEnrollment(
         challengeId: String,
         assertionResponseJson: String,
@@ -137,9 +142,11 @@ internal class PasskeyRecoveryRepository(
         }
     }
 
+    /** Begins passkey recovery sign-in by fetching assertion options and PRF salts. */
     suspend fun beginUnlock(): AssertionStart =
         assertionStart(response(callable.call(BEGIN_UNLOCK, emptyMap())))
 
+    /** Verifies a WebAuthn unlock assertion and returns the stored recovery envelope. */
     suspend fun completeUnlock(challengeId: String, assertionResponseJson: String): UnlockResult {
         val value = response(callable.call(COMPLETE_UNLOCK, mapOf(
             "challengeId" to validChallengeId(challengeId),
@@ -152,6 +159,7 @@ internal class PasskeyRecoveryRepository(
         return UnlockResult(envelope, prfInput)
     }
 
+    /** Lists registered passkey recovery factors for the signed-in account. */
     suspend fun listCredentials(): List<Credential> {
         val values = response(callable.call(LIST_CREDENTIALS, emptyMap()))["credentials"] as? List<*>
             ?: error("Invalid passkey recovery credential list")
@@ -169,6 +177,7 @@ internal class PasskeyRecoveryRepository(
         }
     }
 
+    /** Revokes a previously enrolled passkey recovery credential on the backend. */
     suspend fun removeCredential(credentialId: String) {
         val id = credentialId(credentialId)
         val value = response(callable.call(REMOVE_CREDENTIAL, mapOf("credentialId" to id)))
@@ -177,6 +186,7 @@ internal class PasskeyRecoveryRepository(
         }
     }
 
+    /** Extracts assertion options, challenge ID, and validated PRF inputs from a response map. */
     private fun assertionStart(value: Map<*, *>): AssertionStart {
         val rawInputs = value["prfInputs"] as? Map<*, *> ?: error("Invalid passkey recovery assertion")
         val inputs = rawInputs.entries.associate { (rawId, rawInput) ->
@@ -186,6 +196,7 @@ internal class PasskeyRecoveryRepository(
         return AssertionStart(options(value), challengeId(value), inputs)
     }
 
+    /** Extracts and validates WebAuthn options from a callable response map. */
     private fun options(value: Map<*, *>): Map<String, Any?> {
         val raw = value["options"] as? Map<*, *> ?: error("Invalid passkey recovery options")
         return raw.entries.associate { (key, item) ->
@@ -193,6 +204,7 @@ internal class PasskeyRecoveryRepository(
         }
     }
 
+    /** Extracts and validates the passkey challenge identifier from a callable response map. */
     private fun challengeId(value: Map<*, *>) = validChallengeId(value["challengeId"])
 
     private companion object {
@@ -206,15 +218,19 @@ internal class PasskeyRecoveryRepository(
         val CREDENTIAL_ID = Regex("[A-Za-z0-9_-]{16,1024}")
         val CHALLENGE_ID = Regex("[A-Za-z0-9_-]{22,128}")
 
+        /** Casts a raw callable payload to a key-value map or throws if malformed. */
         fun response(value: Any?): Map<*, *> = value as? Map<*, *>
             ?: error("Invalid passkey recovery response")
 
+        /** Validates a passkey credential identifier against expected Base64URL bounds. */
         fun credentialId(value: Any?): String = (value as? String)
             ?.takeIf(CREDENTIAL_ID::matches) ?: error("Invalid passkey recovery credential")
 
+        /** Validates a passkey recovery challenge identifier against expected bounds. */
         fun validChallengeId(value: Any?): String = (value as? String)
             ?.takeIf(CHALLENGE_ID::matches) ?: error("Invalid passkey recovery challenge")
 
+        /** Decodes and verifies that a WebAuthn PRF input salt is exactly 32 bytes. */
         fun validPrfInput(value: Any?): String {
             val encoded = value as? String ?: error("Invalid passkey PRF input")
             val bytes = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
@@ -224,6 +240,7 @@ internal class PasskeyRecoveryRepository(
             return encoded
         }
 
+        /** Parses a WebAuthn response JSON string while ensuring no raw PRF results leave the client. */
         fun jsonMap(value: String): Map<String, Any?> {
             val response = JSONObject(value)
             check(response.optJSONObject("clientExtensionResults")
@@ -234,9 +251,11 @@ internal class PasskeyRecoveryRepository(
             return jsonObjectMap(response)
         }
 
+        /** Recursively converts a [JSONObject] into a plain Kotlin map. */
         fun jsonObjectMap(value: JSONObject): Map<String, Any?> = value.keys().asSequence()
             .associateWith { key -> jsonValue(value.get(key)) }
 
+        /** Converts a JSON element into its primitive, map, list, or null representation. */
         fun jsonValue(value: Any?): Any? = when (value) {
             JSONObject.NULL -> null
             is JSONObject -> jsonObjectMap(value)

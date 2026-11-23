@@ -3,16 +3,13 @@ package com.olive.app.ui.covers
 
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveIconButton as IconButton
-import com.olive.app.ui.shared.OliveOutlinedIconButton as OutlinedIconButton
 import com.olive.app.ui.shared.*
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -59,18 +55,7 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.shared.AddressFields
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.olive.app.ui.shared.Cream
-import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
@@ -190,6 +175,7 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
     var birthday by rememberBirthdayInput(session.coverDob)
     var showBirthdayErrors by remember(session.coverDob) { mutableStateOf(false) }
+    var birthdayShake by remember(session.coverDob) { mutableIntStateOf(0) }
     var address by remember(session.deliveryAddress) { mutableStateOf(session.deliveryAddress) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("@${session.coverUsername}")
@@ -206,13 +192,14 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
                 )
             }.keepVisibleWhileTyping()
         )
-        BirthdayPicker(birthday, "cover_dob", !session.busy, showBirthdayErrors) { birthday = it }
+        BirthdayPicker(birthday, "cover_dob", !session.busy, showBirthdayErrors, shakeTrigger = birthdayShake) { birthday = it }
         Text(stringResource(R.string.location), style = MaterialTheme.typography.titleMedium)
         AddressFields(address, cityOnlyRequired = true) { address = it }
         Button(
             onClick = {
                 showBirthdayErrors = !InputPolicy.validDob(birthday)
-                if (!showBirthdayErrors) session.saveCoverSettings(fullName, birthday, address)
+                if (showBirthdayErrors) birthdayShake += 1
+                else session.saveCoverSettings(fullName, birthday, address)
             },
             enabled = !session.busy && fullName.isNotBlank() && address.locationValid,
             modifier = Modifier.fillMaxWidth().testTag("cover_save_settings")
@@ -259,7 +246,6 @@ internal object CoverLauncher {
     fun apply(context: Context, selected: CoverType, role: AccountRole) {
         val manager = context.packageManager
         val aliases = listOf(
-            "GameLauncher",
             "NewsLauncher",
             "FitnessLauncher",
             "BranchLauncher",
@@ -271,7 +257,6 @@ internal object CoverLauncher {
             AccountRole.USER -> when (selected) {
                 CoverType.NEWS -> "NewsLauncher"
                 CoverType.FITNESS -> "FitnessLauncher"
-                CoverType.GAME -> "GameLauncher"
             }
         }
         val changes = aliases.map { name ->
@@ -299,116 +284,6 @@ internal object CoverLauncher {
                         PackageManager.DONT_KILL_APP
                     )
                 }
-        }
-    }
-}
-
-// Cover users: shows the olive game cover and its entry controls.
-
-/**
- * A small, usable game cover. The nickname field also accepts the configured safe-entry phrase.
- *
- * @param sessionViewModel Optional session view model supplied to [GameCover].
- * @param interactive Whether to apply interactive.
- * @param onEntryAttempt Function used to transform or provide on entry attempt.
- */
-@Composable
-internal fun GameCover(
-    sessionViewModel: SessionViewModel? = null,
-    interactive: Boolean = true,
-    onEntryAttempt: (String) -> Boolean = { false },
-) {
-    var nickname by remember { mutableStateOf("") }
-    var score by rememberSaveable(sessionViewModel?.coverAccountId) { mutableIntStateOf(0) }
-    var settingsOpen by remember(sessionViewModel?.coverAccountId) { mutableStateOf(false) }
-    val coverReset = sessionViewModel?.coverReset ?: 0
-    var handledCoverReset by remember { mutableIntStateOf(coverReset) }
-    LaunchedEffect(interactive, coverReset) {
-        val resetChanged = coverReset != handledCoverReset
-        handledCoverReset = coverReset
-        if ((!interactive || resetChanged) && settingsOpen) {
-            settingsOpen = false
-        }
-    }
-    if (settingsOpen && sessionViewModel != null) {
-        CoverSettingsPage(sessionViewModel) { settingsOpen = false }
-        return
-    }
-    BackHandler(interactive) { }
-    BoxWithConstraints(Modifier.fillMaxSize().background(WarmWhite).safeDrawingPadding()) {
-        val viewportHeight = maxHeight
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .heightIn(min = viewportHeight).padding(24.dp)
-                .testTag("game_cover"),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Row(
-                modifier = Modifier.semantics(mergeDescendants = true) { },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Icon(
-                        Icons.Outlined.SportsEsports,
-                        contentDescription = null,
-                        modifier = Modifier.padding(12.dp).size(34.dp).testTag("cover_brand_game"),
-                        tint = OliveGreen,
-                    )
-                }
-                Text(
-                    stringResource(R.string.game_cover_title),
-                    modifier = Modifier.weight(1f, fill = false).semantics { heading() },
-                    fontFamily = FontFamily.Serif,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OliveGreen,
-                )
-                if (sessionViewModel != null) OutlinedIconButton(
-                    onClick = { settingsOpen = true },
-                    enabled = interactive,
-                    modifier = Modifier.testTag("game_settings"),
-                ) {
-                    Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.game_cover_instructions), color = Muted)
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = nickname,
-                onValueChange = { value ->
-                    nickname = if (onEntryAttempt(value)) "" else value.take(64)
-                },
-                enabled = interactive,
-                singleLine = true,
-                label = { Text(stringResource(R.string.game_player_name)) },
-                modifier = Modifier.fillMaxWidth().testTag("game_entry"),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { score++ },
-                enabled = interactive,
-                modifier = Modifier.defaultMinSize(minWidth = 112.dp, minHeight = 112.dp).testTag("game_olive"),
-                shape = CircleShape,
-            ) {
-                Text(stringResource(R.string.game_tap_olive))
-            }
-            Spacer(Modifier.height(12.dp))
-            Surface(
-                shape = CircleShape, color = PaleOlive, contentColor = Ink,
-                border = BorderStroke(1.dp, OliveDivider),
-            ) {
-                Text(
-                    stringResource(R.string.game_score, score),
-                    modifier = Modifier.testTag("game_score").padding(horizontal = 18.dp, vertical = 8.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
         }
     }
 }

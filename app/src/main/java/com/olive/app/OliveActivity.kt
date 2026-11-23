@@ -484,8 +484,7 @@ class OliveActivity : FragmentActivity() {
             role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.mipmap.ic_launcher_tree
             role == AccountRole.SAFE_CONTACT -> R.mipmap.ic_launcher_branch
             type == CoverType.NEWS -> R.mipmap.ic_launcher_news
-            type == CoverType.FITNESS -> R.mipmap.ic_launcher_fitness
-            else -> R.mipmap.ic_launcher_game
+            else -> R.mipmap.ic_launcher_fitness
         }
         val appTitle = when (role) {
             AccountRole.SAFE_CONTACT -> getString(R.string.olive_branch)
@@ -495,7 +494,6 @@ class OliveActivity : FragmentActivity() {
                 when (type) {
                     CoverType.NEWS -> R.string.ui_daily_digest
                     CoverType.FITNESS -> R.string.fitness_tracker
-                    CoverType.GAME -> R.string.ui_game
                 }
             )
         }

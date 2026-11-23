@@ -236,7 +236,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     fun everyCoverChoiceCanBecomeTheSingleSelectedOption() {
         reachCoverPicker("cover_picker_test")
-        val tags = listOf("cover_choice_news", "cover_choice_fitness", "cover_choice_game")
+        val tags = listOf("cover_choice_news", "cover_choice_fitness")
         tags.forEach { selectedTag ->
             compose.onNodeWithTag(selectedTag).performScrollTo().performClick()
             compose.waitUntil(5_000) {

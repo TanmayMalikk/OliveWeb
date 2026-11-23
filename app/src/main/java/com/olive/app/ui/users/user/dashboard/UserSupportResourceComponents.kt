@@ -340,6 +340,7 @@ internal fun SavedResourcesEmptyCard() {
     }
 }
 
+/** Renders an accessible pulsing 24/7 availability badge for hotline cards. */
 @Composable
 private fun HotlineAlwaysOpenBadge() {
     val description = stringResource(R.string.hotline_available_247)
@@ -374,6 +375,7 @@ private fun HotlineAlwaysOpenBadge() {
     }
 }
 
+/** Returns the localized display label for a [HotlineResourceKind] category. */
 @Composable
 internal fun hotlineKindLabel(kind: HotlineResourceKind): String = stringResource(
     when (kind) {

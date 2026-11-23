@@ -403,6 +403,7 @@ internal fun FitnessGoalQuestionnairePage(
     }
 }
 
+/** Renders the age, height, weight, and metabolic basis inputs step of the fitness goal wizard. */
 @Composable
 private fun BodyDetailsStep(
     ageText: String,
@@ -479,6 +480,7 @@ private fun BodyDetailsStep(
     )
 }
 
+/** Displays the calculated fitness and nutrition goal summary before saving. */
 @Composable
 private fun RecommendationReviewStep(recommendation: FitnessGoalRecommendation) {
     val profile = recommendation.profile
@@ -548,6 +550,7 @@ private fun RecommendationReviewStep(recommendation: FitnessGoalRecommendation) 
     )
 }
 
+/** Displays a single label-and-value row in the goal recommendation summary. */
 @Composable
 private fun ReviewMetricRow(label: String, value: String) {
     Row(
@@ -560,6 +563,7 @@ private fun ReviewMetricRow(label: String, value: String) {
     }
 }
 
+/** Renders a selectable card option with title, description, and check indicator. */
 @Composable
 private fun QuestionnaireOptionCard(
     title: String,
@@ -597,6 +601,7 @@ private fun QuestionnaireOptionCard(
     }
 }
 
+/** Returns the title and description string resources for a primary fitness [goal]. */
 private fun primaryGoalStrings(goal: FitnessPrimaryGoal): Pair<Int, Int> = when (goal) {
     FitnessPrimaryGoal.LOSE_WEIGHT ->
         R.string.fitness_questionnaire_goal_lose to R.string.fitness_questionnaire_goal_lose_desc
@@ -608,6 +613,7 @@ private fun primaryGoalStrings(goal: FitnessPrimaryGoal): Pair<Int, Int> = when 
         R.string.fitness_questionnaire_goal_fitness to R.string.fitness_questionnaire_goal_fitness_desc
 }
 
+/** Returns the title and description string resources for an activity [level]. */
 private fun activityLevelStrings(level: FitnessActivityLevel): Pair<Int, Int> = when (level) {
     FitnessActivityLevel.SEDENTARY ->
         R.string.fitness_questionnaire_activity_sedentary to R.string.fitness_questionnaire_activity_sedentary_desc
@@ -619,6 +625,7 @@ private fun activityLevelStrings(level: FitnessActivityLevel): Pair<Int, Int> = 
         R.string.fitness_questionnaire_activity_very to R.string.fitness_questionnaire_activity_very_desc
 }
 
+/** Returns the title and description string resources for a nutrition [style]. */
 private fun nutritionStyleStrings(style: FitnessNutritionStyle): Pair<Int, Int> = when (style) {
     FitnessNutritionStyle.BALANCED ->
         R.string.fitness_questionnaire_nutrition_balanced to R.string.fitness_questionnaire_nutrition_balanced_desc

@@ -179,14 +179,14 @@ class AccountModelBoundaryTest {
             contacts = listOf(SafeContact("c1", "Amina", "555-0100", true, "uid-2", "Sister")),
             address = DeliveryAddress(city = "Edmonton"),
             role = AccountRole.SAFE_CONTACT,
-            coverType = CoverType.GAME,
+            coverType = CoverType.NEWS,
             email = "a@b.ca",
             phone = "555-0101",
         )
         val map = profile.toMap()
         assertEquals("olive_user", map["username"])
         assertEquals("SAFE_CONTACT", map["role"])
-        assertEquals("GAME", map["coverType"])
+        assertEquals("NEWS", map["coverType"])
         assertEquals(FieldChange("Title", "A", "B"), FieldChange.fromJson(FieldChange("Title", "A", "B").toJson()))
     }
 

@@ -612,6 +612,8 @@ internal fun InviteCodeEntry(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var connected by remember { mutableStateOf<String?>(null) }
+    var shakeAttempt by remember { mutableIntStateOf(0) }
+    val effectiveShake = rememberFieldErrorShakeTrigger(error, shakeAttempt)
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -634,7 +636,7 @@ internal fun InviteCodeEntry(
                     keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
                     enabled = enabled && !busy,
                     isError = error != null,
-                    modifier = Modifier.weight(1f).testTag("friend_invite_code")
+                    modifier = Modifier.weight(1f).testTag("friend_invite_code").oliveErrorShake(effectiveShake)
                 )
                 Button(
                     onClick = {
@@ -648,6 +650,7 @@ internal fun InviteCodeEntry(
                                 throw cancelled
                             } catch (failure: Exception) {
                                 error = failure.localizedMessage
+                                shakeAttempt += 1
                             } finally {
                                 busy = false
                             }

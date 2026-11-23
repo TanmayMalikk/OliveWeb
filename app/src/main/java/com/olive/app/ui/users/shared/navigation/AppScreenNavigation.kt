@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.FitnessCover
-import com.olive.app.ui.covers.GameCover
 import com.olive.app.ui.covers.news.NewsCover
 import com.olive.app.ui.users.admin.AdminPortal
 import com.olive.app.ui.users.safecontact.SafeContactArea
@@ -218,11 +217,6 @@ internal fun OliveRoot(
                             )
 
                             CoverType.FITNESS -> FitnessCover(session, isCover)
-                            CoverType.GAME -> GameCover(
-                                sessionViewModel = session,
-                                interactive = isCover,
-                                onEntryAttempt = session.account::interceptSearch,
-                            )
                         }
                     }
                 }
@@ -513,6 +507,7 @@ internal fun OliveRoot(
     }
 }
 
+/** Returns whether the PIN-to-Safe unlock reveal animation still needs to play for the current screen state. */
 internal fun shouldShowPinSafeAnimation(
     screen: SessionScreen,
     unlockAnimationVersion: Int,
@@ -559,6 +554,7 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     val busy get() = runtime.state.busy
     val message get() = runtime.state.message
     val credentialFieldError get() = runtime.state.credentialFieldError
+    val inputErrorVersion get() = runtime.state.inputErrorVersion
     val creatingAccount get() = runtime.state.creatingAccount
     val setupUsername get() = runtime.setupUsername
     val setupProfile get() = runtime.setupProfile
@@ -637,7 +633,7 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
      * @param text Text string to display, parse, or send.
      */
     fun showError(text: String) {
-        runtime.state.message = text
+        runtime.state.failInput(text)
     }
 
     /**

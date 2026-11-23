@@ -128,6 +128,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable(create) { mutableIntStateOf(0) }
+    val combinedShakeTrigger = shakeAttempt + session.account.inputErrorVersion
     val organizationLogin =
         !create && session.account.role in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val usernameValid =
@@ -203,7 +205,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
             username,
             "username",
             enabled = !session.account.busy,
-            error = usernameError
+            error = usernameError,
+            shakeTrigger = combinedShakeTrigger
         ) {
             username = it.take(if (create) 24 else 254)
             submitted =
@@ -239,7 +242,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
             showSecretToggle = true,
             enabled = !session.account.busy,
             error = passwordError,
-            newPassword = create
+            newPassword = create,
+            shakeTrigger = combinedShakeTrigger
         ) {
             password = it.take(if (create) 24 else 128)
             submitted =
@@ -283,7 +287,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
                 secret = true,
                 showSecretToggle = true,
                 enabled = !session.account.busy,
-                error = confirmError
+                error = confirmError,
+                shakeTrigger = combinedShakeTrigger
             ) {
                 confirm = it.take(24)
                 submitted = false
@@ -299,11 +304,11 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
         OnboardingNavigation(
             session.navigation::back, {
                 submitted = true
-                if (usernameValid && passwordValid && confirmationValid) session.account.authenticate(
-                    username,
-                    password,
-                    create
-                )
+                if (usernameValid && passwordValid && confirmationValid) {
+                    session.account.authenticate(username, password, create)
+                } else {
+                    shakeAttempt += 1
+                }
             }, nextTag = "credentials_submit", enabled = !session.account.busy,
             nextLabel = if (create) uiText(R.string.create_account) else uiText(R.string.sign_in)
         )
@@ -332,6 +337,7 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val pinValid = InputPolicy.validPin(pin)
     val confirmationValid = confirm.isNotEmpty() && confirm == pin
     val stages = if (session.account.creatingAccount) 7 else 2
@@ -354,7 +360,8 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             numeric = true,
             showSecretToggle = true,
             enabled = !session.account.busy,
-            error = if (showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null
+            error = if (showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null,
+            shakeTrigger = shakeAttempt
         ) {
             pin = it.filter(Char::isDigit).take(6)
             showErrors = false
@@ -368,7 +375,8 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             numeric = true,
             showSecretToggle = true,
             enabled = !session.account.busy,
-            error = if (showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null
+            error = if (showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null,
+            shakeTrigger = shakeAttempt
         ) {
             confirm = it.filter(Char::isDigit).take(6)
             showErrors = false
@@ -383,10 +391,11 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             onBack,
             {
                 showErrors = true
-                if (pinValid && confirmationValid) session.account.createDevicePin(
-                    pin,
-                    confirm
-                )
+                if (pinValid && confirmationValid) {
+                    session.account.createDevicePin(pin, confirm)
+                } else {
+                    shakeAttempt += 1
+                }
             },
             last = true,
             nextTag = "pin_setup_submit",
@@ -440,15 +449,34 @@ internal fun PinPrompt(session: SessionViewModel) {
  */
 @Composable
 internal fun SystemPinPrompt(session: SessionViewModel, challenge: Int) {
+    val uiText = rememberResourceText()
     var pin by remember(challenge) { mutableStateOf("") }
+    var localShake by remember(challenge) { mutableIntStateOf(0) }
+    var pinError by remember(challenge) { mutableStateOf(false) }
+    val sessionErrorVersion = session.account.inputErrorVersion
+    var lastSeenErrorVersion by remember(challenge) { mutableIntStateOf(sessionErrorVersion) }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            pinError = true
+            localShake += 1
+        }
+    }
     /**
-     * Computes submit.
+     * Submits the entered PIN or triggers shake feedback when fewer than four digits are entered.
      */
     fun submit() {
         if (session.account.busy || session.privacyBlackout || session.screen != SessionScreen.Pin ||
-            session.pinChallengeVersion != challenge || !InputPolicy.validPin(pin)) return
+            session.pinChallengeVersion != challenge) return
+        if (!InputPolicy.validPin(pin)) {
+            pinError = true
+            localShake += 1
+            session.account.showError(uiText(R.string.enter_your_4_6_digit_pin))
+            return
+        }
+        pinError = false
         val attempt = pin
         pin = ""
         session.account.submitPin(attempt, challenge)
@@ -458,15 +486,22 @@ internal fun SystemPinPrompt(session: SessionViewModel, challenge: Int) {
         Heading(stringResource(R.string.enter_pin), stringResource(R.string.enter_your_pin))
         OutlinedTextField(
             value = pin,
-            onValueChange = { value -> if (value.length <= 6 && value.all(Char::isDigit)) pin = value },
+            onValueChange = { value ->
+                if (value.length <= 6 && value.all(Char::isDigit)) {
+                    pin = value
+                    pinError = false
+                }
+            },
             label = { Text(stringResource(R.string.a11y_pin)) },
             enabled = !session.account.busy,
             singleLine = true,
+            isError = pinError,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done,
                 autoCorrectEnabled = false),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("unlock_pin"),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("unlock_pin")
+                .oliveErrorShake(localShake),
         )
         Status(session)
         Button(onClick = ::submit, enabled = !session.account.busy && InputPolicy.validPin(pin),

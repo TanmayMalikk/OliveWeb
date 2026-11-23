@@ -10,6 +10,7 @@ import {
   Logo,
   Forward,
   StepProgress,
+  shakeNamedFields,
 } from "../../../components/SharedComponents";
 import {
   emptyProfile,
@@ -36,21 +37,39 @@ export function AuthPage({
     <>
       <Form
         key={create ? "create-account" : "sign-in"}
-        onSubmit={async (data) => {
+        onSubmit={async (data, form) => {
           const username = String(data.get("username"));
           const password = String(data.get("password"));
           await session.perform(async () => {
-            if (create && !validUsername(username))
+            if (create && !validUsername(username)) {
+              shakeNamedFields(form, ["username"]);
               throw new Error(
                 "Use 8–24 lowercase letters, numbers, or underscores.",
               );
-            if (create && !validPassword(password))
+            }
+            if (create && !validPassword(password)) {
+              shakeNamedFields(form, ["password"]);
               throw new Error(
                 "Use 8–24 characters with a letter, number, and special character.",
               );
-            if (create && password !== data.get("confirmation"))
+            }
+            if (create && password !== data.get("confirmation")) {
+              shakeNamedFields(form, ["password", "confirmation"]);
               throw new Error("Passwords do not match.");
-            await session.authenticate(username, password, role, create);
+            }
+            try {
+              await session.authenticate(username, password, role, create);
+            } catch (failure) {
+              const details = failure instanceof Error ? failure.message.toLowerCase() : "";
+              if (create && details.includes("username")) {
+                shakeNamedFields(form, ["username"]);
+              } else if (details.includes("password")) {
+                shakeNamedFields(form, ["password"]);
+              } else {
+                shakeNamedFields(form, ["username", "password"]);
+              }
+              throw failure;
+            }
           });
         }}
       >
@@ -313,13 +332,15 @@ export function Setup() {
         {step === 1 ? (
           <Form
             className="setup-form"
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await session.perform(async () => {
                 const email = profile.email.trim().toLowerCase();
                 if (email && !validEmail(email)) {
+                  shakeNamedFields(form, ["email"]);
                   throw new Error("Enter a valid email address.");
                 }
                 if (email && !profile.emailCommunicationConsent) {
+                  shakeNamedFields(form, ["emailCommunicationConsent"]);
                   throw new Error("Please agree to receive email communications, or clear the email field.");
                 }
                 const next = {
@@ -329,6 +350,12 @@ export function Setup() {
                   emailCommunicationConsent: Boolean(email && profile.emailCommunicationConsent),
                 };
                 if (!next.fullName.trim() || !next.dob || !next.address.city.trim()) {
+                  const missing = [
+                    !next.fullName.trim() ? "fullName" : "",
+                    !next.dob ? "dob" : "",
+                    !next.address.city.trim() ? "city" : "",
+                  ].filter(Boolean);
+                  shakeNamedFields(form, missing);
                   throw new Error("Add your name, a valid birth date, and city.");
                 }
                 if (personal) {
@@ -341,6 +368,7 @@ export function Setup() {
             <div className="form-grid">
               <Field
                 label="Full name"
+                name="fullName"
                 value={profile.fullName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   update("fullName", e.target.value)
@@ -352,6 +380,7 @@ export function Setup() {
               <BirthdayField defaultValue={profile.dob} required />
               <Field
                 label="City"
+                name="city"
                 value={profile.address.city}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setProfile({
@@ -430,26 +459,36 @@ export function Setup() {
         ) : (
           <Form
             className="setup-form narrow"
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await session.perform(async () => {
                 const pin = String(data.get("pin"));
-                if (!validPin(pin) || pin !== data.get("confirmation"))
+                if (!validPin(pin) || pin !== data.get("confirmation")) {
+                  shakeNamedFields(form, ["pin", "confirmation"]);
                   throw new Error("Enter matching PINs with 4–6 digits.");
-                if (!profile.triggerHash && trigger.trim().length < 3)
+                }
+                if (!profile.triggerHash && trigger.trim().length < 3) {
+                  shakeNamedFields(form, ["trigger"]);
                   throw new Error("Choose a trigger with 3–64 characters.");
+                }
                 const p = {
                   ...profile,
                   triggerHash: trigger
                     ? await triggerHash(trigger)
                     : profile.triggerHash,
                 };
-                await session.completeSetup(p, pin);
+                try {
+                  await session.completeSetup(p, pin);
+                } catch (failure) {
+                  shakeNamedFields(form, ["pin", "confirmation"]);
+                  throw failure;
+                }
               });
             }}
           >
             {!profile.triggerHash && (
               <Field
                 label="Trigger word or phrase"
+                name="trigger"
                 value={trigger}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setTrigger(e.target.value)

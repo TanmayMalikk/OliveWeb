@@ -97,6 +97,7 @@ internal class SessionViewModel @JvmOverloads constructor(
         get() = runtime.state.passkeyRecoveryCredentials
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
+    val inputErrorVersion get() = runtime.state.inputErrorVersion
     val profile get() = runtime.state.profile
     val attempts get() = runtime.state.attempts
     val settingsHistory get() = runtime.state.settingsHistory
@@ -108,7 +109,9 @@ internal class SessionViewModel @JvmOverloads constructor(
     val loadingHistory get() = coverAccountId?.let { it == runtime.history.loadingUid } == true
     val historyLoadFailed get() = coverAccountId?.let { it == runtime.history.failedUid } == true
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
+    /** Ensures real-time observation of incoming and outgoing shared private entries is active. */
     fun ensureSharedEntriesObservation() = runtime.secureSharing.observeSharedEntries()
+    /** Shares a private entry with selected [friends] and invokes [onComplete] afterward. */
     fun sharePrivateEntryWithFriends(
         entry: PrivateEntry,
         friends: List<Friend>,
@@ -757,8 +760,11 @@ internal interface SessionAccountManagementActions {
      */
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
+    /** Refreshes the list of registered passkey recovery factors. */
     fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
+    /** Starts enrolling a new passkey recovery factor for the signed-in account. */
     fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
+    /** Removes an enrolled passkey recovery credential identified by [credentialId]. */
     fun removePasskeyRecovery(credentialId: String) =
         runtime.settings.removePasskeyRecovery(credentialId)
 }

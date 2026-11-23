@@ -193,6 +193,7 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Loading) loadState = MapLoadState.Error
     }
 
+    /** Encodes current user and contact points into JSON and pushes them to the WebView map. */
     fun updatePoints(view: WebView, moveCamera: Boolean) {
         val encoded = JSONArray().apply {
             points.forEach { point ->
@@ -225,6 +226,7 @@ internal fun InteractiveLocationMap(
         )
     }
 
+    /** Encodes directory support locations and pushes them to the WebView map. */
     fun updateSupportServices(view: WebView) {
         val encoded = JSONArray().apply {
             supportServices.forEach { service ->
@@ -242,6 +244,7 @@ internal fun InteractiveLocationMap(
         if (fit) supportWereFitted = true
     }
 
+    /** Serializes active turn-by-turn route coordinates and sends them to the WebView map. */
     fun updateRoute(view: WebView, fitRoute: Boolean) {
         val encoded = JSONArray().apply {
             route?.coordinates?.forEach { coordinate ->
@@ -251,6 +254,7 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveSetRoute($encoded,$fitRoute);", null)
     }
 
+    /** Notifies the WebView map when its CSS pixel dimensions change so the canvas resizes cleanly. */
     fun resizeMapIfChanged(view: WebView) {
         if (view.height <= 0 || view.width <= 0) return
         val density = view.resources.displayMetrics.density
@@ -262,6 +266,7 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);", null)
     }
 
+    /** Pushes the picked incident coordinates or clears selection in the WebView map. */
     fun updateSelection(view: WebView) {
         val latitude = selectedLocation?.first ?: 0.0
         val longitude = selectedLocation?.second ?: 0.0
@@ -334,6 +339,7 @@ internal fun InteractiveLocationMap(
 
     val showCompassControl = compassEnabled || onToggleHeadingUp != null || hasRotatedBearing
 
+    /** Renders the compass FAB to reset north or toggle heading-up rotation mode. */
     @Composable
     fun CompassFab() {
         SmallFloatingActionButton(
@@ -383,6 +389,7 @@ internal fun InteractiveLocationMap(
                         private var touchDownX = 0f
                         private var touchDownY = 0f
 
+                        /** Claims parent touch interception during map drags and dispatches clicks on tap. */
                         override fun onTouchEvent(event: MotionEvent): Boolean {
                             when (event.actionMasked) {
                                 MotionEvent.ACTION_DOWN -> {
@@ -406,6 +413,7 @@ internal fun InteractiveLocationMap(
                             return super.onTouchEvent(event)
                         }
 
+                        /** Completes accessibility click handling for the map WebView. */
                         override fun performClick(): Boolean {
                             super.performClick()
                             return true
@@ -449,6 +457,7 @@ internal fun InteractiveLocationMap(
                             "OliveMapCamera",
                         )
                         webChromeClient = object : WebChromeClient() {
+                            /** Watches the WebView page title signal to initialize map layers once ready. */
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 if (webView[0] !== view) return
                                 if (title == "olive-map-error") loadState = MapLoadState.Error
@@ -476,20 +485,24 @@ internal fun InteractiveLocationMap(
                             }
                         }
                         webViewClient = object : WebViewClient() {
+                            /** Serves bundled offline map assets and cached map tiles over HTTPS. */
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest,
                             ): WebResourceResponse? = bundledMapAsset(context, request.url, request.method)
 
+                            /** Triggers a container resize check once the map page finishes loading. */
                             override fun onPageFinished(view: WebView, url: String) {
                                 view.post { resizeMapIfChanged(view) }
                             }
 
+                            /** Prevents the embedded map WebView from navigating away from local map HTML. */
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest,
                             ) = true
 
+                            /** Marks the map as failed when loading the main frame reports an error. */
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
@@ -579,6 +592,7 @@ internal fun InteractiveLocationMap(
                 }
 
                 if (!userSearchEnabled) {
+                    /** Renders the map recenter button that re-engages follow mode and centers on the target. */
                     @Composable
                     fun RecenterFab() {
                         SmallFloatingActionButton(
@@ -594,6 +608,7 @@ internal fun InteractiveLocationMap(
                         }
                     }
 
+                    /** Renders the toggle button controlling whether the camera follows the tracked marker. */
                     @Composable
                     fun FollowFab() {
                         SmallFloatingActionButton(
@@ -740,6 +755,7 @@ internal fun InteractiveLocationMap(
 
 private class LocationSelectionBridge(private val onChange: (Double, Double) -> Unit) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    /** Receives map coordinate selection callbacks from JavaScript after bounds validation. */
     @JavascriptInterface
     fun selected(latitude: Double, longitude: Double) {
         if (latitude in -90.0..90.0 && longitude in -180.0..180.0) mainHandler.post { onChange(latitude, longitude) }
@@ -748,13 +764,16 @@ private class LocationSelectionBridge(private val onChange: (Double, Double) -> 
 
 private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
+    /** Dispatches a selected support directory resource ID from JavaScript to the main thread. */
     @JavascriptInterface
     fun selected(id: String) { if (id.length in 1..512) handler.post { onSelected(id) } }
 }
 
 private class MapCameraBridge(private val onGesture: () -> Unit, private val onBearing: (Float) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
+    /** Notifies the Compose host when the user pans or rotates the map manually. */
     @JavascriptInterface fun onUserGesture() { handler.post(onGesture) }
+    /** Forwards map bearing updates in degrees from JavaScript to update the compass needle. */
     @JavascriptInterface fun onBearingChanged(bearing: Double) { if (bearing.isFinite()) handler.post { onBearing(bearing.toFloat()) } }
 }
 
@@ -762,6 +781,7 @@ private enum class MapLoadState { Loading, Ready, Error }
 
 private const val MAP_READY_TITLE = "olive-map-ready"
 
+/** Draws a rotating compass dial with a red north-pointing needle at [bearingDegrees]. */
 @Composable
 private fun CompassNeedleIcon(bearingDegrees: Float, contentDescription: String) {
     Box(
