@@ -12,6 +12,7 @@ import {
   purgeEntry,
   signInEmail,
   TRASH_RETENTION_MS,
+  validEmail,
   validPassword,
   validPin,
   validUsername,
@@ -90,6 +91,15 @@ describe("recent web domain boundaries", () => {
     expect(secondProfile.contacts).toEqual([]);
     expect(secondProfile.address.city).toBe("");
     expect(secondProfile.role).toBe("SAFE_CONTACT");
+    expect(secondProfile.emailCommunicationConsent).toBe(false);
+  });
+
+  it("validates real emails and rejects Olive internal aliases", () => {
+    expect(validEmail(" User@Example.CA ")).toBe(true);
+    expect(validEmail("")).toBe(false);
+    expect(validEmail("invalid-email")).toBe(false);
+    expect(validEmail("person@users.olive.invalid")).toBe(false);
+    expect(validEmail("person@safe.olive.invalid")).toBe(false);
   });
 
   // Input: active, boundary-expired, and already-purged trash entries. Expected: redaction is exact and idempotent.

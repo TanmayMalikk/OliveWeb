@@ -22,6 +22,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.firestore.FirebaseFirestore
 import com.olive.app.R
 import com.olive.app.data.location.LocationDatabase
 import com.olive.app.data.location.LocationTrailPoint
@@ -234,6 +235,7 @@ class LiveLocationService : Service() {
                 }.getOrNull()
             reference?.onDisconnect()?.cancel()
             reference?.updateChildren(mapOf("active" to false))
+            runCatching { FirebaseFirestore.getInstance().collection("liveLocationSessions").document(ownerUid).delete() }
             LiveLocationKeyStore(this).remove(ownerUid)
         }
         getSharedPreferences("olive_location_sharing", MODE_PRIVATE).edit {

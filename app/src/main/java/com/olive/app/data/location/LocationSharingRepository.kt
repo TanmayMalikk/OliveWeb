@@ -18,6 +18,7 @@ import com.olive.app.security.KeyManager
 import java.io.IOException
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
 import javax.net.ssl.HttpsURLConnection
@@ -293,6 +294,27 @@ private class LiveLocationSharingDataSource(
         return key
     }
 
+    /** Records active live-location metadata so backend notification triggers know session timing and recipients. */
+    suspend fun setSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) {
+        val doc = firestore.collection("liveLocationSessions").document(ownerUid)
+        val cleanRecipients = recipientUids.filter { it.isNotBlank() && it != ownerUid }.distinct().take(25)
+        if (active && cleanRecipients.isNotEmpty() && expiresAt > System.currentTimeMillis()) {
+            doc.set(
+                mapOf(
+                    "ownerUid" to ownerUid,
+                    "sessionId" to UUID.randomUUID().toString(),
+                    "recipientUids" to cleanRecipients,
+                    "active" to true,
+                    "startedAt" to System.currentTimeMillis(),
+                    "expiresAt" to expiresAt,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+        } else {
+            runCatching { doc.delete().await() }
+        }
+    }
+
     /**
      * Listens for live-location changes and removes the listener when closed.
      *
@@ -539,6 +561,8 @@ internal interface LocationSharingDataSource {
      * @return The resulting [SecretKey], or `null` if unavailable.
      */
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
+    /** Records or clears active live-location session metadata for notification scheduling. */
+    suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) = Unit
     /**
      * Watches static contacts for changes.
      *
@@ -615,6 +639,10 @@ internal class LocationSharingRepository private constructor(
      */
     override suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>) =
         liveLocations.setRecipients(ownerUid, friends)
+
+    /** Records or clears live-location session timing and recipient metadata. */
+    override suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) =
+        liveLocations.setSessionState(ownerUid, recipientUids, expiresAt, active)
 
     /**
      * Watches static contacts for changes.

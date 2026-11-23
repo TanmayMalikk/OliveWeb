@@ -72,6 +72,7 @@ import com.olive.app.ui.users.shared.navigation.FormColumn
 import com.olive.app.ui.users.shared.navigation.SafePermissionsSettings
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.onboarding.EmailConsentSection
 import com.olive.app.ui.shared.BirthdayPicker
 import com.olive.app.ui.shared.rememberBirthdayInput
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -99,6 +100,9 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var abuserName by remember { mutableStateOf(profile.abuserName) }
     var birthday by rememberBirthdayInput(profile.dob)
     var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
+    var email by remember(profile.email) { mutableStateOf(profile.email) }
+    var emailConsent by remember(profile.emailCommunicationConsent) { mutableStateOf(profile.emailCommunicationConsent) }
+    var showEmailErrors by remember(profile.email) { mutableStateOf(false) }
     var situation by remember { mutableStateOf(profile.situation) }
     var address by remember { mutableStateOf(profile.address) }
     var trigger by remember { mutableStateOf("") }
@@ -195,6 +199,22 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     }) { abuserName = it.take(120) }
                             }
                             BirthdayPicker(birthday, "settings_dob", !session.busy, showBirthdayErrors) { birthday = it }
+                            EmailConsentSection(
+                                email = email,
+                                consent = emailConsent,
+                                enabled = !session.busy,
+                                showErrors = showEmailErrors,
+                                requireConsentWhenEntered = false,
+                                emailTag = "settings_email",
+                                consentTag = "settings_email_consent",
+                                onEmailChange = {
+                                    email = it
+                                    if (it.isBlank()) emailConsent = false
+                                    showEmailErrors = false
+                                },
+                                onConsentChange = { emailConsent = it },
+                                onFocusEmail = { session.recordSettingsInteraction("Olive Branch", "Focused email") },
+                            )
                             if (userRole) Field(
                                 uiText(R.string.brief_description_of_your_situation_optional_recommended),
                                 situation,
@@ -221,14 +241,17 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 }) { address = it }
                             Button(onClick = save@{
                                 showBirthdayErrors = !InputPolicy.validDob(birthday)
-                                if (showBirthdayErrors) return@save
+                                showEmailErrors = email.isNotBlank() && !InputPolicy.validEmail(email)
+                                if (showBirthdayErrors || showEmailErrors) return@save
                                 session.saveSettings(
                                     fullName,
                                     affected,
                                     abuserName,
                                     birthday,
                                     situation,
-                                    address
+                                    address,
+                                    email = email,
+                                    emailCommunicationConsent = email.isNotBlank() && emailConsent,
                                 )
                             }, enabled = !session.busy, modifier = Modifier.testTag("save_settings")) {
                                 Text(

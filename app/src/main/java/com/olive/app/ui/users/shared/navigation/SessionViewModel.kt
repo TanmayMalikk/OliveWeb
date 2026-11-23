@@ -702,7 +702,9 @@ internal interface SessionAccountManagementActions {
         dob: String,
         situation: String,
         address: DeliveryAddress,
-    ) = runtime.settings.saveSettings(fullName, affected, abuserName, dob, situation, address)
+        email: String? = null,
+        emailCommunicationConsent: Boolean? = null,
+    ) = runtime.settings.saveSettings(fullName, affected, abuserName, dob, situation, address, email, emailCommunicationConsent)
 
     /**
      * Saves the public profile details used by the selected cover app.

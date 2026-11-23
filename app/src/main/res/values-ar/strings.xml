@@ -530,4 +530,11 @@
     <string name="notes_share_help">يمكن فقط للأصدقاء المقبولين المحددين فتح هذه الملاحظة أو الحادثة. ألغِ تحديد أي شخص لإلغاء وصوله فوراً.</string>
     <string name="notes_manage_sharing">إدارة مشاركة الملاحظة</string>
     <string name="safety_sharing_saved">تم حفظ صلاحيات المشاركة.</string>
+    <string name="email_optional">البريد الإلكتروني (اختياري)</string>
+    <string name="email_communication_consent">أوافق على تلقي الإشعارات والرسائل عبر البريد الإلكتروني من Olive Branch.</string>
+    <string name="email_consent_required">يرجى تحديد مربع الموافقة على تلقي الرسائل عبر البريد الإلكتروني، أو مسح حقل البريد الإلكتروني.</string>
+    <string name="email_notifications_label">إشعارات البريد الإلكتروني</string>
+    <string name="email_notifications_enabled">مفعّلة</string>
+    <string name="email_notifications_disabled">معطّلة</string>
+    <string name="email_invalid_message">أدخل عنوان بريد إلكتروني صالحاً.</string>
 </resources>

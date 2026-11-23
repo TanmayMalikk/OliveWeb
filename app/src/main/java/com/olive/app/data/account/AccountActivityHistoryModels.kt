@@ -306,6 +306,12 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
     changed("Province / state", before.address.province, after.address.province)
     changed("Postal / ZIP", before.address.postalCode, after.address.postalCode)
     changed("Country", before.address.country, after.address.country)
+    changed("Email", before.email, after.email)
+    changed(
+        "Email notifications",
+        if (before.emailCommunicationConsent) "Enabled" else "Disabled",
+        if (after.emailCommunicationConsent) "Enabled" else "Disabled",
+    )
     changed("Cover app", before.coverType.title, after.coverType.title)
     if (before.triggerHash != after.triggerHash) add(
         FieldChange(
@@ -598,6 +604,13 @@ class FirebaseAccountRepository(
      */
     override fun signOut() = auth.signOut()
 
+    /** Records this Android installation for cross-device sign-in notifications. */
+    override suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean) {
+        functions.getHttpsCallable("recordDeviceSignIn")
+            .call(mapOf("deviceId" to deviceId, "platform" to "APP", "registerOnly" to registerOnly))
+            .await()
+    }
+
     /**
      * Converts a stored activity JSON record into short text suitable for the history screen.
      *
@@ -734,6 +747,8 @@ interface AccountRepository {
      * @return The resulting [AccountRole], or `null` if unavailable.
      */
     suspend fun authenticatedRole(): AccountRole? = null
+    /** Records one device sign-in for cross-device security alerts. */
+    suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean = false) = Unit
     /**
      * Signs out the current account and clears its repository session.
      */

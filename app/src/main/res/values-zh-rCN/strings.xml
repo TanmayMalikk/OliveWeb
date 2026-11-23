@@ -515,4 +515,11 @@
     <string name="notes_share_help">仅所选已接受好友可打开此笔记或事件记录。取消勾选即可立即撤销其访问权限。</string>
     <string name="notes_manage_sharing">管理共享权限</string>
     <string name="safety_sharing_saved">已保存共享访问权限。</string>
+    <string name="email_optional">电子邮箱（可选）</string>
+    <string name="email_communication_consent">我同意接收来自 Olive Branch 的电子邮件通知与通信。</string>
+    <string name="email_consent_required">请勾选同意接收电子邮件通信，或清空邮箱栏。</string>
+    <string name="email_notifications_label">电子邮件通知</string>
+    <string name="email_notifications_enabled">已启用</string>
+    <string name="email_notifications_disabled">已停用</string>
+    <string name="email_invalid_message">请输入有效的电子邮箱地址。</string>
 </resources>

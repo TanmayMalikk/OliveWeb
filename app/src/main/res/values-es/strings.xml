@@ -521,4 +521,11 @@
     <string name="notes_share_help">Solo las amistades aceptadas seleccionadas pueden abrir esta nota o incidente. Desmarca a una persona para revocar su acceso de inmediato.</string>
     <string name="notes_manage_sharing">Administrar acceso compartido</string>
     <string name="safety_sharing_saved">Acceso compartido guardado.</string>
+    <string name="email_optional">Correo electrónico (opcional)</string>
+    <string name="email_communication_consent">Acepto recibir notificaciones y comunicaciones por correo electrónico de Olive Branch.</string>
+    <string name="email_consent_required">Marca la casilla para aceptar comunicaciones por correo electrónico o borra el campo de correo.</string>
+    <string name="email_notifications_label">Notificaciones por correo electrónico</string>
+    <string name="email_notifications_enabled">Activadas</string>
+    <string name="email_notifications_disabled">Desactivadas</string>
+    <string name="email_invalid_message">Ingresa una dirección de correo electrónico válida.</string>
 </resources>

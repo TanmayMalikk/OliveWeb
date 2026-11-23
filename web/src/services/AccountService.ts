@@ -55,6 +55,34 @@ export async function firebase() {
   await cloud.authReady;
   return cloud;
 }
+async function signinDeviceId(): Promise<string> {
+  const db = await database;
+  const existing = await db.get("device", "signin-device-id");
+  if (typeof existing === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(existing)) {
+    return existing;
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  const created = btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  await db.put("device", created, "signin-device-id");
+  return created;
+}
+async function recordWebSignIn(registerOnly: boolean): Promise<void> {
+  if (!cloudMode) return;
+  try {
+    const { functions } = await firebase();
+    const { httpsCallable } = await import("firebase/functions");
+    const deviceId = await signinDeviceId();
+    await httpsCallable(functions, "recordDeviceSignIn")({
+      deviceId,
+      platform: "WEB",
+      registerOnly,
+    });
+  } catch {
+    // Sign-in notifications are best-effort and must not block account access.
+  }
+}
 // Tells other signed-in devices to reload account files after a profile or history write.
 export async function notifyAccountChanged(uid: string) {
   const { db } = await firebase();
@@ -193,6 +221,7 @@ export class Accounts {
         username: user.displayName || user.email!.split("@")[0],
         role,
       };
+      void recordWebSignIn(create);
       const db = await database;
       const saved = await db.get("accounts", `CLOUD:${user.uid}`);
       // A missing history file means this account has no saved activity yet.
@@ -333,7 +362,10 @@ export class Accounts {
       await (
         await database
       ).put("device", { ...enrollment, failures: 0 }, "current");
-      if (cloudMode) return await this.load();
+      if (cloudMode) {
+        void recordWebSignIn(true);
+        return await this.load();
+      }
       return {
         ...value,
         history: {

@@ -41,30 +41,26 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param address Address supplied to [saveSettings].
      */
     fun saveSettings(
-        fullName: String,
-        affected: String,
-        abuserName: String,
-        dob: String,
-        situation: String,
-        address: DeliveryAddress
+        fullName: String, affected: String, abuserName: String,
+        dob: String, situation: String, address: DeliveryAddress,
+        email: String? = null, emailCommunicationConsent: Boolean? = null,
     ) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe || busy) return
                 history.recordSettingsInteraction("Olive Branch", "Pressed save profile settings")
+                val nextEmail = email?.let(InputPolicy::normalizedEmail) ?: profile?.email.orEmpty()
+                val nextConsent = if (nextEmail.isBlank()) false else (emailCommunicationConsent ?: (profile?.emailCommunicationConsent == true))
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
-                    message =
-                        runtime.application.getString(R.string.ui_profile_required_fields)
-                    return
+                    message = runtime.application.getString(R.string.ui_profile_required_fields); return
+                }
+                if (nextEmail.isNotBlank() && !InputPolicy.validEmail(nextEmail)) {
+                    message = runtime.application.getString(R.string.email_invalid_message); return
                 }
                 val updated = profile?.copy(
-                    fullName = fullName.trim(),
-                    affectedNames = affected.trim(),
-                    abuserName = abuserName.trim(),
-                    dob = dob,
-                    situation = situation.trim(),
-                    region = address.generalLocation,
-                    address = address
+                    fullName = fullName.trim(), affectedNames = affected.trim(), abuserName = abuserName.trim(),
+                    dob = dob, situation = situation.trim(), region = address.generalLocation,
+                    address = address, email = nextEmail, emailCommunicationConsent = nextConsent,
                 ) ?: return
                 saveSafeProfile(updated)
             }

@@ -584,6 +584,14 @@ internal class LocationMapController(
                     LiveLocationState.current.filterNotNull()
                         .first { it.uid == configuration.identity.uid && it.updatedAt >= startedAt }
                 }
+                runCatching {
+                    repository?.setLiveSessionState(
+                        configuration.identity.uid,
+                        recipients.map { it.uid },
+                        end,
+                        true,
+                    )
+                }
                 state = state.copy(working = false, liveActive = true, expiresAt = end)
                 onStarted(end)
                 watchExpiry()
@@ -606,10 +614,14 @@ internal class LocationMapController(
      * User location controller: Stops sharing.
      */
     fun stopSharing() {
+        val uid = state.ownerUid
         LiveLocationController.stop(applicationContext)
         state = state.copy(liveActive = false, expiresAt = 0L)
         expiryJob?.cancel()
         expiryJob = null
+        if (!uid.isNullOrBlank()) {
+            scope.launch { runCatching { repository?.setLiveSessionState(uid, emptyList(), 0L, false) } }
+        }
     }
 
     /**

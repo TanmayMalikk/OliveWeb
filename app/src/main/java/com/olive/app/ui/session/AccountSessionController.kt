@@ -31,6 +31,7 @@ import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.network.persistentInstallationId
 import kotlinx.coroutines.delay
 
 
@@ -87,8 +88,14 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
                 runtime.enrollment?.let { enrollment ->
-                    if (!runtime.localMode) withContext(Dispatchers.IO) {
-                        MessageSendWorker.enqueuePending(runtime.application, enrollment.uid)
+                    if (!runtime.localMode) {
+                        withContext(Dispatchers.IO) {
+                            MessageSendWorker.enqueuePending(runtime.application, enrollment.uid)
+                        }
+                        if (runtime.accounts.authenticatedUid() == enrollment.uid) {
+                            val signInDeviceId = persistentInstallationId(runtime.application, "olive_device_signin", "signin_device_id")
+                            runtime.scope.launch { runCatching { runtime.accounts.recordDeviceSignIn(signInDeviceId, registerOnly = true) } }
+                        }
                     }
                     watchAccountChanges(
                         AccountIdentity(enrollment.uid, runtime.state.coverUsername)
@@ -194,11 +201,23 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         runtime.application.getString(R.string.full_name_a_valid_date_of_birth_language_and_city_are_required)
                     return
                 }
+                val normalizedEmail = InputPolicy.normalizedEmail(value.email)
+                if (normalizedEmail.isNotBlank() && (!InputPolicy.validEmail(normalizedEmail) || !value.emailCommunicationConsent)) {
+                    message = runtime.application.getString(
+                        if (!InputPolicy.validEmail(normalizedEmail)) R.string.email_invalid_message
+                        else R.string.email_consent_required
+                    )
+                    return
+                }
+                val cleanValue = value.copy(
+                    email = normalizedEmail,
+                    emailCommunicationConsent = normalizedEmail.isNotBlank() && value.emailCommunicationConsent,
+                )
                 operations.runOperation(runtime.application.getString(R.string.your_account_exists_but_the_profile_was_not_saved_retry_here_or_sign_in_again_to_finish_setup)) { token ->
-                    accounts.saveProfile(identity, value)
-                    if (value.role == AccountRole.SAFE_CONTACT) {
+                    accounts.saveProfile(identity, cleanValue)
+                    if (cleanValue.role == AccountRole.SAFE_CONTACT) {
                         val saved =
-                            withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, value) }
+                            withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, cleanValue) }
                         if (epoch == token) {
                             enrollment = saved
                             archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
@@ -206,28 +225,28 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                                 store.restoredClosedConversationIds(saved.uid)
                             }
                             privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
-                            profile = value
+                            profile = cleanValue
                             coverUsername =
-                                value.username
-                            coverDob = value.dob
-                            coverFullName = value.fullName
-                            accountRole = value.role
-                            language = value.language
+                                cleanValue.username
+                            coverDob = cleanValue.dob
+                            coverFullName = cleanValue.fullName
+                            accountRole = cleanValue.role
+                            language = cleanValue.language
                             deliveryAddress =
-                                value.address
+                                cleanValue.address
                             screenHistory.clear()
                             safePageHistory.clear()
                             page =
                                 SafePage.Home
                             screen = SessionScreen.Safe
                             history.refreshHistory(saved.uid)
-                            if (!localMode) history.loadCloudHistory(saved.uid, value.username)
+                            if (!localMode) history.loadCloudHistory(saved.uid, cleanValue.username)
                             watchAccountChanges(identity)
                         }
                     } else {
-                        withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, value) }
+                        withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, cleanValue) }
                         if (epoch == token) {
-                            pendingProfile = value
+                            pendingProfile = cleanValue
                             navigation.openScreen(SessionScreen.DevicePin)
                         }
                     }
@@ -382,6 +401,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                                     }
                                 }
                                 locationSharingRepository?.setLiveRecipients(uid, emptyList())
+                                locationSharingRepository?.setLiveSessionState(uid, emptyList(), 0L, false)
                             }
                         }
                         if (!localMode) {

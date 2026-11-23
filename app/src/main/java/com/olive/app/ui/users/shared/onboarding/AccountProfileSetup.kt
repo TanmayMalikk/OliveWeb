@@ -13,6 +13,7 @@ import com.olive.app.ui.users.user.account.CoverPicker
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
@@ -23,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -96,6 +99,69 @@ private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (Str
 }
 
 /**
+ * Renders the optional contact email field and explicit email communication consent checkbox.
+ */
+@Composable
+internal fun EmailConsentSection(
+    email: String,
+    consent: Boolean,
+    enabled: Boolean,
+    showErrors: Boolean,
+    requireConsentWhenEntered: Boolean,
+    emailTag: String,
+    consentTag: String,
+    onEmailChange: (String) -> Unit,
+    onConsentChange: (Boolean) -> Unit,
+    onFocusEmail: () -> Unit = {},
+) {
+    val uiText = rememberResourceText()
+    val invalidEmail = showErrors && email.isNotBlank() && !InputPolicy.validEmail(email)
+    val missingConsent = requireConsentWhenEntered && showErrors && email.isNotBlank() && !consent
+    Field(
+        uiText(R.string.email_optional),
+        email,
+        emailTag,
+        enabled = enabled,
+        error = if (invalidEmail) uiText(R.string.email_invalid_message) else null,
+        onFocus = onFocusEmail,
+    ) { onEmailChange(it.take(254)) }
+    if (email.isNotBlank()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .toggleable(
+                    value = consent,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onConsentChange,
+                )
+                .testTag(consentTag),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(
+                checked = consent,
+                onCheckedChange = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+            Text(
+                uiText(R.string.email_communication_consent),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (missingConsent) {
+            Text(
+                uiText(R.string.email_consent_required),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/**
  * USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks. UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
  *
  * @param session Shared session view model owning application state and actions.
@@ -110,6 +176,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
     var birthday by rememberBirthdayInput(existing?.dob.orEmpty())
     val dob = birthday
+    var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
+    var emailConsent by remember(existing) { mutableStateOf(existing?.emailCommunicationConsent == true) }
     val language = existing?.language?.ifBlank { "English" } ?: "English"
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
@@ -141,7 +209,9 @@ internal fun ProfileSetup(session: SessionViewModel) {
         address,
         trigger,
         contactName,
-        contactDetails
+        contactDetails,
+        email,
+        emailConsent,
     )
     val required = validation.requiredFields
     val completed = required.count { it }
@@ -192,6 +262,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
             address = address,
             coverType = coverType,
             role = session.account.role,
+            email = InputPolicy.normalizedEmail(email),
+            emailCommunicationConsent = email.isNotBlank() && emailConsent,
             safetyIntake = if (safeContact) SafetyPlanIntake() else safetyIntake.copy(completed = true),
         )
         preparingProfile = true
@@ -230,6 +302,24 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     BirthdayPicker(
                         birthday, "dob", !session.account.busy, showErrors,
                     ) { birthday = it }
+                    EmailConsentSection(
+                        email = email,
+                        consent = emailConsent,
+                        enabled = !session.account.busy,
+                        showErrors = showErrors,
+                        requireConsentWhenEntered = true,
+                        emailTag = "setup_email",
+                        consentTag = "setup_email_consent",
+                        onEmailChange = {
+                            email = it
+                            if (it.isBlank()) emailConsent = false
+                            showErrors = false
+                        },
+                        onConsentChange = {
+                            emailConsent = it
+                            showErrors = false
+                        },
+                    )
                     if (!safeContact) {
                         HorizontalDivider()
                         AffectedPeopleFields(affected, !session.account.busy) { affected = it }
@@ -420,8 +510,12 @@ internal class ProfileSetupValidation(
     private val trigger: String,
     private val contactName: String,
     private val contactDetails: String,
+    private val email: String = "",
+    private val emailConsent: Boolean = false,
 ) {
-    val personalValid get() = fullName.isNotBlank() && InputPolicy.validDob(dob)
+    val emailValid get() = email.isBlank() || InputPolicy.validEmail(email)
+    val emailConsentValid get() = email.isBlank() || emailConsent
+    val personalValid get() = fullName.isNotBlank() && InputPolicy.validDob(dob) && emailValid && emailConsentValid
     val supportValid get() = contactName.isBlank() == contactDetails.isBlank()
     val requiredFields
         get() = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), address.locationValid) +

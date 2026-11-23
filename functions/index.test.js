@@ -96,6 +96,9 @@ test("deployment keeps the existing callable endpoint names", () => {
     "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "fitnessAiBilling", "fitnessAiCoach", "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation",
+    "emailOnFriendInviteClaimed", "emailOnLiveLocationSession", "checkExpiringLocationShares",
+    "emailOnConversationUpdated", "emailOnSafetyPlanUpdated", "emailOnAppRelease",
+    "emailOnEmergencyCreated", "recordDeviceSignIn",
     "emergencyStart", "emergencyResolve", "emergencyReopen", "emergencyAttachUpload", "emergencyUploadLinked", "emergencyUploadCompleted", "notifyEmergency"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));

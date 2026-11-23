@@ -50,14 +50,24 @@ module.exports = function fixture(overrides = {}) {
     getAll: (...refs) => Promise.all(refs.map(ref => ref.get())),
     runTransaction: async action => {const tx = writer(); const result = await action(tx); await tx.commit(); return result;},
   };
-  const cache = new Map();
+  const cache = new Map(), params = {...(overrides._params || {})};
   const imports = {
-    "firebase-functions/v2/firestore": {onDocumentWritten: (...args) => args.at(-1), onDocumentCreated: (...args) => args.at(-1)},
+    "firebase-functions/v2/firestore": {
+      onDocumentWritten: (...args) => args.at(-1),
+      onDocumentCreated: (...args) => args.at(-1),
+      onDocumentUpdated: (...args) => args.at(-1),
+    },
     "firebase-functions/v2/https": {onCall: (...args) => args.at(-1), HttpsError},
+    "firebase-functions/v2/scheduler": {onSchedule: (...args) => args.at(-1)},
+    "firebase-functions/params": {
+      defineSecret: name => ({value: () => params[name] ?? process.env[name] ?? ""}),
+      defineString: (name, opts = {}) => ({value: () => params[name] ?? process.env[name] ?? opts.default ?? ""}),
+    },
     "./firebaseAdminClient": {db, auth: {getUser: async uid => {
       if (!users.has(uid)) throw Object.assign(new Error("No user"), {code: "auth/user-not-found"});
       return users.get(uid);
     },
+      listUsers: async () => ({users: [...users.values()]}),
       createUser: async value => {
         if ([...users.values()].some(user => user.email === value.email)) throw Object.assign(new Error("Duplicate"), {code: "auth/email-already-exists"});
         const user = {uid: `created-${++sequence}`, ...value}; users.set(user.uid, user); return user;
@@ -96,5 +106,5 @@ module.exports = function fixture(overrides = {}) {
     );
     cache.set(name, result.exports); return result.exports;
   }
-  return {records, users, profiles, db, load, services: imports, setCaller: value => {caller = value;}};
+  return {records, users, profiles, db, load, params, services: imports, setCaller: value => {caller = value;}};
 };

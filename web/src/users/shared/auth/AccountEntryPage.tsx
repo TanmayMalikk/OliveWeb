@@ -13,6 +13,7 @@ import {
 } from "../../../components/SharedComponents";
 import {
   emptyProfile,
+  validEmail,
   validUsername,
   validPassword,
   validPin,
@@ -314,7 +315,19 @@ export function Setup() {
             className="setup-form"
             onSubmit={async (data) => {
               await session.perform(async () => {
-                const next = { ...profile, dob: String(data.get("dob") ?? "") };
+                const email = profile.email.trim().toLowerCase();
+                if (email && !validEmail(email)) {
+                  throw new Error("Enter a valid email address.");
+                }
+                if (email && !profile.emailCommunicationConsent) {
+                  throw new Error("Please agree to receive email communications, or clear the email field.");
+                }
+                const next = {
+                  ...profile,
+                  dob: String(data.get("dob") ?? ""),
+                  email,
+                  emailCommunicationConsent: Boolean(email && profile.emailCommunicationConsent),
+                };
                 if (!next.fullName.trim() || !next.dob || !next.address.city.trim()) {
                   throw new Error("Add your name, a valid birth date, and city.");
                 }
@@ -350,6 +363,35 @@ export function Setup() {
                 required
                 maxLength={160}
               />
+              <Field
+                label="Email (optional)"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={profile.email}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const nextEmail = e.target.value;
+                  setProfile((p) => ({
+                    ...p,
+                    email: nextEmail,
+                    emailCommunicationConsent: nextEmail.trim() ? Boolean(p.emailCommunicationConsent) : false,
+                  }));
+                }}
+                maxLength={254}
+              />
+              {profile.email.trim().length > 0 && (
+                <label className="checkbox-field full">
+                  <input
+                    type="checkbox"
+                    name="emailCommunicationConsent"
+                    checked={Boolean(profile.emailCommunicationConsent)}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, emailCommunicationConsent: e.target.checked }))
+                    }
+                  />
+                  <span>I agree to receive email notifications and communications from Olive Branch.</span>
+                </label>
+              )}
               {personal && (
                 <>
                   <AffectedPeopleFields value={profile.affectedNames} onChange={(value) => update("affectedNames", value)} />

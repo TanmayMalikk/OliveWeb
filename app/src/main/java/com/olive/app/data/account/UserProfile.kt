@@ -163,6 +163,7 @@ data class UserProfile(
     val coverType: CoverType = CoverType.FITNESS,
     val role: AccountRole = AccountRole.USER,
     val email: String = "",
+    val emailCommunicationConsent: Boolean = false,
     val phone: String = "",
     val safetyIntake: SafetyPlanIntake = SafetyPlanIntake(),
 ) {
@@ -195,6 +196,7 @@ data class UserProfile(
         "coverType" to coverType.name,
         "role" to role.name,
         "email" to email,
+        "emailCommunicationConsent" to emailCommunicationConsent,
         "phone" to phone,
         "safetyIntake" to safetyIntake.toMap(),
     )

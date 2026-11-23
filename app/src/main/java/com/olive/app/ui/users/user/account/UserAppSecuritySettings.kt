@@ -656,6 +656,17 @@ internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) 
                 add(uiText(R.string.situation) to profile.situation)
             }
             add(uiText(R.string.date_of_birth) to profile.dob)
+            if (profile.role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)) {
+                add(uiText(R.string.ui_email) to profile.email)
+                if (profile.email.isNotBlank()) {
+                    add(
+                        uiText(R.string.email_notifications_label) to uiText(
+                            if (profile.emailCommunicationConsent) R.string.email_notifications_enabled
+                            else R.string.email_notifications_disabled
+                        )
+                    )
+                }
+            }
             add(uiText(R.string.preferred_language) to profile.language)
             add(
                 uiText(R.string.region_city_state) to profile.region

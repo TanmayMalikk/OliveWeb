@@ -294,7 +294,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','phone'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','emailCommunicationConsent','phone'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -320,6 +320,10 @@ service cloud.firestore {
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 
         && (!('cover_app' in p) || p.cover_app is string)
+
+        && (!('email' in p) || (p.email is string && p.email.size() <= 254))
+
+        && (!('emailCommunicationConsent' in p) || p.emailCommunicationConsent is bool)
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -642,6 +646,57 @@ service cloud.firestore {
       allow delete: if owner(ownerUid);
     }
 
+    function liveLocationRecipientUidAt(values, index) {
+      return values.size() <= index || (values[index] is string
+        && values[index].size() > 0 && values[index].size() <= 128);
+    }
+
+    function validLiveLocationSession(data, ownerUid) {
+      return data.keys().hasAll(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.keys().hasOnly(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.ownerUid is string && data.ownerUid == ownerUid
+        && data.sessionId is string && data.sessionId.matches('^[A-Za-z0-9_-]{8,64}$')
+        && data.recipientUids is list && data.recipientUids.size() >= 1 && data.recipientUids.size() <= 25
+        && liveLocationRecipientUidAt(data.recipientUids, 0)
+        && liveLocationRecipientUidAt(data.recipientUids, 1)
+        && liveLocationRecipientUidAt(data.recipientUids, 2)
+        && liveLocationRecipientUidAt(data.recipientUids, 3)
+        && liveLocationRecipientUidAt(data.recipientUids, 4)
+        && liveLocationRecipientUidAt(data.recipientUids, 5)
+        && liveLocationRecipientUidAt(data.recipientUids, 6)
+        && liveLocationRecipientUidAt(data.recipientUids, 7)
+        && liveLocationRecipientUidAt(data.recipientUids, 8)
+        && liveLocationRecipientUidAt(data.recipientUids, 9)
+        && liveLocationRecipientUidAt(data.recipientUids, 10)
+        && liveLocationRecipientUidAt(data.recipientUids, 11)
+        && liveLocationRecipientUidAt(data.recipientUids, 12)
+        && liveLocationRecipientUidAt(data.recipientUids, 13)
+        && liveLocationRecipientUidAt(data.recipientUids, 14)
+        && liveLocationRecipientUidAt(data.recipientUids, 15)
+        && liveLocationRecipientUidAt(data.recipientUids, 16)
+        && liveLocationRecipientUidAt(data.recipientUids, 17)
+        && liveLocationRecipientUidAt(data.recipientUids, 18)
+        && liveLocationRecipientUidAt(data.recipientUids, 19)
+        && liveLocationRecipientUidAt(data.recipientUids, 20)
+        && liveLocationRecipientUidAt(data.recipientUids, 21)
+        && liveLocationRecipientUidAt(data.recipientUids, 22)
+        && liveLocationRecipientUidAt(data.recipientUids, 23)
+        && liveLocationRecipientUidAt(data.recipientUids, 24)
+        && data.active is bool && data.active == true
+        && data.startedAt is int && data.startedAt > 0
+        && data.expiresAt is int && data.expiresAt > data.startedAt
+        && data.expiresAt <= data.startedAt + 73 * 60 * 60 * 1000
+        && data.updatedAt == request.time;
+    }
+
+    // Active live-location session markers track bounded owner-managed sharing sessions.
+    match /liveLocationSessions/{ownerUid} {
+      allow get: if owner(ownerUid);
+      allow list: if false;
+      allow create, update: if owner(ownerUid) && request.auth.token.role == 'USER' && validLiveLocationSession(request.resource.data, ownerUid);
+      allow delete: if owner(ownerUid);
+    }
+
     function conversationParticipant(data) {
       return signedIn() && data.participantIds is list && request.auth.uid in data.participantIds;
     }
@@ -831,6 +886,11 @@ service cloud.firestore {
         (request.auth.token.role == 'ADMIN' || resource.data.ownerUid == request.auth.uid);
       allow write: if false;
     }
+    // Login device alerts, email delivery logs/cooldowns, and release metadata are server-only.
+    match /accountLoginDevices/{uid}/{document=**} { allow read, write: if false; }
+    match /emailNotificationLogs/{logId} { allow read, write: if false; }
+    match /emailCooldowns/{cooldownId} { allow read, write: if false; }
+    match /appReleases/{releaseId} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
 
   }

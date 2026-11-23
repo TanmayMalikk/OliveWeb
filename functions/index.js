@@ -36,10 +36,13 @@ exports.fitnessAiCoach = fitnessAi.fitnessAiCoach;
 const syncInvalidations = require("./src/syncInvalidations");
 Object.entries(syncInvalidations).filter(([name]) => name !== "_test")
     .forEach(([name, value]) => { exports[name] = value; });
+const emailNotifications = require("./src/emailNotifications");
+Object.entries(emailNotifications).filter(([name]) => name !== "_test")
+    .forEach(([name, value]) => { exports[name] = value; });
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
-  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
+  organizationEmailKey, isTemporaryEmail, validEmail, profileComplete, validPassword, text,
   protectedAccount, roleFromUser, defaultProfile} = require("./src/accountPolicy");
 exports._test = {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
-  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
+  organizationEmailKey, isTemporaryEmail, validEmail, profileComplete, validPassword, text,
   protectedAccount, roleFromUser, defaultProfile, syncInvalidations: syncInvalidations._test};

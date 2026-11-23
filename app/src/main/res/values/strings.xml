@@ -572,4 +572,11 @@
     <string name="notes_share_help">Only selected accepted friends can open this note or incident. Uncheck a person to revoke their access immediately.</string>
     <string name="notes_manage_sharing">Manage note sharing</string>
     <string name="safety_sharing_saved">Sharing access saved.</string>
+    <string name="email_optional">Email (optional)</string>
+    <string name="email_communication_consent">I agree to receive email notifications and communications from Olive Branch.</string>
+    <string name="email_consent_required">Please check the box agreeing to receive email communications, or clear the email field.</string>
+    <string name="email_notifications_label">Email notifications</string>
+    <string name="email_notifications_enabled">Enabled</string>
+    <string name="email_notifications_disabled">Disabled</string>
+    <string name="email_invalid_message">Enter a valid email address.</string>
 </resources>

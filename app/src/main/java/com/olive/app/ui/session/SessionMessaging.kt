@@ -15,6 +15,7 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.network.hasValidatedInternetConnection
+import com.olive.app.data.network.persistentInstallationId
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
@@ -460,6 +461,13 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             } catch (failure: Exception) {
                 if (!showCredentialFailure(failure, create, sessionVersion)) throw failure
                 return@runOperation
+            }
+
+            if (!runtime.localMode) {
+                val signInDeviceId = persistentInstallationId(runtime.application, "olive_device_signin", "signin_device_id")
+                runtime.scope.launch {
+                    runCatching { runtime.accounts.recordDeviceSignIn(signInDeviceId, registerOnly = create) }
+                }
             }
 
             val profile = loadProfile(identity)

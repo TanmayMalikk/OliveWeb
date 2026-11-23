@@ -107,4 +107,33 @@ class SessionSettingsPersistenceTest {
             assertFalse(InputPolicy.matchesTrigger("moon garden", hash))
         }
     }
+
+    @Test
+    fun emailSettingsValidateNormalizePersistConsentAndAllowOptOut() = runBlocking<Unit> {
+        fixture().use { f ->
+            f.runtime.settings.saveSettings(
+                "Owner Name", "", "", "2000-01-01", "", DeliveryAddress(city = "Edmonton"),
+                email = "bad-email", emailCommunicationConsent = true,
+            )
+            assertEquals("email_invalid_message", f.runtime.state.message)
+            assertEquals("", f.runtime.store.profile("owner").email)
+
+            f.runtime.settings.saveSettings(
+                "Owner Name", "", "", "2000-01-01", "", DeliveryAddress(city = "Edmonton"),
+                email = " User@Example.com ", emailCommunicationConsent = true,
+            )
+            f.await { !f.runtime.state.busy }
+            assertEquals("user@example.com", f.runtime.store.profile("owner").email)
+            assertTrue(f.runtime.store.profile("owner").emailCommunicationConsent)
+
+            // Unchecking consent persists opt-out while keeping saved email if desired.
+            f.runtime.settings.saveSettings(
+                "Owner Name", "", "", "2000-01-01", "", DeliveryAddress(city = "Edmonton"),
+                email = "user@example.com", emailCommunicationConsent = false,
+            )
+            f.await { !f.runtime.state.busy }
+            assertEquals("user@example.com", f.runtime.store.profile("owner").email)
+            assertFalse(f.runtime.store.profile("owner").emailCommunicationConsent)
+        }
+    }
 }

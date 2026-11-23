@@ -83,6 +83,10 @@ exports.adminDeleteAccount = onCall({secrets: [stripeKey]}, async (request) => {
   await deleteFriendListReferences(uid);
   await db.recursiveDelete(db.collection("friendLists").doc(uid)).catch(() => {});
   await db.recursiveDelete(db.collection("notificationTokens").doc(uid)).catch(() => {});
+  await db.recursiveDelete(db.collection("accountLoginDevices").doc(uid)).catch(() => {});
+  await db.collection("liveLocationSessions").doc(uid).delete().catch(() => {});
+  await db.collection("emailCooldowns").doc(`safety-plan--${uid}`).delete().catch(() => {});
+  await deleteQuery(db.collection("emailNotificationLogs").where("uid", "==", uid)).catch(() => {});
   await db.collection("users").doc(uid).delete().catch(() => {});
   // Frees the global username only after its conversations and private records are cleaned up.
   if (username) {

@@ -521,4 +521,11 @@
     <string name="notes_share_help">Seuls les contacts acceptés sélectionnés peuvent ouvrir cette note ou cet incident. Décochez une personne pour révoquer son accès immédiatement.</string>
     <string name="notes_manage_sharing">Gérer le partage de la note</string>
     <string name="safety_sharing_saved">Accès de partage enregistré.</string>
+    <string name="email_optional">Courriel (facultatif)</string>
+    <string name="email_communication_consent">J’accepte de recevoir des notifications et communications par courriel d’Olive Branch.</string>
+    <string name="email_consent_required">Veuillez cocher la case acceptant les communications par courriel ou effacer le champ du courriel.</string>
+    <string name="email_notifications_label">Notifications par courriel</string>
+    <string name="email_notifications_enabled">Activées</string>
+    <string name="email_notifications_disabled">Désactivées</string>
+    <string name="email_invalid_message">Entrez une adresse courriel valide.</string>
 </resources>

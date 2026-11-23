@@ -741,6 +741,18 @@ object InputPolicy {
      * @param value Input value to store, parse, or format.
      */
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
+    private val emailRegex = Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""")
+
+    /** Normalizes an optional contact email address before validation or storage. */
+    fun normalizedEmail(value: String) = value.trim().lowercase(Locale.ROOT)
+
+    /** Accepts a real contact email while rejecting empty strings and internal aliases. */
+    fun validEmail(value: String): Boolean {
+        val normalized = normalizedEmail(value)
+        return normalized.length in 1..254 &&
+            emailRegex.matches(normalized) &&
+            !normalized.endsWith(".olive.invalid")
+    }
     /**
      * Keeps passwords between 8 and 24 characters.
      *
