@@ -63,6 +63,14 @@ internal class AccountKeysetRepository(
         }
     }
 
+    suspend fun isPasswordRecoveryEnrolled(accountId: String): Boolean {
+        require(auth.currentUser?.uid == accountId) { "Sign in again before checking recovery" }
+        val snapshot = firestore.collection(COLLECTION).document(accountId).get(Source.SERVER).await()
+        if (!snapshot.exists()) return false
+        val data = snapshot.data ?: return false
+        return data["passwordRecovery"] is Map<*, *>
+    }
+
     companion object {
         private const val COLLECTION = "accountKeysets"
         private const val DIRECTORY = "accountKeyDirectories"
@@ -78,7 +86,7 @@ internal fun interface PasskeyRecoveryAuthenticator {
     suspend fun reauthenticate(accountId: String, password: String)
 }
 
-private class FirebasePasskeyRecoveryAuthenticator(
+internal class FirebasePasskeyRecoveryAuthenticator(
     private val authProvider: () -> FirebaseAuth = FirebaseAuth::getInstance,
 ) : PasskeyRecoveryAuthenticator {
     override suspend fun reauthenticate(accountId: String, password: String) {
@@ -93,7 +101,7 @@ private class FirebasePasskeyRecoveryAuthenticator(
     }
 }
 
-private class FirebaseAccountRecoveryCallable(
+internal class FirebaseAccountRecoveryCallable(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
 ) : AccountRecoveryCallable {
     override suspend fun call(name: String, data: Map<String, Any?>): Any? =

@@ -526,4 +526,22 @@
     <string name="incident_body_required">تفاصيل الحادثة (مطلوبة)</string>
     <string name="note_content_required">الملاحظة (مطلوبة)</string>
     <string name="incident_clear_time">مسح الوقت</string>
+    <string name="password_recovery_title">استرداد بكلمة المرور الاحتياطية</string>
+    <string name="password_recovery_help">أضف كلمة مرور حسابك كخيار احتياطي للاسترداد. يُفضل دائماً استخدام مفاتيح المرور أولاً. يستخدم تطبيق Olive Branch تشفير OPAQUE دون المعرفة الصفرية، وبالتالي لا يتلقى الخادم أو يخزن أبداً كلمة المرور أو مفتاح الاسترداد الخاصين بك.</string>
+    <string name="password_recovery_warning">تحذير: قد يؤدي فقدان كل من استرداد كلمة المرور وجميع مفاتيح المرور المسجلة إلى منع استرداد البيانات المشفرة نهائياً على جهاز جديد.</string>
+    <string name="password_recovery_add">إضافة استرداد بكلمة المرور</string>
+    <string name="password_recovery_added">تمت إضافة استرداد كلمة المرور الاحتياطي.</string>
+    <string name="password_recovery_recover">استرداد البيانات المشفرة بكلمة المرور</string>
+    <string name="password_recovery_use_fallback">استخدام استرداد كلمة المرور بدلاً من ذلك</string>
+    <string name="password_recovery_change">تغيير كلمة مرور الاسترداد</string>
+    <string name="password_recovery_changed">تم تحديث كلمة مرور الاسترداد.</string>
+    <string name="password_recovery_remove">إزالة استرداد كلمة المرور</string>
+    <string name="password_recovery_removed">تمت إزالة استرداد كلمة المرور الاحتياطي.</string>
+    <string name="password_recovery_remove_blocked_last">لا يمكن إزالة استرداد كلمة المرور دون وجود مفتاح مرور نشط. أضف مفتاح مرور أولاً لتجنب فقدان الوصول إلى بياناتك المشفرة.</string>
+    <string name="password_recovery_error_unsupported">جهاز أو بروتوكول استرداد كلمة المرور غير مدعوم. الرمز: OPK-01.</string>
+    <string name="password_recovery_error_incorrect">كلمة مرور الاسترداد غير صحيحة. الرمز: OPK-02.</string>
+    <string name="password_recovery_error_connection">تم قطع الاتصال. تحقق من الشبكة وحاول مرة أخرى. الرمز: OPK-03.</string>
+    <string name="password_recovery_error_corrupted">حزمة الاسترداد تالفة. أبلغ الدعم: OPK-04.</string>
+    <string name="password_recovery_error_account_mismatch">عدم تطابق الحساب. سجل الاسترداد يخص مستخدماً آخر. الرمز: OPK-05.</string>
+    <string name="password_recovery_error_revoked">الاسترداد غير متاح بسبب إلغاء حق الوصول إلى الحساب. الرمز: OPK-06.</string>
 </resources>

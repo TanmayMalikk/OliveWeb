@@ -100,7 +100,7 @@ service cloud.firestore {
     // Account keysets contain an ARK-encrypted private key, never an ARK or a raw file key.
     // The owner can create its initial ciphertext envelope and retry the exact same envelope; future
     // rotations require a dedicated, reviewed migration rather than a broad client update rule.
-    function validAccountKeysetShape(data, uid) {
+    function validAccountKeysetInitialShape(data, uid) {
       return data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt'])
         && data.version == 1
         && data.accountId is string && data.accountId == uid
@@ -114,8 +114,17 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function validAccountKeysetShape(data, uid) {
+      return validAccountKeysetInitialShape(data, uid)
+        || (
+          data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt','ownerUid','passwordRecovery'])
+          && (data.version == 1 || data.version == 2)
+          && (data.accountId == uid || data.ownerUid == uid)
+        );
+    }
+
     function validAccountKeysetWrite(data, uid) {
-      return validAccountKeysetShape(data, uid) && data.updatedAt == request.time;
+      return validAccountKeysetInitialShape(data, uid) && data.updatedAt == request.time;
     }
 
     match /accountKeysets/{uid} {
@@ -168,6 +177,12 @@ service cloud.firestore {
     // exclusively by callable functions. An encrypted envelope is released only after a verified,
     // user-present passkey assertion, never through a direct Firestore read.
     match /accountRecoveryPasskeys/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery records and short-lived unlock sessions are owned exclusively
+    // by Cloud Functions with App Check and caller UID enforcement. Direct client access is denied.
+    match /accountRecoveryOpaqueRecords/{uid} {
       allow read, write: if false;
     }
 

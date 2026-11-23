@@ -79,6 +79,7 @@ internal class SessionViewModel @JvmOverloads constructor(
     val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
     val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
         get() = runtime.state.passkeyRecoveryCredentials
+    val passwordRecoveryEnrolled: Boolean? get() = runtime.state.passwordRecoveryEnrolled
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val profile get() = runtime.state.profile
@@ -393,6 +394,12 @@ internal interface SessionAccountManagementActions {
     fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
     fun removePasskeyRecovery(credentialId: String, password: String) =
         runtime.settings.removePasskeyRecovery(credentialId, password)
+    fun refreshPasswordRecovery() = runtime.passwordRecovery.refreshPasswordRecovery()
+    fun enablePasswordRecovery(password: String) = runtime.passwordRecovery.enablePasswordRecovery(password)
+    fun rotatePasswordRecovery(oldPassword: String, newPassword: String) =
+        runtime.passwordRecovery.rotatePasswordRecovery(oldPassword, newPassword)
+    fun removePasswordRecovery(password: String) = runtime.passwordRecovery.removePasswordRecovery(password)
+    fun unlockWithPasswordRecovery(password: String) = runtime.passwordRecovery.unlockWithPasswordRecovery(password)
 }
 
 // Connects cover, private note, activity, and privacy screens to their workflows.

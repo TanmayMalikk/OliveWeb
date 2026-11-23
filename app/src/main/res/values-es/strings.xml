@@ -517,4 +517,22 @@
     <string name="incident_body_required">Detalles del incidente (obligatorios)</string>
     <string name="note_content_required">Nota (obligatoria)</string>
     <string name="incident_clear_time">Borrar hora</string>
+    <string name="password_recovery_title">Copia de seguridad con contraseña</string>
+    <string name="password_recovery_help">Agrega la contraseña de tu cuenta como respaldo de recuperación. Las llaves de acceso siempre son la opción preferida. Olive Branch usa criptografía OPAQUE de conocimiento cero, por lo que el servidor nunca recibe ni guarda tu contraseña ni la clave de recuperación.</string>
+    <string name="password_recovery_warning">Advertencia: Si pierdes tanto la recuperación con contraseña como todas las llaves de acceso registradas, podrías perder permanentemente el acceso a los datos cifrados en un dispositivo nuevo.</string>
+    <string name="password_recovery_add">Agregar recuperación con contraseña</string>
+    <string name="password_recovery_added">Se agregó la recuperación con contraseña.</string>
+    <string name="password_recovery_recover">Recuperar datos cifrados con contraseña</string>
+    <string name="password_recovery_use_fallback">Usar recuperación con contraseña en su lugar</string>
+    <string name="password_recovery_change">Cambiar contraseña de recuperación</string>
+    <string name="password_recovery_changed">Se actualizó la contraseña de recuperación.</string>
+    <string name="password_recovery_remove">Eliminar recuperación con contraseña</string>
+    <string name="password_recovery_removed">Se eliminó la recuperación con contraseña.</string>
+    <string name="password_recovery_remove_blocked_last">No se puede eliminar la recuperación con contraseña sin una llave de acceso activa. Agrega una llave de recuperación primero para evitar perder el acceso a tus datos cifrados.</string>
+    <string name="password_recovery_error_unsupported">Dispositivo o protocolo de recuperación con contraseña no compatible. Código: OPK-01.</string>
+    <string name="password_recovery_error_incorrect">Contraseña de recuperación incorrecta. Código: OPK-02.</string>
+    <string name="password_recovery_error_connection">Conexión interrumpida. Comprueba tu red e inténtalo de nuevo. Código: OPK-03.</string>
+    <string name="password_recovery_error_corrupted">Paquete de recuperación dañado. Informa a soporte: OPK-04.</string>
+    <string name="password_recovery_error_account_mismatch">Cuenta no coincidente. El registro de recuperación pertenece a otro usuario. Código: OPK-05.</string>
+    <string name="password_recovery_error_revoked">Recuperación no disponible debido al acceso revocado de la cuenta. Código: OPK-06.</string>
 </resources>

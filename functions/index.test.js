@@ -85,6 +85,8 @@ test("deployment keeps the existing callable endpoint names", () => {
     "passkeyRecoveryBeginEnrollment", "passkeyRecoveryContinueEnrollment", "passkeyRecoveryCompleteEnrollment",
     "passkeyRecoveryBeginUnlock", "passkeyRecoveryCompleteUnlock", "passkeyRecoveryListCredentials",
     "passkeyRecoveryRemoveCredential",
+    "opaqueRecoveryBeginRegistration", "opaqueRecoveryFinishRegistration", "opaqueRecoveryBeginUnlock",
+    "opaqueRecoveryFinishUnlock", "opaqueRecoveryRotate", "opaqueRecoveryRemove",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
