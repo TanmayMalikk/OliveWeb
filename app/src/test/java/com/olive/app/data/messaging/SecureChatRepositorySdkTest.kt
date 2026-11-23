@@ -176,13 +176,13 @@ class SecureChatRepositorySdkTest {
                 "participantIds" to listOf("friend"),
             )
 
-            val candidates = repository.recoverableConversations(
+            val candidates = repository.accountAccessRecovery.candidates(
                 conversations + corrupt + revoked,
                 "owner",
             )
             assertEquals((conversations.map { it.id } + "corrupt").toSet(), candidates.map { it.id }.toSet())
 
-            val first = repository.restoreCurrentDeviceAccess(conversations + corrupt + revoked, "owner", keyset)
+            val first = repository.accountAccessRecovery.restore(conversations + corrupt + revoked, "owner", keyset)
             assertEquals(conversations.map { it.id }.toSet(), first.recovered.map { it.conversation.id }.toSet())
             assertEquals(setOf("corrupt", "revoked"), first.failedIds)
             first.recovered.forEach { access ->
@@ -192,7 +192,7 @@ class SecureChatRepositorySdkTest {
                 )
             }
 
-            val repeated = repository.restoreCurrentDeviceAccess(conversations, "owner", keyset)
+            val repeated = repository.accountAccessRecovery.restore(conversations, "owner", keyset)
             assertEquals(conversations.map { it.id }.toSet(), repeated.recovered.map { it.conversation.id }.toSet())
             assertTrue(repeated.failedIds.isEmpty())
         }

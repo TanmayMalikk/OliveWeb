@@ -67,14 +67,14 @@ internal class SessionViewModel @JvmOverloads constructor(
         deviceId = { KeyManager.deviceId() },
         unlock = runtime.settings::unlockAccountKeysetForMedia,
         findChats = { conversations, uid ->
-            runtime.secureChatRepository?.recoverableConversations(conversations, uid).orEmpty()
+            runtime.secureChatRepository?.accountAccessRecovery?.candidates(conversations, uid).orEmpty()
         },
         restoreMedia = { candidates, uid, keyset ->
             media?.restoreDeviceAccess(candidates, uid, keyset)
                 ?: MediaAccessRecoveryResult(emptyList(), candidates.mapTo(mutableSetOf(), SafetyDocument::id), emptySet())
         },
         restoreChats = { conversations, uid, keyset ->
-            runtime.secureChatRepository?.restoreCurrentDeviceAccess(conversations, uid, keyset)
+            runtime.secureChatRepository?.accountAccessRecovery?.restore(conversations, uid, keyset)
                 ?: ChatAccessRecoveryResult(emptyList(), conversations.mapTo(mutableSetOf(), ChatConversation::id))
         },
         rememberMedia = documents::rememberRecoveredDocuments,
