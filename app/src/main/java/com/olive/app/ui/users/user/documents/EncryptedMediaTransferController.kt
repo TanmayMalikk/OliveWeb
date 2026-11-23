@@ -595,11 +595,15 @@ internal class MediaTransferController(
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
             .getOrElse { deviceFailure ->
                 val accountWrapper=document.accountWrappedKeys[viewerUid]
-                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
-                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrNull()
-                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                    ?: throw MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_MISSING,deviceFailure)
+                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrElse {
+                    throw MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED,it)
+                } ?: throw MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED,deviceFailure)
+                if(keyset.keyId != accountWrapper.keyId || keyset.epoch != accountWrapper.epoch) {
+                    throw MediaAccessException(MediaAccessError.ACCOUNT_KEYSET_MISMATCH)
+                }
                 runCatching { accountWrapper.unwrap(keyset) }
-                    .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
+                    .getOrElse { throw MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED,it) }
             }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
@@ -613,7 +617,8 @@ internal class MediaTransferController(
             return@withContext target
         } catch(failure:Exception) {
             partial.delete()
-            throw failure
+            if (failure is MediaAccessException) throw failure
+            throw MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure)
         }
     }
 

@@ -96,6 +96,11 @@
     <string name="documents_access_revoked">Vous n’avez plus accès à ce fichier. Sa copie hors ligne a été supprimée.</string>
     <string name="documents_offline_copy_corrupt">La copie hors ligne est endommagée et a été supprimée. Téléchargez-la à nouveau.</string>
     <string name="documents_key_unavailable">Cet appareil ne possède pas la clé de chiffrement de ce fichier. Ouvrez Documents sur un appareil déjà autorisé pour ce compte ou demandez au propriétaire de le partager à nouveau.</string>
+    <string name="documents_account_wrapper_missing">Ce fichier n’a pas été préparé pour la récupération du compte. Ouvrez-le sur l’appareil qui l’a téléversé, puis partagez-le à nouveau.</string>
+    <string name="documents_account_recovery_failed">Nous n’avons pas pu restaurer l’accès chiffré de votre compte. Vérifiez la connexion et choisissez à nouveau votre clé d’accès de récupération.</string>
+    <string name="documents_account_keyset_mismatch">Ce fichier appartient à un autre jeu de clés chiffrées. Restaurez la clé d’accès de récupération d’origine du compte, puis réessayez.</string>
+    <string name="documents_account_wrapper_failed">La clé chiffrée de ce fichier n’a pas pu être restaurée. Laissez le fichier inchangé et réessayez la récupération.</string>
+    <string name="documents_ciphertext_authentication_failed">Le fichier chiffré n’a pas pu être authentifié. Il est peut-être endommagé ou utilise une autre clé de récupération.</string>
     <string name="documents_account_mismatch">Cette copie hors ligne appartient à un autre compte.</string>
     <string name="documents_storage_full">L’espace de stockage est insuffisant pour cette copie hors ligne.</string>
     <string name="documents_download_failed">Le fichier chiffré n’a pas pu être téléchargé. Réessayez.</string>

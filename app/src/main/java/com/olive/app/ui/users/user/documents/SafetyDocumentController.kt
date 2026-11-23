@@ -525,6 +525,11 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.ACCESS_REVOKED -> R.string.documents_access_revoked
         MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
         MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
+        MediaAccessError.ACCOUNT_WRAPPER_MISSING -> R.string.documents_account_wrapper_missing
+        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> R.string.documents_account_recovery_failed
+        MediaAccessError.ACCOUNT_KEYSET_MISMATCH -> R.string.documents_account_keyset_mismatch
+        MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED -> R.string.documents_account_wrapper_failed
+        MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED -> R.string.documents_ciphertext_authentication_failed
         MediaAccessError.ACCOUNT_MISMATCH -> R.string.documents_account_mismatch
         MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed

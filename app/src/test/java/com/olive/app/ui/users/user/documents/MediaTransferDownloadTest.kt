@@ -91,6 +91,47 @@ class MediaTransferDownloadTest {
     }
 
     @Test
+    fun freshDeviceOpensMediaUsingOnlyItsRecoveredAccountWrapper() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val recoveredKeyset = envelope.unlock("owner", recoveryKey)
+            val accountWrapper = AccountKeysetWrappedKey(
+                envelope.keyId,
+                envelope.epoch,
+                "RSA-OAEP-256",
+                KeyManager.wrapForAccountKeyset(f.key, recoveredKeyset.publicKey),
+            )
+            val freshDeviceDocument = f.document.copy(
+                wrappedKeys = emptyMap(),
+                deviceWrappedKeys = emptyMap(),
+                accountRecoveryReady = true,
+                accountWrappedKeys = mapOf("owner" to accountWrapper),
+            )
+            `when`(f.cache.availability("owner", freshDeviceDocument))
+                .thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.ticket()
+            val controller = MediaTransferController(
+                f.app,
+                f.scope,
+                f.repository,
+                f.store,
+                f.cache,
+                OkHttpClient.Builder().addInterceptor { chain ->
+                    Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                        .message("fixture").body(f.bytes.toResponseBody()).build()
+                }.build(),
+                accountKeysetUnlocker = { recoveredKeyset },
+            )
+
+            val opened = controller.downloadFile(freshDeviceDocument, "owner")
+
+            assertArrayEquals(f.plaintext, opened.readBytes())
+            opened.delete()
+        }
+    }
+
+    @Test
     fun expiredOfflineAccessRequiresRevalidationAndRevocationRemovesCachedBytes() = runBlocking<Unit> {
         Fixture().use { f ->
             `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.REVALIDATION_REQUIRED)
@@ -164,13 +205,13 @@ class MediaTransferDownloadTest {
             val missing = f.document.copy(wrappedKeys = emptyMap())
             `when`(f.cache.availability("owner", missing)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
             val failure = assertThrows(MediaAccessException::class.java) { runBlocking { f.controller.downloadFile(missing, "owner") } }
-            assertEquals(MediaAccessError.KEY_UNAVAILABLE, failure.reason)
+            assertEquals(MediaAccessError.ACCOUNT_WRAPPER_MISSING, failure.reason)
             val recoverable = missing.copy(accountRecoveryReady = true)
             `when`(f.cache.availability("owner", recoverable)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
             val unavailable = assertThrows(MediaAccessException::class.java) {
                 runBlocking { f.controller.downloadFile(recoverable, "owner") }
             }
-            assertEquals(MediaAccessError.KEY_UNAVAILABLE, unavailable.reason)
+            assertEquals(MediaAccessError.ACCOUNT_WRAPPER_MISSING, unavailable.reason)
         }
     }
 }

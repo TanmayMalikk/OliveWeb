@@ -218,6 +218,26 @@ class DocumentControllerMediaRoutingTest {
     }
 
     @Test
+    fun `account recovery failures each present specific guidance`() {
+        assertEquals(
+            com.olive.app.R.string.documents_account_recovery_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_account_keyset_mismatch,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_KEYSET_MISMATCH)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_account_wrapper_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_ciphertext_authentication_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED)),
+        )
+    }
+
+    @Test
     fun `evidence change updates the visible document and persists it`() {
         val original = document(objectKey = "users/owner/media/r2-document")
         val repository = FakeDocumentRepository(original, File(context.cacheDir, "legacy"))
