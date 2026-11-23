@@ -195,6 +195,41 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
     });
   });
   await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      passwordRecovery: {
+        version: 1,
+        accountId: uid,
+        opaqueRecordId: 'rec_1234567890123456',
+        algorithm: 'OPAQUE-3DH-HKDF-SHA256-AES-256-GCM',
+        salt: `${'A'.repeat(43)}=`,
+        iv: 'A'.repeat(16),
+        ciphertext: 'A'.repeat(64),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await assertSucceeds(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      'passwordRecovery.salt': 'invalid',
+    });
+  });
+  await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      version: 2,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await assertFails(getDoc(target));
 });
 
 test('account key directory exposes exact public wrapping keys without enumeration', async () => {

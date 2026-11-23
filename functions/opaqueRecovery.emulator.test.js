@@ -26,6 +26,17 @@ test("opaque recovery callable lifecycle: register, unlock, rotate, and removal 
   const uid = `opaque-user-${Date.now()}`;
   const password = "correct-recovery-password-123";
   const userAuth = auth(uid);
+  const originalKeyset = {
+    version: 1,
+    accountId: uid,
+    keyId: "123e4567-e89b-12d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: b64(400, 4),
+    iv: b64(12, 5),
+    ciphertext: b64(1600, 6),
+  };
+  await db.collection("accountKeysets").doc(uid).set(originalKeyset);
 
   // 1. Client starts registration
   const clientReg = opaque.client.startRegistration({ password });
@@ -75,6 +86,9 @@ test("opaque recovery callable lifecycle: register, unlock, rotate, and removal 
 
   const keysetDoc = await db.collection("accountKeysets").doc(uid).get();
   assert.equal(keysetDoc.exists, true);
+  for (const [field, value] of Object.entries(originalKeyset)) {
+    assert.deepEqual(keysetDoc.data()[field], value);
+  }
   assert.deepEqual(keysetDoc.data().passwordRecovery.ciphertext, envelope.ciphertext);
 
   // 6. Client starts unlock flow on new device

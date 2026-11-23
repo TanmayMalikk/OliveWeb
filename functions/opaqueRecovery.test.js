@@ -57,18 +57,47 @@ test("opaque recovery validates opaque registration record string bounds", () =>
   }
 });
 
+test("opaque recovery requires an existing version-one encrypted account keyset", () => {
+  const uid = "uid-a";
+  const valid = {
+    version: 1,
+    accountId: uid,
+    keyId: "123e4567-e89b-12d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: b64(400),
+    iv: b64(12),
+    ciphertext: b64(1600),
+  };
+  assert.equal(opaqueRecovery.requireStoredAccountKeyset(valid, uid), valid);
+
+  for (const invalid of [
+    null,
+    { ...valid, version: 2 },
+    { ...valid, accountId: "uid-b" },
+    { ...valid, keyId: "not-a-uuid" },
+    { ...valid, epoch: 2 },
+    { ...valid, algorithm: "RSA-OAEP" },
+    { ...valid, publicKey: "not-base64" },
+    { ...valid, iv: b64(16) },
+    { ...valid, ciphertext: b64(100) },
+  ]) {
+    assert.throws(() => opaqueRecovery.requireStoredAccountKeyset(invalid, uid));
+  }
+});
+
 test("opaque recovery removal is blocked when no passkey recovery factor exists", () => {
   const accountWithoutPasskey = {
-    ownerUid: "uid-a",
-    version: 2,
+    accountId: "uid-a",
+    version: 1,
     passwordRecovery: { version: 1 },
     // no passkey recovery
   };
   assert.equal(opaqueRecovery.canRemovePasswordRecovery(accountWithoutPasskey), false);
 
   const accountWithPasskey = {
-    ownerUid: "uid-a",
-    version: 2,
+    accountId: "uid-a",
+    version: 1,
     passwordRecovery: { version: 1 },
     passkeyRecovery: { version: 1, credentialId: "cred-1" },
   };

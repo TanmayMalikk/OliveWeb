@@ -84,6 +84,32 @@ function opaqueRegistrationRecord(value) {
   return value;
 }
 
+function requireStoredAccountKeyset(value, uid) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const base64 = /^[A-Za-z0-9+/]+={0,2}$/;
+  if (
+    !value ||
+    value.version !== 1 ||
+    value.accountId !== uid ||
+    typeof value.keyId !== "string" ||
+    !uuid.test(value.keyId) ||
+    value.epoch !== 1 ||
+    value.algorithm !== "RSA-OAEP-256" ||
+    typeof value.publicKey !== "string" ||
+    value.publicKey.length < 400 ||
+    value.publicKey.length > 1024 ||
+    !base64.test(value.publicKey) ||
+    !base64Bytes(value.iv, 12) ||
+    typeof value.ciphertext !== "string" ||
+    value.ciphertext.length < 2000 ||
+    value.ciphertext.length > 4096 ||
+    !base64.test(value.ciphertext)
+  ) {
+    throw new HttpsError("failed-precondition", "Create encrypted account access before adding password recovery.");
+  }
+  return value;
+}
+
 function canRemovePasswordRecovery(keysetData) {
   if (!keysetData) return false;
   // User must retain at least one passkey recovery factor to prevent accidental complete lock-out.
@@ -134,6 +160,9 @@ const opaqueRecoveryFinishRegistration = onCall(callableOptions, async (request)
   const keysetDocRef = db.collection("accountKeysets").doc(uid);
 
   await db.runTransaction(async (transaction) => {
+    const keysetDoc = await transaction.get(keysetDocRef);
+    requireStoredAccountKeyset(keysetDoc.exists ? keysetDoc.data() : null, uid);
+
     transaction.set(opaqueDocRef, {
       ownerUid: uid,
       recordId: rawRecordId,
@@ -146,8 +175,6 @@ const opaqueRecoveryFinishRegistration = onCall(callableOptions, async (request)
     transaction.set(
       keysetDocRef,
       {
-        ownerUid: uid,
-        version: 2,
         passwordRecovery: {
           ...envelope,
           createdAt: FieldValue.serverTimestamp(),
@@ -269,6 +296,9 @@ const opaqueRecoveryRotate = onCall(callableOptions, async (request) => {
   const keysetDocRef = db.collection("accountKeysets").doc(uid);
 
   await db.runTransaction(async (transaction) => {
+    const keysetDoc = await transaction.get(keysetDocRef);
+    requireStoredAccountKeyset(keysetDoc.exists ? keysetDoc.data() : null, uid);
+
     transaction.set(opaqueDocRef, {
       ownerUid: uid,
       recordId: rawRecordId,
@@ -280,8 +310,6 @@ const opaqueRecoveryRotate = onCall(callableOptions, async (request) => {
     transaction.set(
       keysetDocRef,
       {
-        ownerUid: uid,
-        version: 2,
         passwordRecovery: {
           ...envelope,
           updatedAt: FieldValue.serverTimestamp(),
@@ -333,6 +361,7 @@ module.exports = {
   _test: {
     recoveryEnvelope,
     opaqueRegistrationRecord,
+    requireStoredAccountKeyset,
     canRemovePasswordRecovery,
     requiredRecordId,
     getServerSetup,
