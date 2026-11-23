@@ -511,4 +511,22 @@
     <string name="incident_body_required">事件详情（必填）</string>
     <string name="note_content_required">笔记（必填）</string>
     <string name="incident_clear_time">清除时间</string>
+    <string name="password_recovery_title">密码恢复备选方案</string>
+    <string name="password_recovery_help">添加您的帐户密码作为备份恢复方案。通行密钥始终为首选。Olive Branch使用零知识OPAQUE密码学，服务器绝不会接收或存储您的密码或恢复密钥。</string>
+    <string name="password_recovery_warning">警告：如果同时丢失密码恢复方案和所有已注册的通行密钥，将永久无法在新设备上恢复加密数据。</string>
+    <string name="password_recovery_add">添加密码恢复</string>
+    <string name="password_recovery_added">已添加密码恢复备用方案。</string>
+    <string name="password_recovery_recover">使用密码恢复加密数据</string>
+    <string name="password_recovery_use_fallback">改用密码恢复</string>
+    <string name="password_recovery_change">更改恢复密码</string>
+    <string name="password_recovery_changed">恢复密码已更新。</string>
+    <string name="password_recovery_remove">移除密码恢复</string>
+    <string name="password_recovery_removed">已移除密码恢复备用方案。</string>
+    <string name="password_recovery_remove_blocked_last">必须拥有至少一个有效的通行密钥才能移除密码恢复。请先添加通行密钥恢复因子，以免丢失加密数据。</string>
+    <string name="password_recovery_error_unsupported">不受支持的密码恢复设备或协议。代码：OPK-01。</string>
+    <string name="password_recovery_error_incorrect">恢复密码不正确。代码：OPK-02。</string>
+    <string name="password_recovery_error_connection">连接中断。请检查网络后重试。代码：OPK-03。</string>
+    <string name="password_recovery_error_corrupted">恢复包已损坏。请联系支持：OPK-04。</string>
+    <string name="password_recovery_error_account_mismatch">帐户不匹配。该恢复记录属于其他用户。代码：OPK-05。</string>
+    <string name="password_recovery_error_revoked">由于帐户访问权限已被撤销，恢复不可用。代码：OPK-06。</string>
 </resources>

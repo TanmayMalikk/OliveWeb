@@ -106,7 +106,10 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val recoveryCredentials = session.passkeyRecoveryCredentials
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
-        if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
+        if (userRole && cacheUid != null) {
+            session.refreshPasskeyRecovery()
+            session.refreshPasswordRecovery()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -448,6 +451,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                         },
                                     )
                                 }
+                                PasswordRecoverySection(session)
                             }
                             HorizontalDivider()
                             Text(

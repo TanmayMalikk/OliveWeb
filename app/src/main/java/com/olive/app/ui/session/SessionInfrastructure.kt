@@ -11,6 +11,8 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRepository
 import com.olive.app.data.account.AccountKeysetRepository
 import com.olive.app.data.account.PasskeyRecoveryRepository
+import com.olive.app.data.account.OpaqueRecoveryRepository
+import com.olive.app.data.account.AndroidOpaqueClient
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminRepository
 import com.olive.app.data.account.CoverType
@@ -95,6 +97,7 @@ internal class SessionDataSources(
     val adminLocations: AdminLocationRepository?,
     val accountKeysets: AccountKeysetRepository?,
     val passkeyRecovery: PasskeyRecoveryRepository?,
+    val opaqueRecovery: OpaqueRecoveryRepository? = null,
 ) {
     companion object {
         // Creates the cloud repository bundle used by a signed-in Firebase account.
@@ -122,6 +125,7 @@ internal class SessionDataSources(
                 adminLocations = if (localMode) null else AdminLocationRepository(),
                 accountKeysets = if (localMode) null else AccountKeysetRepository(),
                 passkeyRecovery = if (localMode) null else PasskeyRecoveryRepository(),
+                opaqueRecovery = if (localMode) null else OpaqueRecoveryRepository(opaqueClient = AndroidOpaqueClient(application)),
             )
         }
     }
@@ -405,6 +409,7 @@ internal class SessionRuntime(
     val locationSharingRepository get() = dataSources.locations
     val accountKeysetRepository get() = dataSources.accountKeysets
     val passkeyRecoveryRepository get() = dataSources.passkeyRecovery
+    val opaqueRecoveryRepository get() = dataSources.opaqueRecovery
     private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment
@@ -455,6 +460,8 @@ internal class SessionRuntime(
     val safety = SessionSafetyPlans(this)
     val staffSupport = StaffSupportController(this)
     val settings = SessionSettings(this)
+    val passkeyRecoveryController = SessionPasskeyRecovery(this)
+    val passwordRecovery = SessionPasswordRecovery(this)
     val operations = SessionOperations(this)
 
     val configured get() = enrollment != null

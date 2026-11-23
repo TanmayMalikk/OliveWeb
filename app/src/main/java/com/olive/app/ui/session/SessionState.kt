@@ -58,6 +58,7 @@ internal data class SessionAccountState(
     val creatingAccount: Boolean = false,
     val passkeyCredentialRequest: PasskeyCredentialRequest? = null,
     val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>? = null,
+    val passwordRecoveryEnrolled: Boolean? = null,
 )
 
 internal data class SessionActivityState(
@@ -192,6 +193,9 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
         get() = accountSnapshot.passkeyRecoveryCredentials
         set(value) = updateAccount { it.copy(passkeyRecoveryCredentials = value) }
+    var passwordRecoveryEnrolled: Boolean?
+        get() = accountSnapshot.passwordRecoveryEnrolled
+        set(value) = updateAccount { it.copy(passwordRecoveryEnrolled = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
     private var activitySnapshot by mutableStateOf(activityFlow.value)
