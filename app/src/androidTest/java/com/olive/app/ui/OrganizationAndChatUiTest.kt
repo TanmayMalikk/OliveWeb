@@ -511,7 +511,7 @@ class OrganizationAndChatUiTest {
         val password = hasTestTag("messaging_reconnect_password")
         val reconnect = hasTestTag("messaging_reconnect")
         list.performScrollToNode(reconnect)
-        compose.onNode(reconnect).assertIsNotEnabled()
+        compose.onNode(reconnect).assertIsEnabled().performClick()
         list.performScrollToNode(password)
         compose.onNode(password).performTextReplacement("synthetic-password")
         list.performScrollToNode(reconnect)

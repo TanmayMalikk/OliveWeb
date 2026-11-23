@@ -72,8 +72,6 @@ function PinGate() {
             }}
             inputMode="numeric"
             autoComplete="off"
-            pattern="[0-9]{4,6}"
-            required
             maxLength={6}
           />
           <div className="pin-keypad" role="group" aria-label="PIN keypad">
@@ -107,7 +105,7 @@ function PinGate() {
               {s.message}
             </p>
           )}
-          <Button type="submit" disabled={s.busy || pin.length < 4}>
+          <Button type="submit" disabled={s.busy}>
             {s.busy ? "Unlocking…" : "Unlock"} <ArrowRight size={17} aria-hidden="true" />
           </Button>
         </Form>

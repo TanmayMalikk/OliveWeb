@@ -93,6 +93,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var kind by remember { mutableStateOf(PrivateEntryKind.Note) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
+    var noteShake by remember { mutableIntStateOf(0) }
     var incidentDate by remember { mutableStateOf("") }
     var incidentTime by remember { mutableStateOf("") }
     var incidentLocation by remember { mutableStateOf("") }
@@ -462,47 +463,27 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 }
             }
             item {
+                val bodyMissing = noteShake > 0 && body.isBlank()
                 OutlinedTextField(
                     value = body,
                     onValueChange = { body = it.take(10_000) },
-                    label = {
-                        Text(
-                            stringResource(
-                                if (kind == PrivateEntryKind.Incident) R.string.incident_body_required
-                                else R.string.note_content_required
-                            )
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp)
-                        .testTag("private_entry_body").keepVisibleWhileTyping(),
+                    label = { Text(stringResource(if (kind == PrivateEntryKind.Incident) R.string.incident_body_required else R.string.note_content_required)) },
+                    isError = bodyMissing,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp).testTag("private_entry_body")
+                        .oliveErrorShake(if (bodyMissing) noteShake else 0).keepVisibleWhileTyping(),
                     enabled = !session.busy
                 )
             }
             item {
-                Button(
-                    onClick = { attachmentMenuOpen = true },
-                    enabled = uid != null && !session.busy,
-                    modifier = Modifier.fillMaxWidth().testTag("private_add_attachment"),
-                ) {
+                Button(onClick = { attachmentMenuOpen = true }, enabled = uid != null && !session.busy,
+                    modifier = Modifier.fillMaxWidth().testTag("private_add_attachment")) {
                     Icon(Icons.Outlined.Attachment, null)
-                    Text(
-                        stringResource(R.string.add_attachment),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                    Text(stringResource(R.string.add_attachment), modifier = Modifier.padding(start = 8.dp))
                 }
-                if (kind == PrivateEntryKind.Incident) Text(
-                    stringResource(R.string.incident_attachments_help),
-                    color = Muted,
-                )
+                if (kind == PrivateEntryKind.Incident) Text(stringResource(R.string.incident_attachments_help), color = Muted)
                 session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
-                    Row(
-                        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = true,
-                            onCheckedChange = { selectedAttachments = selectedAttachments - document.id },
-                        )
+                    Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = true, onCheckedChange = { selectedAttachments = selectedAttachments - document.id })
                         Text(document.name, modifier = Modifier.weight(1f))
                         if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
                     }
@@ -511,24 +492,20 @@ internal fun PrivateNotes(session: SessionViewModel) {
             item {
                 Button(
                     onClick = {
-                        if (kind == PrivateEntryKind.Incident && uid != null) {
+                        val valid = body.isNotBlank() && (kind == PrivateEntryKind.Note ||
+                            (validIncidentDate(incidentDate) && validIncidentTime(incidentTime, entry?.incidentTime)))
+                        if (!valid) noteShake += 1
+                        if (valid && kind == PrivateEntryKind.Incident && uid != null) {
                             session.documents.state.files.filter { it.id in selectedAttachments && !it.evidence }
                                 .forEach { session.documents.setEvidence(it, uid, true) }
                         }
-                        session.savePrivateEntry(
-                            editingId, kind, title, body, incidentDate, incidentTime,
-                            incidentLocation, incidentLatitude, incidentLongitude,
-                            selectedAttachments.toList(), newEntryId = newEntryId,
-                        )
-                        if (body.isNotBlank()) editorOpen = false
+                        session.savePrivateEntry(editingId, kind, title, body, incidentDate, incidentTime,
+                            incidentLocation, incidentLatitude, incidentLongitude, selectedAttachments.toList(), newEntryId = newEntryId)
+                        if (valid) editorOpen = false
                     },
-                    enabled = !session.busy && body.isNotBlank() &&
-                        (kind == PrivateEntryKind.Note || (validIncidentDate(incidentDate) &&
-                            validIncidentTime(incidentTime, entry?.incidentTime))),
+                    enabled = !session.busy,
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
-                ) {
-                    Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
-                }
+                ) { Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry)) }
             }
             // Save the note only after at least one field has changed.
             if (entry?.edits?.isNotEmpty() == true) item {

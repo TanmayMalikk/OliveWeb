@@ -4,6 +4,8 @@ import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.oliveErrorShake
+import com.olive.app.ui.shared.rememberFieldErrorShakeTrigger
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -122,29 +124,34 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
                     }
                 }
                 Text(stringResource(R.string.nutrition_label_short), style = MaterialTheme.typography.bodySmall)
+                var manualShake by remember { mutableIntStateOf(0) }
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (scanning) LoadingSkeleton(SkeletonLayout.Form, rows = 2)
                     scanMessage?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
+                    val nameShake = rememberFieldErrorShakeTrigger(if (draft.name.isBlank()) "name" else null, manualShake)
                     OutlinedTextField(draft.name, { draft = draft.copy(name = it.take(160)) },
                         label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true,
                         colors = fieldColors, isError = draft.name.isBlank(),
-                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_name"))
+                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_name").oliveErrorShake(nameShake))
+                    val servingShake = rememberFieldErrorShakeTrigger(if (draft.serving.isBlank()) "serving" else null, manualShake)
                     OutlinedTextField(draft.serving, { draft = draft.copy(serving = it.take(120)) },
                         label = { Text(stringResource(R.string.nutrition_serving_short)) },
                         placeholder = { Text("1 bar (40 g)") }, singleLine = true,
                         colors = fieldColors, isError = draft.serving.isBlank(),
-                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_serving"))
+                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_serving").oliveErrorShake(servingShake))
                     val fields = LabelNutrient.entries.filter { it.required || extras }
                     fields.chunked(2).forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             pair.forEach { field ->
                                 val value = draft.nutrients[field].orEmpty()
+                                val fieldInvalid = draft.amount(field) == null
+                                val fieldShake = rememberFieldErrorShakeTrigger(if (fieldInvalid) field.name else null, manualShake)
                                 OutlinedTextField(value, { draft = draft.copy(nutrients = draft.nutrients + (field to it.take(24))) },
                                     label = { Text(stringResource(field.label), style = MaterialTheme.typography.bodySmall) },
                                     suffix = { Text(field.unit) }, singleLine = true, enabled = !scanning,
-                                    colors = fieldColors, isError = draft.amount(field) == null,
+                                    colors = fieldColors, isError = fieldInvalid,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1f).testTag("manual_${field.name}"))
+                                    modifier = Modifier.weight(1f).testTag("manual_${field.name}").oliveErrorShake(fieldShake))
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
@@ -155,8 +162,15 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                    Button(onClick = { draft.food()?.let(onContinue) }, enabled = !scanning && draft.valid,
-                        modifier = Modifier.testTag("manual_food_continue")) { Text(stringResource(R.string.nutrition_choose_portion)) }
+                    Button(
+                        onClick = {
+                            val food = draft.food()
+                            if (food == null) manualShake += 1
+                            else onContinue(food)
+                        },
+                        enabled = !scanning,
+                        modifier = Modifier.testTag("manual_food_continue"),
+                    ) { Text(stringResource(R.string.nutrition_choose_portion)) }
                 }
             }
         }

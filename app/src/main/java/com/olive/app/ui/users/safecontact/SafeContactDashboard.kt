@@ -11,6 +11,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.safetyplan.SafeContactSafetyPlansScreen
+import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.SettingsEditor
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
 import com.olive.app.ui.users.user.location.LocationMapScreen
@@ -86,6 +87,7 @@ internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session)
             else -> SafeContactHome(session)
         }
     }
@@ -184,6 +186,13 @@ private fun SafeContactHome(session: SessionViewModel) {
             "safe_contact_documents",
             session.documents.state.files.count { it.ownerUid != session.coverAccountId },
             { session.navigation.openSafePage(SafePage.Documents) })
+        SafeContactActionCard(
+            stringResource(R.string.support_walkthrough),
+            stringResource(R.string.walkthrough_subtitle),
+            Icons.Outlined.Description,
+            "safe_contact_walkthrough",
+            0,
+            { session.navigation.openSafePage(SafePage.Walkthrough) })
         if (session.pendingSync) Surface(
             Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.primaryContainer

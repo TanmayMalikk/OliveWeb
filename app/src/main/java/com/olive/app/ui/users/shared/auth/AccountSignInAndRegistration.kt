@@ -504,7 +504,7 @@ internal fun SystemPinPrompt(session: SessionViewModel, challenge: Int) {
                 .oliveErrorShake(localShake),
         )
         Status(session)
-        Button(onClick = ::submit, enabled = !session.account.busy && InputPolicy.validPin(pin),
+        Button(onClick = ::submit, enabled = !session.account.busy,
             modifier = Modifier.fillMaxWidth().testTag("unlock_submit")) {
             Text(stringResource(R.string.a11y_unlock))
         }

@@ -479,16 +479,21 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     }
                     OutlinedButton(
                         onClick = {
-                            contacts += SafeContact(
-                                UUID.randomUUID().toString(),
-                                contactName.trim(),
-                                contactDetails.trim()
-                            )
-                            contactName = ""
-                            contactDetails = ""
-                            showErrors = false
+                            if (contactName.isBlank() || contactDetails.isBlank()) {
+                                showErrors = true
+                                shakeAttempt += 1
+                            } else {
+                                contacts += SafeContact(
+                                    UUID.randomUUID().toString(),
+                                    contactName.trim(),
+                                    contactDetails.trim()
+                                )
+                                contactName = ""
+                                contactDetails = ""
+                                showErrors = false
+                            }
                         },
-                        enabled = !session.account.busy && contactName.isNotBlank() && contactDetails.isNotBlank() && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 25,
                         modifier = Modifier.fillMaxWidth().testTag("add_onboarding_contact")
                     ) {
                         Icon(Icons.Outlined.Add, null)

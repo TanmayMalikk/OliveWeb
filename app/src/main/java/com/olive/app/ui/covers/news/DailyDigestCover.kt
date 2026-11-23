@@ -506,6 +506,12 @@ private fun NewsLocationDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                var showLocationError by remember { mutableStateOf(false) }
+                var locationShake by remember { mutableIntStateOf(0) }
+                val locationErrorShake = rememberFieldErrorShakeTrigger(
+                    if (showLocationError && value.isBlank()) "location_required" else null,
+                    locationShake,
+                )
                 Text(
                     uiText(R.string.ui_this_changes_the_local_news_search_on_this_device),
                     color = Muted,
@@ -513,12 +519,17 @@ private fun NewsLocationDialog(
                 )
                 OutlinedTextField(
                     value,
-                    onValueChange,
+                    {
+                        onValueChange(it)
+                        showLocationError = false
+                    },
                     label = { Text(stringResource(R.string.city_or_region)) },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                     singleLine = true,
+                    isError = showLocationError && value.isBlank(),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth().testTag("news_location_input")
+                        .oliveErrorShake(locationErrorShake)
                         .keepVisibleWhileTyping()
                 )
                 OutlinedButton(
@@ -541,8 +552,15 @@ private fun NewsLocationDialog(
                         Text(stringResource(R.string.cancel))
                     }
                     Button(
-                        onClick = onSave,
-                        enabled = value.isNotBlank(),
+                        onClick = {
+                            if (value.isBlank()) {
+                                showLocationError = true
+                                locationShake += 1
+                            } else {
+                                onSave()
+                            }
+                        },
+                        enabled = true,
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                             .testTag("news_location_save")
                     ) {

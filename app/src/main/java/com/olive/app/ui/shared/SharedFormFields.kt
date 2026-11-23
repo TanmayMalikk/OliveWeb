@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -322,7 +323,8 @@ internal fun BirthdayPicker(
                 .oliveErrorShake(effectiveShake)
                 .semantics { message?.let { error(it) } },
             enabled = enabled,
-            border = if (message != null) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else null,
+            border = if (message != null) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error)
+                else ButtonDefaults.outlinedButtonBorder(enabled),
         ) { Text(dateText ?: uiText(R.string.dob_picker_title)) }
         if (!required && value.isNotBlank()) {
             TextButton(enabled = enabled, onClick = { onChange("") }) { Text(uiText(R.string.dob_clear)) }

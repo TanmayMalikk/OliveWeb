@@ -81,7 +81,8 @@ The primary role. Users get the full private workspace behind the cover app.
 **Location**
 - Interactive device location map, live-location sharing with selected contacts (add/remove recipients, stop sharing anytime), map view of locations shared with you, saved location directory, and turn-by-turn style route navigation with manual or automatic refresh.
 
-**Support resources and emergency report**
+**Support resources, walkthrough, and emergency report**
+- **Interactive walkthrough:** step-by-step guided tour with a clickable Table of Contents covering every feature, an interactive practice sandbox per topic, and one-tap buttons to jump directly into each live tool.
 - Bundled Canadian hotline and support-resource directory with province/territory and city filtering, direct phone dialing, saved/bookmarked hotlines, and an explicit one-time GPS location lookup that does not overwrite the saved profile address.
 - Trusted safe-contact directory with relationship details, contact info, a "safe to stay" indicator, and linking to accepted chat friends.
 - **Emergency** action that generates an encrypted emergency report PDF (including profile context and current location), uploads it, and alerts organization administrators.
@@ -103,7 +104,7 @@ A trusted person who supports a User. Safe Contacts use a connection-focused wor
 - **Documents (shared and personal):** view and download documents explicitly shared by a User, plus upload and manage their own encrypted documents.
 - **Notes and incidents (shared and personal):** open full-screen views of notes and incident reports shared by a User, and maintain their own private notes and incident records (with pinning, attachments, trash, and edit history).
 - **Location and navigation:** view live locations shared with them on an interactive map, share their own location, and run route navigation to a shared location.
-- **Hotlines and activity history (web):** browse the hotline directory and review their own account activity history.
+- **Hotlines, walkthrough, and activity history:** interactive feature walkthrough with Table of Contents and practice sandbox (Android and web), plus hotline directory and account activity history on the web portal.
 - **Settings and offline sync:** edit profile, email consent, and password; manage Android app permissions; and sync queued offline changes.
 - Safe Contacts never receive automatic access to a User's private workspace—every shared plan, document, note, incident, or location requires explicit User selection.
 

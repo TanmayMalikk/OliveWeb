@@ -638,8 +638,14 @@ internal fun InviteCodeEntry(
                     isError = error != null,
                     modifier = Modifier.weight(1f).testTag("friend_invite_code").oliveErrorShake(effectiveShake)
                 )
+                val codeRequiredText = stringResource(R.string.friend_invite_code)
                 Button(
                     onClick = {
+                        if (code.isBlank()) {
+                            error = codeRequiredText
+                            shakeAttempt += 1
+                            return@Button
+                        }
                         busy = true; error = null; connected = null
                         scope.launch {
                             try {
@@ -656,7 +662,7 @@ internal fun InviteCodeEntry(
                             }
                         }
                     },
-                    enabled = enabled && !busy && code.isNotBlank(),
+                    enabled = enabled && !busy,
                     modifier = Modifier.testTag("friend_invite_claim")
                 ) {
                     Text(stringResource(if (busy) R.string.friend_invite_connecting else R.string.friend_invite_connect))

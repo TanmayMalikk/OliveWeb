@@ -292,6 +292,8 @@ private fun MessagingSidebar(
                 color = WarmBannerYellow,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                var reconnectShake by remember { mutableIntStateOf(0) }
+                var reconnectError by remember { mutableStateOf(false) }
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         uiText(R.string.ui_reconnect_your_account),
@@ -307,17 +309,25 @@ private fun MessagingSidebar(
                         "messaging_reconnect_password",
                         secret = true,
                         showSecretToggle = true,
-                        enabled = !session.messages.busy
+                        enabled = !session.messages.busy,
+                        error = if (reconnectError && reconnectPassword.isBlank()) uiText(R.string.enter_your_current_password) else null,
+                        shakeTrigger = reconnectShake,
                     ) {
                         reconnectPassword = it.take(128)
+                        reconnectError = false
                     }
                     Button(
                         onClick = {
-                            session.messages.reconnectMessaging(reconnectPassword) {
-                                reconnectPassword = ""
+                            if (reconnectPassword.isBlank()) {
+                                reconnectError = true
+                                reconnectShake += 1
+                            } else {
+                                session.messages.reconnectMessaging(reconnectPassword) {
+                                    reconnectPassword = ""
+                                }
                             }
                         },
-                        enabled = reconnectPassword.isNotBlank() && !session.messages.busy,
+                        enabled = !session.messages.busy,
                         modifier = Modifier.fillMaxWidth().testTag("messaging_reconnect")
                     ) { Text(stringResource(R.string.reconnect)) }
                 }

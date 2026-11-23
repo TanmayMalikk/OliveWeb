@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 
 import {
   History as HistoryIcon,
   ArrowLeft,
+  BookOpen,
   Menu,
   X,
   FileLock2,
@@ -31,6 +32,7 @@ import Profile from "./AccountProfilePage";
 import SettingsPage from "./AccountSettingsPage";
 import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
+import WalkthroughPage from "./WalkthroughPage";
 import {
   DocumentsPage,
   LocationPage,
@@ -58,6 +60,7 @@ const navigation: { label: string; items: NavItem[] }[] = [
   { label: "Account", items: [
     { page: "Profile", label: "My profile", icon: UserRound },
     { page: "Activity", label: "Account activity", icon: HistoryIcon },
+    { page: "Walkthrough", label: "Walkthrough", icon: BookOpen },
     { page: "Settings", label: "Settings", icon: Settings },
   ] },
 ];
@@ -79,6 +82,7 @@ const pages: Record<Page, ComponentType> = {
   Home, Notes, Contacts, Profile, Settings: SettingsPage, Activity,
   SafetyPlan, Documents: DocumentsPage, Location: LocationPage,
   Hotlines: HotlinesPage, StaffHelp: StaffHelpPage, Messages,
+  Walkthrough: WalkthroughPage,
 };
 
 export default function SafeApp() {

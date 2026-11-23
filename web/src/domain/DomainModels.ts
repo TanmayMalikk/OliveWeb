@@ -13,7 +13,8 @@ export type Page =
   | "Hotlines"
   | "StaffHelp"
   | "Documents"
-  | "Location";
+  | "Location"
+  | "Walkthrough";
 export interface Address {
   line1: string;
   line2: string;

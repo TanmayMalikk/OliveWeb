@@ -315,6 +315,7 @@ internal fun OliveRoot(
                                             SafePage.Location -> uiText(
                                                 R.string.location_map
                                             )
+                                            SafePage.Walkthrough -> uiText(R.string.support_walkthrough)
                                         }
 
                                         SessionScreen.Loading -> uiText(R.string.ui_loading)
@@ -515,7 +516,7 @@ internal fun shouldShowPinSafeAnimation(
 ): Boolean = screen == SessionScreen.Safe && unlockAnimationVersion > completedUnlockAnimation
 
 internal enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
-internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location }
+internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location, Walkthrough }
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Privacy }
 internal enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 

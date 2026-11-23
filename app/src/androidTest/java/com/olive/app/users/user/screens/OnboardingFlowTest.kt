@@ -69,10 +69,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
     fun addingAnEmergencyContactRequiresBothFieldsAndSupportsRemoval() {
         reachCoverPicker("onboard_contact_fixture")
         val add = compose.onNodeWithTag("add_onboarding_contact")
-        add.performScrollTo().assertIsNotEnabled()
+        add.performScrollTo().assertIsEnabled().performClick()
         fill("setup_contact_name", "Synthetic contact")
         hideKeyboard()
-        add.performScrollTo().assertIsNotEnabled()
+        add.performScrollTo().assertIsEnabled().performClick()
         fill("setup_contact_details", "Call after 5 pm")
         hideKeyboard()
         add.performScrollTo().assertIsEnabled().performClick()
@@ -82,7 +82,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         remove.performScrollTo().performClick()
         compose.onNodeWithText("Synthetic contact").assertDoesNotExist()
         compose.onNodeWithText("Call after 5 pm").assertDoesNotExist()
-        add.assertIsNotEnabled()
+        add.assertIsEnabled()
     }
 
     // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.

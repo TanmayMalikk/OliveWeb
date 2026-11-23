@@ -1,5 +1,5 @@
 import {
-  ArrowRight, FileLock2, HeartHandshake, MapPinned, MessageCircle, NotebookPen,
+  ArrowRight, BookOpen, FileLock2, HeartHandshake, MapPinned, MessageCircle, NotebookPen,
   PhoneCall, ShieldCheck, Users,
 } from "lucide-react";
 import type { Page } from "../../../domain/DomainModels";
@@ -24,9 +24,13 @@ const contactConnections: Shortcut[] = [
   { page: "Messages", label: "Friends & messages", description: "Check in with people you support.", icon: MessageCircle },
   { page: "Documents", label: "Documents", description: "Find shared documents and your own files.", icon: FileLock2 },
 ];
-const contactTools = tools.filter(({ page }) => page === "Notes" || page === "Location");
+const contactTools: Shortcut[] = [
+  ...tools.filter(({ page }) => page === "Notes" || page === "Location"),
+  { page: "Walkthrough", label: "Walkthrough", description: "Interactive guide and table of contents for every feature.", icon: BookOpen },
+];
 
 const support: Shortcut[] = [
+  { page: "Walkthrough", label: "Walkthrough", description: "Interactive demo and table of contents for all features.", icon: BookOpen },
   { page: "Contacts", label: "Trusted contacts", description: "Manage the people in your support network.", icon: Users },
   { page: "StaffHelp", label: "Staff help", description: "Start a support conversation.", icon: HeartHandshake },
   { page: "Hotlines", label: "Hotlines", description: "Find a helpline you can call.", icon: PhoneCall },

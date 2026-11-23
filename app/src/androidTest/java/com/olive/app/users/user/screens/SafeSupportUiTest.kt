@@ -268,7 +268,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
         toggle()
-        compose.onNodeWithTag("support_walkthrough").assertIsNotEnabled()
+        compose.onNodeWithTag("support_walkthrough").assertIsEnabled()
         compose.onNodeWithTag("support_emergency").assertIsEnabled()
         compose.onNodeWithTag("support_staff_help").assertIsEnabled()
         compose.onNodeWithTag("support_hotlines").assertIsEnabled()
@@ -279,6 +279,21 @@ class SafeSupportUiTest : OliveUiTestBase() {
         waitCover()
         compose.onNodeWithTag("support_hotlines").assertDoesNotExist()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
+    }
+
+    @Test
+    fun walkthroughOpensFromSupportMenuWithTableOfContentsAndFeatureDemo() {
+        val session = setup()
+        toggle()
+        compose.onNodeWithTag("support_walkthrough").performClick()
+        waitFor("walkthrough_screen")
+        assertEquals(SafePage.Walkthrough, session.page)
+        compose.onNodeWithTag("walkthrough_toc").assertExists()
+        compose.onNodeWithTag("walkthrough_toc_safety_plan").performScrollTo().performClick()
+        compose.onNodeWithTag("walkthrough_demo_action").performScrollTo().performClick()
+        compose.onNodeWithTag("walkthrough_demo_feedback").assertExists()
+        compose.onNodeWithTag("walkthrough_open_feature").performScrollTo().performClick()
+        assertEquals(SafePage.SafetyPlan, session.page)
     }
 
     // Checks the trusted contacts open from the support menu instead of settings step with the test's sample data.

@@ -5,6 +5,8 @@ import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.oliveErrorShake
+import com.olive.app.ui.shared.rememberFieldErrorShakeTrigger
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -202,6 +204,7 @@ internal fun FitnessGoalQuestionnairePage(
     onCancel: () -> Unit,
 ) {
     var step by rememberSaveable { mutableIntStateOf(0) }
+    var bodyShake by rememberSaveable { mutableIntStateOf(0) }
     var primaryGoalName by rememberSaveable(initialInput) { mutableStateOf(initialInput.primaryGoal.name) }
     var activityLevelName by rememberSaveable(initialInput) { mutableStateOf(initialInput.activityLevel.name) }
     var nutritionStyleName by rememberSaveable(initialInput) { mutableStateOf(initialInput.nutritionStyle.name) }
@@ -357,6 +360,7 @@ internal fun FitnessGoalQuestionnairePage(
                     metabolicBasis = metabolicBasis,
                     onBasisSelect = { metabolicBasisName = it.name },
                     enabled = enabled,
+                    shakeTrigger = bodyShake,
                 )
 
                 else -> RecommendationReviewStep(
@@ -373,8 +377,11 @@ internal fun FitnessGoalQuestionnairePage(
                     modifier = Modifier.weight(1f).testTag("questionnaire_back"),
                 ) { Text(stringResource(R.string.fitness_questionnaire_back)) }
                 Button(
-                    onClick = { step++ },
-                    enabled = enabled && (step != 2 || bodyValid),
+                    onClick = {
+                        if (step == 2 && !bodyValid) bodyShake += 1
+                        else step++
+                    },
+                    enabled = enabled,
                     modifier = Modifier.weight(1f).testTag("questionnaire_next"),
                 ) { Text(stringResource(R.string.fitness_questionnaire_next)) }
             }
@@ -418,6 +425,7 @@ private fun BodyDetailsStep(
     metabolicBasis: FitnessMetabolicBasis,
     onBasisSelect: (FitnessMetabolicBasis) -> Unit,
     enabled: Boolean,
+    shakeTrigger: Int = 0,
 ) {
     GoalField(
         value = ageText,
@@ -426,6 +434,7 @@ private fun BodyDetailsStep(
         enabled = enabled,
         isError = ageError,
         supportingText = if (ageError) stringResource(R.string.fitness_questionnaire_age_error) else null,
+        shakeTrigger = shakeTrigger,
         modifier = Modifier.fillMaxWidth().testTag("questionnaire_age"),
     )
     GoalField(
@@ -435,6 +444,7 @@ private fun BodyDetailsStep(
         enabled = enabled,
         isError = heightError,
         supportingText = if (heightError) stringResource(R.string.fitness_questionnaire_height_error) else null,
+        shakeTrigger = shakeTrigger,
         modifier = Modifier.fillMaxWidth().testTag("questionnaire_height"),
     )
     GoalField(
@@ -444,6 +454,7 @@ private fun BodyDetailsStep(
         enabled = enabled,
         isError = weightError,
         supportingText = if (weightError) stringResource(R.string.fitness_questionnaire_weight_error) else null,
+        shakeTrigger = shakeTrigger,
         modifier = Modifier.fillMaxWidth().testTag("questionnaire_weight"),
     )
     Text(
@@ -654,8 +665,13 @@ private fun GoalField(
     enabled: Boolean,
     isError: Boolean = false,
     supportingText: String? = null,
+    shakeTrigger: Int = 0,
     modifier: Modifier = Modifier.fillMaxWidth(),
 ) {
+    val effectiveShake = rememberFieldErrorShakeTrigger(
+        if (isError) (supportingText ?: label) else null,
+        shakeTrigger,
+    )
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(it.filter(Char::isDigit).take(6)) },
@@ -665,6 +681,6 @@ private fun GoalField(
         enabled = enabled,
         isError = isError,
         supportingText = supportingText?.let { message -> { Text(message) } },
-        modifier = modifier,
+        modifier = modifier.oliveErrorShake(effectiveShake),
     )
 }

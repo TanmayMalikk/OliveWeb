@@ -174,34 +174,63 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
 internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
     var birthday by rememberBirthdayInput(session.coverDob)
-    var showBirthdayErrors by remember(session.coverDob) { mutableStateOf(false) }
-    var birthdayShake by remember(session.coverDob) { mutableIntStateOf(0) }
+    var showCoverErrors by remember(session.coverAccountId, session.coverDob) { mutableStateOf(false) }
+    var coverShake by remember(session.coverAccountId, session.coverDob) { mutableIntStateOf(0) }
     var address by remember(session.deliveryAddress) { mutableStateOf(session.deliveryAddress) }
+    val nameMissing = showCoverErrors && fullName.isBlank()
+    val nameShake = rememberFieldErrorShakeTrigger(
+        if (nameMissing) stringResource(R.string.ui_name_required) else null,
+        coverShake,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("@${session.coverUsername}")
         OutlinedTextField(
             fullName,
-            { fullName = it.take(120) },
+            {
+                fullName = it.take(120)
+                showCoverErrors = false
+            },
             label = { Text(stringResource(R.string.full_name)) },
             singleLine = true,
             enabled = !session.busy,
-            modifier = Modifier.fillMaxWidth().testTag("cover_full_name").onFocusChanged {
-                if (it.isFocused) session.recordSettingsInteraction(
-                    session.coverType.title,
-                    "Focused full name"
-                )
-            }.keepVisibleWhileTyping()
+            isError = nameMissing,
+            supportingText = if (nameMissing) ({ AccessibleMessage(stringResource(R.string.ui_name_required)) }) else null,
+            modifier = Modifier.fillMaxWidth().testTag("cover_full_name")
+                .oliveErrorShake(nameShake)
+                .onFocusChanged {
+                    if (it.isFocused) session.recordSettingsInteraction(
+                        session.coverType.title,
+                        "Focused full name"
+                    )
+                }.keepVisibleWhileTyping()
         )
-        BirthdayPicker(birthday, "cover_dob", !session.busy, showBirthdayErrors, shakeTrigger = birthdayShake) { birthday = it }
+        BirthdayPicker(birthday, "cover_dob", !session.busy, showCoverErrors, shakeTrigger = coverShake) {
+            birthday = it
+            showCoverErrors = false
+        }
         Text(stringResource(R.string.location), style = MaterialTheme.typography.titleMedium)
-        AddressFields(address, cityOnlyRequired = true) { address = it }
+        AddressFields(
+            address,
+            cityOnlyRequired = true,
+            cityError = if (showCoverErrors && !address.locationValid) stringResource(R.string.ui_city_required) else null,
+            shakeTrigger = coverShake,
+        ) {
+            address = it
+            showCoverErrors = false
+        }
         Button(
             onClick = {
-                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                if (showBirthdayErrors) birthdayShake += 1
-                else session.saveCoverSettings(fullName, birthday, address)
+                val invalidDob = !InputPolicy.validDob(birthday)
+                val invalid = fullName.isBlank() || invalidDob || !address.locationValid
+                showCoverErrors = invalid
+                if (invalid) {
+                    coverShake += 1
+                    if (!invalidDob) session.saveCoverSettings(fullName, birthday, address)
+                } else {
+                    session.saveCoverSettings(fullName, birthday, address)
+                }
             },
-            enabled = !session.busy && fullName.isNotBlank() && address.locationValid,
+            enabled = !session.busy,
             modifier = Modifier.fillMaxWidth().testTag("cover_save_settings")
         ) {
             Text(stringResource(R.string.save_account_settings))

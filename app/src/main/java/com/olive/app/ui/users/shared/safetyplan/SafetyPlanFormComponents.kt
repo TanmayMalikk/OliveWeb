@@ -451,30 +451,50 @@ private fun SafetyPlanContactPicker(
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.add_a_contact))
         } else OutlinedCard(Modifier.fillMaxWidth()) {
+            var showContactErrors by remember { mutableStateOf(false) }
+            var contactShake by remember { mutableIntStateOf(0) }
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     stringResource(R.string.add_a_contact),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.semantics { heading() })
-                Field(stringResource(R.string.contact_name), name, "safety_contact_name") {
+                Field(
+                    stringResource(R.string.contact_name),
+                    name,
+                    "safety_contact_name",
+                    error = if (showContactErrors && name.isBlank()) stringResource(R.string.ui_name_required) else null,
+                    shakeTrigger = contactShake,
+                ) {
                     name = it.take(120)
+                    showContactErrors = false
                 }
                 Field(
                     stringResource(R.string.phone_or_email),
                     details,
-                    "safety_contact_details"
-                ) { details = it.take(200) }
+                    "safety_contact_details",
+                    error = if (showContactErrors && details.isBlank()) stringResource(R.string.enter_a_name_and_a_phone_number_or_email) else null,
+                    shakeTrigger = contactShake,
+                ) {
+                    details = it.take(200)
+                    showContactErrors = false
+                }
                 Button(
                     onClick = {
-                        val contact =
-                            SafeContact(UUID.randomUUID().toString(), name.trim(), details.trim())
-                        onContactsChange?.invoke(contacts + contact)
-                        onItemsChange(items + safetyPlanContactItem(contact))
-                        name = ""
-                        details = ""
-                        adding = false
+                        if (name.isBlank() || details.isBlank()) {
+                            showContactErrors = true
+                            contactShake += 1
+                        } else {
+                            val contact =
+                                SafeContact(UUID.randomUUID().toString(), name.trim(), details.trim())
+                            onContactsChange?.invoke(contacts + contact)
+                            onItemsChange(items + safetyPlanContactItem(contact))
+                            name = ""
+                            details = ""
+                            showContactErrors = false
+                            adding = false
+                        }
                     },
-                    enabled = name.isNotBlank() && details.isNotBlank(),
+                    enabled = true,
                     modifier = Modifier.fillMaxWidth().testTag("safety_save_contact")
                 ) {
                     Text(stringResource(R.string.safety_save_and_select_contact))

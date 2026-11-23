@@ -96,7 +96,7 @@ class FitnessCoverDiaryUiTest {
         compose.onNode(lunch).performClick()
         compose.onNodeWithTag("nutrition_manual_entry").performClick()
         val proceed = compose.onNodeWithTag("manual_food_continue")
-        proceed.assertIsNotEnabled()
+        proceed.assertIsEnabled().performClick()
         compose.onNodeWithTag("manual_food_name").performTextInput("Synthetic oat bar")
         compose.onNodeWithTag("manual_food_serving").performTextInput("1 bar (40 g)")
         LabelNutrient.entries.filter { it.required }.forEach { nutrient ->

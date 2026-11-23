@@ -46,7 +46,7 @@ class FriendInvitesUiTest {
         compose.setContent { OliveTheme { MessagesScreen(session) } }
         compose.onNodeWithTag("friend_invite").assertIsDisplayed()
         compose.onNodeWithTag("friend_invite_code").assertExists()
-        compose.onNodeWithTag("friend_invite_claim").assertIsNotEnabled()
+        compose.onNodeWithTag("friend_invite_claim").assertIsEnabled()
         compose.onNodeWithTag("message_username").assertDoesNotExist()
         compose.onNodeWithTag("search_users").assertDoesNotExist()
     }

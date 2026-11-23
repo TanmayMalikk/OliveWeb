@@ -21,7 +21,7 @@ export function InviteCodeEntry() {
     <Field label="Have an invite code? (optional)" name="inviteCode" value={code}
       onChange={(event: React.ChangeEvent<HTMLInputElement>) => setCode(event.target.value)}
       maxLength={32} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={busy || !cloudMode} />
-    <Button type="submit" variant="outline" disabled={!cloudMode || busy || !code.trim()}>
+    <Button type="submit" variant="outline" disabled={!cloudMode || busy}>
       {busy ? "Connecting…" : "Add connection"}
     </Button>
     {feedback && <p role={error ? "alert" : "status"}>{feedback}</p>}

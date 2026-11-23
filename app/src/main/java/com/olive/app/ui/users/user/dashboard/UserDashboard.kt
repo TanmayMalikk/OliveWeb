@@ -50,6 +50,7 @@ import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.safetyplan.*
+import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.*
 import com.olive.app.ui.users.user.documents.EmergencyReportLocation
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
@@ -100,6 +101,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
             SafePage.Location -> LocationMapScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session)
         }
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
@@ -306,9 +308,14 @@ internal fun SafeSupportControls(
                     R.string.support_walkthrough,
                     Icons.AutoMirrored.Outlined.MenuBook,
                     "support_walkthrough",
-                    false,
+                    true,
                     120
-                ) {}
+                ) {
+                    if (expanded) {
+                        onExpanded(false)
+                        session.navigation.openSafePage(SafePage.Walkthrough)
+                    }
+                }
                 SupportAction(
                     R.string.support_staff_help,
                     Icons.Outlined.SupportAgent,

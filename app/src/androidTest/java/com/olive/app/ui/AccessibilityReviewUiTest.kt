@@ -86,7 +86,7 @@ class AccessibilityReviewUiTest {
         val field = compose.onNodeWithTag("unlock_pin")
         field.assert(SemanticsMatcher.keyIsDefined(SemanticsActions.SetText))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
-        compose.onNodeWithTag("unlock_submit").assertIsNotEnabled()
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         field.performTextReplacement("0012")
         compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
