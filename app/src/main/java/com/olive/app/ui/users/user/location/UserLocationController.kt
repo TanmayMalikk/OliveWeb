@@ -5,6 +5,7 @@ package com.olive.app.ui.users.user.location
 import android.content.Context
 import android.location.Location
 import android.net.Uri
+import android.util.Log
 import android.webkit.WebResourceResponse
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -590,8 +591,9 @@ internal class LocationMapController(
                         recipients.map { it.uid },
                         end,
                         true,
+                        startedAt,
                     )
-                }
+                }.onFailure { runCatching { Log.w("OliveLocation", "Failed to save liveLocationSessions", it) } }
                 state = state.copy(working = false, liveActive = true, expiresAt = end)
                 onStarted(end)
                 watchExpiry()
@@ -620,7 +622,10 @@ internal class LocationMapController(
         expiryJob?.cancel()
         expiryJob = null
         if (!uid.isNullOrBlank()) {
-            scope.launch { runCatching { repository?.setLiveSessionState(uid, emptyList(), 0L, false) } }
+            scope.launch {
+                runCatching { repository?.setLiveSessionState(uid, emptyList(), 0L, false) }
+                    .onFailure { runCatching { Log.w("OliveLocation", "Failed to clear liveLocationSessions", it) } }
+            }
         }
     }
 

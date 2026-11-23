@@ -390,3 +390,48 @@ test("emergency creation emails every active Admin with no user payload", async 
   assert.equal(f.sent[0].mail.to, "admin1@yourolivebranch.ca");
   assert.match(f.sent[0].mail.subject, /Emergency response needed/);
 });
+
+test("legacy USER account without role custom claim still triggers live location emails", async () => {
+  const f = createEmailFixture();
+  f.users.set("legacy_owner", {
+    uid: "legacy_owner",
+    displayName: "legacyuser",
+    email: "legacyuser@users.olive.invalid",
+    disabled: false,
+    customClaims: {},
+  });
+  f.profiles.set("legacy_owner", {
+    username: "legacyuser",
+    fullName: "Legacy User",
+    dob: "1992-05-01",
+    language: "English",
+    address: { city: "Edmonton" },
+    role: "USER",
+    email: "legacyowner@example.com",
+    emailCommunicationConsent: true,
+  });
+  f.records.set("accountDirectory/legacyuser", { uid: "legacy_owner", username: "legacyuser", role: "USER" });
+  seedAccount(f, "safe1", "SAFE_CONTACT", { username: "trusted_safe", email: "safe1@example.com", consent: true });
+  f.records.set("friendLists/legacy_owner/friends/f1", { friendUid: "safe1", friendUsername: "trusted_safe" });
+
+  const session = {
+    ownerUid: "legacy_owner",
+    sessionId: "sess-legacy-1234",
+    recipientUids: ["safe1"],
+    active: true,
+    startedAt: 1_700_000_000_000,
+    expiresAt: 1_700_000_900_000,
+  };
+  f.records.set("liveLocationSessions/legacy_owner", session);
+
+  await f.notifications.emailOnLiveLocationSession({
+    params: { ownerUid: "legacy_owner" },
+    data: { before: { exists: false }, after: { exists: true, data: () => session } },
+  });
+
+  assert.equal(f.sent.length, 2);
+  assert.deepEqual(
+    f.sent.map((entry) => entry.mail.to),
+    ["legacyowner@example.com", "safe1@example.com"],
+  );
+});

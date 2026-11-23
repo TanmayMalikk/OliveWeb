@@ -150,6 +150,12 @@ async function handleLiveLocationSessionWritten(event) {
   const durationLabel = formatDurationLabel(durationMs);
 
   const owner = await resolveEmailRecipient(ownerUid, ["USER"]);
+  console.info(JSON.stringify({
+    eventType: "live_location_session",
+    rawRecipientCount: rawRecipients.length,
+    validatedRecipientCount: validatedRecipients.length,
+    ownerEligible: Boolean(owner),
+  }));
   const tasks = [];
 
   if (owner) {

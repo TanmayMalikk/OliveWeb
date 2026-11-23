@@ -295,17 +295,17 @@ private class LiveLocationSharingDataSource(
     }
 
     /** Records active live-location metadata so backend notification triggers know session timing and recipients. */
-    suspend fun setSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) {
+    suspend fun setSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) {
         val doc = firestore.collection("liveLocationSessions").document(ownerUid)
         val cleanRecipients = recipientUids.filter { it.isNotBlank() && it != ownerUid }.distinct().take(25)
-        if (active && cleanRecipients.isNotEmpty() && expiresAt > System.currentTimeMillis()) {
+        if (active && cleanRecipients.isNotEmpty() && startedAt > 0L && expiresAt > startedAt) {
             doc.set(
                 mapOf(
                     "ownerUid" to ownerUid,
                     "sessionId" to UUID.randomUUID().toString(),
                     "recipientUids" to cleanRecipients,
                     "active" to true,
-                    "startedAt" to System.currentTimeMillis(),
+                    "startedAt" to startedAt,
                     "expiresAt" to expiresAt,
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),
@@ -562,7 +562,7 @@ internal interface LocationSharingDataSource {
      */
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
     /** Records or clears active live-location session metadata for notification scheduling. */
-    suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) = Unit
+    suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) = Unit
     /**
      * Watches static contacts for changes.
      *
@@ -641,8 +641,8 @@ internal class LocationSharingRepository private constructor(
         liveLocations.setRecipients(ownerUid, friends)
 
     /** Records or clears live-location session timing and recipient metadata. */
-    override suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean) =
-        liveLocations.setSessionState(ownerUid, recipientUids, expiresAt, active)
+    override suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long) =
+        liveLocations.setSessionState(ownerUid, recipientUids, expiresAt, active, startedAt)
 
     /**
      * Watches static contacts for changes.

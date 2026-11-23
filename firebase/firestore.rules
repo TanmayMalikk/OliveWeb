@@ -691,9 +691,20 @@ service cloud.firestore {
 
     // Active live-location session markers track bounded owner-managed sharing sessions.
     match /liveLocationSessions/{ownerUid} {
+      function liveLocationSessionUser() {
+        return signedIn() && (
+          ('role' in request.auth.token && request.auth.token.role == 'USER')
+          || (!('role' in request.auth.token)
+            && 'email' in request.auth.token
+            && request.auth.token.email is string
+            && request.auth.token.email.matches('.*@users[.]olive[.]invalid'))
+        );
+      }
       allow get: if owner(ownerUid);
       allow list: if false;
-      allow create, update: if owner(ownerUid) && request.auth.token.role == 'USER' && validLiveLocationSession(request.resource.data, ownerUid);
+      allow create, update: if owner(ownerUid)
+        && liveLocationSessionUser()
+        && validLiveLocationSession(request.resource.data, ownerUid);
       allow delete: if owner(ownerUid);
     }
 

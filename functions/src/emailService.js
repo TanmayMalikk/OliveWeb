@@ -153,19 +153,24 @@ function isAlreadyExistsError(error) {
 }
 
 async function sendEmailOnce(dedupKey, meta, mail) {
+  const eventType = text(meta?.eventType, 80);
   const recipient = text(mail?.to, 254).toLowerCase();
-  if (!validEmail(recipient)) return { sent: false, reason: "invalid_recipient" };
+  if (!validEmail(recipient)) {
+    console.info(JSON.stringify({ eventType, status: "skipped", reason: "invalid_recipient" }));
+    return { sent: false, reason: "invalid_recipient" };
+  }
   const ref = db.collection("emailNotificationLogs").doc(logDocId(dedupKey));
   try {
     await ref.create({
       uid: text(meta?.uid, 128),
-      eventType: text(meta?.eventType, 80),
+      eventType,
       dedupKey: String(dedupKey).slice(0, 200),
       status: "sending",
       createdAt: FieldValue.serverTimestamp(),
     });
   } catch (error) {
     if (isAlreadyExistsError(error)) {
+      console.info(JSON.stringify({ eventType, status: "skipped", reason: "duplicate" }));
       return { sent: false, reason: "duplicate" };
     }
     throw error;
@@ -174,9 +179,11 @@ async function sendEmailOnce(dedupKey, meta, mail) {
     const result = await sendEmail(mail);
     if (!result.sent) {
       await ref.delete().catch(() => {});
+      console.info(JSON.stringify({ eventType, status: "skipped", reason: result.reason || "not_sent" }));
       return result;
     }
     await ref.set({ status: "sent", sentAt: FieldValue.serverTimestamp() }, { merge: true });
+    console.info(JSON.stringify({ eventType, status: "sent" }));
     return result;
   } catch (error) {
     await ref.delete().catch(() => {});
