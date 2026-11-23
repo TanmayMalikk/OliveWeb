@@ -550,28 +550,50 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         return recoveryKey
     }
 
+    /**
+     * Recovers and validates the account recovery key through a passkey PRF assertion.
+     *
+     * @param uid Authenticated account whose encrypted keyset is being recovered.
+     * @param keyset Server-fetched encrypted account keyset used to validate the recovered key.
+     * @param token Session generation used to reject stale authentication results.
+     * @return The validated account recovery key held only in client memory.
+     */
     private suspend fun recoverAccountRecoveryKey(
         uid: String,
         keyset: AccountKeysetEnvelope,
         token: Long,
     ): AccountRecoveryKey {
         val repository = checkNotNull(runtime.passkeyRecoveryRepository)
-        val start = repository.beginUnlock()
-        val assertion = requestPasskey(
-            PasskeyPrfProtocol.assertionRequest(start.options, start.prfInputs),
-            assertion = true,
-            uid = uid,
-            token = token,
-        ) as? PasskeyCredentialResult.Assertion ?: error("Passkey recovery was cancelled")
+        val start = atPasskeyRecoveryStage(PasskeyRecoveryStage.BEGIN_UNLOCK) {
+            repository.beginUnlock()
+        }
+        val assertion = atPasskeyRecoveryStage(PasskeyRecoveryStage.REQUEST_PASSKEY) {
+            requestPasskey(
+                PasskeyPrfProtocol.assertionRequest(start.options, start.prfInputs),
+                assertion = true,
+                uid = uid,
+                token = token,
+            ) as? PasskeyCredentialResult.Assertion ?: error("Passkey recovery was cancelled")
+        }
         val result = assertion.value
         try {
-            val completion = repository.completeUnlock(start.challengeId, result.serverResponseJson)
-            check(start.prfInputs[result.credentialId] == completion.prfInput) {
-                "Passkey recovery input mismatch"
+            val completion = atPasskeyRecoveryStage(PasskeyRecoveryStage.COMPLETE_UNLOCK) {
+                repository.completeUnlock(start.challengeId, result.serverResponseJson)
             }
-            val recoveryKey = completion.envelope.open(uid, result.credentialId, result.prfOutput)
-            withContext(Dispatchers.IO) { keyset.unlock(uid, recoveryKey) }
-            protectDeviceRecoveryKey(uid, recoveryKey, keyset, token)
+            atPasskeyRecoveryStage(PasskeyRecoveryStage.VERIFY_PRF_INPUT) {
+                check(start.prfInputs[result.credentialId] == completion.prfInput) {
+                    "Passkey recovery input mismatch"
+                }
+            }
+            val recoveryKey = atPasskeyRecoveryStage(PasskeyRecoveryStage.OPEN_RECOVERY_ENVELOPE) {
+                completion.envelope.open(uid, result.credentialId, result.prfOutput)
+            }
+            atPasskeyRecoveryStage(PasskeyRecoveryStage.VALIDATE_ACCOUNT_KEYSET) {
+                withContext(Dispatchers.IO) { keyset.unlock(uid, recoveryKey) }
+            }
+            atPasskeyRecoveryStage(PasskeyRecoveryStage.PROTECT_DEVICE_COPY) {
+                protectDeviceRecoveryKey(uid, recoveryKey, keyset, token)
+            }
             return recoveryKey
         } finally {
             result.prfOutput.fill(0)

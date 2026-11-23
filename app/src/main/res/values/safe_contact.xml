@@ -99,6 +99,13 @@
     <string name="documents_key_unavailable">This device does not have this file’s encryption key. Open Documents on an existing authorized device for this account, or ask the file owner to share it again.</string>
     <string name="documents_account_wrapper_missing">This file was not prepared for account recovery. Open it on the device that uploaded it, then share it again.</string>
     <string name="documents_account_recovery_failed">We could not restore your encrypted account access. Check your connection and choose your recovery passkey again.</string>
+    <string name="documents_recovery_begin_failed">Recovery could not start. Check your connection and try again. (RPK-DOC-01)</string>
+    <string name="documents_recovery_passkey_failed">The recovery passkey was not completed. Choose your account’s recovery passkey and try again. (RPK-DOC-02)</string>
+    <string name="documents_recovery_server_failed">Your passkey was accepted, but recovery could not be verified. Check your connection and try again. (RPK-DOC-03)</string>
+    <string name="documents_recovery_prf_mismatch">The selected passkey returned recovery data that does not match this account. (RPK-DOC-04)</string>
+    <string name="documents_recovery_envelope_failed">The selected passkey could not unlock this account’s recovery key. (RPK-DOC-05)</string>
+    <string name="documents_recovery_keyset_failed">The recovered key does not match this account’s encrypted files. Do not replace or remove the recovery passkey. (RPK-DOC-06)</string>
+    <string name="documents_recovery_device_save_failed">Account access was recovered but could not be protected on this device. Confirm device authentication and retry. (RPK-DOC-07)</string>
     <string name="documents_account_keyset_mismatch">This file belongs to a different encrypted account keyset. Restore the account’s original recovery passkey and try again.</string>
     <string name="documents_account_wrapper_failed">This file’s encrypted key could not be restored. Keep the file unchanged and try recovery again.</string>
     <string name="documents_ciphertext_authentication_failed">The encrypted file could not be authenticated. It may be damaged or use a different recovery key.</string>
