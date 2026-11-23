@@ -183,12 +183,14 @@ internal class FirestoreTestDriver {
             else -> emptyMap()
         }
         return {
-            if (call.method.name == "delete") records.remove(path)
-            else {
-                val merged = if (call.method.name == "set" && call.arguments.size == offset + 1) data
-                    else records[path].orEmpty() + data
-                records[path] = merged
-                mutations += path to data
+            synchronized(records) {
+                if (call.method.name == "delete") records.remove(path)
+                else {
+                    val merged = if (call.method.name == "set" && call.arguments.size == offset + 1) data
+                        else records[path].orEmpty() + data
+                    records[path] = merged
+                    mutations += path to data
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import com.olive.app.data.account.AdminAccountDraft
 import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
@@ -23,12 +24,16 @@ import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRelationship
 import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.messaging.ChatAccessRecoveryResult
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.security.KeyManager
 import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.shared.organization.AdminLocationMapController
 import com.olive.app.ui.users.user.documents.MediaTransferController
+import com.olive.app.ui.users.user.documents.MediaAccessRecoveryResult
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
+import com.olive.app.ui.users.user.documents.recoverableMediaDocuments
 import com.olive.app.ui.users.user.location.LocationMapController
 
 
@@ -57,6 +62,32 @@ internal class SessionViewModel @JvmOverloads constructor(
     }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
+    internal val encryptedAccessRecovery = EncryptedAccessRecoveryController(
+        scope = viewModelScope,
+        deviceId = { KeyManager.deviceId() },
+        unlock = runtime.settings::unlockAccountKeysetForMedia,
+        findChats = { conversations, uid ->
+            runtime.secureChatRepository?.recoverableConversations(conversations, uid).orEmpty()
+        },
+        restoreMedia = { candidates, uid, keyset ->
+            media?.restoreDeviceAccess(candidates, uid, keyset)
+                ?: MediaAccessRecoveryResult(emptyList(), candidates.mapTo(mutableSetOf(), SafetyDocument::id), emptySet())
+        },
+        restoreChats = { conversations, uid, keyset ->
+            runtime.secureChatRepository?.restoreCurrentDeviceAccess(conversations, uid, keyset)
+                ?: ChatAccessRecoveryResult(emptyList(), conversations.mapTo(mutableSetOf(), ChatConversation::id))
+        },
+        rememberMedia = documents::rememberRecoveredDocuments,
+        rememberChat = { uid, access, deviceId, validatedAt ->
+            runtime.chatCache.saveAccess(
+                ownerUid = uid,
+                conversation = access.conversation,
+                wrappedRoomKey = access.wrappedRoomKey,
+                deviceId = deviceId,
+                validatedAt = validatedAt,
+            )
+        },
+    )
     internal val locationMap =
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)
     internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
@@ -106,6 +137,7 @@ internal class SessionViewModel @JvmOverloads constructor(
     val adminAccounts get() = runtime.state.adminAccounts
     val savedNews get() = runtime.state.savedNews
     val privacyBlackout get() = runtime.state.privacyBlackout
+    val encryptedAccessRecoveryState get() = encryptedAccessRecovery.state
     val coverReset get() = runtime.state.coverReset
     val localMode get() = runtime.localMode
     val coverAccountId get() = runtime.coverAccountId
@@ -115,6 +147,26 @@ internal class SessionViewModel @JvmOverloads constructor(
     fun pauseIdleTimerForCall() = runtime.privacy.pauseIdleTimerForCall()
 
     fun resumeIdleTimerAfterCall() = runtime.privacy.resumeIdleTimerAfterCall()
+
+    /** Evaluates encrypted access only inside an authenticated personal-account session. */
+    fun evaluateEncryptedAccess() {
+        val uid = coverAccountId ?: return
+        if (accountRole != AccountRole.USER || screen != SessionScreen.Safe || privacyBlackout) return
+        encryptedAccessRecovery.evaluate(
+            ownerUid = uid,
+            media = recoverableMediaDocuments(documents.state.files, uid, KeyManager.deviceId()),
+            conversations = runtime.state.conversations,
+        )
+    }
+
+    /** Starts the user-confirmed recovery operation without exposing account key material. */
+    fun restoreEncryptedAccess() = encryptedAccessRecovery.restore()
+
+    /** Defers only the currently detected recovery candidates. */
+    fun dismissEncryptedAccess() = encryptedAccessRecovery.dismiss()
+
+    /** Clears the localized recovery result after the user acknowledges it. */
+    fun clearEncryptedAccessNotice() = encryptedAccessRecovery.clearNotice()
 
     @Volatile
     var externalFilePickerOpen = false

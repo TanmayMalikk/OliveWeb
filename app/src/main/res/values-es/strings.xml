@@ -535,4 +535,14 @@
     <string name="password_recovery_error_corrupted">Paquete de recuperación dañado. Informa a soporte: OPK-04.</string>
     <string name="password_recovery_error_account_mismatch">Cuenta no coincidente. El registro de recuperación pertenece a otro usuario. Código: OPK-05.</string>
     <string name="password_recovery_error_revoked">Recuperación no disponible debido al acceso revocado de la cuenta. Código: OPK-06.</string>
+    <string name="restore_encrypted_access_title">¿Restaurar el acceso cifrado?</string>
+    <string name="restore_encrypted_access_body">Restaura el acceso a tus chats y archivos cifrados en este dispositivo. Es posible que debas confirmar tu llave de acceso de recuperación.</string>
+    <string name="restore_access">Restaurar acceso</string>
+    <string name="later">Más tarde</string>
+    <string name="restoring_encrypted_access">Restaurando el acceso cifrado…</string>
+    <string name="encrypted_access_result_title">Acceso cifrado</string>
+    <string name="encrypted_access_restored">Tus chats y archivos cifrados están disponibles en este dispositivo.</string>
+    <string name="encrypted_access_partially_restored">No se pudieron restaurar algunos elementos cifrados. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="encrypted_access_restore_failed">No se pudo restaurar el acceso cifrado. Comprueba tu conexión y tu llave de acceso de recuperación, e inténtalo de nuevo.</string>
+    <string name="ok">Aceptar</string>
 </resources>

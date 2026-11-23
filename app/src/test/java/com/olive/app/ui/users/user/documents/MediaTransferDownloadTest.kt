@@ -176,6 +176,74 @@ class MediaTransferDownloadTest {
     }
 
     @Test
+    fun oneAccountUnlockRestoresRepeatedMediaClassesAndIsolatesFailures() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val keyset = envelope.unlock("owner", recoveryKey)
+            val originalKeys = mutableMapOf<String, javax.crypto.SecretKey>()
+            val documents = (0 until 25).map { index ->
+                val documentKey = EncryptionUtils.generateSymmetricKey()
+                val id = "restore-$index"
+                originalKeys[id] = documentKey
+                val metadata = EncryptionUtils.encryptText(
+                    JSONObject()
+                        .put("name", "restored-$index.${if (index % 2 == 0) "pdf" else "jpg"}")
+                        .put("mimeType", if (index % 2 == 0) "application/pdf" else "image/jpeg")
+                        .toString(),
+                    documentKey,
+                )
+                f.document.copy(
+                    id = id,
+                    name = "Encrypted document",
+                    mimeType = "application/octet-stream",
+                    encryptedMetadata = metadata,
+                    wrappedKeys = emptyMap(),
+                    deviceWrappedKeys = emptyMap(),
+                    accountWrappedKeys = mapOf(
+                        "owner" to AccountKeysetWrappedKey(
+                            envelope.keyId,
+                            envelope.epoch,
+                            "RSA-OAEP-256",
+                            KeyManager.wrapForAccountKeyset(documentKey, keyset.publicKey),
+                        ),
+                    ),
+                )
+            }
+            val corrupted = documents.first().copy(
+                id = "corrupted",
+                encryptedMetadata = documents.first().encryptedMetadata.dropLast(1) + "!",
+            )
+            val wrongRecoveryKey = AccountRecoveryKey.generate()
+            val wrongEnvelope = AccountKeysetEnvelope.create("owner", wrongRecoveryKey)
+            val wrongKeyset = wrongEnvelope.unlock("owner", wrongRecoveryKey)
+            val mismatched = documents.last().copy(
+                id = "mismatched",
+                accountWrappedKeys = mapOf(
+                    "owner" to AccountKeysetWrappedKey(
+                        wrongEnvelope.keyId,
+                        wrongEnvelope.epoch,
+                        "RSA-OAEP-256",
+                        KeyManager.wrapForAccountKeyset(originalKeys.getValue(documents.last().id), wrongKeyset.publicKey),
+                    ),
+                ),
+            )
+
+            val result = f.controller.restoreDeviceAccess(documents + corrupted + mismatched, "owner", keyset)
+
+            assertEquals(25, result.documents.size)
+            assertEquals(setOf("corrupted", "mismatched"), result.failedIds)
+            assertTrue(result.pendingSyncIds.isEmpty())
+            result.documents.forEach { restored ->
+                assertNotEquals("Encrypted document", restored.name)
+                val wrapped = restored.deviceWrappedKeys.getValue("owner--${KeyManager.deviceId()}")
+                assertArrayEquals(originalKeys.getValue(restored.id).encoded, KeyManager.unwrapKey(wrapped).encoded)
+            }
+            verify(f.repository, times(25)).updateDeviceKeys(anyString(), anyMap())
+        }
+    }
+
+    @Test
     fun expiredOfflineAccessRequiresRevalidationAndRevocationRemovesCachedBytes() = runBlocking<Unit> {
         Fixture().use { f ->
             `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.REVALIDATION_REQUIRED)

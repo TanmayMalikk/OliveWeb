@@ -535,4 +535,14 @@
     <string name="password_recovery_error_corrupted">Paquet de récupération corrompu. Signalez au support : OPK-04.</string>
     <string name="password_recovery_error_account_mismatch">Non-concordance de compte. L’enregistrement appartient à un autre utilisateur. Code : OPK-05.</string>
     <string name="password_recovery_error_revoked">Récupération indisponible en raison d’un accès au compte révoqué. Code : OPK-06.</string>
+    <string name="restore_encrypted_access_title">Restaurer l’accès chiffré ?</string>
+    <string name="restore_encrypted_access_body">Restaurez l’accès à vos discussions et fichiers chiffrés sur cet appareil. Une confirmation de votre clé d’accès de récupération peut être demandée.</string>
+    <string name="restore_access">Restaurer l’accès</string>
+    <string name="later">Plus tard</string>
+    <string name="restoring_encrypted_access">Restauration de l’accès chiffré…</string>
+    <string name="encrypted_access_result_title">Accès chiffré</string>
+    <string name="encrypted_access_restored">Vos discussions et fichiers chiffrés sont accessibles sur cet appareil.</string>
+    <string name="encrypted_access_partially_restored">Certains éléments chiffrés n’ont pas pu être restaurés. Vérifiez votre connexion et réessayez.</string>
+    <string name="encrypted_access_restore_failed">L’accès chiffré n’a pas pu être restauré. Vérifiez votre connexion et votre clé d’accès de récupération, puis réessayez.</string>
+    <string name="ok">OK</string>
 </resources>

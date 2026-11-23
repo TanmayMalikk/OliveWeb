@@ -586,4 +586,14 @@
     <string name="incident_clear_date">Clear date</string>
     <string name="incident_body_required">Incident details (required)</string>
     <string name="note_content_required">Note (required)</string>
+    <string name="restore_encrypted_access_title">Restore encrypted access?</string>
+    <string name="restore_encrypted_access_body">Restore access to your encrypted chats and files on this device. You may be asked to confirm your recovery passkey.</string>
+    <string name="restore_access">Restore access</string>
+    <string name="later">Later</string>
+    <string name="restoring_encrypted_access">Restoring encrypted access…</string>
+    <string name="encrypted_access_result_title">Encrypted access</string>
+    <string name="encrypted_access_restored">Your encrypted chats and files are available on this device.</string>
+    <string name="encrypted_access_partially_restored">Some encrypted items could not be restored. Check your connection and try again.</string>
+    <string name="encrypted_access_restore_failed">Encrypted access could not be restored. Check your connection and recovery passkey, then try again.</string>
+    <string name="ok">OK</string>
 </resources>

@@ -529,4 +529,14 @@
     <string name="password_recovery_error_corrupted">恢复包已损坏。请联系支持：OPK-04。</string>
     <string name="password_recovery_error_account_mismatch">帐户不匹配。该恢复记录属于其他用户。代码：OPK-05。</string>
     <string name="password_recovery_error_revoked">由于帐户访问权限已被撤销，恢复不可用。代码：OPK-06。</string>
+    <string name="restore_encrypted_access_title">恢复加密访问权限？</string>
+    <string name="restore_encrypted_access_body">在此设备上恢复对加密聊天和文件的访问。系统可能会要求您确认恢复通行密钥。</string>
+    <string name="restore_access">恢复访问权限</string>
+    <string name="later">稍后</string>
+    <string name="restoring_encrypted_access">正在恢复加密访问权限…</string>
+    <string name="encrypted_access_result_title">加密访问权限</string>
+    <string name="encrypted_access_restored">现在可以在此设备上访问您的加密聊天和文件。</string>
+    <string name="encrypted_access_partially_restored">部分加密项目无法恢复。请检查网络连接后重试。</string>
+    <string name="encrypted_access_restore_failed">无法恢复加密访问权限。请检查网络连接和恢复通行密钥，然后重试。</string>
+    <string name="ok">确定</string>
 </resources>

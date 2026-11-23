@@ -17,6 +17,7 @@ import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.OcrReview
 import com.olive.app.ui.users.user.documents.MediaTransferOperations
 import com.olive.app.ui.users.user.documents.OpenedMedia
+import com.olive.app.ui.users.user.documents.MediaAccessRecoveryResult
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.documents.mediaFailureResource
 import com.olive.app.ui.session.PasskeyRecoveryStage
@@ -427,6 +428,11 @@ class DocumentControllerMediaRoutingTest {
             failure?.let { throw it }
             return OpenedMedia(document, file)
         }
+        override suspend fun restoreDeviceAccess(
+            documents: List<SafetyDocument>,
+            viewerUid: String,
+            keyset: com.olive.app.security.UnlockedAccountKeyset,
+        ) = MediaAccessRecoveryResult(emptyList(), emptySet(), emptySet())
         override suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String) = Unit
         override suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String) = Unit
         override fun onDocumentSnapshot(

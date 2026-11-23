@@ -195,6 +195,7 @@ internal class SafetyDocumentsController(
             try {
                 runCatching { openDocument(document, viewerUid) }
                     .onSuccess { opened ->
+                        rememberRecoveredDocument(viewerUid, opened.document)
                         if (token == generation && state.ownerUid == viewerUid) {
                             onReady(opened.document, opened.file)
                         } else opened.file.delete()
@@ -235,6 +236,7 @@ internal class SafetyDocumentsController(
                     } else source.cachedFor(viewerUid, documentId)
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
                     val opened = openDocument(document, viewerUid)
+                    rememberRecoveredDocument(viewerUid, opened.document)
                     if (token == generation && state.ownerUid == viewerUid) {
                         onReady(opened.document, opened.file)
                     } else opened.file.delete()
@@ -513,6 +515,32 @@ internal class SafetyDocumentsController(
         if (token == generation) {
             state = state.copy(openingDocumentIds = state.openingDocumentIds - documentId)
         }
+    }
+
+    /**
+     * Applies restored metadata immediately and commits it to the encrypted account index.
+     *
+     * @param ownerUid Active account that owns the encrypted index partition.
+     * @param documents Locally authenticated records carrying current-device wrappers.
+     */
+    internal suspend fun rememberRecoveredDocuments(
+        ownerUid: String,
+        documents: List<SafetyDocument>,
+    ) {
+        withContext(Dispatchers.IO) {
+            documents.forEach { repository?.rememberRecovered(ownerUid, it) }
+        }
+        if (state.ownerUid == ownerUid) {
+            val recovered = documents.associateBy(SafetyDocument::id)
+            state = state.copy(files = state.files.map { recovered[it.id] ?: it })
+        }
+    }
+
+    private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
+        if (state.ownerUid == ownerUid) {
+            state = state.copy(files = state.files.map { if (it.id == document.id) document else it })
+        }
+        scope.launch(Dispatchers.IO) { repository?.rememberRecovered(ownerUid, document) }
     }
 
     private fun localizedFailure(failure: Throwable): String {

@@ -49,12 +49,39 @@ import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal data class OpenedMedia(val document: SafetyDocument, val file: File)
+
+internal data class MediaAccessRecoveryResult(
+    val documents: List<SafetyDocument>,
+    val failedIds: Set<String>,
+    val pendingSyncIds: Set<String>,
+)
+
+/**
+ * Selects authorized media whose account wrapper can provision the current device.
+ *
+ * @param documents Encrypted media records visible to the account.
+ * @param viewerUid Active Firebase account identifier.
+ * @param deviceId Stable identifier derived from the current device encryption key.
+ * @return Distinct media records missing this device's wrapped DEK.
+ */
+internal fun recoverableMediaDocuments(
+    documents: List<SafetyDocument>,
+    viewerUid: String,
+    deviceId: String,
+): List<SafetyDocument> = documents.filter { document ->
+    document.objectKey.isNotBlank() &&
+        viewerUid in document.allowedUsers &&
+        document.accountWrappedKeys[viewerUid] != null &&
+        document.deviceWrappedKeys["$viewerUid--$deviceId"].isNullOrBlank()
+}.distinctBy(SafetyDocument::id)
 
 internal interface MediaTransferOperations {
     // Watches pending uploads for this account and reports progress to the screen.
@@ -76,6 +103,11 @@ internal interface MediaTransferOperations {
     )
     // Downloads, checks, and decrypts one allowed media file.
     suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia
+    suspend fun restoreDeviceAccess(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult
     suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String)
     suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String)
     fun onDocumentSnapshot(viewerUid: String, documents: List<SafetyDocument>, serverConfirmed: Boolean)
@@ -269,6 +301,59 @@ internal class MediaTransferController(
             state=MediaTransferState.Failed(null,message,true)
             throw failure
         }
+    }
+
+    /**
+     * Restores recoverable media metadata and device wrappers with one unlocked account keyset.
+     *
+     * @param documents Authorized encrypted media records visible to the account.
+     * @param viewerUid Active Firebase account identifier.
+     * @param keyset Account private key unlocked by one foreground recovery confirmation.
+     * @return Locally restored records, rejected IDs, and wrappers awaiting server synchronization.
+     */
+    override suspend fun restoreDeviceAccess(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult = coroutineScope {
+        val deviceId = KeyManager.deviceId()
+        val deviceMapKey = "$viewerUid--$deviceId"
+        val publicKey = KeyManager.getOrCreatePublicKey()
+        val gate = Semaphore(4)
+        val candidates = recoverableMediaDocuments(documents, viewerUid, deviceId)
+        val outcomes = candidates.map { document ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    runCatching {
+                        val accountWrapper = checkNotNull(document.accountWrappedKeys[viewerUid])
+                        check(accountWrapper.keyId == keyset.keyId && accountWrapper.epoch == keyset.epoch) {
+                            "Account keyset does not match encrypted media"
+                        }
+                        val documentKey = accountWrapper.unwrap(keyset)
+                        val deviceWrapper = KeyManager.wrapKey(documentKey, publicKey)
+                        val metadataResolved = if (document.encryptedMetadata.isBlank()) document else {
+                            document.withDecryptedMetadata(
+                                JSONObject(EncryptionUtils.decryptText(document.encryptedMetadata, documentKey)),
+                            )
+                        }
+                        val resolved = metadataResolved.copy(
+                            deviceWrappedKeys = document.deviceWrappedKeys + (deviceMapKey to deviceWrapper),
+                        )
+                        val synced = runCatching {
+                            repository.updateDeviceKeys(document.id, mapOf(deviceMapKey to deviceWrapper))
+                        }.isSuccess
+                        Triple(resolved, synced, document.id)
+                    }
+                }
+            }
+        }.awaitAll()
+        val restored = outcomes.mapNotNull { it.getOrNull() }
+        val restoredIds = restored.mapTo(mutableSetOf()) { it.third }
+        MediaAccessRecoveryResult(
+            documents = restored.map { it.first },
+            failedIds = candidates.mapTo(mutableSetOf(), SafetyDocument::id) - restoredIds,
+            pendingSyncIds = restored.filterNot { it.second }.mapTo(mutableSetOf()) { it.third },
+        )
     }
 
     override suspend fun makeAvailableOffline(document:SafetyDocument,viewerUid:String) {

@@ -544,4 +544,14 @@
     <string name="password_recovery_error_corrupted">حزمة الاسترداد تالفة. أبلغ الدعم: OPK-04.</string>
     <string name="password_recovery_error_account_mismatch">عدم تطابق الحساب. سجل الاسترداد يخص مستخدماً آخر. الرمز: OPK-05.</string>
     <string name="password_recovery_error_revoked">الاسترداد غير متاح بسبب إلغاء حق الوصول إلى الحساب. الرمز: OPK-06.</string>
+    <string name="restore_encrypted_access_title">هل تريد استعادة الوصول المشفّر؟</string>
+    <string name="restore_encrypted_access_body">استعد الوصول إلى محادثاتك وملفاتك المشفّرة على هذا الجهاز. قد يُطلب منك تأكيد مفتاح مرور الاسترداد.</string>
+    <string name="restore_access">استعادة الوصول</string>
+    <string name="later">لاحقًا</string>
+    <string name="restoring_encrypted_access">جارٍ استعادة الوصول المشفّر…</string>
+    <string name="encrypted_access_result_title">الوصول المشفّر</string>
+    <string name="encrypted_access_restored">أصبحت محادثاتك وملفاتك المشفّرة متاحة على هذا الجهاز.</string>
+    <string name="encrypted_access_partially_restored">تعذرت استعادة بعض العناصر المشفّرة. تحقق من الاتصال وحاول مرة أخرى.</string>
+    <string name="encrypted_access_restore_failed">تعذرت استعادة الوصول المشفّر. تحقق من الاتصال ومفتاح مرور الاسترداد ثم حاول مرة أخرى.</string>
+    <string name="ok">حسنًا</string>
 </resources>
