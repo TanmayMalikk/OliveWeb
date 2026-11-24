@@ -1,9 +1,99 @@
 // Renders the crossing terrain and voxel models through an elevated, behind-the-player camera.
 import {
   CROSSING, railSignal,
-  type CrossingDirection, type CrossingVehicle, type CrossingWorld,
+  type CrossingDeathReason, type CrossingDirection, type CrossingVehicle, type CrossingWorld,
 } from "./olive-crossing";
 import { OLIVE_CHARACTERS, type OliveCharacter } from "./olive-crossing-characters";
+
+export interface CrossingHopAnimation {
+  direction: CrossingDirection;
+  progress: number;
+  offsetX: number;
+  offsetY: number;
+  blocked?: boolean;
+}
+
+export interface CrossingPlayerPose {
+  dx: number;
+  dy: number;
+  jumpZ: number;
+  bobZ: number;
+  stretchZ: number;
+  squashXY: number;
+  leanX: number;
+  leanY: number;
+  stride: number;
+  shadowScale: number;
+}
+
+export const HOP_DURATION_SECONDS = 0.14;
+
+export function computePlayerPose(
+  anim: CrossingHopAnimation | null | undefined,
+  hop: number,
+  riding: boolean,
+  clockSeconds = 0,
+): CrossingPlayerPose {
+  if (!anim) {
+    return {
+      dx: 0,
+      dy: 0,
+      jumpZ: 0,
+      bobZ: riding ? Math.sin(clockSeconds * 4.5) * 1.1 : 0,
+      stretchZ: 1,
+      squashXY: 1,
+      leanX: 0,
+      leanY: 0,
+      stride: 0,
+      shadowScale: 1,
+    };
+  }
+  const t = Math.max(0, Math.min(1, anim.progress));
+  const eased = 1 - (1 - t) * (1 - t);
+  const remain = 1 - eased;
+  const arc = Math.sin(t * Math.PI);
+  const peakHeight = anim.blocked ? 7 : 20;
+  const jumpZ = arc * peakHeight;
+
+  let stretchZ = 1;
+  let squashXY = 1;
+  if (t < 0.2) {
+    const k = t / 0.2;
+    stretchZ = 1 - 0.12 * Math.sin(k * Math.PI);
+    squashXY = 1 + 0.08 * Math.sin(k * Math.PI);
+  } else if (t < 0.82) {
+    const k = (t - 0.2) / 0.62;
+    const mid = Math.sin(k * Math.PI);
+    stretchZ = 1 + 0.14 * mid;
+    squashXY = 1 - 0.06 * mid;
+  } else {
+    const k = (t - 0.82) / 0.18;
+    const land = Math.sin(k * Math.PI);
+    stretchZ = 1 - 0.1 * land;
+    squashXY = 1 + 0.08 * land;
+  }
+
+  const leanAmt = arc * (anim.blocked ? 2.5 : 4.2);
+  const leanX =
+    anim.direction === "left" ? -leanAmt : anim.direction === "right" ? leanAmt : 0;
+  const leanY =
+    anim.direction === "up" ? -leanAmt : anim.direction === "down" ? leanAmt : 0;
+  const strideSign = hop % 2 === 0 ? 1 : -1;
+  const stride = arc * strideSign * (anim.blocked ? 1.5 : 4.5);
+
+  return {
+    dx: anim.offsetX * CELL * remain || 0,
+    dy: anim.offsetY * CELL * remain || 0,
+    jumpZ,
+    bobZ: 0,
+    stretchZ,
+    squashXY,
+    leanX,
+    leanY,
+    stride,
+    shadowScale: Math.max(0.55, 1 - (jumpZ / 20) * 0.35),
+  };
+}
 
 const CELL = CROSSING.cell;
 const WORLD_WIDTH = CROSSING.columns * CELL;
@@ -136,38 +226,179 @@ function Vehicle({ project, vehicle, direction, y }: {
   );
 }
 
-function Player({ project, x, y, character, facing, hop, riding, over }: {
+const EYE_WHITE: FaceColors = ["#ffffff", "#f2f5f0", "#dfe5dd"] as const;
+
+function Player({ project, x, y, character, facing, hop, hopAnim, clockSeconds, riding, over, deathReason }: {
   project: Project; x: number; y: number; character: OliveCharacter;
-  facing: CrossingDirection; hop: number; riding: boolean; over: boolean;
+  facing: CrossingDirection; hop: number; hopAnim?: CrossingHopAnimation | null;
+  clockSeconds: number; riding: boolean; over: boolean; deathReason?: CrossingDeathReason;
 }) {
-  const [px, py] = project(x, y);
   const feet: FaceColors = [character.footFill, character.footFill, character.stroke];
   const body: FaceColors = [character.bodyTop, character.bodyFront, character.bodySide];
   const crest: FaceColors = [character.crestFill, character.crestFill, character.crestDark];
-  const z = riding ? 8 : 0;
-  return (
-    <g className="crossing-player" data-world-x={x} data-world-y={y}
-      style={{ transform: `translate(${px}px, ${py}px)` }}>
-      <g transform={`translate(${-px} ${-py})`}>
-        {!over && <Ground project={project} x={x - 11} y={y - 7} width={24} depth={20} fill="rgba(26,39,21,.23)" />}
-        <g key={hop} className="crossing-player-hop">
-          <Box project={project} x={x - 10} y={y - 6} z={z} width={8} depth={16} height={6} colors={feet} />
-          <Box project={project} x={x + 2} y={y - 6} z={z} width={8} depth={16} height={6} colors={feet} />
-          <Box project={project} x={x - 11} y={y - 9} z={z + 5} width={22} depth={19} height={23} colors={body} />
-          <Box project={project} x={x - 5} y={y - 4} z={z + 28} width={10} depth={9} height={character.id === "chef" ? 12 : 6} colors={crest} />
-          {facing === "down" && [-6, 4].map((offset) => (
-            <Box key={offset} project={project} x={x + offset} y={y + 10} z={z + 16} width={3} depth={1} height={4} colors={TIRE} />
-          ))}
+  const pose = computePlayerPose(over ? null : hopAnim, hop, riding && !over, clockSeconds);
+  const rx = x + pose.dx;
+  const ry = y + pose.dy;
+  const baseZ = riding ? 8 : 0;
+  const z = baseZ + pose.jumpZ + pose.bobZ;
+
+  if (over && deathReason === "water") {
+    const [sx, sy] = project(rx, ry, 1);
+    return (
+      <g className="crossing-player crossing-player-riding" data-world-x={x} data-world-y={y} data-facing={facing}>
+        <g transform={`translate(${sx} ${sy})`} className="crossing-splash">
+          <ellipse rx="20" ry="11" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.88" />
+          <ellipse rx="13" ry="7" fill="none" stroke="#c8ecfa" strokeWidth="2" />
+          <circle cx="-11" cy="-9" r="2.5" fill="#eaf8ff" />
+          <circle cx="12" cy="-11" r="2.2" fill="#eaf8ff" />
+          <circle cx="4" cy="-14" r="1.8" fill="#ffffff" />
         </g>
       </g>
+    );
+  }
+
+  if (over && (deathReason === "traffic" || deathReason === "train")) {
+    return (
+      <g className="crossing-player crossing-player-riding" data-world-x={x} data-world-y={y} data-facing={facing}>
+        <Box project={project} x={rx - 15} y={ry - 12} z={baseZ} width={30} depth={24} height={4} colors={body} />
+        <Box project={project} x={rx - 6} y={ry - 5} z={baseZ + 4} width={12} depth={10} height={2} colors={crest} />
+      </g>
+    );
+  }
+
+  const sideways = facing === "left" || facing === "right";
+  const bodyW = (sideways ? 19 : 22) * pose.squashXY;
+  const bodyD = (sideways ? 22 : 19) * pose.squashXY;
+  const bodyH = 23 * pose.stretchZ;
+  const crestH = (character.id === "chef" ? 12 : 6) * pose.stretchZ;
+  const crestShiftX = facing === "left" ? -2.2 : facing === "right" ? 2.2 : 0;
+  const crestShiftY = facing === "up" ? -2.2 : facing === "down" ? 2.2 : 0;
+  const bx = rx + pose.leanX * 0.45;
+  const by = ry + pose.leanY * 0.45;
+  const cx = rx + pose.leanX + crestShiftX;
+  const cy = ry + pose.leanY + crestShiftY;
+  const eyeZ = z + 5 + bodyH * 0.46;
+  const shadowW = 24 * pose.shadowScale;
+  const shadowD = 20 * pose.shadowScale;
+  const footOffsetX = facing === "left" ? -9 : facing === "right" ? -6 : 0;
+  const footOffsetY = facing === "up" ? -8 : -5;
+
+  return (
+    <g
+      className={`crossing-player${riding ? " crossing-player-riding" : ""}`}
+      data-world-x={x}
+      data-world-y={y}
+      data-facing={facing}
+    >
+      {!over && (
+        <Ground
+          project={project}
+          x={rx - shadowW / 2}
+          y={ry - shadowD / 2 + 2}
+          z={baseZ + 0.15}
+          width={shadowW}
+          depth={shadowD}
+          fill={`rgba(26,39,21,${(0.24 * pose.shadowScale).toFixed(2)})`}
+        />
+      )}
+      {sideways ? (
+        <>
+          <Box
+            project={project}
+            x={rx + footOffsetX + pose.stride}
+            y={ry - 9}
+            z={z}
+            width={15}
+            depth={7}
+            height={6}
+            colors={feet}
+          />
+          <Box
+            project={project}
+            x={rx + footOffsetX - pose.stride}
+            y={ry + 2}
+            z={z}
+            width={15}
+            depth={7}
+            height={6}
+            colors={feet}
+          />
+        </>
+      ) : (
+        <>
+          <Box
+            project={project}
+            x={rx - 10}
+            y={ry + footOffsetY + pose.stride}
+            z={z}
+            width={8}
+            depth={15}
+            height={6}
+            colors={feet}
+          />
+          <Box
+            project={project}
+            x={rx + 2}
+            y={ry + footOffsetY - pose.stride}
+            z={z}
+            width={8}
+            depth={15}
+            height={6}
+            colors={feet}
+          />
+        </>
+      )}
+      <Box
+        project={project}
+        x={bx - bodyW / 2}
+        y={by - bodyD / 2}
+        z={z + 5}
+        width={bodyW}
+        depth={bodyD}
+        height={bodyH}
+        colors={body}
+      />
+      <Box
+        project={project}
+        x={cx - 5}
+        y={cy - 4.5}
+        z={z + 5 + bodyH}
+        width={10}
+        depth={9}
+        height={crestH}
+        colors={crest}
+      />
+      {facing === "down" && [-6.8, 2.2].map((offset) => (
+        <g key={offset}>
+          <Box project={project} x={bx + offset} y={by + bodyD / 2 - 0.4} z={eyeZ} width={4.6} depth={1.6} height={5.2} colors={EYE_WHITE} />
+          <Box project={project} x={bx + offset + 1.1} y={by + bodyD / 2 + 0.7} z={eyeZ + 0.9} width={2.4} depth={1.1} height={3.2} colors={TIRE} />
+        </g>
+      ))}
+      {facing === "left" && (
+        <g>
+          <Box project={project} x={bx - bodyW / 2 - 1.5} y={by - 3.5} z={eyeZ} width={1.8} depth={5} height={5} colors={EYE_WHITE} />
+          <Box project={project} x={bx - bodyW / 2 - 2.2} y={by - 2.3} z={eyeZ + 0.9} width={1.1} depth={2.6} height={3} colors={TIRE} />
+          <Box project={project} x={bx - bodyW / 2 + 1.2} y={by + bodyD / 2 - 0.5} z={eyeZ} width={4.4} depth={1.5} height={4.8} colors={EYE_WHITE} />
+          <Box project={project} x={bx - bodyW / 2 + 1.4} y={by + bodyD / 2 + 0.6} z={eyeZ + 0.9} width={2.2} depth={1.1} height={3} colors={TIRE} />
+        </g>
+      )}
+      {facing === "right" && (
+        <g>
+          <Box project={project} x={bx + bodyW / 2 - 0.3} y={by - 3.5} z={eyeZ} width={1.8} depth={5} height={5} colors={EYE_WHITE} />
+          <Box project={project} x={bx + bodyW / 2 + 1.1} y={by - 2.3} z={eyeZ + 0.9} width={1.1} depth={2.6} height={3} colors={TIRE} />
+          <Box project={project} x={bx + bodyW / 2 - 5.6} y={by + bodyD / 2 - 0.5} z={eyeZ} width={4.4} depth={1.5} height={4.8} colors={EYE_WHITE} />
+          <Box project={project} x={bx + bodyW / 2 - 3.6} y={by + bodyD / 2 + 0.6} z={eyeZ + 0.9} width={2.2} depth={1.1} height={3} colors={TIRE} />
+        </g>
+      )}
     </g>
   );
 }
 
 export default function CrossingBoard({
-  aspectRatio, hop, world, character = OLIVE_CHARACTERS[0], facing = "up", eagleProgress = 0,
+  aspectRatio, hop, hopAnim = null, clockSeconds = 0, world, character = OLIVE_CHARACTERS[0], facing = "up", eagleProgress = 0,
 }: {
-  aspectRatio: number; hop: number; world: CrossingWorld; character?: OliveCharacter;
+  aspectRatio: number; hop: number; hopAnim?: CrossingHopAnimation | null; clockSeconds?: number;
+  world: CrossingWorld; character?: OliveCharacter;
   facing?: CrossingDirection; eagleProgress?: number;
 }) {
   const camera = crossingCamera(world.playerColumn, aspectRatio);
@@ -235,7 +466,8 @@ export default function CrossingBoard({
                 colors={signal === "green" ? LEAVES : signal === "yellow" ? GOLD : CAR[0]} />
             )}
             {row === world.playerRow && <Player project={project} x={playerX} y={playerY} character={character}
-              facing={facing} hop={hop} riding={riding} over={world.over} />}
+              facing={facing} hop={hop} hopAnim={hopAnim} clockSeconds={clockSeconds}
+              riding={riding} over={world.over} deathReason={world.deathReason} />}
           </g>
         );
       })}

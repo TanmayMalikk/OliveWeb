@@ -63,11 +63,9 @@ test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   await expect(board).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(page.getByRole("status")).toContainText("1 lanes cleared");
-  await expect(page.locator(".crossing-player-hop")).toHaveCSS(
-    "animation-name",
-    "crossing-hop",
-  );
+  await expect(page.locator(".crossing-player")).toHaveAttribute("data-facing", "up");
   await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".crossing-player")).toHaveAttribute("data-facing", "left");
 
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Paused. Take your time.");

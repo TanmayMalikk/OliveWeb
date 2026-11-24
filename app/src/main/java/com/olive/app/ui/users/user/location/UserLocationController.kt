@@ -831,10 +831,8 @@ internal fun bundledMapAsset(context: Context, url: Uri, method: String = "GET")
         val path = url.path.orEmpty().removePrefix("/")
         val mime = when (path) {
             "map/map.html" -> "text/html"
-            "map/leaflet.css", "map/mapbox-gl.css" -> "text/css"
-            "map/leaflet.js", "map/map.js", "map/mapbox-basemap.js", "map/mapbox-gl.js" -> "text/javascript"
-            "map/images/layers.png", "map/images/layers-2x.png", "map/images/marker-icon.png",
-            "map/images/marker-icon-2x.png", "map/images/marker-shadow.png" -> "image/png"
+            "map/mapbox-gl.css" -> "text/css"
+            "map/map.js", "map/mapbox-gl.js" -> "text/javascript"
             else -> null
         }
         if (mime != null) {

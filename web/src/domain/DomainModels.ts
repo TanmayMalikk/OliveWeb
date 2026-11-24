@@ -107,17 +107,6 @@ export interface Enrollment {
   pinKey: WrappedKey;
   failures: number;
 }
-export interface NewsArticle {
-  id: string;
-  title: string;
-  summary: string;
-  link: string;
-  source: string;
-  published: string;
-  topic: string;
-  imageUrl?: string;
-  isPaywalled?: boolean;
-}
 export const covers: {
   id: Cover;
   slug: string;

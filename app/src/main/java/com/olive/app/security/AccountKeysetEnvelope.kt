@@ -320,7 +320,7 @@ internal data class OpaquePasswordRecoveryEnvelope(
     }
 
     /**
-     * Converts this passkey recovery envelope into a backend callable map payload.
+     * Converts this password recovery envelope into a backend callable map payload.
      *
      * @return The serialized fields ready for storage or transport.
      */
@@ -335,11 +335,11 @@ internal data class OpaquePasswordRecoveryEnvelope(
     )
 
     /**
-     * Decrypts and returns the wrapped [AccountRecoveryKey] using [prfOutput] and HKDF-SHA-256.
+     * Decrypts and returns the wrapped [AccountRecoveryKey] using [exportKey] and HKDF-SHA-256.
      *
      * @param expectedAccountId The account ID the encrypted data must belong to.
-     * @param expectedCredentialId The credential ID the recovery envelope must match.
-     * @param prfOutput The credential manager's PRF output for this passkey.
+     * @param expectedRecordId The OPAQUE record ID the recovery envelope must match.
+     * @param exportKey The OPAQUE export key derived from the user's recovery password.
      * @return The account recovery key decrypted from the supplied record.
      */
     internal fun open(
@@ -385,15 +385,15 @@ internal data class OpaquePasswordRecoveryEnvelope(
         private val RECORD_ID = Regex("[A-Za-z0-9_-]{16,1024}")
 
         /**
-         * Encrypts [recoveryKey] under a key derived from WebAuthn [prfOutput] and random salt/IV.
+         * Encrypts [recoveryKey] under a key derived from OPAQUE [exportKey] and random salt/IV.
          *
          * @param accountId The account ID that owns the key or record.
-         * @param credentialId The WebAuthn credential identifier for the passkey.
-         * @param prfOutput The credential manager's PRF output for this passkey.
+         * @param opaqueRecordId The OPAQUE record identifier for this password recovery envelope.
+         * @param exportKey The OPAQUE export key derived from the user's recovery password.
          * @param recoveryKey The account recovery key used to protect or open the private keyset.
          * @param salt The salt used to derive the wrapping key.
          * @param iv The initialization vector used to encrypt the recovery envelope.
-         * @return The recovery envelope containing the passkey-protected key.
+         * @return The recovery envelope containing the password-protected key.
          */
         internal fun create(
             accountId: String,

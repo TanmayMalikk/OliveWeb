@@ -209,14 +209,6 @@ export async function unwrapRoomKeyBytes(uid: string, value: string) {
     base64ToBytes(value),
   ));
 }
-// Turns the opened room-key bytes into the AES key used to read and send chat messages.
-export async function unwrapRoomKey(uid: string, value: string) {
-  const raw = await unwrapRoomKeyBytes(uid, value);
-  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
-    "encrypt",
-    "decrypt",
-  ]);
-}
 // Registers this account and browser for secure chat. It saves only the public key in Firebase.
 export async function register(identity: Identity) {
   const { db } = await firebase();

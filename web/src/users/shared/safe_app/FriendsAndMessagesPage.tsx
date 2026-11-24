@@ -10,7 +10,7 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react";
-import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Empty, Form, Modal } from "../../../components/SharedComponents";
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, cloudMode } from "../../../services/AccountService";
 import * as messaging from "../../../services/MessagingService";

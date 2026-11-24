@@ -597,29 +597,3 @@ internal fun rememberDeviceHeadingState(
         androidx.compose.runtime.derivedStateOf { if (enabled) headingState.value else null }
     }
 }
-
-/**
- * Observes tilt-invariant true-north compass orientation and GPS movement bearing while [enabled] is true,
- * returning a circularly smoothed heading in `[0f, 360f)`.
- *
- * @param enabled Whether to subscribe to heading updates.
- * @param latitude The latitude in decimal degrees.
- * @param longitude The longitude in decimal degrees.
- * @param gpsBearing The latest GPS movement bearing in degrees, if available.
- * @param gpsSpeedMetersPerSecond The latest GPS speed in meters per second, if available.
- * @return The current smoothed heading in degrees from true north, or null when unavailable.
- */
-@Composable
-internal fun rememberDeviceHeading(
-    enabled: Boolean,
-    latitude: Double? = null,
-    longitude: Double? = null,
-    gpsBearing: Float? = null,
-    gpsSpeedMetersPerSecond: Float? = null,
-): Float? = rememberDeviceHeadingState(
-    enabled = enabled,
-    latitude = latitude,
-    longitude = longitude,
-    gpsBearing = gpsBearing,
-    gpsSpeedMetersPerSecond = gpsSpeedMetersPerSecond,
-).value
