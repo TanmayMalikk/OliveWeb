@@ -3,7 +3,7 @@ package com.olive.app
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -31,7 +31,7 @@ class OnboardingBirthdayInputTest {
 
         compose.onNodeWithText("Birthday required").assertIsDisplayed()
         choose("open")
-        compose.onNodeWithContentDescription("Years 2 0 0 7 through 2 0 1 6").assertExists()
+        compose.onNodeWithContentDescription("Years 2007 through 2016").assertExists()
         compose.onNodeWithTag("dob_range_1926").assertDoesNotExist()
         val today = LocalDate.now()
         choose("range_${today.year}")

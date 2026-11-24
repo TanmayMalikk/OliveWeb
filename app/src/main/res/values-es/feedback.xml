@@ -49,7 +49,7 @@
     <string name="dob_pick_day">Elige un día</string>
     <string name="dob_clear">Borrar fecha de nacimiento</string>
     <string name="location_background_access">Activar la ubicación en segundo plano</string>
-    <string name="location_background_settings">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. En los ajustes de Android, elige %1$s y vuelve aquí.</string>
+    <string name="location_background_settings">En la siguiente pantalla de permisos de Android, elige %1$s y vuelve a Olive. Android necesita este ajuste para actualizar la ubicación en segundo plano.</string>
     <string name="location_background_dialog">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. Elige Permitir siempre en el aviso de Android.</string>
     <string name="chat_dms_tab">Mensajes directos</string>
     <string name="chat_tickets_tab">Chats de tickets</string>

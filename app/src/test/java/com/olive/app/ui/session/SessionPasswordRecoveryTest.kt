@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountKeysetRepository
 import com.olive.app.data.account.AccountRecoveryAuthenticator
 import com.olive.app.data.account.AccountRecoveryCallable
 import com.olive.app.data.account.AccountRole
@@ -31,6 +32,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
 import java.security.KeyStore
@@ -200,7 +202,7 @@ class SessionPasswordRecoveryTest {
             opaqueClient = fakeOpaqueClient,
         )
 
-        SessionRuntimeFixture(opaqueRecoveryOverride = failingAuthRepo).use { fixture ->
+        SessionRuntimeFixture(accountKeysetsOverride = unenrolledKeysets(), opaqueRecoveryOverride = failingAuthRepo).use { fixture ->
             val runtime = fixture.runtime
             val identity = AccountIdentity(uid, "fixture_owner")
             val profile = UserProfile(
@@ -215,7 +217,7 @@ class SessionPasswordRecoveryTest {
 
             enrollDeviceArk(runtime)
 
-            runtime.passwordRecovery.enablePasswordRecovery("WrongPassword123!")
+            startEnrollment(runtime, "WrongPassword123!")
             fixture.await { !runtime.state.busy }
 
             assertNull(runtime.state.deviceLockRequest)
@@ -240,7 +242,7 @@ class SessionPasswordRecoveryTest {
             opaqueClient = fakeOpaqueClient,
         )
 
-        SessionRuntimeFixture(opaqueRecoveryOverride = expiredAuthRepo).use { fixture ->
+        SessionRuntimeFixture(accountKeysetsOverride = unenrolledKeysets(), opaqueRecoveryOverride = expiredAuthRepo).use { fixture ->
             val runtime = fixture.runtime
             val identity = AccountIdentity(uid, "fixture_owner")
             val profile = UserProfile(
@@ -255,7 +257,7 @@ class SessionPasswordRecoveryTest {
 
             enrollDeviceArk(runtime)
 
-            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            startEnrollment(runtime, "Password123!")
             fixture.await { !runtime.state.busy }
 
             assertNull(runtime.state.deviceLockRequest)
@@ -288,7 +290,7 @@ class SessionPasswordRecoveryTest {
             opaqueClient = failingClient,
         )
 
-        SessionRuntimeFixture(opaqueRecoveryOverride = runtimeFailingRepo).use { fixture ->
+        SessionRuntimeFixture(accountKeysetsOverride = unenrolledKeysets(), opaqueRecoveryOverride = runtimeFailingRepo).use { fixture ->
             val runtime = fixture.runtime
             val identity = AccountIdentity(uid, "fixture_owner")
             val profile = UserProfile(
@@ -303,7 +305,7 @@ class SessionPasswordRecoveryTest {
 
             enrollDeviceArk(runtime)
 
-            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            startEnrollment(runtime, "Password123!")
             fixture.await { !runtime.state.busy }
 
             assertNull(runtime.state.deviceLockRequest)
@@ -336,7 +338,7 @@ class SessionPasswordRecoveryTest {
             opaqueClient = clientFailingClient,
         )
 
-        SessionRuntimeFixture(opaqueRecoveryOverride = clientFailingRepo).use { fixture ->
+        SessionRuntimeFixture(accountKeysetsOverride = unenrolledKeysets(), opaqueRecoveryOverride = clientFailingRepo).use { fixture ->
             val runtime = fixture.runtime
             val identity = AccountIdentity(uid, "fixture_owner")
             val profile = UserProfile(
@@ -351,7 +353,7 @@ class SessionPasswordRecoveryTest {
 
             enrollDeviceArk(runtime)
 
-            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            startEnrollment(runtime, "Password123!")
             fixture.await { !runtime.state.busy }
 
             assertNull(runtime.state.deviceLockRequest)
@@ -363,14 +365,14 @@ class SessionPasswordRecoveryTest {
     }
 
     /**
-     * Verifies that cancelling OPAQUE password recovery unlock during enrollment displays
+     * Verifies that cancelling OPAQUE password recovery unlock during recovery displays
      * the unlock cancelled message without triggering device lock prompts.
      */
     @Test
-    fun enablePasswordRecoveryWithCancelledPasswordRecoveryUnlockShowsCancelledMessage() = runBlocking<Unit> {
+    fun accountRecoveryKeyUnlockWithCancelledPasswordRecoveryShowsCancelledMessage() = runBlocking<Unit> {
         val ark = AccountRecoveryKey.generate()
         val keyset = AccountKeysetEnvelope.create(uid, ark)
-        val keysetRepo = mock(com.olive.app.data.account.AccountKeysetRepository::class.java)
+        val keysetRepo = mock(AccountKeysetRepository::class.java)
         `when`(keysetRepo.fetch(uid)).thenReturn(keyset)
 
         SessionRuntimeFixture(
@@ -389,7 +391,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            runtime.operations.runOperation(
+                "Recovery unlock failed",
+                failureFor = runtime.passwordRecovery::passwordRecoveryFailure,
+            ) { token ->
+                runtime.settings.accountRecoveryKey(uid, token)
+            }
             fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || !runtime.state.busy }
             assertNull(runtime.state.deviceLockRequest)
             runtime.state.passwordRecoveryUnlockRequest?.complete(null)
@@ -504,7 +511,7 @@ class SessionPasswordRecoveryTest {
             opaqueClient = fakeOpaqueClient,
         )
 
-        SessionRuntimeFixture(opaqueRecoveryOverride = serverUnconfiguredRepo).use { fixture ->
+        SessionRuntimeFixture(accountKeysetsOverride = unenrolledKeysets(), opaqueRecoveryOverride = serverUnconfiguredRepo).use { fixture ->
             val runtime = fixture.runtime
             val identity = AccountIdentity(uid, "fixture_owner")
             val profile = UserProfile(
@@ -519,7 +526,7 @@ class SessionPasswordRecoveryTest {
 
             enrollDeviceArk(runtime)
 
-            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            startEnrollment(runtime, "Password123!")
             fixture.await { !runtime.state.busy }
 
             assertNull(runtime.state.deviceLockRequest)
@@ -538,8 +545,10 @@ class SessionPasswordRecoveryTest {
             state.screen = SessionScreen.Cover
             state.accountRole = AccountRole.USER
 
-            runtime.passwordRecovery.enablePasswordRecovery(password)
-
+            val failure = runCatching {
+                runtime.passwordRecovery.enrollAfterAuthentication(uid, password, runtime.epoch, true)
+            }.exceptionOrNull()
+            assertEquals("Recovery session changed", failure?.message)
             assertFalse(state.passwordRecoveryEnrolled == true)
         }
     }
@@ -604,7 +613,87 @@ class SessionPasswordRecoveryTest {
         }
     }
 
-    private fun fixture() = SessionRuntimeFixture(opaqueRecoveryOverride = fakeRecoveryRepo).also { fixture ->
+    @Test
+    fun signupRetryEnrollsRecoveryWithAccountPasswordWithoutCreatingAnotherAccount() = runBlocking<Unit> {
+        val identity = AccountIdentity(uid, "fixture_owner")
+        val keysets = unenrolledKeysets()
+        var authenticatedPassword: String? = null
+        var finished = false
+        var registrationAttempts = 0
+        val recovery = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { name, _ ->
+                when (name) {
+                    "opaqueRecoveryBeginRegistration" -> {
+                        registrationAttempts++
+                        if (registrationAttempts == 1) {
+                            throw functionsFailure("Temporary registration failure", FirebaseFunctionsException.Code.UNAVAILABLE)
+                        }
+                        mapOf("registrationResponse" to "response")
+                    }
+                    "opaqueRecoveryFinishRegistration" -> {
+                        finished = true
+                        mapOf("success" to true)
+                    }
+                    else -> error("Unexpected callable")
+                }
+            },
+            authenticator = AccountRecoveryAuthenticator { _, enteredPassword -> authenticatedPassword = enteredPassword },
+            opaqueClient = fakeOpaqueClient,
+        )
+        SessionRuntimeFixture(accountKeysetsOverride = keysets, opaqueRecoveryOverride = recovery).use { fixture ->
+            val runtime = fixture.runtime
+            runtime.enrollment = null
+            runtime.state.screen = SessionScreen.NewCredentials
+            `when`(fixture.accounts.authenticatedUid()).thenReturn(uid)
+            `when`(fixture.accounts.create(identity.username, password, AccountRole.USER)).thenReturn(identity)
+            `when`(fixture.accounts.authenticate(identity.username, password, AccountRole.USER)).thenReturn(identity)
+
+            runtime.accountSignIn.authenticate(identity.username, password, create = true)
+            fixture.await { !runtime.state.busy }
+            assertNull(runtime.state.deviceLockRequest)
+            assertEquals(SessionScreen.NewCredentials, runtime.state.screen)
+            assertFalse(finished)
+
+            runtime.accountSignIn.authenticate(identity.username, password, create = true)
+            fixture.await { !runtime.state.busy }
+            assertNull(runtime.state.deviceLockRequest)
+            assertEquals(SessionScreen.ProfileSetup, runtime.state.screen)
+            assertEquals(password, authenticatedPassword)
+            assertTrue(finished)
+            assertTrue(runtime.state.passwordRecoveryEnrolled == true)
+            assertNotNull(runtime.accountKeysets.read(uid))
+            verify(fixture.accounts).create(identity.username, password, AccountRole.USER)
+            verify(fixture.accounts).authenticate(identity.username, password, AccountRole.USER)
+        }
+    }
+
+    @Test
+    fun existingRecoveryEnrollmentDoesNotPromptOrReplaceItsKeyset() = runBlocking<Unit> {
+        val keysets = mock(AccountKeysetRepository::class.java)
+        `when`(keysets.isPasswordRecoveryEnrolled(uid)).thenReturn(true)
+        fixture(keysets).use { fixture ->
+            val runtime = fixture.runtime
+            runtime.passwordRecovery.enrollAfterAuthentication(uid, password, runtime.epoch, setupRequired = false)
+            assertTrue(runtime.state.passwordRecoveryEnrolled == true)
+            assertNull(runtime.state.deviceLockRequest)
+            assertNull(runtime.accountKeysets.read(uid))
+        }
+    }
+
+    private suspend fun unenrolledKeysets() = mock(AccountKeysetRepository::class.java).also {
+        `when`(it.isPasswordRecoveryEnrolled(uid)).thenReturn(false)
+    }
+
+    private fun startEnrollment(runtime: SessionRuntime, password: String) {
+        runtime.operations.runOperation("Recovery enrollment failed", failureFor = runtime.passwordRecovery::passwordRecoveryFailure) { token ->
+            runtime.passwordRecovery.enrollAfterAuthentication(uid, password, token, setupRequired = true)
+        }
+    }
+
+    private fun fixture(keysets: AccountKeysetRepository? = null) = SessionRuntimeFixture(
+        accountKeysetsOverride = keysets,
+        opaqueRecoveryOverride = fakeRecoveryRepo,
+    ).also { fixture ->
         val runtime = fixture.runtime
         val identity = AccountIdentity(uid, "fixture_owner")
         val profile = UserProfile(

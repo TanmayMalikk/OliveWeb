@@ -1,6 +1,9 @@
 // News cover users: opens an article in the app reader.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.*
 
 import android.graphics.Bitmap
@@ -15,19 +18,22 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +47,7 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -48,11 +55,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
+import com.olive.app.data.news.estimateReadingMinutes
 import com.olive.app.data.news.fallbackNewsTopic
 import com.olive.app.data.news.isSecureNewsUrl
 import com.olive.app.data.news.localPublishedDate
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsMetadataRepository
+import com.olive.app.data.news.NewsReadingHistoryStore
 import com.olive.app.R
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -61,8 +70,15 @@ import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.rememberResourceText
 import java.net.URI
 
-// Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering.
-// Story details form one TalkBack target; the bookmark remains a separate action.
+/**
+ * Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering. Story details form one TalkBack target; the bookmark remains a separate action.
+ *
+ * @param article Article supplied to [NewsArticleCard].
+ * @param language Language supplied to [NewsArticleCard].
+ * @param saved Whether to apply saved.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param onBookmark Callback invoked when bookmark changes or occurs.
+ */
 @Composable
 internal fun NewsArticleCard(
     article: NewsArticle,
@@ -80,6 +96,12 @@ internal fun NewsArticleCard(
         displayed = metadata.load(article).applyTo(article)
     }
     val topic = displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) }
+    val readingTime = uiText(
+        R.string.news_min_read,
+        remember(displayed.title, displayed.summary, displayed.wordCount) {
+            estimateReadingMinutes(displayed)
+        }
+    )
     var imageFailed by remember(displayed.imageUrl) { mutableStateOf(false) }
     Card(
         onClick = onOpen,
@@ -102,7 +124,7 @@ internal fun NewsArticleCard(
                     maxLines = 2
                 )
                 Text(
-                    displayed.localPublishedDate(language),
+                    "${displayed.localPublishedDate(language)} · $readingTime",
                     color = Muted,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 2
@@ -226,11 +248,24 @@ internal fun NewsArticleCard(
     }
 }
 
-// Google News and publisher redirects stay inside the reader; local files and app intents do not open.
+/**
+ * Google News and publisher redirects stay inside the reader; local files and app intents do not open.
+ *
+ * @param url HTTPS URL to validate, fetch, or open.
+ * @return `true` if is news reader URL allowed, or `false` otherwise.
+ */
 internal fun isNewsReaderUrlAllowed(url: String): Boolean = isSecureNewsUrl(url)
 
-// Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher.
-// Publisher pages require JavaScript. Navigation remains HTTPS-only and the WebView exposes no native bridge or files.
+/**
+ * Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher. Publisher pages require JavaScript. Navigation remains HTTPS-only and the WebView exposes no native bridge or files.
+ *
+ * @param article Article supplied to [NewsArticleReader].
+ * @param saved Whether to apply saved.
+ * @param active Whether to apply active.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onBookmark Callback invoked when bookmark changes or occurs.
+ */
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun NewsArticleReader(
@@ -251,17 +286,40 @@ internal fun NewsArticleReader(
     var failed by remember(article.link) { mutableStateOf(!isNewsReaderUrlAllowed(readerUrl)) }
     var currentUrl by remember(article.link) { mutableStateOf(readerUrl) }
     var publisherReached by remember(article.link) { mutableStateOf(false) }
+    var textZoom by remember(article.link) { mutableIntStateOf(100) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = runCatching { URI(currentUrl).host }.getOrNull().orEmpty()
+    val cachedMeta = remember(article.link) {
+        NewsMetadataRepository(context.applicationContext).cached(article.link)
+    }
+    val readingTime = uiText(
+        R.string.news_min_read,
+        remember(article.title, article.summary, article.wordCount, cachedMeta?.wordCount) {
+            estimateReadingMinutes(
+                article.title,
+                article.summary,
+                article.wordCount ?: cachedMeta?.wordCount
+            )
+        }
+    )
+    val shareTitle = uiText(R.string.news_share_article)
 
-    BackHandler(active) {
+    LaunchedEffect(article.link) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            NewsReadingHistoryStore(context.applicationContext).record(article)
+        }
+    }
+
+    val backProgress = rememberOliveBack(active) {
         val view = browser
         if (view != null && view.canGoBack()) view.goBack() else onBack()
     }
     // Pauses the article browser when this reader is hidden or the app is paused.
     DisposableEffect(browser, active, lifecycle) {
         val view = browser
-        // Pauses the WebView off-screen and resumes it only while this article is visible.
+        /**
+         * Pauses the WebView off-screen and resumes it only while this article is visible.
+         */
         fun updateVisibility() {
             if (active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view?.onResume()
             else view?.onPause()
@@ -276,20 +334,15 @@ internal fun NewsArticleReader(
         }
     }
 
-    Column(modifier) {
+    Column(modifier.oliveBackPreview(backProgress)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp).testTag("news_reader_toolbar"),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, modifier = Modifier.testTag("news_reader_back")) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, null)
-                Spacer(Modifier.width(5.dp))
-                Text(stringResource(R.string.back_to_stories))
+            IconButton(onClick = onBack, modifier = Modifier.testTag("news_reader_back")) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.back_to_stories))
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { browser?.reload() }, enabled = browser != null && !failed) {
-                Icon(Icons.Outlined.Refresh, uiText(R.string.a11y_refresh_article))
-            }
             IconButton(onClick = onBookmark, modifier = Modifier.testTag("news_reader_bookmark")) {
                 Icon(
                     if (saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -297,17 +350,55 @@ internal fun NewsArticleReader(
                     tint = OliveGreen
                 )
             }
+            IconButton(
+                onClick = {
+                    textZoom = when (textZoom) {
+                        100 -> 125
+                        125 -> 150
+                        else -> 100
+                    }
+                    browser?.settings?.textZoom = textZoom
+                },
+                enabled = browser != null || failed
+            ) {
+                Icon(Icons.Outlined.FormatSize, uiText(R.string.news_text_size), tint = OliveGreen)
+            }
+            IconButton(
+                onClick = {
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
+                        putExtra(
+                            android.content.Intent.EXTRA_TEXT,
+                            "${article.title}\n\n${article.publisherUrl.ifBlank { article.link }}"
+                        )
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, shareTitle))
+                }
+            ) {
+                Icon(Icons.Outlined.Share, shareTitle, tint = OliveGreen)
+            }
+            IconButton(onClick = { browser?.reload() }, enabled = browser != null && !failed) {
+                Icon(Icons.Outlined.Refresh, uiText(R.string.a11y_refresh_article))
+            }
         }
         Text(
-            article.title, modifier = Modifier.padding(horizontal = 20.dp),
-            style = MaterialTheme.typography.titleMedium, maxLines = 2
-        )
-        Text(
-            host, color = Muted, style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+            if (host.isNotBlank()) "$host · $readingTime" else readingTime,
+            color = Muted, style = MaterialTheme.typography.labelSmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 5.dp)
                 .testTag("news_reader_host")
         )
-        HorizontalDivider()
+        if (progress in 1..99) {
+            LinearProgressIndicator(
+                progress = { progress / 100f },
+                modifier = Modifier.fillMaxWidth().height(2.5.dp),
+                color = OliveGreen,
+                trackColor = PaleOlive
+            )
+        } else {
+            HorizontalDivider()
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             key(article.link) {
                 AndroidView(
@@ -326,13 +417,24 @@ internal fun NewsArticleReader(
                             settings.setSupportMultipleWindows(false)
                             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
                             webChromeClient = object : WebChromeClient() {
-                                // Updates the loading bar as the publisher page loads.
+                                /**
+                                 * Updates the loading bar as the publisher page loads.
+                                 *
+                                 * @param view View supplied to [onProgressChanged].
+                                 * @param newProgress New progress supplied to [onProgressChanged].
+                                 */
                                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                                     progress = newProgress
                                 }
                             }
                             webViewClient = object : WebViewClient() {
-                                // Keeps HTTPS news links in the reader and blocks unsafe link types.
+                                /**
+                                 * Keeps HTTPS news links in the reader and blocks unsafe link types.
+                                 *
+                                 * @param view View supplied to [shouldOverrideUrlLoading].
+                                 * @param request Request supplied to [shouldOverrideUrlLoading].
+                                 * @return `true` if should override URL loading, or `false` otherwise.
+                                 */
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -342,7 +444,13 @@ internal fun NewsArticleReader(
                                     return blocked
                                 }
 
-                                // Resets the reader state when a new publisher page starts loading.
+                                /**
+                                 * Resets the reader state when a new publisher page starts loading.
+                                 *
+                                 * @param view View supplied to [onPageStarted].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 * @param favicon Optional favicon supplied to [onPageStarted].
+                                 */
                                 override fun onPageStarted(
                                     view: WebView,
                                     url: String,
@@ -353,13 +461,24 @@ internal fun NewsArticleReader(
                                     progress = 0
                                 }
 
-                                // Records the final URL and completes the loading bar.
+                                /**
+                                 * Records the final URL and completes the loading bar.
+                                 *
+                                 * @param view View supplied to [onPageFinished].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 */
                                 override fun onPageFinished(view: WebView, url: String) {
                                     currentUrl = url
                                     progress = 100
                                 }
 
-                                // Clears only the Google News redirect from Back history.
+                                /**
+                                 * Clears only the Google News redirect from Back history.
+                                 *
+                                 * @param view View supplied to [doUpdateVisitedHistory].
+                                 * @param url HTTPS URL to validate, fetch, or open.
+                                 * @param isReload Whether is reload.
+                                 */
                                 override fun doUpdateVisitedHistory(
                                     view: WebView,
                                     url: String,
@@ -374,7 +493,13 @@ internal fun NewsArticleReader(
                                     currentUrl = url
                                 }
 
-                                // Shows the reader error screen when the main page fails to load.
+                                /**
+                                 * Shows the reader error screen when the main page fails to load.
+                                 *
+                                 * @param view View supplied to [onReceivedError].
+                                 * @param request Request supplied to [onReceivedError].
+                                 * @param error Throwable or error message describing a failure.
+                                 */
                                 override fun onReceivedError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -386,7 +511,13 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
-                                // Treats a failed HTTP response for the main article as a reader error.
+                                /**
+                                 * Treats a failed HTTP response for the main article as a reader error.
+                                 *
+                                 * @param view View supplied to [onReceivedHttpError].
+                                 * @param request Request supplied to [onReceivedHttpError].
+                                 * @param response Response supplied to [onReceivedHttpError].
+                                 */
                                 override fun onReceivedHttpError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -398,7 +529,13 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
-                                // Cancels invalid HTTPS certificates instead of opening an unsafe article.
+                                /**
+                                 * Cancels invalid HTTPS certificates instead of opening an unsafe article.
+                                 *
+                                 * @param view View supplied to [onReceivedSslError].
+                                 * @param handler Handler supplied to [onReceivedSslError].
+                                 * @param error Throwable or error message describing a failure.
+                                 */
                                 override fun onReceivedSslError(
                                     view: WebView,
                                     handler: SslErrorHandler,
@@ -432,12 +569,53 @@ internal fun NewsArticleReader(
                 SkeletonLayout.NewsArticle, Modifier.fillMaxWidth().padding(16.dp), rows = 1,
             )
             if (failed) Column(
-                Modifier.fillMaxSize().background(Cream).padding(24.dp),
-                verticalArrangement = Arrangement.Center,
+                Modifier.fillMaxSize().background(Cream).padding(20.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(uiText(R.string.ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag))
-                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Paper),
+                    border = BorderStroke(1.dp, SoftGray),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Surface(
+                            color = PaleOlive,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                uiText(R.string.news_offline_reader),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkOlive
+                            )
+                        }
+                        Text(
+                            article.title,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp * (textZoom / 100f),
+                            lineHeight = 26.sp * (textZoom / 100f),
+                            color = Ink
+                        )
+                        if (article.summary.isNotBlank()) {
+                            Text(
+                                article.summary,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 15.sp * (textZoom / 100f),
+                                lineHeight = 22.sp * (textZoom / 100f),
+                                color = Ink
+                            )
+                        }
+                    }
+                }
+                Text(
+                    uiText(R.string.ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted
+                )
                 Button(
                     onClick = {
                         if (isNewsReaderUrlAllowed(readerUrl)) {

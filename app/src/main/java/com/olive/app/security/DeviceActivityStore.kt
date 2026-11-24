@@ -44,21 +44,41 @@ import kotlinx.coroutines.launch
 
 // Encrypted, account-scoped activity and private-entry storage; no authentication responsibilities.
 internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
-    // These histories stay encrypted on this device under the current account ID.
+    /**
+     * These histories stay encrypted on this device under the current account ID.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param event Sensor, UI, or lifecycle event being processed.
+     */
     fun recordSettings(uid: String, event: SettingsEvent) {
         activityVault.update { append(it, uid, "settingsHistory", event.toJson()) }
     }
 
-    // Adds one setting change to the phone's encrypted history.
+    /**
+     * Adds one setting change to the phone's encrypted history.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting settings history items.
+     */
     fun settingsHistory(uid: String): List<SettingsEvent> =
         rows(uid, "settingsHistory").map(SettingsEvent::fromJson)
 
-    // Records trigger for device activity store.
+    /**
+     * Records trigger for device activity store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param event Sensor, UI, or lifecycle event being processed.
+     */
     fun recordTrigger(uid: String, event: TriggerEvent) {
         activityVault.update { append(it, uid, "triggerHistory", event.toJson()) }
     }
 
-    // Loads discreet-trigger history from encrypted phone storage.
+    /**
+     * Loads discreet-trigger history from encrypted phone storage.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting trigger history items.
+     */
     fun triggerHistory(uid: String): List<TriggerEvent> =
         rows(uid, "triggerHistory").map(TriggerEvent::fromJson).map { event ->
             // Hide old first-try Accepted rows too; the trigger itself still stays in history.
@@ -68,7 +88,13 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             ) else event
         }
 
-    // Records trigger attempt for device activity store.
+    /**
+     * Records trigger attempt for device activity store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param id ID supplied to [recordTriggerAttempt].
+     * @param accepted Whether to apply accepted.
+     */
     fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) {
         activityVault.update { root ->
             val events = root.optJSONObject("triggerHistory")?.optJSONArray(uid) ?: return@update
@@ -87,7 +113,12 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Adds a private-entry event to encrypted device activity history.
+    /**
+     * Adds a private-entry event to encrypted device activity history.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param entry Entry supplied to [savePrivateEntry].
+     */
     fun savePrivateEntry(uid: String, entry: PrivateEntry) {
         activityVault.update { root ->
             val byAccount = root.child("privateEntries")
@@ -100,12 +131,23 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Loads private notes and incident records from encrypted phone storage.
+    /**
+     * Loads private notes and incident records from encrypted phone storage.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting private entries items.
+     */
     fun privateEntries(uid: String): List<PrivateEntry> =
         rows(uid, "privateEntries").map(PrivateEntry::fromJson)
             .filter { it.purgedAt == null }
 
-    // After the configured retention period, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
+    /**
+     * After the configured retention period, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param now Current epoch timestamp in milliseconds.
+     * @return `true` if purge expired private entries, or `false` otherwise.
+     */
     fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()): Boolean {
         var changed = false
         activityVault.update { root ->
@@ -132,7 +174,12 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         return changed
     }
 
-    // Loads activity records that still need cloud sync.
+    /**
+     * Loads activity records that still need cloud sync.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting pending history items.
+     */
     fun pendingHistory(uid: String): List<HistoryRecord> {
         val root = activityVault.read()
         val synced = root.optJSONObject("historySynced")?.optJSONObject(uid)
@@ -149,7 +196,12 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             }
     }
 
-    // Updates the saved history synced used by app security.
+    /**
+     * Updates the saved history synced used by app security.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param record Record supplied to [markHistorySynced].
+     */
     fun markHistorySynced(uid: String, record: HistoryRecord) {
         activityVault.update { root ->
             val section = when (record.category) {
@@ -166,7 +218,12 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Merges cloud history into the encrypted phone copy.
+    /**
+     * Merges cloud history into the encrypted phone copy.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param records Collection of records values to process.
+     */
     fun mergeHistory(uid: String, records: List<HistoryRecord>) {
         activityVault.update { root ->
             val sections = mapOf(
@@ -216,7 +273,14 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Adds one security event to the correct account and history section.
+    /**
+     * Adds one security event to the correct account and history section.
+     *
+     * @param root Root JSON object or directory being read or updated.
+     * @param uid Firebase UID of the target user account.
+     * @param section Section supplied to [append].
+     * @param value Input value to store, parse, or format.
+     */
     private fun append(root: JSONObject, uid: String, section: String, value: JSONObject) {
         val byAccount = root.child(section)
         val entries = byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid, it) }
@@ -230,7 +294,13 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         root.child("historySynced").child(uid).put("$category/${value.getString("id")}", false)
     }
 
-    // Reads one saved history list from the encrypted vault.
+    /**
+     * Reads one saved history list from the encrypted vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param section Section supplied to [rows].
+     * @return List of resulting rows items.
+     */
     private fun rows(uid: String, section: String): List<JSONObject> {
         val entries = activityVault.read().optJSONObject(section)?.optJSONArray(uid) ?: JSONArray()
         return (0 until entries.length()).map { entries.getJSONObject(it) }.asReversed()
@@ -251,6 +321,8 @@ object KeyManager {
     /**
      * Generates a persistent RSA Public/Private KeyPair in the Android Keystore.
      * This should be called once when the user first creates their account.
+     *
+     * @return The resulting [KeyPair] for generate user key pair.
      */
     fun generateUserKeyPair(): KeyPair {
         val keyPairGenerator = KeyPairGenerator.getInstance(
@@ -277,6 +349,8 @@ object KeyManager {
 
     /**
      * Retrieves the user's Public Key to encrypt AES keys before sending to Firestore.
+     *
+     * @return The resulting [PublicKey], or `null` if unavailable.
      */
     fun getPublicKey(): PublicKey? {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -284,10 +358,19 @@ object KeyManager {
         return certificate?.publicKey
     }
 
-    // Loads this device's key pair or creates it the first time it is needed.
+    /**
+     * Loads this device's key pair or creates it the first time it is needed.
+     *
+     * @return The resulting [PublicKey] for get or create public key.
+     */
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
-    // Secure messaging: identifies this installation without exposing its private key.
+    /**
+     * Secure messaging: identifies this installation without exposing its private key.
+     *
+     * @param publicKey Public key supplied to [deviceId].
+     * @return The resulting device ID string.
+     */
     fun deviceId(publicKey: PublicKey = getOrCreatePublicKey()): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(publicKey.encoded)
         return android.util.Base64.encodeToString(
@@ -298,6 +381,8 @@ object KeyManager {
 
     /**
      * Retrieves the user's Private Key to decrypt AES keys pulled from Firestore.
+     *
+     * @return List of resulting get private keys items.
      */
     private fun getPrivateKeys(): List<PrivateKey> {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -309,12 +394,23 @@ object KeyManager {
     /**
      * Wraps (Encrypts) the AES SecretKey using an RSA Public Key.
      * Returns a Base64 string safe for Firestore.
+     *
+     * @param secretKey Secret key supplied to [wrapKey].
+     * @param publicKey Public key supplied to [wrapKey].
+     * @return The resulting wrap key string.
      */
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
         return wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA1)
     }
 
-    // Secure messaging: uses the mask digest declared by the receiving device.
+    /**
+     * Secure messaging: uses the mask digest declared by the receiving device.
+     *
+     * @param secretKey Secret key supplied to [wrapKey].
+     * @param publicKey Public key supplied to [wrapKey].
+     * @param mgf1Digest Mgf 1 digest supplied to [wrapKey].
+     * @return The resulting wrap key string.
+     */
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey, mgf1Digest: MGF1ParameterSpec): String {
         val cipher = Cipher.getInstance(RSA_MODE)
         val spec = oaepSpec(mgf1Digest = mgf1Digest)
@@ -324,12 +420,21 @@ object KeyManager {
         return Base64.getEncoder().encodeToString(wrappedBytes)
     }
 
-    /** Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest. */
+    /**
+     * Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest.
+     *
+     * @param secretKey The symmetric content key to wrap.
+     * @param publicKey The recipient account's public wrapping key.
+     * @return The Base64-encoded content key wrapped with RSA-OAEP using SHA-256 for MGF1.
+     */
     internal fun wrapForAccountKeyset(secretKey: SecretKey, publicKey: PublicKey): String =
         wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA256)
 
     /**
      * Converts a Base64 string from Firestore back into an RSA PublicKey.
+     *
+     * @param base64Key Base 64 key supplied to [decodePublicKey].
+     * @return The resulting [PublicKey] for decode public key.
      */
     fun decodePublicKey(base64Key: String): PublicKey {
         val keyBytes = Base64.getDecoder().decode(base64Key)
@@ -340,6 +445,10 @@ object KeyManager {
     /**
      * Unwraps (Decrypts) the Base64 string back into a usable AES SecretKey.
      * Uses the user's secure hardware Private Key.
+     *
+     * @param wrappedKeyBase64 Wrapped key base 64 supplied to [unwrapKey].
+     * @param keyWrapVersion Optional key wrap version supplied to [unwrapKey].
+     * @return The resulting [SecretKey] for unwrap key.
      */
     fun unwrapKey(wrappedKeyBase64: String, keyWrapVersion: Int? = null): SecretKey {
         val privateKeys = getPrivateKeys()
@@ -347,13 +456,28 @@ object KeyManager {
         return unwrapKey(wrappedKeyBase64, privateKeys, keyWrapVersion)
     }
 
-    /** Opens a File DEK with an unlocked account private key during the keyset migration. */
+    /**
+     * Opens a File DEK with an unlocked account private key during the keyset migration.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKey The private key used to unwrap the symmetric key.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
     fun unwrapKey(
         wrappedKeyBase64: String,
         privateKey: PrivateKey,
         keyWrapVersion: Int? = null,
     ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
 
+    /**
+     * Unwraps an RSA-OAEP encrypted symmetric key against candidate private keys and digest profiles.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKeys The candidate private keys tried against the wrapper.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
     private fun unwrapKey(
         wrappedKeyBase64: String,
         privateKeys: List<PrivateKey>,
@@ -387,11 +511,21 @@ object KeyManager {
      * Tries the device-specific key first and then the account recovery copy. Historical media can
      * contain keys wrapped at different times with different OAEP profiles, so the record-level
      * encryption version must not prevent a compatible recipient key from being considered.
+     *
+     * @param wrappedKeysBase64 Collection of wrapped keys base 64 values to process.
+     * @param keyWrapVersion Optional key wrap version supplied to [unwrapFirst].
+     * @return The resulting [SecretKey] for unwrap first.
      */
     fun unwrapFirst(wrappedKeysBase64: Iterable<String>, keyWrapVersion: Int? = null): SecretKey =
         unwrapFirstWithEnvelope(wrappedKeysBase64, keyWrapVersion).secretKey
 
-    /** Returns both the successful envelope and its key so callers cache only usable key copies. */
+    /**
+     * Returns both the successful envelope and its key so callers cache only usable key copies.
+     *
+     * @param wrappedKeysBase64 Collection of wrapped keys base 64 values to process.
+     * @param keyWrapVersion Optional key wrap version supplied to [unwrapFirstWithEnvelope].
+     * @return The resulting [UnwrappedKeyEnvelope] for unwrap first with envelope.
+     */
     fun unwrapFirstWithEnvelope(
         wrappedKeysBase64: Iterable<String>,
         keyWrapVersion: Int? = null,
@@ -416,6 +550,10 @@ object KeyManager {
      * New Android keys use SHA-256 as the OAEP digest and SHA-1 only for MGF1. The digest parameter
      * remains explicit so historical WebCrypto SHA-1/SHA-1 keys can be read without provider
      * defaults.
+     *
+     * @param digest Digest supplied to [oaepSpec].
+     * @param mgf1Digest Mgf 1 digest supplied to [oaepSpec].
+     * @return The resulting oaep spec.
      */
     private fun oaepSpec(
         digest: String = "SHA-256",
@@ -432,7 +570,12 @@ object KeyManager {
         val mgf1Digest: MGF1ParameterSpec,
     )
 
-    /** Explicit compatibility profiles; this never falls back to provider defaults. */
+    /**
+     * Explicit compatibility profiles; this never falls back to provider defaults.
+     *
+     * @param keyWrapVersion Optional key wrap version supplied to [oaepProfiles].
+     * @return List of resulting oaep profiles items.
+     */
     private fun oaepProfiles(keyWrapVersion: Int?): List<OaepProfile> {
         val current = OaepProfile("SHA-256", MGF1ParameterSpec.SHA1)
         val legacyAndroidOrWeb = OaepProfile("SHA-256", MGF1ParameterSpec.SHA256)
@@ -463,7 +606,11 @@ internal class AndroidDeviceLock(
         activity,
         activity.mainExecutor,
         object : BiometricPrompt.AuthenticationCallback() {
-            // Continues private entry after Android confirms the device owner.
+            /**
+             * Continues private entry after Android confirms the device owner.
+             *
+             * @param result Result payload delivered to the callback.
+             */
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 val current = request ?: return
                 val cipher = result.cryptoObject?.cipher
@@ -471,14 +618,23 @@ internal class AndroidDeviceLock(
                 finish(current, cipher)
             }
 
-            // Any cancellation or rejected credential keeps the Safe App locked.
+            /**
+             * Any cancellation or rejected credential keeps the Safe App locked.
+             *
+             * @param code Verification, invitation, or error code.
+             * @param error Throwable or error message describing a failure.
+             */
             override fun onAuthenticationError(code: Int, error: CharSequence) {
                 request?.let { finish(it, null) }
             }
         }
     )
 
-    // Opens Android device authentication and returns its result.
+    /**
+     * Opens Android device authentication and returns its result.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun show(value: DeviceLockRequest) {
         cancel()
         request = value
@@ -511,16 +667,26 @@ internal class AndroidDeviceLock(
         }
     }
 
-    // Formats the subtitle shown by app security.
+    /**
+     * Formats the subtitle shown by app security.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting subtitle.
+     */
     private fun subtitle(value: DeviceLockRequest) = activity.getString(
-        when {
+        value.subtitleRes ?: when {
             value.settingsChange -> R.string.entry_confirm_settings
             value.challenge.enrolling -> R.string.entry_confirm_setup
             else -> R.string.entry_unlock_description
         }
     )
 
-    // Ends the authentication request once and sends its final result.
+    /**
+     * Ends the authentication request once and sends its final result.
+     *
+     * @param value Input value to store, parse, or format.
+     * @param cipher Optional cipher supplied to [finish].
+     */
     private fun finish(value: DeviceLockRequest, cipher: Cipher?) {
         if (request !== value) return
         // Wait to show device authentication until the activity is visible.
@@ -542,7 +708,9 @@ internal class AndroidDeviceLock(
         value.complete(cipher)
     }
 
-    // Delivers the pending device-lock result when the app resumes.
+    /**
+     * Delivers the pending device-lock result when the app resumes.
+     */
     fun resume() {
         activity.window.decorView.post {
             val value = request
@@ -551,7 +719,9 @@ internal class AndroidDeviceLock(
         }
     }
 
-    // Android device lock: Cancels the active task.
+    /**
+     * Android device lock: Cancels the active task.
+     */
     fun cancel() {
         val previous = request
         request = null

@@ -1,0 +1,4 @@
+<resources>
+    <string name="a11y_safety_progress">Progreso, %1$d de %2$d</string>
+    <string name="nutrition_sign_in_required">Inicia sesión en Olive para buscar en esta fuente. Puedes introducir alimentos manualmente.</string>
+</resources>

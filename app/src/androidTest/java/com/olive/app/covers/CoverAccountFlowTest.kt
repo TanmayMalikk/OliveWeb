@@ -35,7 +35,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
-        listOf("news", "fitness", "game").forEach {
+        listOf("news", "fitness").forEach {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
         click("cover_choice_news")
@@ -77,8 +77,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         waitFor("unlock_pin")
         enterPin("123456")
         waitFor("safe_settings")
-        click("sign_out")
-        openOnboarding()
+        signOutAndOpenOnboarding()
         waitFor("returning_user")
     }
 

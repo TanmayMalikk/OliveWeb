@@ -20,6 +20,18 @@ const messages = new Map<string, Message[]>([["active", [
   { id: "unsent", senderUid: "owner", senderUsername: "Hidden account", body: "Removed private words", deleted: true, clientSentAt: 2 },
 ]]]);
 const events = new Map<string, ChatMembershipEvent[]>();
+const sharedFixture = new URLSearchParams(location.search).get("panel") === "shared-messages";
+if (sharedFixture) {
+  tickets[0].participantIds.push("added-friend");
+  events.set("active", [
+    { id: "added", action: "ADDED", actorUid: "owner", actorName: "Owner", participantUid: "added-friend", participantName: "Guest Fixture", createdAt: 3 },
+    { id: "staff", action: "ADDED", actorUid: "owner", actorName: "Owner", participantUid: "staff", participantName: "Staff", createdAt: 4 },
+  ]);
+  messages.get("active")?.push(...[
+    "SHARED_MEDIA:doc:Identification", "SHARED_INCIDENT:record:Shared fixture incident",
+    "SHARED_NOTE:unavailable:Unavailable record", "SHARED_SAFETY_PLAN::Plan fixture", "SHARED_LOCATION",
+  ].map((body, index) => ({ id: `shared-${index}`, senderUid: "staff", senderUsername: "Staff", body, deleted: false, clientSentAt: index + 10 })));
+}
 const broadcastTickets = () => inboxListeners.forEach(update => update(structuredClone(tickets)));
 export async function register() {}
 export async function prepareSupportTickets() {}
@@ -75,4 +87,17 @@ export async function closeSupportTicket(id: string) {
   if (!conversation) throw new Error("Unknown ticket");
   conversation.closedAt = 5;
   broadcastTickets();
+}
+
+export async function removeTicketFriend(id: string, uid: string) {
+  const conversation = tickets.find(row => row.id === id);
+  if (!conversation || uid === conversation.staffUid) throw new Error("Friend cannot be removed");
+  conversation.participantIds = conversation.participantIds.filter(participant => participant !== uid);
+  broadcastTickets();
+}
+
+export async function unsendMessage(id: string, item: Message) {
+  const rows = (messages.get(id) ?? []).map(message => message.id === item.id ? { ...message, deleted: true } : message);
+  messages.set(id, rows);
+  messageListeners.get(id)?.(rows);
 }

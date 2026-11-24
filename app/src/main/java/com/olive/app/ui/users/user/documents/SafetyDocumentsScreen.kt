@@ -1,17 +1,20 @@
 // Safe-app users: lists the user’s saved safety documents.
 package com.olive.app.ui.users.user.documents
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
-
-
 import com.olive.app.ui.users.shared.navigation.*
-
-
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -38,23 +41,52 @@ import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.safety.DocumentListSource
 import com.olive.app.data.safety.SafetyDocument
 import java.io.File
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.pickerMediaKind
+import com.olive.app.data.messaging.Friend
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
-// Lists encrypted documents and provides upload, filter, open, and share actions.
+/**
+ * Lists encrypted documents and provides upload, filter, open, and share actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val uid = session.coverAccountId ?: return
     val controller = session.documents
     val state = controller.state
     val mediaController = session.media
-    val uploads = mediaController?.uploads.orEmpty()
+    val uploads = mediaController?.uploads.orEmpty().filterNot(MediaUploadPresentation::chatOnly)
     val preparation = mediaController?.state as? MediaTransferState.Preparing
     val preparing = preparation != null && preparation.stage != "downloading"
     var filter by rememberSaveable { mutableStateOf(DocumentFilter.All) }
     var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
+    var wtUploadOpen by remember { mutableStateOf(false) }
+    val wtDirective = LocalWalkthroughDirective.current
+    LaunchedEffect(wtDirective?.stepId, wtDirective?.action) {
+        if (wtDirective?.action == "docs_open_upload") {
+            choosingUpload = true
+            wtUploadOpen = true
+        } else if (wtUploadOpen) {
+            choosingUpload = false
+            wtUploadOpen = false
+        }
+    }
+    val listState = rememberLazyListState()
+    var lastFilter by remember { mutableStateOf(filter) }
+    LaunchedEffect(filter) {
+        if (filter != lastFilter) {
+            lastFilter = filter
+            listState.scrollToItem(0)
+        }
+    }
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
         controller.load(uid, session.coverUsername, session.localMode)
     }
@@ -94,7 +126,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         Button(
             onClick = { choosingUpload = true },
             enabled = !preparing && !session.localMode,
-            modifier = Modifier.fillMaxWidth().testTag("documents_upload")
+            modifier = Modifier.fillMaxWidth().walkthroughTarget("documents_upload").testTag("documents_upload")
         ) {
             Icon(
                 Icons.Outlined.UploadFile,
@@ -121,7 +153,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             Text(stringResource(R.string.documents_offline_index),
                 style = MaterialTheme.typography.bodySmall, color = Muted)
         }
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth().walkthroughTarget("documents_filter_chips"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DocumentFilter.entries.toList().chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { option ->
@@ -182,13 +214,23 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             }
         }
         LazyColumn(
-            Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp),
+            Modifier.weight(1f).fillMaxWidth().oliveScrollbar(listState),
+            state = listState,
+            contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (state.loading) item(key = "loading_documents") { LoadingSkeleton(SkeletonLayout.Documents) }
             if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
             items(uploads, key = { "upload_${it.jobId}" }) { upload ->
-                PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }
+                PendingUploadCard(
+                    upload = upload,
+                    onOpen = {
+                        mediaController?.openPendingUpload(upload.jobId, uid)?.let { (doc, local) ->
+                            opened = doc to local
+                        }
+                    },
+                    onRetry = { mediaController?.retryUpload(upload.jobId) }
+                )
             }
             items(shown, key = { it.id }) { file ->
                 SafetyDocumentCard(file, uid, session.messages.friends,
@@ -220,11 +262,25 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     SafetyDocumentUploadFlow(
         session = session,
         visible = choosingUpload,
-        onDismiss = { choosingUpload = false },
+        inWindowSheet = wtUploadOpen,
+        onDismiss = {
+            choosingUpload = false
+            wtUploadOpen = false
+        },
     )
 }
 
-/** Keeps every document entry point on the same protected camera/media/file upload workflow. */
+/**
+ * Keeps every document entry point on the same protected camera/media/file upload workflow.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param visible Whether the UI component should be visible.
+ * @param inWindowSheet Whether to render as an in-window sheet so the walkthrough overlays on top.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param tags Collection of tags values to process.
+ * @param onSelectExisting Callback invoked when select existing changes or occurs.
+ * @param onUploadStarted Callback invoked when upload started changes or occurs.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentUploadFlow(
@@ -234,6 +290,7 @@ internal fun SafetyDocumentUploadFlow(
     tags: Set<String> = emptySet(),
     onSelectExisting: ((SafetyDocument) -> Unit)? = null,
     onUploadStarted: (() -> Unit)? = null,
+    inWindowSheet: Boolean = false,
 ) {
     val controller = session.documents
     val unableUpload = stringResource(R.string.documents_upload_failed)
@@ -245,6 +302,11 @@ internal fun SafetyDocumentUploadFlow(
             showOliveStorage = false
         }
     }
+    /**
+     * Finishes selection.
+     *
+     * @param uri Content or file URI identifying the selected local item, or null when not provided.
+     */
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         val uid = session.coverAccountId
@@ -263,6 +325,11 @@ internal fun SafetyDocumentUploadFlow(
         ActivityResultContracts.OpenDocument(),
         ::finishSelection,
     )
+    /**
+     * Launches protected picker.
+     *
+     * @param action Action or callback executed for action.
+     */
     fun launchProtectedPicker(action: () -> Unit) {
         onUploadStarted?.invoke()
         onDismiss()
@@ -272,125 +339,138 @@ internal fun SafetyDocumentUploadFlow(
             controller.reportError(unableUpload)
         }
     }
-    if (visible) ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                stringResource(
-                    if (showOliveStorage) R.string.olive_storage
-                    else R.string.documents_choose_source
-                ),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() })
-            Text(
-                stringResource(
-                    if (showOliveStorage) R.string.olive_storage_help
-                    else R.string.documents_choose_source_help
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Muted
-            )
-            if (showOliveStorage) {
-                val ownerUid = session.coverAccountId
-                val available = controller.state.files.filter { it.ownerUid == ownerUid }
-                if (available.isEmpty()) {
-                    Text(
-                        stringResource(R.string.attachments_empty_help),
-                        color = Muted,
-                        modifier = Modifier.padding(vertical = 16.dp),
-                    )
-                } else {
-                    LazyColumn(
-                        Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(available, key = SafetyDocument::id) { document ->
-                            OutlinedButton(
-                                onClick = {
-                                    onSelectExisting?.invoke(document)
-                                    onDismiss()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                                    .testTag("olive_storage_${document.id}"),
-                            ) {
-                                Icon(Icons.Outlined.Attachment, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(document.name, modifier = Modifier.weight(1f))
+    if (visible) {
+        val sheetContent: @Composable ColumnScope.() -> Unit = {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = if (inWindowSheet) 18.dp else 32.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    stringResource(
+                        if (showOliveStorage) R.string.olive_storage
+                        else R.string.documents_choose_source
+                    ),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() })
+                Text(
+                    stringResource(
+                        if (showOliveStorage) R.string.olive_storage_help
+                        else R.string.documents_choose_source_help
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted
+                )
+                if (showOliveStorage) {
+                    val ownerUid = session.coverAccountId
+                    val available = controller.state.files.filter { it.ownerUid == ownerUid }
+                    if (available.isEmpty()) {
+                        Text(
+                            stringResource(R.string.attachments_empty_help),
+                            color = Muted,
+                            modifier = Modifier.padding(vertical = 16.dp),
+                        )
+                    } else {
+                        LazyColumn(
+                            Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(available, key = SafetyDocument::id) { document ->
+                                OutlinedButton(
+                                    onClick = {
+                                        onSelectExisting?.invoke(document)
+                                        onDismiss()
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .testTag("olive_storage_${document.id}"),
+                                ) {
+                                    Icon(Icons.Outlined.Attachment, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(document.name, modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
+                    TextButton(
+                        onClick = { showOliveStorage = false },
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text(stringResource(R.string.back)) }
+                    return@Column
+                }
+                Button(
+                    onClick = {
+                        onUploadStarted?.invoke()
+                        session.pendingCameraUploadTags = pickerTags
+                        onDismiss()
+                        session.navigation.openSafePage(SafePage.Camera)
+                    },
+                    modifier = Modifier.fillMaxWidth().walkthroughTarget("documents_choose_camera").testTag("documents_choose_camera")
+                ) {
+                    Icon(Icons.Outlined.PhotoCamera, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.documents_camera)
+                    )
+                }
+                OutlinedButton(onClick = {
+                    launchProtectedPicker {
+                        mediaPicker.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                            )
+                        )
+                    }
+                }, modifier = Modifier.fillMaxWidth().walkthroughTarget("documents_choose_media").testTag("documents_choose_media")) {
+                    Icon(Icons.Outlined.PermMedia, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.documents_choose_media)
+                    )
+                }
+                OutlinedButton(onClick = {
+                    launchProtectedPicker {
+                        documentPicker.launch(
+                            arrayOf(
+                                "application/pdf", "text/plain", "application/msword",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                        )
+                    }
+                }, modifier = Modifier.fillMaxWidth().walkthroughTarget("documents_choose_document").testTag("documents_choose_document")) {
+                    Icon(Icons.Outlined.Description, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.documents_choose_document)
+                    )
+                }
+                if (onSelectExisting != null) OutlinedButton(
+                    onClick = { showOliveStorage = true },
+                    modifier = Modifier.fillMaxWidth().testTag("documents_choose_olive_storage"),
+                ) {
+                    Icon(Icons.Outlined.FolderSpecial, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.olive_storage))
                 }
                 TextButton(
-                    onClick = { showOliveStorage = false },
-                    modifier = Modifier.align(Alignment.End),
-                ) { Text(stringResource(R.string.back)) }
-                return@Column
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) { Text(stringResource(R.string.cancel)) }
             }
-            Button(
-                onClick = {
-                    onUploadStarted?.invoke()
-                    session.pendingCameraUploadTags = pickerTags
-                    onDismiss()
-                    session.navigation.openSafePage(SafePage.Camera)
-                },
-                modifier = Modifier.fillMaxWidth().testTag("documents_choose_camera")
-            ) {
-                Icon(Icons.Outlined.PhotoCamera, null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.documents_camera)
-                )
-            }
-            OutlinedButton(onClick = {
-                launchProtectedPicker {
-                    mediaPicker.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                        )
-                    )
-                }
-            }, modifier = Modifier.fillMaxWidth().testTag("documents_choose_media")) {
-                Icon(Icons.Outlined.PermMedia, null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.documents_choose_media)
-                )
-            }
-            OutlinedButton(onClick = {
-                launchProtectedPicker {
-                    documentPicker.launch(
-                        arrayOf(
-                            "application/pdf", "text/plain", "application/msword",
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        )
-                    )
-                }
-            }, modifier = Modifier.fillMaxWidth().testTag("documents_choose_document")) {
-                Icon(Icons.Outlined.Description, null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.documents_choose_document)
-                )
-            }
-            if (onSelectExisting != null) OutlinedButton(
-                onClick = { showOliveStorage = true },
-                modifier = Modifier.fillMaxWidth().testTag("documents_choose_olive_storage"),
-            ) {
-                Icon(Icons.Outlined.FolderSpecial, null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.olive_storage))
-            }
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.End)
-            ) { Text(stringResource(R.string.cancel)) }
+        }
+        if (inWindowSheet) {
+            WalkthroughInWindowBottomSheet(
+                sheetTargetId = "documents_upload_sheet",
+                onDismiss = onDismiss,
+                content = sheetContent,
+            )
+        } else {
+            ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = true, content = sheetContent)
         }
     }
 }
 
-// user safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
+/**
+ * User safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
+ */
 @Composable
 private fun PreparingUploadCard() {
     val title = stringResource(R.string.documents_preparing_upload)
@@ -413,9 +493,19 @@ private fun PreparingUploadCard() {
     }
 }
 
-// Shows upload progress, errors, and retry controls for one pending file.
+/**
+ * Shows upload progress, errors, and retry controls for one pending file.
+ *
+ * @param upload Upload supplied to [PendingUploadCard].
+ * @param onRetry Callback invoked when retry changes or occurs.
+ * @param onOpen Runs when the user opens the item.
+ */
 @Composable
-private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
+internal fun PendingUploadCard(
+    upload: MediaUploadPresentation,
+    onOpen: (() -> Unit)? = null,
+    onRetry: () -> Unit,
+) {
     val failed = upload.status == MediaTransferStatus.FAILED
     val waitingToRetry = upload.status == MediaTransferStatus.QUEUED && upload.error != null
     val retryable = failed || waitingToRetry
@@ -435,7 +525,10 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
         MediaTransferStatus.CANCELLED -> stringResource(R.string.documents_upload_cancelled)
     }
     val summary = listOfNotNull(upload.name, status, upload.error?.takeIf { retryable }).joinToString(". ")
-    OutlinedCard(Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics {
@@ -452,7 +545,7 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
                 Column(Modifier.weight(1f)) {
                     Text(upload.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                     Text(
-                        status,
+                        status + if (onOpen != null && !retryable) " • Tap to preview" else "",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         color = if (retryable) MaterialTheme.colorScheme.error else Muted
@@ -479,4 +572,241 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
             }
         }
     }
+}
+
+/**
+ * User safety-document card used to view details and actions.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param currentUid Current user ID supplied to [SafetyDocumentCard].
+ * @param friends List of friend records.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param offline Offline supplied to [SafetyDocumentCard].
+ * @param onShare Callback invoked when share changes or occurs.
+ * @param onDelete Callback invoked when delete changes or occurs.
+ * @param onMakeOffline Callback invoked when make offline changes or occurs.
+ * @param onRemoveOffline Callback invoked when remove offline changes or occurs.
+ * @param opening Whether to apply opening.
+ * @param evidenceUpdating Whether to apply evidence updating.
+ * @param onEvidenceChange Callback invoked when evidence change changes or occurs.
+ */
+@Composable
+internal fun SafetyDocumentCard(
+    file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
+    offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
+    onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
+    opening: Boolean,
+    evidenceUpdating: Boolean,
+    onEvidenceChange: (Boolean) -> Unit,
+) {
+    val own = file.ownerUid == currentUid
+    val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
+    OutlinedCard(Modifier.fillMaxWidth().testTag("document_${file.id}")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    when {
+                        file.mimeType.startsWith("image/") -> Icons.Outlined.Image
+                        file.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
+                        else -> Icons.Outlined.Description
+                    }, null,
+                    Modifier.size(30.dp), tint = OliveGreen
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(file.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                    Text(
+                        if (own) stringResource(R.string.documents_yours) else stringResource(
+                            R.string.documents_shared_by,
+                            owner ?: stringResource(R.string.safe_contact_shared_user)
+                        ),
+                        style = MaterialTheme.typography.bodySmall, color = Muted
+                    )
+                    file.ocrConfidence?.let { confidence ->
+                        Text(
+                            stringResource(
+                                R.string.camera_ocr_confidence,
+                                (confidence * 100).toInt()
+                            ),
+                            style = MaterialTheme.typography.bodySmall, color = Muted
+                        )
+                    }
+                }
+            }
+            file.ocrText?.takeIf { it.isNotBlank() }?.let { text ->
+                Text(
+                    text, style = MaterialTheme.typography.bodySmall, maxLines = 3,
+                    modifier = Modifier.testTag("document_ocr_${file.id}")
+                )
+            }
+            // Only the owner may change evidence status; shared viewers do not see this action.
+            if (own) Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("document_evidence_${file.id}")
+                    .toggleable(
+                        value = file.evidence,
+                        enabled = !evidenceUpdating,
+                        role = Role.Checkbox,
+                        onValueChange = onEvidenceChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = file.evidence,
+                    onCheckedChange = null,
+                    enabled = !evidenceUpdating,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
+                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (pickerMediaKind(file.mimeType) != MediaKind.AUDIO) Button(
+                    onClick = onOpen,
+                    enabled = !opening,
+                    modifier = Modifier.weight(1f).testTag("document_open_${file.id}"),
+                ) {
+                    if (opening) SecureFileOpeningIndicator()
+                    else {
+                        Icon(Icons.Outlined.Visibility, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.open))
+                    }
+                }
+                // Owners can share the document; recipients only get the open action.
+                if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        Icons.Outlined.Share,
+                        null
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.share))
+                }
+                if (own) IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        stringResource(R.string.remove)
+                    )
+                }
+            }
+            if (file.objectKey.isNotBlank()) {
+                val cached = offline in setOf(
+                    OfflineMediaAvailability.AVAILABLE,
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                )
+                OutlinedButton(
+                    onClick = if (cached) onRemoveOffline else onMakeOffline,
+                    enabled = offline != OfflineMediaAvailability.SAVING,
+                    modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
+                ) {
+                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(when {
+                        offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                        cached -> R.string.documents_remove_offline_copy
+                        else -> R.string.documents_make_available_offline
+                    }))
+                }
+                when (offline) {
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                    OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> Text(
+                        stringResource(R.string.documents_offline_revalidation_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    OfflineMediaAvailability.AVAILABLE -> Text(
+                        stringResource(R.string.documents_available_offline),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OliveGreen,
+                    )
+                    OfflineMediaAvailability.RECENT_AVAILABLE -> Text(
+                        stringResource(R.string.documents_recently_cached),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                    else -> Unit
+                }
+            }
+        }
+    }
+}
+/**
+ * Lets the user choose which trusted contacts may open a document.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @param currentUid Current user ID supplied to [DocumentSharingDialog].
+ * @param friends List of friend records.
+ * @param contacts Collection of contact records.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSave Callback invoked when save changes or occurs.
+ */
+@Composable
+internal fun DocumentSharingDialog(
+    file: SafetyDocument,
+    currentUid: String,
+    friends: List<Friend>,
+    contacts: List<SafeContact>,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, String>) -> Unit
+) {
+    var selected by remember(file.id) {
+        mutableStateOf(file.allowedUsers.filterNot { it == currentUid }.toSet())
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.documents_share_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.documents_share_help),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (friends.isEmpty()) Text(
+                    stringResource(R.string.location_no_friends),
+                    color = Muted
+                )
+                friends.forEach { friend ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        val trusted = contacts.firstOrNull { it.linkedUid == friend.uid }
+                        Checkbox(
+                            friend.uid in selected,
+                            { checked ->
+                                selected =
+                                    if (checked) selected + friend.uid else selected - friend.uid
+                            },
+                            enabled = friend.uid in selected || selected.size < 10
+                        )
+                        Column {
+                            Text(trusted?.name ?: friend.username)
+                            if (trusted != null) Text(
+                                "@${friend.username}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Muted
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val namedRecipients = friends.filter { it.uid in selected }.associate { it.uid to it.username }
+                val existingHiddenRecipients = selected
+                    .filter { it in file.allowedUsers && it !in namedRecipients }
+                    .associateWith { "" }
+                onSave(existingHiddenRecipients + namedRecipients)
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }

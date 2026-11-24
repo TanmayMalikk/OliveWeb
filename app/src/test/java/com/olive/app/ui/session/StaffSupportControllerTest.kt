@@ -18,7 +18,7 @@ class StaffSupportControllerTest {
         SessionRuntimeFixture().use { f ->
             val repo = mock(SupportRepository::class.java)
             val controller = StaffSupportController(f.runtime) { repo }
-            `when`(repo.requestHelp()).thenReturn(StaffSupportTicket(true, "staff", "ticket"))
+            `when`(repo.requestHelp(anyString())).thenReturn(StaffSupportTicket(true, "staff", "ticket"))
             `when`(repo.cancelRequest("ticket")).thenReturn(StaffSupportTicket(false, "", "ticket"))
             controller.requestHelp()
             f.await { controller.saving == 0 }
@@ -29,7 +29,7 @@ class StaffSupportControllerTest {
             f.await { controller.saving == 0 }
             assertFalse(controller.requested)
             verify(repo).cancelRequest("ticket")
-            `when`(repo.requestHelp()).thenAnswer { error("Synthetic transport failure") }
+            `when`(repo.requestHelp(anyString())).thenAnswer { error("Synthetic transport failure") }
             controller.requestHelp()
             f.await { controller.saving == 0 }
             assertEquals(R.string.support_request_error, controller.error)
@@ -104,6 +104,46 @@ class StaffSupportControllerTest {
             controller.removeParticipant("ticket", "")
             controller.requestStaffForConversation("") { fail() }
             verifyNoInteractions(repo)
+        }
+    }
+
+    @Test
+    fun planCompletedCloseAndRemovalFailuresPreserveSafeState() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.STAFF).use { f ->
+            val repo = mock(SupportRepository::class.java)
+            val controller = StaffSupportController(f.runtime) { repo }
+            controller.close("ticket", planCompleted = true)
+            f.await { controller.saving == 0 }
+            verify(repo).close("ticket", true)
+
+            `when`(repo.removeParticipant("chat", "friend")).thenAnswer { error("Minimum two members") }
+            controller.removeParticipant("chat", "friend")
+            f.await { controller.saving == 0 }
+            assertEquals("Minimum two members", controller.addParticipantError)
+        }
+
+        SessionRuntimeFixture(localMode = true).use { local ->
+            val controller = StaffSupportController(local.runtime)
+            controller.requestHelp()
+            assertEquals(R.string.safety_account_required, controller.error)
+        }
+    }
+
+    @Test
+    fun staffSupportActionFailuresSurfaceAppropriateErrors() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.STAFF).use { f ->
+            val repo = mock(SupportRepository::class.java)
+            val controller = StaffSupportController(f.runtime) { repo }
+
+            `when`(repo.requestAdmin("ticket")).thenAnswer { error("admin escalation failed") }
+            controller.requestAdmin("ticket")
+            f.await { controller.saving == 0 }
+            assertEquals(R.string.support_admin_request_error, controller.error)
+
+            `when`(repo.close("ticket", false)).thenAnswer { error("close failed") }
+            controller.close("ticket", false)
+            f.await { controller.saving == 0 }
+            assertEquals(R.string.support_close_error, controller.error)
         }
     }
 }

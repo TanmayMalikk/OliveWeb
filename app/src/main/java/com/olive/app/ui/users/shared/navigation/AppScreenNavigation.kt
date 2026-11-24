@@ -1,11 +1,12 @@
 // All safe-app roles: routes each account role to its allowed screen.
 package com.olive.app.ui.users.shared.navigation
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.View
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -35,13 +36,18 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.FitnessCover
-import com.olive.app.ui.covers.GameCover
 import com.olive.app.ui.covers.news.NewsCover
 import com.olive.app.ui.users.admin.AdminPortal
 import com.olive.app.ui.users.safecontact.SafeContactArea
 import com.olive.app.ui.users.shared.auth.*
 import com.olive.app.ui.users.shared.onboarding.ProfileSetup
 import com.olive.app.ui.users.shared.organization.OrganizationProfileSetup
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughSettingsTab
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughTour
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughCoachmarkOverlay
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughVisits
+import com.olive.app.ui.users.shared.walkthrough.firstWalkthroughStepForTopic
+import com.olive.app.ui.users.shared.walkthrough.walkthroughTourStepsForRole
 import com.olive.app.ui.users.staff.StaffPortal
 import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
@@ -61,12 +67,23 @@ import com.olive.app.security.allowsAppPin
 import com.olive.app.ui.session.SessionRuntime
 
 
-// Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
+/**
+ * Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
+ *
+ * @param usesCover Whether to apply uses cover.
+ * @return `true` if should compose cover, or `false` otherwise.
+ */
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
 internal val LocalQuickExit = staticCompositionLocalOf<(() -> Unit)?> { null }
 
-// Chooses the account, cover, onboarding, or Safe App root screen.
+/**
+ * Chooses the account, cover, onboarding, or Safe App root screen.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param locationPermissionVersion Location permission version supplied to [OliveRoot].
+ * @param closeApp Action or callback executed for close app.
+ */
 @Composable
 internal fun OliveRoot(
     session: SessionViewModel,
@@ -135,8 +152,8 @@ internal fun OliveRoot(
     val isCover = navigation.screen == SessionScreen.Cover
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var imeWasVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(isCover, imeVisible) {
-        if (!isCover && imeWasVisible && !imeVisible) focus.clearFocus()
+    LaunchedEffect(navigation.screen, imeVisible) {
+        if (!isCover && navigation.screen != SessionScreen.Pin && imeWasVisible && !imeVisible) focus.clearFocus()
         imeWasVisible = !isCover && imeVisible
     }
     val view = LocalView.current
@@ -245,9 +262,20 @@ internal fun OliveRoot(
         }
     }
     val coverTitle = session.coverType.localizedTitle(uiText)
+    var completedUnlockAnimation by remember { mutableIntStateOf(navigation.unlockAnimationVersion) }
+    val showPinAnimation = shouldShowPinSafeAnimation(
+        navigation.screen,
+        navigation.unlockAnimationVersion,
+        completedUnlockAnimation,
+    )
+    LaunchedEffect(navigation.screen, navigation.unlockAnimationVersion) {
+        if (navigation.screen != SessionScreen.Safe) {
+            completedUnlockAnimation = navigation.unlockAnimationVersion
+        }
+    }
     val inActiveChat = navigation.page == SafePage.Messages && session.messages.activeConversation != null
     val safeUser = navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
-    val showSupport = safeUser && !inActiveChat && navigation.page != SafePage.Camera
+    val showSupport = safeUser && !inActiveChat && navigation.page != SafePage.Camera && !showPinAnimation
     val chatHasQuickExit = navigation.screen == SessionScreen.Safe && inActiveChat
     val userQuickExit = session.accountRole == AccountRole.USER
     val showQuickExit = userQuickExit && !isCover && !chatHasQuickExit
@@ -256,19 +284,31 @@ internal fun OliveRoot(
         navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    var observedUnlock by remember { mutableIntStateOf(navigation.unlockAnimationVersion) }
-    var pinAnimationRunning by remember { mutableStateOf(false) }
-    // Start the olive reveal only after a new successful private entry.
-    LaunchedEffect(navigation.unlockAnimationVersion, navigation.screen) {
-        val currentUnlock = navigation.unlockAnimationVersion
-        if (currentUnlock > observedUnlock && navigation.screen == SessionScreen.Safe) {
-            pinAnimationRunning = true
-        } else if (navigation.screen != SessionScreen.Safe) {
-            pinAnimationRunning = false
-        }
-        observedUnlock = currentUnlock
+    val activeTourStep = remember(session.accountRole, navigation.walkthroughTourStepId) {
+        walkthroughTourStepsForRole(session.accountRole).firstOrNull { it.id == navigation.walkthroughTourStepId }
     }
-    val showPinAnimation = pinAnimationRunning
+    val startTour: (String) -> Unit = { targetId ->
+        val steps = walkthroughTourStepsForRole(session.accountRole)
+        val step = steps.firstOrNull { it.id == targetId }
+            ?: firstWalkthroughStepForTopic(session.accountRole, targetId)
+        if (step != null) session.runtime.navigation.startWalkthroughTour(step.id, step.tourPage)
+    }
+    LaunchedEffect(callAccountId, navigation.screen, showPinAnimation) {
+        if (navigation.screen == SessionScreen.Safe && !showPinAnimation && callAccountId.isNotBlank()) {
+            val visits = WalkthroughVisits(context, callAccountId)
+            if (!visits.hasSeenInitialTour()) {
+                visits.markInitialTourSeen()
+                walkthroughTourStepsForRole(session.accountRole).firstOrNull()?.let { firstStep ->
+                    session.runtime.navigation.startWalkthroughTour(firstStep.id, firstStep.tourPage)
+                }
+            }
+        }
+    }
+    LaunchedEffect(activeTourStep?.id, activeTourStep?.openSupportMenu, navigation.screen, navigation.page) {
+        if (navigation.screen == SessionScreen.Safe) {
+            supportExpanded = activeTourStep?.openSupportMenu == true
+        }
+    }
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
@@ -287,11 +327,6 @@ internal fun OliveRoot(
                             )
 
                             CoverType.FITNESS -> FitnessCover(session, isCover)
-                            CoverType.GAME -> GameCover(
-                                sessionViewModel = session,
-                                interactive = isCover,
-                                onEntryAttempt = session.account::interceptSearch,
-                            )
                         }
                     }
                 }
@@ -307,208 +342,253 @@ internal fun OliveRoot(
             }
         }
         if (!isCover) {
-            // Hide the keyboard whenever the private PIN screen opens.
-            LaunchedEffect(navigation.screen) {
-                if (navigation.screen == SessionScreen.Pin) {
-                    keyboard?.hide()
-                    focus.clearFocus(force = true)
-                }
-            }
-            BackHandler {
+            val backProgress = rememberOliveBack(
+                preview = privateArea && !privacyHidden && !showPinAnimation && !supportExpanded &&
+                    navigation.page != SafePage.Camera,
+            ) {
                 keyboard?.hide()
                 focus.clearFocus(force = true)
                 session.navigation.back()
             }
             val screenBackground = MaterialTheme.colorScheme.background
             Surface(Modifier.fillMaxSize(), color = screenBackground) {
-                Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
-                    Scaffold(
-                        containerColor = screenBackground,
-                        contentColor = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.testTag("session_screen_content")
-                            .accessibilityTraversal(AccessibilityTraversalOrder.ScreenContent)
-                            .then(if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier),
-                        contentWindowInsets = if (navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Camera)
-                            WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
-                    ) { padding ->
-                        Box(Modifier.fillMaxSize().padding(padding)) {
-                            AnimatedContent(
-                                targetState = navigation.screen, label = "session screen",
-                                transitionSpec = {
-                                    // Security boundaries replace old controls immediately, without an outgoing PIN/private screen.
-                                    if (initialState in setOf(
-                                            SessionScreen.Pin,
-                                            SessionScreen.Safe
-                                        ) || targetState in setOf(
-                                            SessionScreen.Pin,
-                                            SessionScreen.Safe
+                OliveUndoOverlay(
+                    scopeKey = Triple(callAccountId, navigation.screen, navigation.page),
+                    enabled = privateArea && !privacyHidden && !showPinAnimation && !supportExpanded,
+                    bottomClearance = if (showQuickExit || showSupport) OlivePrivateLayout.FloatingActionClearance else 12.dp,
+                ) {
+                    val walkthroughTargets = remember { WalkthroughTargetRegistry() }
+                    CompositionLocalProvider(LocalWalkthroughTargets provides walkthroughTargets) {
+                        Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
+                        Scaffold(
+                            containerColor = screenBackground,
+                            contentColor = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.testTag("session_screen_content")
+                                .accessibilityTraversal(AccessibilityTraversalOrder.ScreenContent)
+                                .oliveBackPreview(backProgress)
+                                .then(if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier),
+                            contentWindowInsets = if (navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Camera)
+                                WindowInsets(0, 0, 0, 0) else WindowInsets.safeDrawing,
+                        ) { padding ->
+                            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                                AnimatedContent(
+                                    targetState = navigation.screen, label = "session screen",
+                                    transitionSpec = {
+                                        // Security boundaries replace old controls immediately, without an outgoing PIN/private screen.
+                                        if (initialState in setOf(
+                                                SessionScreen.Pin,
+                                                SessionScreen.Safe, SessionScreen.Portal
+                                            ) || targetState in setOf(
+                                                SessionScreen.Pin,
+                                                SessionScreen.Safe, SessionScreen.Portal
+                                            )
                                         )
-                                    )
-                                        EnterTransition.None.togetherWith(ExitTransition.None)
-                                    else (fadeIn(tween(180)) + scaleIn(
-                                        tween(180),
-                                        initialScale = .985f
-                                    ))
-                                        .togetherWith(fadeOut(tween(120)))
-                                }) { targetScreen ->
-                                val pane = when (targetScreen) {
-                                    SessionScreen.Pin -> uiText(if (session.account.usesDeviceLock || !session.account.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
-                                    SessionScreen.Safe -> when (navigation.page) {
-                                        SafePage.Home -> uiText(R.string.home)
-                                        SafePage.Notes -> uiText(
-                                            R.string.ui_notes
+                                            EnterTransition.None.togetherWith(ExitTransition.None)
+                                        else (fadeIn(tween(180)) + scaleIn(
+                                            tween(180),
+                                            initialScale = .985f
+                                        ))
+                                            .togetherWith(fadeOut(tween(120)))
+                                    }) { targetScreen ->
+                                    val pane = when (targetScreen) {
+                                        SessionScreen.Pin -> uiText(if (session.account.usesDeviceLock || !session.account.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
+                                        SessionScreen.Safe -> when (navigation.page) {
+                                            SafePage.Home -> uiText(R.string.home)
+                                            SafePage.Notes -> uiText(
+                                                R.string.ui_notes
+                                            )
+
+                                            SafePage.Messages -> uiText(R.string.messages)
+                                            SafePage.Profile -> uiText(R.string.ui_profile)
+                                            SafePage.Contacts -> uiText(
+                                                R.string.ui_contacts
+                                            )
+
+                                            SafePage.Settings -> uiText(R.string.settings)
+                                            SafePage.Activity -> uiText(
+                                                R.string.ui_activity
+                                            )
+
+                                            SafePage.Hotlines -> uiText(R.string.support_hotlines)
+                                            SafePage.SafetyPlan -> uiText(
+                                                R.string.support_safety_plan
+                                            )
+                                            SafePage.StaffHelp -> uiText(R.string.support_staff_help)
+
+                                            SafePage.Documents -> uiText(R.string.support_documents)
+                                            SafePage.Camera -> uiText(R.string.camera_title)
+                                            SafePage.Location -> uiText(
+                                                R.string.location_map
+                                            )
+                                            SafePage.Walkthrough -> uiText(R.string.support_walkthrough)
+                                        }
+
+                                        SessionScreen.Loading -> uiText(R.string.ui_loading)
+                                        SessionScreen.Welcome -> uiText(R.string.welcome)
+                                        SessionScreen.NewCredentials -> uiText(R.string.create_account)
+                                        SessionScreen.ReturningCredentials -> uiText(R.string.sign_in)
+                                        SessionScreen.ProfileSetup, SessionScreen.OrganizationProfileSetup -> uiText(
+                                            R.string.your_profile
                                         )
 
-                                        SafePage.Messages -> uiText(R.string.messages)
-                                        SafePage.Profile -> uiText(R.string.ui_profile)
-                                        SafePage.Contacts -> uiText(
-                                            R.string.ui_contacts
-                                        )
-
-                                        SafePage.Settings -> uiText(R.string.settings)
-                                        SafePage.Activity -> uiText(
-                                            R.string.ui_activity
-                                        )
-
-                                        SafePage.Hotlines -> uiText(R.string.support_hotlines)
-                                        SafePage.SafetyPlan -> uiText(
-                                            R.string.support_safety_plan
-                                        )
-                                        SafePage.StaffHelp -> uiText(R.string.support_staff_help)
-
-                                        SafePage.Documents -> uiText(R.string.support_documents)
-                                        SafePage.Camera -> uiText(R.string.camera_title)
-                                        SafePage.Location -> uiText(
-                                            R.string.location_map
-                                        )
+                                        SessionScreen.TriggerSetup -> uiText(R.string.ui_set_your_private_entry)
+                                        SessionScreen.DevicePin -> uiText(R.string.secure_this_device)
+                                        SessionScreen.Portal -> uiText(R.string.ui_organization_portal)
+                                        SessionScreen.StorageError -> uiText(R.string.unable_to_open_local_storage)
+                                        SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
                                     }
+                                    CompositionLocalProvider(
+                                        LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
+                                        LocalQuickExit provides if (userQuickExit) exit else null,
+                                        LocalWalkthroughTour provides startTour,
+                                        LocalWalkthroughSettingsTab provides activeTourStep?.settingsTabTag,
+                                        LocalWalkthroughDirective provides activeTourStep?.let {
+                                            WalkthroughDirective(it.id, it.targetId, it.action, it.settingsTabTag)
+                                        },
+                                        LocalSafeSystemLauncher provides systemLaunchers.open,
+                                        LocalSafePermissionActions provides systemLaunchers.permissions,
+                                        LocalSafeUpdateReminder provides update.onDownload,
+                                    ) {
+                                        // Entry setup owns its pane title because choosing New PIN changes its local screen.
+                                        Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
+                                            paneTitle = pane
+                                        }).then(if (targetScreen != navigation.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                                            // Opens the cover, account entry, onboarding, or Safe App for the current session.
+                                            when (targetScreen) {
+                                                SessionScreen.Loading -> Box(
+                                                    Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) { LoadingSkeleton(SkeletonLayout.Action, Modifier.widthIn(max = 180.dp).fillMaxWidth()) }
 
-                                    SessionScreen.Loading -> uiText(R.string.ui_loading)
-                                    SessionScreen.Welcome -> uiText(R.string.welcome)
-                                    SessionScreen.NewCredentials -> uiText(R.string.create_account)
-                                    SessionScreen.ReturningCredentials -> uiText(R.string.sign_in)
-                                    SessionScreen.ProfileSetup, SessionScreen.OrganizationProfileSetup -> uiText(
-                                        R.string.your_profile
-                                    )
-
-                                    SessionScreen.TriggerSetup -> uiText(R.string.ui_set_your_private_entry)
-                                    SessionScreen.DevicePin -> uiText(R.string.secure_this_device)
-                                    SessionScreen.Portal -> uiText(R.string.ui_organization_portal)
-                                    SessionScreen.StorageError -> uiText(R.string.unable_to_open_local_storage)
-                                    SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
-                                }
-                                CompositionLocalProvider(
-                                    LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
-                                    LocalQuickExit provides if (userQuickExit) exit else null,
-                                    LocalSafeSystemLauncher provides systemLaunchers.open,
-                                    LocalSafePermissionActions provides systemLaunchers.permissions,
-                                    LocalSafeUpdateReminder provides update.onDownload,
-                                ) {
-                                    // Entry setup owns its pane title because choosing New PIN changes its local screen.
-                                    Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
-                                        paneTitle = pane
-                                    }).then(if (targetScreen != navigation.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
-                                        // Opens the cover, account entry, onboarding, or Safe App for the current session.
-                                        when (targetScreen) {
-                                            SessionScreen.Loading -> Box(
-                                                Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.Center
-                                            ) { LoadingSkeleton(SkeletonLayout.Action, Modifier.widthIn(max = 180.dp).fillMaxWidth()) }
-
-                                            SessionScreen.Welcome -> Welcome(session)
-                                            SessionScreen.NewCredentials -> Credentials(
-                                                session,
-                                                true
-                                            )
-
-                                            SessionScreen.ReturningCredentials -> Credentials(
-                                                session,
-                                                false
-                                            )
-
-                                            SessionScreen.ProfileSetup -> ProfileSetup(session)
-                                            SessionScreen.TriggerSetup -> TriggerSetup(session)
-                                            SessionScreen.OrganizationProfileSetup -> OrganizationProfileSetup(
-                                                session
-                                            )
-
-                                            SessionScreen.DevicePin -> DevicePin(session)
-                                            SessionScreen.Pin -> PinPrompt(session)
-                                            SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT) {
-                                                key(session.coverReset) { SafeContactArea(session, exit) }
-                                            } else SafeArea(session, exit)
-
-                                            SessionScreen.Portal -> key(session.coverReset) {
-                                                when (session.accountRole) {
-                                                    AccountRole.ADMIN -> AdminPortal(session)
-                                                    AccountRole.STAFF -> StaffPortal(session)
-                                                    else -> Unit
-                                                }
-                                            }
-                                            SessionScreen.StorageError -> FormColumn {
-                                                Heading(
-                                                    uiText(R.string.unable_to_open_local_storage),
-                                                    uiText(R.string.access_remains_locked_your_existing_data_has_not_been_replaced)
+                                                SessionScreen.Welcome -> Welcome(session)
+                                                SessionScreen.NewCredentials -> Credentials(
+                                                    session,
+                                                    true
                                                 )
-                                                Button(
-                                                    onClick = session.account::load,
-                                                    enabled = !session.busy
-                                                ) { Text(stringResource(R.string.retry)) }
-                                            }
 
-                                            SessionScreen.Cover -> Unit
+                                                SessionScreen.ReturningCredentials -> Credentials(
+                                                    session,
+                                                    false
+                                                )
+
+                                                SessionScreen.ProfileSetup -> ProfileSetup(session)
+                                                SessionScreen.TriggerSetup -> TriggerSetup(session)
+                                                SessionScreen.OrganizationProfileSetup -> OrganizationProfileSetup(
+                                                    session
+                                                )
+
+                                                SessionScreen.DevicePin -> DevicePin(session)
+                                                SessionScreen.Pin -> PinPrompt(session)
+                                                SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT) {
+                                                    key(session.coverReset) { SafeContactArea(session, exit) }
+                                                } else SafeArea(session, exit)
+
+                                                SessionScreen.Portal -> key(session.coverReset) {
+                                                    when (session.accountRole) {
+                                                        AccountRole.ADMIN -> AdminPortal(session)
+                                                        AccountRole.STAFF -> StaffPortal(session)
+                                                        else -> Unit
+                                                    }
+                                                }
+                                                SessionScreen.StorageError -> FormColumn {
+                                                    Heading(
+                                                        uiText(R.string.unable_to_open_local_storage),
+                                                        uiText(R.string.access_remains_locked_your_existing_data_has_not_been_replaced)
+                                                    )
+                                                    Button(
+                                                        onClick = session.account::load,
+                                                        enabled = !session.busy
+                                                    ) { Text(stringResource(R.string.retry)) }
+                                                }
+
+                                                SessionScreen.Cover -> Unit
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                        if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
+                            SafeAppUpdateBanner(update, Modifier.align(Alignment.TopCenter))
+                        }
+                        if (showPinAnimation) key(navigation.unlockAnimationVersion) {
+                            PinSafeOliveTransition(
+                                backgroundColor = screenBackground,
+                                modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
+                                    .pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                                        }
+                                    },
+                                onAnimationEnd = { completedUnlockAnimation = navigation.unlockAnimationVersion },
+                            )
+                        }
+                        SafeSupportControls(
+                            session,
+                            exit,
+                            showQuickExit,
+                            showSupport,
+                            supportExpanded
+                        ) { nextExpanded ->
+                            supportExpanded = nextExpanded
+                            if ((nextExpanded && activeTourStep?.openSupportMenu != true) ||
+                                (!nextExpanded && activeTourStep?.openSupportMenu == true)
+                            ) {
+                                session.runtime.navigation.dismissWalkthroughTour()
+                            }
+                        }
+                        if (navigation.screen == SessionScreen.Safe && session.profile != null &&
+                            activeTourStep != null && !privacyHidden && !showPinAnimation &&
+                            !callOverlayVisible && navigation.idleCountdownSeconds == null &&
+                            (!supportExpanded || activeTourStep.openSupportMenu)
+                        ) {
+                            WalkthroughCoachmarkOverlay(
+                                role = session.accountRole,
+                                activeStepId = activeTourStep.id,
+                                showBottomControls = showQuickExit || showSupport,
+                                onAdvance = { nextId ->
+                                    if (nextId == null) session.runtime.navigation.completeWalkthroughTour()
+                                    else startTour(nextId)
+                                },
+                                onOpenContents = {
+                                    session.runtime.navigation.dismissWalkthroughTour()
+                                    session.navigation.openSafePage(SafePage.Walkthrough)
+                                },
+                                onSkip = { session.runtime.navigation.dismissWalkthroughTour() },
+                                modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+                            )
+                        }
                     }
-                    if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
-                        SafeAppUpdateBanner(update, Modifier.align(Alignment.TopCenter))
                     }
-                    if (showPinAnimation) PinSafeOliveTransition(
-                        backgroundColor = screenBackground,
-                        modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
-                                }
-                            },
-                        onAnimationEnd = { pinAnimationRunning = false },
-                    )
-                    SafeSupportControls(
-                        session,
-                        exit,
-                        showQuickExit,
-                        showSupport,
-                        supportExpanded
-                    ) { supportExpanded = it }
                 }
             }
             navigation.idleCountdownSeconds?.let { seconds ->
-                if (navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) AlertDialog(
-                    onDismissRequest = session::noteInteraction,
-                    title = { Text(stringResource(R.string.locking_soon)) },
-                    text = {
-                        Text(
-                            if (session.usesCover) uiText(
-                                R.string.ui_no_activity_returning_to_your_cover_in_value_seconds,
-                                seconds
-                            ) else uiText(
-                                R.string.ui_no_activity_locking_olive_branch_in_value_seconds,
-                                seconds
-                            )
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = session::noteInteraction) {
-                            Text(
-                                stringResource(R.string.stay_here)
-                            )
-                        }
-                    },
-                    dismissButton = { TextButton(onClick = exit) { Text(stringResource(R.string.quick_exit)) } }
-                )
+                if (navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) {
+                    IdleLockWarningDialog(
+                        seconds = seconds,
+                        usesCover = session.usesCover,
+                        currentTimeoutSeconds = session.idleTimeoutSeconds(),
+                        onStayHere = session::noteInteraction,
+                        onExtendTimeout = session::setIdleTimeoutSeconds,
+                        onQuickExit = exit,
+                    )
+                }
+            }
+        }
+        if (isCover && !navigation.privacyBlackout && session.coverEmergencyConfirmation?.first == session.coverAccountId &&
+            session.coverEmergencyConfirmation != null) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 24.dp)
+                    .widthIn(min = 160.dp, max = 280.dp).testTag("cover_emergency_done"),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shadowElevation = 4.dp,
+            ) {
+                Text(stringResource(R.string.friend_invite_done),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium)
             }
         }
         if (navigation.privacyBlackout) Box(
@@ -554,19 +634,46 @@ internal fun OliveRoot(
     }
 }
 
+/**
+ * Returns whether the PIN-to-Safe unlock reveal animation still needs to play for the current screen state.
+ *
+ * @param screen The current app screen.
+ * @param unlockAnimationVersion The sequence number of the latest successful unlock animation.
+ * @param completedUnlockAnimation The most recent unlock animation sequence already completed.
+ * @return True when the unlock animation for the current PIN challenge still needs to play.
+ */
+internal fun shouldShowPinSafeAnimation(
+    screen: SessionScreen,
+    unlockAnimationVersion: Int,
+    completedUnlockAnimation: Int,
+): Boolean = screen == SessionScreen.Safe && unlockAnimationVersion > completedUnlockAnimation
+
 internal enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
-internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location }
+internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location, Walkthrough }
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Privacy }
 internal enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 
-// Creates the messaging identity used after account sign-in.
+/**
+ * Creates the messaging identity used after account sign-in.
+ *
+ * @param identity Authenticated account identity containing UID and username.
+ * @param publicKey Raw public key byte array.
+ * @return The resulting messaging identity marker string.
+ */
 internal fun messagingIdentityMarker(identity: AccountIdentity, publicKey: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(publicKey)
     val keyId = Base64.getUrlEncoder().withoutPadding().encodeToString(digest).take(16)
     return "secure-v2:${identity.uid}:${identity.username.lowercase()}:$keyId"
 }
 
-// Registers an encryption identity before opening secure messaging.
+/**
+ * Registers an encryption identity before opening secure messaging.
+ *
+ * @param savedMarker Optional saved marker supplied to [shouldRegisterMessagingIdentity].
+ * @param identity Authenticated account identity containing UID and username.
+ * @param publicKey Raw public key byte array.
+ * @return `true` if should register messaging identity, or `false` otherwise.
+ */
 internal fun shouldRegisterMessagingIdentity(
     savedMarker: String?,
     identity: AccountIdentity,
@@ -581,70 +688,155 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     val busy get() = runtime.state.busy
     val message get() = runtime.state.message
     val credentialFieldError get() = runtime.state.credentialFieldError
+    val inputErrorVersion get() = runtime.state.inputErrorVersion
     val creatingAccount get() = runtime.state.creatingAccount
     val setupUsername get() = runtime.setupUsername
     val setupProfile get() = runtime.setupProfile
     val configured get() = runtime.configured
     val preferredEntryMethod get() = runtime.enrollment?.entryMethod ?: SafeEntryMethod.APP_PIN
     val hasAppPin get() = runtime.enrollment?.hasAppPin == true
+    val appPinLength get() = runtime.enrollment?.pinLength
     val phoneHasLock get() = runtime.deviceSecure
     val usesDeviceLock get() = preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK && phoneHasLock
     val canUseAppPin get() = runtime.enrollment?.allowsAppPin() == true
 
-    // Restores the account and private-entry state saved on this device.
+    /**
+     * Restores the account and private-entry state saved on this device.
+     *
+     * @return The resulting load.
+     */
     fun load() = runtime.accountSession.load()
-    // Selects whether the person is a user, trusted contact, staff member, or admin.
+    /**
+     * Selects whether the person is a user, trusted contact, staff member, or admin.
+     *
+     * @param role Account role determining workspace permissions.
+     */
     fun selectRole(role: AccountRole) = runtime.accountSession.selectRole(role)
-    // Opens the new-account path on the account entry screen.
+    /**
+     * Opens the new-account path on the account entry screen.
+     */
     fun chooseNew() = runtime.accountSession.chooseNew()
-    // Opens the returning-account sign-in path.
+    /**
+     * Opens the returning-account sign-in path.
+     */
     fun chooseReturning() = runtime.accountSession.chooseReturning()
-    // Starts profile setup after a new account signs in successfully.
+    /**
+     * Starts profile setup after a new account signs in successfully.
+     */
     fun openAccountSetup() = runtime.accountSession.openAccountSetup()
-    // Clears the username or password error when the user edits the form.
+    /**
+     * Clears the username or password error when the user edits the form.
+     */
     fun clearCredentialError() = runtime.accountSession.clearCredentialError()
-    // Signs in with Firebase, or creates the Firebase account when requested.
+    /**
+     * Signs in with Firebase, or creates the Firebase account when requested.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     * @return The resulting authenticate.
+     */
     fun authenticate(username: String, password: String, create: Boolean) =
         runtime.accountSignIn.authenticate(username, password, create)
 
-    // Saves the profile collected during account setup.
+    /**
+     * Saves the profile collected during account setup.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     fun saveSetupProfile(value: UserProfile) = runtime.accountSession.saveSetupProfile(value)
-    // Checks both PIN fields before saving the first private-entry PIN.
+    /**
+     * Checks both PIN fields before saving the first private-entry PIN.
+     *
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [createDevicePin].
+     * @return The resulting create device PIN.
+     */
     fun createDevicePin(pin: String, confirmation: String) =
         runtime.accountSession.createDevicePin(pin, confirmation)
 
-    // Saves the hidden phrase chosen during first-time setup.
+    /**
+     * Saves the hidden phrase chosen during first-time setup.
+     *
+     * @param trigger Trigger supplied to [saveProvisionedTrigger].
+     */
     fun saveProvisionedTrigger(trigger: String) = runtime.accountSession.saveProvisionedTrigger(trigger)
 
-    // Shows a specific account-entry error on the current screen.
+    /**
+     * Shows a specific account-entry error on the current screen.
+     *
+     * @param text Text string to display, parse, or send.
+     */
     fun showError(text: String) {
-        runtime.state.message = text
+        runtime.state.failInput(text)
     }
 
-    // Checks again whether Android currently has a secure device lock.
+    /**
+     * Checks again whether Android currently has a secure device lock.
+     */
     fun refreshDeviceSecurity() {
         runtime.deviceSecure = runtime.phoneSecure()
     }
 
-    // Changes whether this user prefers Android lock or the app PIN.
+    /**
+     * Changes whether this user prefers Android lock or the app PIN.
+     *
+     * @param method Method supplied to [setSafeEntryMethod].
+     * @param currentPin Current PIN supplied to [setSafeEntryMethod].
+     */
     fun setSafeEntryMethod(method: SafeEntryMethod, currentPin: String) =
         runtime.entrySettings.select(method, currentPin)
 
-    // Saves or replaces the user's backup app PIN.
+    /**
+     * Saves or replaces the user's backup app PIN.
+     *
+     * @param currentPin Current PIN supplied to [saveSafeEntryPin].
+     * @param pin User-entered PIN string.
+     * @param confirmation Confirmation supplied to [saveSafeEntryPin].
+     * @param usePin Whether to use PIN.
+     */
     fun saveSafeEntryPin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) =
         runtime.entrySettings.savePin(currentPin, pin, confirmation, usePin)
 
-    // Opens Android device authentication for entry or first-time enrolment.
+    /**
+     * Opens Android device authentication for entry or first-time enrolment.
+     *
+     * @param enroll Whether to apply enroll.
+     * @return The resulting authenticate device lock.
+     */
     fun authenticateDeviceLock(enroll: Boolean = false) = runtime.deviceAccess.authenticate(enroll)
-    // Confirms device authentication before changing the hidden trigger phrase.
+    /**
+     * Confirms device authentication before changing the hidden trigger phrase.
+     *
+     * @param trigger Trigger supplied to [changeDeviceLockTrigger].
+     * @return The resulting change device lock trigger.
+     */
     fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false, trigger)
 
-    // Checks whether cover-app search text matches the saved hidden phrase.
+    /**
+     * Checks whether cover-app search text matches the saved hidden phrase.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search, or `false` otherwise.
+     */
     fun interceptSearch(value: String): Boolean = runtime.access.interceptSearch(value)
+    /**
+     * Computes intercept search async.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search async, or `false` otherwise.
+     */
     suspend fun interceptSearchAsync(value: String): Boolean = runtime.access.interceptSearchAsync(value)
-    // Opens private authentication after the hidden olive is double-tapped.
+    /**
+     * Opens private authentication after the hidden olive is double-tapped.
+     */
     fun beginDiscreetEntry() = runtime.access.beginDiscreetEntry()
-    // Checks the entered app PIN against the current private-entry challenge.
+    /**
+     * Checks the entered app PIN against the current private-entry challenge.
+     *
+     * @param pin User-entered PIN string.
+     * @param challenge Challenge supplied to [submitPin].
+     */
     fun submitPin(pin: String, challenge: Int = runtime.state.pinChallengeVersion) =
         runtime.access.submitPin(pin, challenge)
 

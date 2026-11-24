@@ -59,9 +59,15 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]) ||
       JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {}) ||
       JSON.stringify(resolvedConflicts) !== JSON.stringify(old.resolvedConflicts || {});
+    const staffEdited = changed && changes.length > 0 && caller.uid !== ownerUid && caller.role === "STAFF";
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
       safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
-    fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;
+    fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now(),
+    ...(staffEdited ? {
+      lastStaffEditAt: Date.now(),
+      lastStaffEditBy: caller.uid,
+      lastStaffEditRevision: (old?.lastStaffEditRevision || 0) + 1,
+    } : {})} : old;
     if (changed) transaction.set(reference, plan);
     return {plan, conflicts, conflictValues};
   });

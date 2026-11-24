@@ -51,6 +51,26 @@ class SessionPinFlowTest {
     }
 
     @Test
+    fun legacyEnrollmentLearnsPinLengthOnlyAfterSuccessfulUnlock() = runBlocking<Unit> {
+        fixture().use { fixture ->
+            val runtime = fixture.runtime
+            assertEquals(6, runtime.store.current()?.pinLength)
+            runtime.vault.update { it.getJSONObject("enrollments").getJSONObject("owner").remove("pinLength") }
+            runtime.enrollment = runtime.store.current()
+            assertNull(runtime.enrollment?.pinLength)
+            runtime.access.beginDiscreetEntry()
+            val challenge = runtime.state.pinChallengeVersion
+            runtime.access.submitPin("9999", challenge)
+            fixture.await { !runtime.state.busy }
+            assertNull(runtime.store.current()?.pinLength)
+            runtime.access.submitPin("123456", challenge)
+            fixture.await { runtime.state.screen == SessionScreen.Safe && !runtime.state.busy }
+            assertEquals(6, runtime.store.current()?.pinLength)
+            assertEquals(6, runtime.enrollment?.pinLength)
+        }
+    }
+
+    @Test
     fun fifthFailedCoverPinReturnsToTheCoverAndCannotBeBypassedWithTheCorrectPin() = runBlocking<Unit> {
         fixture().use { fixture ->
             val runtime = fixture.runtime

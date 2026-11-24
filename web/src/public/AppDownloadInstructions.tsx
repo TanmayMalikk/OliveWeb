@@ -5,6 +5,7 @@ import {
 import { Logo, External } from "../components/SharedComponents";
 import { siteHref } from "../sites/SiteRouting";
 import config from "../../site.config.json";
+import { DownloadInvite } from "./DownloadInvite";
 
 const androidDownload = "/download/android";
 
@@ -25,6 +26,7 @@ export default function DownloadPage() {
           <h1>Get Olive Branch</h1>
           <p>Install on Android, add Little Grove to your iPhone or iPad, or use Olive Branch in your browser.</p>
         </div>
+        <DownloadInvite />
         <div className="install-platforms">
           <section className="access-card install-platform install-android" aria-labelledby="android-install">
             <span className="access-mark"><Download size={24} aria-hidden="true" /></span>

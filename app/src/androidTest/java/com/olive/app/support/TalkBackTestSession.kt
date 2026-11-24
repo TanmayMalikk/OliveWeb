@@ -28,6 +28,7 @@ internal class TalkBackTestSession(activity: Activity) : AutoCloseable {
     )
     private val previous = keys.associateWith { Settings.Secure.getString(resolver, it) }
     val focused = CopyOnWriteArrayList<String>()
+    val announcements = CopyOnWriteArrayList<String>()
     val automation: UiAutomation
 
     init {
@@ -45,6 +46,8 @@ internal class TalkBackTestSession(activity: Activity) : AutoCloseable {
         automation.setOnAccessibilityEventListener { event ->
             if (event.eventType == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED)
                 focused += event.contentDescription?.toString().orEmpty()
+            if (event.eventType == AccessibilityEvent.TYPE_ANNOUNCEMENT)
+                announcements.addAll(event.text.map(CharSequence::toString))
         }
         automation.adoptShellPermissionIdentity(android.Manifest.permission.WRITE_SECURE_SETTINGS)
         // Use the fallback when talk back test session is unavailable.

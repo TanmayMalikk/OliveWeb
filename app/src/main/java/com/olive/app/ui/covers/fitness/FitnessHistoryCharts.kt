@@ -1,6 +1,7 @@
 // Fitness cover users: draws readable 14-day activity and nutrition history graphs.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveCard as Card
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,6 +44,7 @@ import com.olive.app.ui.shared.CarbohydrateGold
 import com.olive.app.ui.shared.DistanceGreen
 import com.olive.app.ui.shared.EatenBrown
 import com.olive.app.ui.shared.FatPlum
+import com.olive.app.ui.shared.FatPlumLight
 import com.olive.app.ui.shared.FitnessDarkCard
 import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.LightSage
@@ -77,7 +78,11 @@ private data class ChartAxisScale(
         }
 }
 
-// Draws the fitness history charts for the fitness cover.
+/**
+ * Draws the fitness history charts for the fitness cover.
+ *
+ * @param days Collection of days values to process.
+ */
 @Composable
 internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     val stepsUnit = stringResource(R.string.fitness_steps_unit)
@@ -174,7 +179,16 @@ internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     }
 }
 
-// Groups a graph, its legend, and the latest values for one fitness measure.
+/**
+ * Groups a graph, its legend, and the latest values for one fitness measure.
+ *
+ * @param title Primary display title text.
+ * @param unit Unit supplied to [HistoryLineChartCard].
+ * @param days Collection of days values to process.
+ * @param series Collection of series values to process.
+ * @param valueText Function used to transform or provide value text.
+ * @param useBars Whether to use bars.
+ */
 @Composable
 private fun HistoryLineChartCard(
     title: String,
@@ -266,7 +280,13 @@ private fun HistoryLineChartCard(
     }
 }
 
-// Names one line in the graph and shows its latest recorded value.
+/**
+ * Names one line in the graph and shows its latest recorded value.
+ *
+ * @param series Series supplied to [HistoryLegendItem].
+ * @param unit Unit supplied to [HistoryLegendItem].
+ * @param valueText Function used to transform or provide value text.
+ */
 @Composable
 private fun HistoryLegendItem(
     series: HistorySeries,
@@ -293,7 +313,15 @@ private fun HistoryLegendItem(
     }
 }
 
-// Draws the graph lines or bars and labels its vertical scale.
+/**
+ * Draws the graph lines or bars and labels its vertical scale.
+ *
+ * @param series Collection of series values to process.
+ * @param axisScale Axis scale supplied to [HistoryChart].
+ * @param description Description supplied to [HistoryChart].
+ * @param useBars Whether to use bars.
+ * @param valueText Function used to transform or provide value text.
+ */
 @Composable
 private fun HistoryChart(
     series: List<HistorySeries>,
@@ -393,7 +421,12 @@ private fun HistoryChart(
     }
 }
 
-// Fitness history graphs: chooses readable, even Y-axis increments instead of arbitrary fractions.
+/**
+ * Fitness history graphs: chooses readable, even Y-axis increments instead of arbitrary fractions.
+ *
+ * @param highestValue Highest value supplied to [calculateChartAxisScale].
+ * @return The resulting [ChartAxisScale] for calculate chart axis scale.
+ */
 private fun calculateChartAxisScale(highestValue: Float): ChartAxisScale {
     val safeHighest = highestValue.takeIf(Float::isFinite)?.coerceAtLeast(1f) ?: 1f
     val roughIncrement = safeHighest / 5f
@@ -411,7 +444,17 @@ private fun calculateChartAxisScale(highestValue: Float): ChartAxisScale {
     return ChartAxisScale(maximum = maximum, increment = increment)
 }
 
-// Draws separate bars for each daily measure in the fitness history chart.
+/**
+ * Draws separate bars for each daily measure in the fitness history chart.
+ *
+ * @receiver The drawing scope for the history chart.
+ * @param series Collection of series values to process.
+ * @param highestValue Highest value supplied to [drawHistoryBars].
+ * @param horizontalPadding Horizontal padding supplied to [drawHistoryBars].
+ * @param verticalPadding Vertical padding supplied to [drawHistoryBars].
+ * @param chartWidth Chart width supplied to [drawHistoryBars].
+ * @param chartHeight Chart height supplied to [drawHistoryBars].
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     series: List<HistorySeries>,
     highestValue: Float,
@@ -447,7 +490,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     }
 }
 
-// Labels the first, middle, and last day shown in the graph.
+/**
+ * Labels the first, middle, and last day shown in the graph.
+ *
+ * @param days Collection of days values to process.
+ */
 @Composable
 private fun HistoryDateAxis(days: List<FitnessHistoryDay>) {
     if (days.isEmpty()) return
@@ -464,7 +511,11 @@ private fun HistoryDateAxis(days: List<FitnessHistoryDay>) {
     }
 }
 
-// Shows today's movement summary and the 14-day activity graphs.
+/**
+ * Shows today's movement summary and the 14-day activity graphs.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
     val distance = FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm)
@@ -519,7 +570,7 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
                     DashboardMetric(
                         burned.roundToInt().toString(),
                         stringResource(R.string.fitness_kilocalories_unit),
-                        FatPlum,
+                        FatPlumLight,
                     )
                 }
                 ActivityProgressRings(progress)
@@ -528,7 +579,13 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
     }
 }
 
-// Builds the dashboard metric that the fitness cover needs.
+/**
+ * Builds the dashboard metric that the fitness cover needs.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ * @param color Color supplied to [DashboardMetric].
+ */
 @Composable
 private fun DashboardMetric(value: String, label: String, color: Color) {
     Row(
@@ -541,14 +598,18 @@ private fun DashboardMetric(value: String, label: String, color: Color) {
     }
 }
 
-// Draws progress for steps, active time, and burned calories.
+/**
+ * Draws progress for steps, active time, and burned calories.
+ *
+ * @param progress Progress supplied to [ActivityProgressRings].
+ */
 @Composable
 private fun ActivityProgressRings(progress: Float) {
     Canvas(Modifier.size(142.dp)) {
         val centre = Offset(size.width / 2f, size.height / 2f)
         val widths = floatArrayOf(11.dp.toPx(), 10.dp.toPx(), 9.dp.toPx())
         val radii = floatArrayOf(size.minDimension * 0.43f, size.minDimension * 0.32f, size.minDimension * 0.21f)
-        val colours = listOf(ProteinLime, CarbohydrateBlue, FatPlum)
+        val colours = listOf(ProteinLime, CarbohydrateBlue, FatPlumLight)
         radii.indices.forEach { index ->
             drawCircle(
                 color = Paper.copy(alpha = 0.12f),

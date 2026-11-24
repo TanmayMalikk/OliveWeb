@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_readiness_title">الاستعداد للطوارئ</string>
+    <string name="emergency_readiness_location">اسمح بالوصول إلى الموقع لإضافة إحداثياتك إلى تقرير الطوارئ ومساعدة المستجيبين في العثور عليك.</string>
+    <string name="emergency_readiness_device_location">فعّل موقع الجهاز حتى يتضمن تقرير الطوارئ مكانك.</string>
+    <string name="emergency_readiness_background">اسمح بالوصول إلى الموقع في الخلفية ليتمكن المشرفون من متابعة موقعك عند مغادرة التطبيق.</string>
+    <string name="emergency_readiness_notifications">فعّل الإشعارات لترى التنبيه أثناء مشاركة موقعك.</string>
+    <string name="emergency_readiness_allow_location">السماح بالموقع</string>
+    <string name="emergency_readiness_enable_location">تفعيل موقع الجهاز</string>
+    <string name="emergency_readiness_allow_background">السماح بالموقع في الخلفية</string>
+    <string name="emergency_readiness_notification_settings">إعدادات الإشعارات</string>
+    <string name="emergency_readiness_remind_later">ذكّرني لاحقًا</string>
+    <string name="emergency_readiness_location_settings_path">اختر %1$s. إذا فتح Android معلومات التطبيق، انتقل إلى الأذونات ثم الموقع.</string>
+</resources>

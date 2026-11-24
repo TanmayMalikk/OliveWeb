@@ -2,6 +2,7 @@ package com.olive.app.data.messaging
 
 import android.Manifest
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Looper
 import io.livekit.android.events.BroadcastEventBus
@@ -25,6 +26,46 @@ import org.robolectric.annotation.Config
 @Config(sdk = [30])
 class LiveKitAudioSessionTest {
     private val details = LiveKitConnectionDetails("wss://calls.example.test", "fixture-token", "fixture-room")
+
+    @Test
+    @Config(sdk = [35])
+    fun modernAudioRoutingUsesTheEarpieceAndReleasesTheSelectedDeviceOnHangup() = runBlocking<Unit> {
+        val app = RuntimeEnvironment.getApplication()
+        shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        val context = spy(app)
+        val audio = mock(AudioManager::class.java)
+        val speaker = mock(AudioDeviceInfo::class.java)
+        val earpiece = mock(AudioDeviceInfo::class.java)
+        `when`(speaker.type).thenReturn(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+        `when`(earpiece.type).thenReturn(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
+        `when`(audio.availableCommunicationDevices).thenReturn(listOf(speaker, earpiece))
+        `when`(audio.setCommunicationDevice(earpiece)).thenReturn(true)
+        `when`(audio.setCommunicationDevice(speaker)).thenReturn(true, false)
+        doReturn(context).`when`(context).applicationContext
+        doReturn(audio).`when`(context).getSystemService(Context.AUDIO_SERVICE)
+        val room = mock(Room::class.java)
+        val local = mock(LocalParticipant::class.java)
+        `when`(room.localParticipant).thenReturn(local)
+        `when`(local.setMicrophoneEnabled(true)).thenReturn(true)
+        `when`(room.events).thenReturn(BroadcastEventBus<RoomEvent>())
+        `when`(room.remoteParticipants).thenReturn(emptyMap())
+
+        val session = LiveKitAudioSession(context) { room }
+        session.connect(details)
+        verify(audio).setCommunicationDevice(earpiece)
+        session.setSpeakerEnabled(true)
+        assertEquals("Could not change the call audio route",
+            runCatching { session.setSpeakerEnabled(true) }.exceptionOrNull()?.message)
+        `when`(audio.availableCommunicationDevices).thenReturn(emptyList())
+        session.setSpeakerEnabled(false)
+        verify(audio).clearCommunicationDevice()
+        assertEquals("Speaker is unavailable", runCatching { session.setSpeakerEnabled(true) }.exceptionOrNull()?.message)
+        session.disconnect()
+        session.disconnect()
+        verify(room).disconnect()
+        verify(audio, times(2)).clearCommunicationDevice()
+        verify(audio).abandonAudioFocusRequest(any())
+    }
 
     @Test
     fun successfulCallStartsPrivatelyAndRestoresAudioAfterARemoteDisconnect() = runBlocking<Unit> {

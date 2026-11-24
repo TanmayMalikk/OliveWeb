@@ -21,6 +21,7 @@
     <string name="enter_your_pin">أدخل رقم التعريف الشخصي الخاص بك.</string>
 <string name="locking_soon">القفل قريبا</string>
     <string name="stay_here">ابق هنا</string>
+    <string name="idle_lock_extend_prompt">تمديد مهلة عدم النشاط</string>
     <string name="read_full_story">قراءة القصة كاملة</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">الأخبار الحية غير متوفرة. تحقق من اتصالك وحاول مرة أخرى.</string>
     <string name="privacy_events">أحداث الخصوصية</string>
@@ -350,7 +351,7 @@
 
 
     <string name="private_contact_note">ملاحظة خاصة لجهة الاتصال</string>
-    <string name="private_contact_note_explanation">أنت وحدك تستطيع قراءة هذه الملاحظة المشفرة على هذا الجهاز. يضاف النص الجديد في سطر جديد.</string>
+    <string name="private_contact_note_explanation">يمكنك وحدك قراءة هذه الملاحظة المشفرة على هذا الجهاز. عدّلها واحفظها هنا.</string>
     <string name="choose_person">اختر شخصًا</string>
     <string name="add_to_private_note">أضف إلى الملاحظة الخاصة</string>
     <string name="append_note">إضافة ملاحظة</string>
@@ -492,6 +493,35 @@
     <string name="incident_body_required">تفاصيل الحادثة (مطلوبة)</string>
     <string name="note_content_required">الملاحظة (مطلوبة)</string>
     <string name="incident_clear_time">مسح الوقت</string>
+    <string name="news_top_story">أبرز خبر</string>
+    <string name="news_offline_reader">قارئ دون اتصال</string>
+    <string name="news_offline">غير متصل</string>
+    <string name="news_daily_edition" formatted="true">الإصدار اليومي · %1$s</string>
+    <string name="news_min_read" formatted="true">قراءة %1$d دقائق</string>
+    <string name="news_recently_read">قُرئت مؤخرًا</string>
+    <string name="news_no_recent_stories">لا توجد مقالات مقروءة مؤخرًا.</string>
+    <string name="news_bookmarks">الإشارات المرجعية</string>
+    <string name="news_history">السجل</string>
+    <string name="news_clear_history">مسح سجل القراءة</string>
+    <string name="news_text_size">تغيير حجم النص</string>
+    <string name="news_share_article">مشاركة المقال</string>
+    <string name="news_category_all">الكل</string>
+    <string name="news_category_world">العالم</string>
+    <string name="news_swipe_bookmark">حفظ</string>
+    <string name="news_swipe_share">مشاركة</string>
+    <string name="notes_shared_with_you">تمت مشاركتها معك</string>
+    <string name="notes_shared_by">تمت المشاركة بواسطة %1$s</string>
+    <string name="notes_share_title">مشاركة الملاحظة الخاصة</string>
+    <string name="notes_share_help">يمكن فقط للأصدقاء المقبولين المحددين فتح هذه الملاحظة أو الحادثة. ألغِ تحديد أي شخص لإلغاء وصوله فوراً.</string>
+    <string name="notes_manage_sharing">إدارة مشاركة الملاحظة</string>
+    <string name="safety_sharing_saved">تم حفظ صلاحيات المشاركة.</string>
+    <string name="email_optional">البريد الإلكتروني (اختياري)</string>
+    <string name="email_communication_consent">أوافق على تلقي الإشعارات والرسائل عبر البريد الإلكتروني من Olive Branch.</string>
+    <string name="email_consent_required">يرجى تحديد مربع الموافقة على تلقي الرسائل عبر البريد الإلكتروني، أو مسح حقل البريد الإلكتروني.</string>
+    <string name="email_notifications_label">إشعارات البريد الإلكتروني</string>
+    <string name="email_notifications_enabled">مفعّلة</string>
+    <string name="email_notifications_disabled">معطّلة</string>
+    <string name="email_invalid_message">أدخل عنوان بريد إلكتروني صالحاً.</string>
     <string name="password_recovery_title">استرداد الحساب</string>
     <string name="password_recovery_help">استخدم كلمة مرور حسابك في Olive Branch مع تشفير OPAQUE دون المعرفة الصفرية لاستعادة محادثاتك وملفاتك المشفرة على جهاز جديد. لا يتلقى الخادم أو يخزن أبداً كلمة المرور أو مفتاح الاسترداد الخاصين بك.</string>
     <string name="password_recovery_warning">بمجرد التفعيل، يبقى استرداد كلمة المرور مفعّلاً بشكل دائم لحماية وصولك إلى البيانات المشفرة على الأجهزة الجديدة.</string>
@@ -528,4 +558,5 @@
     <string name="encrypted_access_partially_restored">تعذرت استعادة بعض العناصر المشفّرة. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="encrypted_access_restore_failed">تعذرت استعادة الوصول المشفّر. تحقق من الاتصال وكلمة مرور الاسترداد ثم حاول مرة أخرى.</string>
     <string name="ok">حسنًا</string>
+    <string name="password_recovery_confirm_device">أكّد هويتك لحماية استرداد الحساب المشفّر على هذا الجهاز.</string>
 </resources>

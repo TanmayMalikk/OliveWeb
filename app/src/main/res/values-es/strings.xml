@@ -21,6 +21,7 @@
     <string name="enter_your_pin">Ingrese su PIN.</string>
 <string name="locking_soon">Cerrando pronto</string>
     <string name="stay_here">quédate aquí</string>
+    <string name="idle_lock_extend_prompt">Ampliar el tiempo de inactividad</string>
     <string name="read_full_story">Leer historia completa</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">Las noticias en vivo no están disponibles. Comprueba tu conexión y vuelve a intentarlo.</string>
     <string name="privacy_events">Eventos de privacidad</string>
@@ -350,7 +351,7 @@
 
 
     <string name="private_contact_note">Nota privada del contacto</string>
-    <string name="private_contact_note_explanation">Solo tú puedes leer esta nota cifrada en este dispositivo. El texto nuevo se agrega en una línea nueva.</string>
+    <string name="private_contact_note_explanation">Solo tú puedes leer esta nota cifrada en este dispositivo. Edítala y guárdala aquí.</string>
     <string name="choose_person">Elegir una persona</string>
     <string name="add_to_private_note">Agregar a la nota privada</string>
     <string name="append_note">Agregar nota</string>
@@ -483,6 +484,35 @@
     <string name="incident_body_required">Detalles del incidente (obligatorios)</string>
     <string name="note_content_required">Nota (obligatoria)</string>
     <string name="incident_clear_time">Borrar hora</string>
+    <string name="news_top_story">NOTICIA PRINCIPAL</string>
+    <string name="news_offline_reader">LECTOR SIN CONEXIÓN</string>
+    <string name="news_offline">Sin conexión</string>
+    <string name="news_daily_edition" formatted="true">Edición diaria · %1$s</string>
+    <string name="news_min_read" formatted="true">%1$d min de lectura</string>
+    <string name="news_recently_read">Leídos recientemente</string>
+    <string name="news_no_recent_stories">No hay artículos leídos recientemente.</string>
+    <string name="news_bookmarks">Marcadores</string>
+    <string name="news_history">Historial</string>
+    <string name="news_clear_history">Borrar historial de lectura</string>
+    <string name="news_text_size">Cambiar tamaño del texto</string>
+    <string name="news_share_article">Compartir artículo</string>
+    <string name="news_category_all">Todo</string>
+    <string name="news_category_world">Mundo</string>
+    <string name="news_swipe_bookmark">Guardar</string>
+    <string name="news_swipe_share">Compartir</string>
+    <string name="notes_shared_with_you">Compartido contigo</string>
+    <string name="notes_shared_by">Compartido por %1$s</string>
+    <string name="notes_share_title">Compartir nota privada</string>
+    <string name="notes_share_help">Solo las amistades aceptadas seleccionadas pueden abrir esta nota o incidente. Desmarca a una persona para revocar su acceso de inmediato.</string>
+    <string name="notes_manage_sharing">Administrar acceso compartido</string>
+    <string name="safety_sharing_saved">Acceso compartido guardado.</string>
+    <string name="email_optional">Correo electrónico (opcional)</string>
+    <string name="email_communication_consent">Acepto recibir notificaciones y comunicaciones por correo electrónico de Olive Branch.</string>
+    <string name="email_consent_required">Marca la casilla para aceptar comunicaciones por correo electrónico o borra el campo de correo.</string>
+    <string name="email_notifications_label">Notificaciones por correo electrónico</string>
+    <string name="email_notifications_enabled">Activadas</string>
+    <string name="email_notifications_disabled">Desactivadas</string>
+    <string name="email_invalid_message">Ingresa una dirección de correo electrónico válida.</string>
     <string name="password_recovery_title">Recuperación de cuenta</string>
     <string name="password_recovery_help">Usa la contraseña de tu cuenta de Olive Branch con criptografía OPAQUE de conocimiento cero para restaurar tus chats y archivos cifrados en un dispositivo nuevo. El servidor nunca recibe ni guarda tu contraseña ni la clave de recuperación.</string>
     <string name="password_recovery_warning">Una vez activada, la recuperación con contraseña permanece habilitada permanentemente para proteger tu acceso a los datos cifrados entre dispositivos.</string>
@@ -519,4 +549,5 @@
     <string name="encrypted_access_partially_restored">No se pudieron restaurar algunos elementos cifrados. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="encrypted_access_restore_failed">No se pudo restaurar el acceso cifrado. Comprueba tu conexión y tu contraseña de recuperación, e inténtalo de nuevo.</string>
     <string name="ok">Aceptar</string>
+    <string name="password_recovery_confirm_device">Confirma tu identidad para proteger la recuperación cifrada de tu cuenta en este dispositivo.</string>
 </resources>

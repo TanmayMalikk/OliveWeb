@@ -1,15 +1,23 @@
 // All safe-app roles: shows profile details for signed-in users.
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { BirthdayField } from "../../../components/BirthdayField";
+import { validEmail } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
-import { Button, Field, Form } from "../../../components/SharedComponents";
+import { Button, Field, Form, shakeNamedFields } from "../../../components/SharedComponents";
 export default function Profile() {
   const s = useSession();
   const p = s.profile!;
+  const [email, setEmail] = useState(p.email);
+  const [emailConsent, setEmailConsent] = useState(Boolean(p.emailCommunicationConsent));
+  useEffect(() => {
+    setEmail(p.email);
+    setEmailConsent(Boolean(p.emailCommunicationConsent));
+  }, [p.email, p.emailCommunicationConsent]);
   return (
     <Form
       className="panel profile-form"
-      onSubmit={async (data) => {
+      onSubmit={async (data, form) => {
         await s.perform(async () => {
           const next = { ...p };
           for (const key of [
@@ -18,10 +26,16 @@ export default function Profile() {
             "affectedNames",
             "abuserName",
             "situation",
-            "email",
             "phone",
           ] as const)
             next[key] = String(data.get(key) ?? p[key]);
+          const cleanEmail = email.trim().toLowerCase();
+          if (cleanEmail && !validEmail(cleanEmail)) {
+            shakeNamedFields(form, ["email"]);
+            throw new Error("Enter a valid email address.");
+          }
+          next.email = cleanEmail;
+          next.emailCommunicationConsent = Boolean(cleanEmail && emailConsent);
           for (const key of [
             "line1",
             "line2",
@@ -39,8 +53,15 @@ export default function Profile() {
             !next.fullName.trim() ||
             !next.address.city.trim() ||
             !next.dob
-          )
+          ) {
+            const missing = [
+              !next.fullName.trim() ? "fullName" : "",
+              !next.dob ? "dob" : "",
+              !next.address.city.trim() ? "city" : "",
+            ].filter(Boolean);
+            shakeNamedFields(form, missing);
             throw new Error("Add a name, valid birth date, and city.");
+          }
           await s.saveProfile(next);
         });
       }}
@@ -71,7 +92,12 @@ export default function Profile() {
           label="Email (optional)"
           name="email"
           type="email"
-          defaultValue={p.email}
+          value={email}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const value = e.target.value;
+            setEmail(value);
+            if (!value.trim()) setEmailConsent(false);
+          }}
           maxLength={254}
         />
         <Field
@@ -80,6 +106,17 @@ export default function Profile() {
           defaultValue={p.phone}
           maxLength={40}
         />
+        {email.trim().length > 0 && (
+          <label className="checkbox-field full">
+            <input
+              type="checkbox"
+              name="emailCommunicationConsent"
+              checked={emailConsent}
+              onChange={(e) => setEmailConsent(e.target.checked)}
+            />
+            <span>I agree to receive email notifications and communications from Olive Branch.</span>
+          </label>
+        )}
       </div>
       <label className="field">
         <span>Your situation (optional)</span>

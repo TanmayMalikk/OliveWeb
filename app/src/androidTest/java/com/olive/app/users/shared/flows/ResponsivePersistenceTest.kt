@@ -4,7 +4,7 @@ package com.olive.app
 import androidx.test.core.app.ApplicationProvider
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
-import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.security.CoverStateStore
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsFeedCacheStore
@@ -62,12 +62,13 @@ class ResponsivePersistenceTest {
             EncryptedVault(context, "responsive-private-social-activity-$suffix")
         )
         store.setConversationArchived("viewer-a", "chat-1", true)
-        store.appendPrivateContactNote("viewer-a", "person-1", "Taylor", "First detail")
-        store.appendPrivateContactNote("viewer-a", "person-1", "Taylor", "Second detail")
+        store.savePrivateContactNote("viewer-a", "person-1", "Taylor", "First detail\nSecond detail")
+        assertEquals("First detail\nSecond detail", store.privateContactNotes("viewer-a")["person-1"]?.body)
+        store.savePrivateContactNote("viewer-a", "person-1", "Taylor", "Edited detail")
 
         assertEquals(setOf("chat-1"), store.archivedConversationIds("viewer-a"))
         assertEquals(
-            "First detail\nSecond detail",
+            "Edited detail",
             store.privateContactNotes("viewer-a")["person-1"]?.body
         )
         assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-b"))

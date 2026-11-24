@@ -35,6 +35,12 @@ class ORTSessionManager(
     var coldLoadTimeMs: Long = 0
         private set
 
+    /**
+     * Loads models.
+     *
+     * @param detAssetPath Text detection asset path supplied to [loadModels].
+     * @param recAssetPath Text recognition asset path supplied to [loadModels].
+     */
     fun loadModels(detAssetPath: String, recAssetPath: String) {
         val loadStart = System.currentTimeMillis()
         env = OrtEnvironment.getEnvironment()
@@ -75,6 +81,13 @@ class ORTSessionManager(
         }
     }
 
+    /**
+     * Executes detection.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param shape Numeric array of shape values.
+     * @return The resulting [Pair] for run detection.
+     */
     fun runDetection(input: FloatArray, shape: LongArray): Pair<FloatArray, LongArray> {
         val session = detSession
             ?: throw OCRError.ModelLoadFailed("detection", Exception("Session not initialized"))
@@ -83,6 +96,13 @@ class ORTSessionManager(
         return runSession(ortEnv, session, detInputName, input, shape, "detection")
     }
 
+    /**
+     * Executes recognition.
+     *
+     * @param input Input stream, matrix, or value to process.
+     * @param shape Numeric array of shape values.
+     * @return The resulting [Pair] for run recognition.
+     */
     fun runRecognition(input: FloatArray, shape: LongArray): Pair<FloatArray, LongArray> {
         val session = recSession
             ?: throw OCRError.ModelLoadFailed("recognition", Exception("Session not initialized"))
@@ -91,6 +111,9 @@ class ORTSessionManager(
         return runSession(ortEnv, session, recInputName, input, shape, "recognition")
     }
 
+    /**
+     * Computes release.
+     */
     fun release() {
         try {
             detSession?.close()
@@ -105,6 +128,12 @@ class ORTSessionManager(
         }
     }
 
+    /**
+     * Reads model asset.
+     *
+     * @param assetPath Asset path supplied to [readModelAsset].
+     * @return The resulting [ByteArray] for read model asset.
+     */
     private fun readModelAsset(assetPath: String): ByteArray {
         return try {
             context.assets.open(assetPath).use { it.readBytes() }
@@ -113,6 +142,17 @@ class ORTSessionManager(
         }
     }
 
+    /**
+     * Executes session.
+     *
+     * @param ortEnv ONNX Runtime env supplied to [runSession].
+     * @param session Shared session view model owning application state and actions.
+     * @param inputName Input name supplied to [runSession].
+     * @param input Input stream, matrix, or value to process.
+     * @param shape Numeric array of shape values.
+     * @param modelName Model name supplied to [runSession].
+     * @return The resulting [Pair] for run session.
+     */
     private fun runSession(
         ortEnv: OrtEnvironment,
         session: OrtSession,
@@ -152,6 +192,12 @@ class ORTSessionManager(
         }
     }
 
+    /**
+     * Copies float buffer.
+     *
+     * @param buffer Buffer supplied to [copyFloatBuffer].
+     * @return The resulting [FloatArray] for copy float buffer.
+     */
     private fun copyFloatBuffer(buffer: FloatBuffer): FloatArray {
         val duplicate = buffer.duplicate()
         duplicate.rewind()

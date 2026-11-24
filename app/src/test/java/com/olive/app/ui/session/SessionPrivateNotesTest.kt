@@ -34,6 +34,21 @@ class SessionPrivateNotesTest {
     }
 
     @Test
+    fun replayingOneNoteDraftDoesNotWriteItTwice() = runBlocking<Unit> {
+        SessionRuntimeFixture().use { f ->
+            f.runtime.state.page = SafePage.Notes
+            repeat(2) {
+                f.runtime.notes.savePrivateEntry(
+                    null, PrivateEntryKind.Note, "Draft", "Private content", "", "", "",
+                    null, null, emptyList(), newEntryId = "draft-id",
+                )
+                f.await { !f.runtime.state.busy }
+            }
+            assertEquals(listOf("draft-id"), f.runtime.store.privateEntries("owner").map { it.id })
+        }
+    }
+
+    @Test
     fun incidentEditsRecordChangedFieldsAndPinningDoesNotCreateContentRevisions() = runBlocking<Unit> {
         SessionRuntimeFixture().use { f ->
             f.runtime.state.page = SafePage.Notes

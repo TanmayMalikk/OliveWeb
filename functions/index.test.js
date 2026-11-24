@@ -81,7 +81,8 @@ test("R2 upload tickets do not sign the checksum of an empty body", async () => 
 // Inputs: the values in this case. Expected: deployment keeps the existing callable endpoint names.
 test("deployment keeps the existing callable endpoint names", () => {
   const endpoints = require("./index");
-  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
+  const names = ["friendInviteCurrent", "friendInviteCreate", "friendInviteClaim", "messagingAuthorizePeer",
+    "adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
     "opaqueRecoveryBeginRegistration", "opaqueRecoveryFinishRegistration", "opaqueRecoveryBeginUnlock",
     "opaqueRecoveryFinishUnlock", "opaqueRecoveryRotate", "opaqueRecoveryRemove",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
@@ -92,8 +93,11 @@ test("deployment keeps the existing callable endpoint names", () => {
     "mediaUpdateAccess", "mediaShareInChat", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
     "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
-    "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
+    "fitnessAiBilling", "fitnessAiCoach", "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation",
+    "emailOnFriendInviteClaimed", "emailOnLiveLocationSession", "checkExpiringLocationShares",
+    "emailOnConversationUpdated", "emailOnSafetyPlanUpdated", "emailOnAppRelease",
+    "emailOnEmergencyCreated", "recordDeviceSignIn",
     "emergencyStart", "emergencyResolve", "emergencyReopen", "emergencyAttachUpload", "emergencyUploadLinked", "emergencyUploadCompleted", "notifyEmergency"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));

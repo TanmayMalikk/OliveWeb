@@ -2,20 +2,32 @@ package com.olive.app.data
 
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaTransferStore
+import com.olive.app.data.media.MediaUploadJob
+import com.olive.app.data.media.OcrReview
+import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.security.JsonVault
+import com.olive.app.support.TestAndroidKeyStore
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
+@RunWith(RobolectricTestRunner::class)
 class OfflineMediaCacheTest {
     @get:Rule val temporary = TemporaryFolder()
 
@@ -294,6 +306,35 @@ class OfflineMediaCacheTest {
         })
     }
 
+    @Test
+    fun `purge cleanupExpiredCandidates and corrupt vault recovery remove stale files safely`() {
+        var clock = 1_000L
+        val root = temporary.newFolder("cleanup")
+        val cache = OfflineMediaCache(FakeJsonVault(), root, now = { clock }, currentDeviceId = { DEVICE })
+        val cand1 = document("c1", ALICE, ALICE)
+        val c1File = ciphertext(cand1)
+        cache.registerUploadCandidate(ALICE, cand1.id, c1File, cand1.ciphertextSize, cand1.ciphertextSha256)
+        clock += OfflineMediaCache.UPLOAD_REUSE_WINDOW_MS + 10_000L
+        cache.cleanupExpiredCandidates()
+        assertEquals(OfflineMediaAvailability.NOT_CACHED, cache.availability(ALICE, cand1))
+
+        val cand2 = document("c2", ALICE, ALICE)
+        val c2File = File(root, "private-candidate.olive").apply { writeBytes("encrypted-${cand2.id}".toByteArray()) }
+        cache.registerUploadCandidate(ALICE, cand2.id, c2File, cand2.ciphertextSize, cand2.ciphertextSha256)
+        cache.purge(ALICE)
+        assertFalse(c2File.exists())
+
+        val brokenVault = object : JsonVault {
+            var cleared = false
+            override fun read(): JSONObject { throw IllegalStateException("Corrupt vault") }
+            override fun update(change: (JSONObject) -> Unit) {}
+            override fun clear() { cleared = true }
+        }
+        val resilientCache = OfflineMediaCache(brokenVault, temporary.newFolder("resilient"), currentDeviceId = { DEVICE })
+        resilientCache.cleanupExpiredCandidates()
+        assertTrue(brokenVault.cleared)
+    }
+
     private fun cache(
         clock: () -> Long = { 1_000L },
         limit: Long = OfflineMediaCache.AUTOMATIC_CACHE_LIMIT_BYTES,
@@ -334,5 +375,43 @@ class OfflineMediaCacheTest {
 
     private companion object {
         const val ALICE = "alice"; const val BOB = "bob"; const val DEVICE = "device"
+    }
+
+    @Test
+    fun mediaUploadJobStoreUpdateModifiesJobRecord() {
+        val store = MediaTransferStore(RuntimeEnvironment.getApplication())
+        val job = MediaUploadJob(
+            id = "job-99",
+            ownerUid = ALICE,
+            source = PreparedEncryptedMedia(
+                filePath = "/tmp/media.enc",
+                ciphertextSize = 200L,
+                ciphertextSha256 = "sha256",
+                encryptedMetadata = "enc-meta",
+                wrappedKeys = mapOf(ALICE to "key"),
+                allowedUsers = listOf(ALICE),
+                kind = MediaKind.DOCUMENT,
+                ocrReview = OcrReview.NOT_RUN,
+            ),
+            createdAt = 1000L,
+        )
+        TestAndroidKeyStore.install().use {
+            store.write(job)
+            val updated = store.update(job.id) { it.copy(status = MediaTransferStatus.COMPLETE) }
+            assertEquals(job.copy(status = MediaTransferStatus.COMPLETE), updated)
+            assertEquals(updated, store.get(job.id))
+        }
+    }
+
+    @Test
+    fun storeCiphertextRejectsMismatchedOrCorruptData() {
+        val root = temporary.newFolder("corrupt-test")
+        val cache = OfflineMediaCache(FakeJsonVault(), root, currentDeviceId = { DEVICE })
+        val doc = document("corrupt-doc", ALICE, ALICE)
+        val badFile = temporary.newFile().apply { writeBytes("wrong-content".toByteArray()) }
+        val failure = assertThrows(MediaAccessException::class.java) {
+            cache.retainDownloaded(ALICE, doc, badFile)
+        }
+        assertEquals(MediaAccessError.CORRUPT_CIPHERTEXT, failure.reason)
     }
 }

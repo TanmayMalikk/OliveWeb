@@ -2,6 +2,7 @@ package com.olive.app.ui.session
 
 import android.os.Looper
 import com.olive.app.data.account.AccountRole
+import com.olive.app.security.IdlePolicy
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionScreen
@@ -66,6 +67,32 @@ class SessionIdlePrivacyTest {
             assertTrue(runtime.state.privacyBlackout)
             runtime.privacy.recordingStopped()
             assertFalse(runtime.state.privacyBlackout)
+        }
+    }
+
+    @Test
+    fun extendOptionsSuggestLargerDurationsAndExtendingResetsActiveCountdown() {
+        assertEquals(listOf(120, 300, 420), IdlePolicy.extendOptions(60))
+        assertEquals(listOf(180, 300, 420), IdlePolicy.extendOptions(120))
+        assertEquals(listOf(360, 420), IdlePolicy.extendOptions(300))
+        assertEquals(emptyList<Int>(), IdlePolicy.extendOptions(420))
+
+        SessionRuntimeFixture(dispatcher = Dispatchers.Main.immediate).use { fixture ->
+            val runtime = fixture.runtime
+            val state = runtime.state
+            `when`(fixture.accounts.authenticatedUid()).thenReturn(null)
+            runtime.privacy.setIdleTimeoutSeconds(60)
+            runtime.privacy.startIdleTimer()
+            advance(50)
+            assertEquals(10, state.idleCountdownSeconds)
+
+            runtime.privacy.setIdleTimeoutSeconds(180)
+            assertEquals(180, runtime.privacy.idleTimeoutSeconds())
+            assertNull(state.idleCountdownSeconds)
+
+            advance(65)
+            assertEquals(SessionScreen.Safe, state.screen)
+            assertNull(state.idleCountdownSeconds)
         }
     }
 

@@ -8,8 +8,10 @@ import {
   moveCrossing,
   newCrossing,
   railSignal,
+  type CrossingDirection,
   type CrossingWorld,
 } from "./olive-crossing";
+import { computePlayerPose } from "./OliveCrossingBoard";
 
 describe("Olive Crossing", () => {
   // Inputs: the values in this case. Expected: starts the olive on a safe lane.
@@ -383,5 +385,107 @@ describe("Olive Crossing", () => {
       lanes: base.lanes.map((lane, row) => (row === base.playerRow ? logLane : lane)),
     };
     expect(crossingCollision(world)).toBe(true);
+  });
+
+  // Inputs: continuous frames on a floating log plus side hops along the log. Expected: player rides smoothly without freezing or false splash.
+  it("keeps the player riding smoothly on a floating log across frames and side hops", () => {
+    const base = newCrossing(() => 0);
+    const logLane = {
+      ...createCrossingLane(15, () => 0.4, false, "water"),
+      direction: 1 as const,
+      waterStyle: "logs" as const,
+      logSpeed: 1.5,
+      logs: [{ id: 1, x: 4, width: 4 }],
+    };
+    let world: CrossingWorld = {
+      ...base,
+      playerColumn: 5.5,
+      lanes: base.lanes.map((lane, row) => (row === base.playerRow ? logLane : lane)),
+    };
+
+    const startCol = world.playerColumn;
+    for (let frame = 0; frame < 40; frame++) {
+      world = advanceCrossing(world, 1 / 60);
+      expect(world.over).toBe(false);
+    }
+    expect(world.playerColumn).toBeCloseTo(startCol + 1.5 * (40 / 60), 2);
+
+    const hoppedRight = moveCrossing(world, "right");
+    expect(hoppedRight.over).toBe(false);
+    expect(hoppedRight.playerColumn).toBeCloseTo(world.playerColumn + 1, 2);
+
+    const hoppedLeft = moveCrossing(hoppedRight, "left");
+    expect(hoppedLeft.over).toBe(false);
+    expect(hoppedLeft.playerColumn).toBeCloseTo(world.playerColumn, 2);
+
+    // Hopping directly onto an adjacent drifting-log lane preserves continuous column instead of snapping.
+    const nextLogLane = {
+      ...createCrossingLane(16, () => 0.4, false, "water"),
+      direction: -1 as const,
+      waterStyle: "logs" as const,
+      logSpeed: 1.2,
+      logs: [{ id: 2, x: hoppedLeft.playerColumn - 0.8, width: 3 }],
+    };
+    const twoLogsWorld: CrossingWorld = {
+      ...hoppedLeft,
+      lanes: hoppedLeft.lanes.map((lane, row) =>
+        row === hoppedLeft.playerRow - 1 ? nextLogLane : lane,
+      ),
+    };
+    const hoppedToNextLog = moveCrossing(twoLogsWorld, "up");
+    expect(hoppedToNextLog.over).toBe(false);
+    expect(hoppedToNextLog.playerColumn).toBeCloseTo(hoppedLeft.playerColumn, 5);
+  });
+
+  // Inputs: directional hops in all 4 directions and idle log riding. Expected: produces smooth offsets, 3D jump arc, directional lean, stride, and settling.
+  it("computes directional hop poses for up, down, left, right and gentle log bobbing", () => {
+    const idleRiding = computePlayerPose(null, 0, true, 0.35);
+    expect(idleRiding.dx).toBe(0);
+    expect(idleRiding.dy).toBe(0);
+    expect(idleRiding.jumpZ).toBe(0);
+    expect(idleRiding.bobZ).not.toBe(0);
+
+    const cases: Array<{
+      direction: CrossingDirection;
+      offsetX: number;
+      offsetY: number;
+      expectLeanX: (v: number) => boolean;
+      expectLeanY: (v: number) => boolean;
+    }> = [
+      { direction: "up", offsetX: 0, offsetY: 1, expectLeanX: (v) => v === 0, expectLeanY: (v) => v < 0 },
+      { direction: "down", offsetX: 0, offsetY: -1, expectLeanX: (v) => v === 0, expectLeanY: (v) => v > 0 },
+      { direction: "left", offsetX: 1, offsetY: 0, expectLeanX: (v) => v < 0, expectLeanY: (v) => v === 0 },
+      { direction: "right", offsetX: -1, offsetY: 0, expectLeanX: (v) => v > 0, expectLeanY: (v) => v === 0 },
+    ];
+
+    for (const c of cases) {
+      const midEven = computePlayerPose(
+        { direction: c.direction, progress: 0.5, offsetX: c.offsetX, offsetY: c.offsetY },
+        2,
+        false,
+        0,
+      );
+      const midOdd = computePlayerPose(
+        { direction: c.direction, progress: 0.5, offsetX: c.offsetX, offsetY: c.offsetY },
+        3,
+        false,
+        0,
+      );
+      expect(midEven.jumpZ).toBeGreaterThan(15);
+      expect(midEven.shadowScale).toBeLessThan(0.8);
+      expect(c.expectLeanX(midEven.leanX)).toBe(true);
+      expect(c.expectLeanY(midEven.leanY)).toBe(true);
+      expect(midEven.stride).toBe(-midOdd.stride);
+
+      const landed = computePlayerPose(
+        { direction: c.direction, progress: 1, offsetX: c.offsetX, offsetY: c.offsetY },
+        2,
+        false,
+        0,
+      );
+      expect(landed.dx).toBe(0);
+      expect(landed.dy).toBe(0);
+      expect(landed.jumpZ).toBeCloseTo(0, 5);
+    }
   });
 });

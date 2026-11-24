@@ -73,13 +73,17 @@ function accountKeysetWrapper(value) {
   };
 }
 
-// Keeps one opaque account-keyset wrapper for every currently authorized account.
-function validateAccountWrappedKeys(value, allowedUsers) {
+// Keeps opaque account-keyset wrappers for authorized accounts that have enrolled recovery.
+function validateAccountWrappedKeys(value, allowedUsers, {requireAll = true} = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
   }
   const entries = Object.entries(value);
-  if (entries.length !== allowedUsers.length || entries.some(([uid]) => !allowedUsers.includes(uid))) {
+  if (
+    (requireAll && entries.length !== allowedUsers.length) ||
+    entries.length > allowedUsers.length ||
+    entries.some(([uid]) => !allowedUsers.includes(uid))
+  ) {
     throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
   }
   return Object.fromEntries(entries.map(([uid, wrapper]) => [uid, accountKeysetWrapper(wrapper)]));
@@ -161,7 +165,9 @@ function accessRequest(data, uid) {
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? null
     : validateAccessDeviceWrappedKeys(data.deviceWrappedKeys, allowedUsers);
-  const accountWrappedKeys = validateAccountWrappedKeys(data?.accountWrappedKeys, allowedUsers);
+  const accountWrappedKeys = validateAccountWrappedKeys(
+    data?.accountWrappedKeys, allowedUsers, {requireAll: false},
+  );
   return { wrappedKeys, allowedUsers, deviceWrappedKeys, accountWrappedKeys };
 }
 
@@ -403,7 +409,6 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   const mediaId = string(request.data?.mediaId, "mediaId", 64);
   const access = accessRequest(request.data, uid);
   const reference = mediaRef(mediaId);
-  const grant = planMediaGrantRef(uid, mediaId);
   const forPlan = request.data?.forPlan === true;
   const grantIndependentRecipients = recipientList(
     request.data?.grantIndependentRecipients, access.allowedUsers, uid, "grantIndependentRecipients",
@@ -416,20 +421,32 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   }
   await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
-    const tracked = await transaction.get(grant);
-    const planSnapshot = forPlan || revokeIndependentRecipients.length ?
-      await transaction.get(db.collection("safetyPlans").doc(uid)) : null;
-    const plan = planSnapshot?.data() || null;
     if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
     const value = snapshot.data();
-    if (value.owner_id !== uid) {
+    const ownerUid = value.owner_id;
+    const isOwner = ownerUid === uid;
+    const isAuthorizedGrantOnly = !isOwner && !forPlan && !revokeIndependentRecipients.length &&
+      Array.isArray(value.allowed_users) && value.allowed_users.includes(uid) &&
+      access.allowedUsers.includes(ownerUid) &&
+      value.allowed_users.every(existing => access.allowedUsers.includes(existing));
+    if (!isOwner && !isAuthorizedGrantOnly) {
       throw new HttpsError("permission-denied", "Only the owner can change media access");
     }
+    const grant = planMediaGrantRef(ownerUid, mediaId);
+    const tracked = await transaction.get(grant);
+    const planSnapshot = forPlan || revokeIndependentRecipients.length ?
+      await transaction.get(db.collection("safetyPlans").doc(ownerUid)) : null;
+    const plan = planSnapshot?.data() || null;
     if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
       throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
     }
     let wrappedKeys = {...access.wrappedKeys};
-    let accountWrappedKeys = {...access.accountWrappedKeys};
+    let accountWrappedKeys = {
+      ...Object.fromEntries(
+        Object.entries(value.account_wrapped_keys || {}).filter(([id]) => access.allowedUsers.includes(id)),
+      ),
+      ...access.accountWrappedKeys,
+    };
     let deviceWrappedKeys = access.deviceWrappedKeys ?? retainedDeviceKeys(value.device_wrapped_keys, access.allowedUsers);
     if (forPlan) {
       const recipients = planMediaReaders(plan, mediaId);
@@ -451,12 +468,14 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
       const independentReaders = new Set(tracked.get("independentReaders") || []);
       const previouslyAllowed = new Set(value.allowed_users || []);
       for (const id of access.allowedUsers) {
-        if (!previouslyAllowed.has(id) && id !== uid) independentReaders.add(id);
+        if (!previouslyAllowed.has(id) && id !== ownerUid) independentReaders.add(id);
       }
       for (const id of previouslyAllowed) {
         if (!access.allowedUsers.includes(id)) independentReaders.delete(id);
       }
-      grantIndependentRecipients.forEach(id => independentReaders.add(id));
+      grantIndependentRecipients.forEach(id => {
+        if (id !== ownerUid) independentReaders.add(id);
+      });
       revokeIndependentRecipients.forEach(id => independentReaders.delete(id));
 
       // Removing a direct share must keep the existing wrapper when an active plan still grants access.

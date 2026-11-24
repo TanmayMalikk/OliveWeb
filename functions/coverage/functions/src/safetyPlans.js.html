@@ -1,0 +1,628 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for functions/src/safetyPlans.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">functions/src</a> safetyPlans.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">97.23% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>176/181</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">80.83% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>97/120</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/0</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">97.23% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>176/181</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Users and support staff: saves safety-plan edits and shares approved plans.
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {auth, db} = require("./firebaseAdminClient");
+const {readProfile} = require("./accountStorage");
+const {roleFromUser, text} = require("./accountPolicy");
+const {mergeFields} = require("./safetyPlanPolicy");
+const {mergeChecklist} = require("./safetyChecklistMerge");
+const {safetyCaller, planReference, canEdit, canRead} = require("./safetyPlanAccess");
+const {repairPlanTicket} = require("./supportTicketRepair");
+exports.safetyPlanSync = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  const ownerUid = request.data?.ownerUid;
+  const reference = planReference(ownerUid);
+  const defaults = request.data?.defaults || {};
+  const changes = request.data?.changes || [];
+  return db.runTransaction(async (transaction) =&gt; {
+    const snapshot = await transaction.get(reference);
+    const old = snapshot.data();
+    if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
+    if (changes.length &amp;&amp; !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
+    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes, caller.uid);
+    const pendingConflicts = {...old?.pendingConflicts};
+    const resolvedConflicts = {...old?.resolvedConflicts};
+    if (caller.role === "STAFF" || caller.role === "ADMIN") {
+      for (const change of changes) {
+        if (conflicts.includes(change.key) &amp;&amp; fields[change.key]?.value !== change.value &amp;&amp;
+            !resolvedConflicts[change.key]<span class="branch-0 cbranch-no" title="branch not covered" >?.includes(</span>change.mutationId)) {
+          pendingConflicts[change.key] = {
+            value: conflictValues[change.key] <span class="branch-0 cbranch-no" title="branch not covered" >|| change.value,</span> mutationId: change.mutationId,
+            baseValue: fields[change.key].value,
+          };
+        }
+      }
+    }
+    for (const [key, proposal] of Object.entries(pendingConflicts)) {
+      const current = fields[key]?.value;
+      if (proposal.baseValue != null &amp;&amp; current != null &amp;&amp; proposal.baseValue !== current) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >        const merged = mergeChecklist(proposal.baseValue, proposal.value, current);</span>
+<span class="cstat-no" title="statement not covered" >        if (merged) pendingConflicts[key] = {...proposal, value: merged.localValue, baseValue: current};</span>
+<span class="cstat-no" title="statement not covered" >      }</span>
+    }
+    const resolution = request.data?.resolution;
+    if (resolution) {
+      if (caller.uid !== ownerUid || caller.role !== "USER") {
+        throw new HttpsError("permission-denied", "Only the plan owner can resolve a conflict.");
+      }
+      const proposal = Object.hasOwn(pendingConflicts, resolution.key) &amp;&amp; pendingConflicts[resolution.key];
+      if (!proposal || proposal.mutationId !== resolution.mutationId ||
+          fields[resolution.key]?.revision !== resolution.revision || typeof resolution.useIncoming !== "boolean") {
+        throw new HttpsError("aborted", "The conflict changed. Review the latest versions.");
+      }
+      if (resolution.useIncoming) fields[resolution.key] = {
+        value: proposal.value, mutationId: proposal.mutationId, revision: resolution.revision + 1,
+      };
+      resolvedConflicts[resolution.key] = [...(resolvedConflicts[resolution.key] || []), proposal.mutationId].slice(-8);
+      delete pendingConflicts[resolution.key];
+    }
+    const changed = !old || Object.keys(fields).length !== Object.keys(old.fields <span class="branch-0 cbranch-no" title="branch not covered" >|| {})</span>.length ||
+      Object.entries(fields).some(([key, field]) =&gt; field !== old.fields?.[key]) ||
+      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {}) ||
+      JSON.stringify(resolvedConflicts) !== JSON.stringify(old.resolvedConflicts || {});
+    const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
+      safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
+    fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;
+    if (changed) transaction.set(reference, plan);
+    return {plan, conflicts, conflictValues};
+  });
+});
+exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  const contacts = Array.isArray(request.data?.contacts) ? request.data.contacts <span class="branch-0 cbranch-no" title="branch not covered" >: [];</span>
+  if (caller.role !== "USER" || contacts.length &gt; 10) <span class="branch-0 cbranch-no" title="branch not covered" >throw new HttpsError("permission-denied", "Owner only.");</span>
+  const clean = contacts.map((contact) =&gt; ({
+    uid: typeof contact?.uid === "string" ? contact.uid <span class="branch-0 cbranch-no" title="branch not covered" >: "",</span>
+    friendshipId: typeof contact?.friendshipId === "string" ? contact.friendshipId <span class="branch-0 cbranch-no" title="branch not covered" >: "",</span>
+    name: typeof contact?.name === "string" ? contact.name.trim().slice(0, 120) <span class="branch-0 cbranch-no" title="branch not covered" >: "",</span>
+  }));
+  if (new Set(clean.map((contact) =&gt; contact.uid)).size !== clean.length || clean.some((contact) =&gt;
+    !/^[A-Za-z0-9_-]{1,128}$/.test(contact.uid) || !/^[A-Za-z0-9_-]{1,300}$/.test(contact.friendshipId))) {
+    throw new HttpsError("invalid-argument", "Invalid contacts.");
+  }
+  const friendships = await Promise.all(clean.map((contact) =&gt;
+    db.collection("friendLists").doc(caller.uid).collection("friends").doc(contact.friendshipId).get()));
+  if (friendships.some((snapshot, index) =&gt; !snapshot.exists || snapshot.data()?.friendUid !== clean[index].uid)) {
+    throw new HttpsError("permission-denied", "Only accepted friends can receive a plan.");
+  }
+  const accounts = await Promise.all(clean.map(({uid}) =&gt; auth.getUser(uid)));
+  if (accounts.some(account =&gt; account.disabled || roleFromUser(account) !== "SAFE_CONTACT")) {
+    throw new HttpsError("permission-denied", "Only active safe contacts can receive a plan.");
+  }
+  const reference = planReference(caller.uid);
+  return db.runTransaction(async (transaction) =&gt; {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) <span class="branch-0 cbranch-no" title="branch not covered" >throw new HttpsError("failed-precondition", "Open the plan before sharing it.");</span>
+    const plan = snapshot.data();
+    const updated = {...plan, safeContactUids: clean.map((contact) =&gt; contact.uid),
+      safeContactNames: Object.fromEntries(clean.map((contact) =&gt; [contact.uid, contact.name])), updatedAt: Date.now()};
+    transaction.set(reference, updated);
+    return {plan: updated};
+  });
+});
+&nbsp;
+// Gives a plan owner the public organization identities needed to wrap attachment keys on-device.
+exports.safetyPlanMediaRecipients = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "USER") throw new HttpsError("permission-denied", "Owner only.");
+  const plan = (await planReference(caller.uid).get()).data();
+  if (!plan) throw new HttpsError("failed-precondition", "Open the plan before sharing files.");
+  const recipients = new Set([...(plan.safeContactUids <span class="branch-0 cbranch-no" title="branch not covered" >|| [])</span>, plan.staffUid, plan.adminUid].filter(Boolean));
+  const rows = await Promise.all([...recipients].map(async (uid) =&gt; {
+    const profile = await readProfile(uid);
+    const username = text(profile?.username, 24).toLowerCase();
+    return /^[a-z0-9_]{4,24}$/.test(username) ? {uid, username} : null;
+  }));
+  return {recipients: rows.filter(Boolean)};
+});
+exports.safetyPlansSharedWithMe = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "SAFE_CONTACT") throw new HttpsError("permission-denied", "Safe contacts only.");
+  const snapshot = await db.collection("safetyPlans").where("safeContactUids", "array-contains", caller.uid).get();
+  return {plans: snapshot.docs.map((document) =&gt; ({ownerUid: document.id,
+    ownerName: document.data().ownerName <span class="branch-0 cbranch-no" title="branch not covered" >|| "",</span> updatedAt: document.data().updatedAt <span class="branch-0 cbranch-no" title="branch not covered" >|| 0}</span>))};
+});
+exports.safetyPlanConsultations = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  if (!["STAFF", "ADMIN"].includes(caller.role)) throw new HttpsError("permission-denied", "Organization access only.");
+  const snapshot = caller.role === "ADMIN" <span class="branch-0 cbranch-no" title="branch not covered" >?</span>
+    await db.collection("safetyPlans").where("consultationRequested", "==", true).get() :
+    await db.collection("safetyPlans").where("staffUid", "==", caller.uid).get();
+  const settings = caller.role === "STAFF" ? await db.collection("safetyStaff").doc(caller.uid).get() <span class="branch-0 cbranch-no" title="branch not covered" >: null;</span>
+  const requestedRows = snapshot.docs.filter(document =&gt; document.data().consultationRequested === true);
+  for (const document of requestedRows) {
+    if (!document.get("consultationConversationId") || !Number.isSafeInteger(document.get("ticketNumber"))) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >      await repairPlanTicket(document.id);</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+  }
+  const requestedPlans = requestedRows.length ? await db.getAll(...requestedRows.map(row =&gt; row.ref)) <span class="branch-0 cbranch-no" title="branch not covered" >: [];</span>
+  const conversationIds = [...new Set(requestedPlans.map(document =&gt;
+    text(document.data().consultationConversationId, 300)).filter(Boolean))];
+  const conversationSnapshots = conversationIds.length ?
+    await db.getAll(...conversationIds.map(id =&gt; db.collection("conversations").doc(id))) <span class="branch-0 cbranch-no" title="branch not covered" >: [];</span>
+  const conversations = new Map(conversationSnapshots.map(document =&gt; [document.id, document.data()]));
+  const completedPlans = requestedPlans.filter(document =&gt; {
+    const conversationId = text(document.data().consultationConversationId, 300);
+    const conversation = conversations.get(conversationId);
+    return conversation?.ticketStatus === "COMPLETED" || Boolean(conversation?.closedAt);
+  });
+  // Repairs older records so completed consultations are not scanned again on later refreshes.
+  if (completedPlans.length) {
+    for (let start = 0; start &lt; completedPlans.length; start += 400) {
+      const batch = db.batch();
+      completedPlans.slice(start, start + 400).forEach(document =&gt; batch.set(document.ref, {
+        consultationRequested: false,
+        staffUid: "",
+        staffName: "",
+        adminUid: "",
+        adminName: "",
+        updatedAt: Date.now(),
+      }, {merge: true}));
+      await batch.commit();
+    }
+  }
+  const completedOwnerUids = new Set(completedPlans.map(document =&gt; document.id));
+  return {available: caller.role === "STAFF" ? settings.data()<span class="branch-0 cbranch-no" title="branch not covered" >?.available </span>!== false <span class="branch-0 cbranch-no" title="branch not covered" >: true,</span>
+    plans: requestedPlans.filter(document =&gt; !completedOwnerUids.has(document.id))
+        .map((document) =&gt; ({
+          ownerUid: document.id,
+          ownerName: document.data().ownerName || "",
+          conversationId: document.data().consultationConversationId <span class="branch-0 cbranch-no" title="branch not covered" >|| "",</span>
+          ticketNumber: Number.isSafeInteger(document.data().ticketNumber) ? document.data().ticketNumber <span class="branch-0 cbranch-no" title="branch not covered" >: -1,</span>
+          staffUid: document.data().staffUid <span class="branch-0 cbranch-no" title="branch not covered" >|| "",</span>
+          staffName: document.data().staffName || "",
+          updatedAt: document.data().updatedAt,
+        }))};
+});
+exports.safetyPlanAvailability = onCall({invoker: "public"}, async (request) =&gt; {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "STAFF" || typeof request.data?.available !== "boolean") throw new HttpsError("permission-denied", "Staff only.");
+  await db.collection("safetyStaff").doc(caller.uid).set({available: request.data.available}, {merge: true});
+  return {available: request.data.available};
+});
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-20T00:53:39.762Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

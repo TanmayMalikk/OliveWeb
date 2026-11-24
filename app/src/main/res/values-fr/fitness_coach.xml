@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_coach_title">Coach fitness</string>
+    <string name="fitness_coach_sign_in">Connectez-vous à un compte en ligne pour utiliser le coach fitness.</string>
+    <string name="fitness_coach_billing_error">Impossible d’ouvrir ou d’actualiser la facturation. Réessayez.</string>
+    <string name="fitness_coach_reply_error">Impossible d’obtenir une réponse. Réessayez.</string>
+    <string name="fitness_coach_limit">Le coach a atteint une limite. Réessayez plus tard.</string>
+    <string name="fitness_coach_subscription_required">Un abonnement actif au coach fitness est requis.</string>
+    <string name="fitness_coach_privacy">Lorsque vous envoyez un message, l’IA reçoit les échanges récents, vos objectifs et jusqu’à 14 jours de pas, de totaux nutritionnels et de noms d’aliments enregistrés.</string>
+    <string name="fitness_coach_you">Vous</string>
+    <string name="fitness_coach_review">Objectifs quotidiens suggérés</string>
+    <string name="fitness_coach_apply">Appliquer les objectifs suggérés</string>
+    <string name="fitness_coach_question">Demandez un programme d’entraînement, des idées de repas ou de l’aide pour vos objectifs</string>
+    <string name="fitness_coach_disclaimer">Le coach utilise une IA qui peut se tromper. Il ne remplace pas un spécialiste de la forme physique ou de la nutrition.</string>
+    <string name="fitness_coach_thinking">Réflexion…</string>
+    <string name="fitness_coach_send">Envoyer</string>
+    <string name="fitness_coach_offer">5,99 $ CA par semaine. Renouvellement hebdomadaire jusqu’à résiliation. Paiement sécurisé avec Stripe.</string>
+    <string name="fitness_coach_subscribe">S’abonner</string>
+    <string name="fitness_coach_manage">Gérer la facturation</string>
+    <string name="fitness_coach_refresh">Vérifier l’abonnement</string>
+    <string name="fitness_coach_goal_steps">Pas · %1$d</string>
+    <string name="fitness_coach_goal_calories">Calories · %1$d kcal</string>
+    <string name="fitness_coach_goal_protein">Protéines · %1$d g</string>
+    <string name="fitness_coach_goal_carbs">Glucides · %1$d g</string>
+    <string name="fitness_coach_goal_fat">Lipides · %1$d g</string>
+    <string name="fitness_coach_goal_water">Eau · %1$d mL</string>
+    <string name="fitness_coach_payment_pending">Stripe confirme le paiement. Vérifiez votre abonnement dans un instant.</string>
+    <string name="fitness_coach_tab">Coach IA</string>
+    <string name="fitness_coach_locked">Coach fitness verrouillé</string>
+    <string name="fitness_coach_auto_goals">Autoriser le coach IA à modifier mes objectifs</string>
+    <string name="fitness_coach_auto_goals_detail">Enregistre automatiquement les objectifs de pas que vous demandez ou confirmez et ajuste légèrement les objectifs nutritionnels et d’eau une fois par jour.</string>
+    <string name="fitness_coach_settings">Paramètres du coach</string>
+    <string name="fitness_coach_clear_history">Effacer l\'historique des conversations</string>
+    <string name="fitness_coach_history_error">Impossible de charger votre historique de discussion.</string>
+    <string name="fitness_coach_goals_saved">Objectifs enregistrés</string>
+    <string name="fitness_coach_prompt_workout">Propose-moi un programme d’entraînement</string>
+    <string name="fitness_coach_prompt_meals">Donne-moi des idées de repas</string>
+</resources>

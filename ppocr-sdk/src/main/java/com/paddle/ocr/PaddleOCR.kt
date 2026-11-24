@@ -32,6 +32,12 @@ class PaddleOCR private constructor(
 
     companion object {
 
+        /**
+         * Creates the paddle OCR.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @return The resulting [PaddleOCR] instance.
+         */
         suspend fun create(context: Context): PaddleOCR {
             val appContext = context.applicationContext
             return withContext(Dispatchers.IO) {
@@ -40,6 +46,14 @@ class PaddleOCR private constructor(
             }
         }
 
+        /**
+         * Creates the paddle OCR.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param config Configuration options governing behavior and thresholds.
+         * @param engineConfig ONNX Runtime execution configuration options.
+         * @return The resulting [PaddleOCR] instance.
+         */
         suspend fun create(
             context: Context,
             config: PaddleOCRConfig,
@@ -52,6 +66,17 @@ class PaddleOCR private constructor(
             }
         }
 
+        /**
+         * Creates the paddle OCR.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param config Configuration options governing behavior and thresholds.
+         * @param engineConfig ONNX Runtime execution configuration options.
+         * @param detModelAssetPath Text detection model asset path supplied to [create].
+         * @param recModelAssetPath Text recognition model asset path supplied to [create].
+         * @param recConfigAssetPath Text recognition config asset path supplied to [create].
+         * @return The resulting [PaddleOCR] instance.
+         */
         suspend fun create(
             context: Context,
             config: PaddleOCRConfig,
@@ -73,6 +98,12 @@ class PaddleOCR private constructor(
         }
     }
 
+    /**
+     * Runs OCR text recognition on the paddle OCR.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [OCRRunResult] instance.
+     */
     suspend fun recognize(bitmap: Bitmap): OCRRunResult {
         if (bitmap.width == 0 || bitmap.height == 0) {
             throw OCRError.InvalidImage()
@@ -80,6 +111,12 @@ class PaddleOCR private constructor(
         return recognizeResult { engine.run(bitmap) }
     }
 
+    /**
+     * Runs OCR text recognition on the paddle OCR.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [OCRRunResult] instance.
+     */
     suspend fun recognize(imageBytes: ByteArray): OCRRunResult {
         if (imageBytes.isEmpty()) {
             throw OCRError.InvalidImage()
@@ -87,6 +124,12 @@ class PaddleOCR private constructor(
         return recognizeResult { engine.run(imageBytes) }
     }
 
+    /**
+     * Runs OCR text recognition on result.
+     *
+     * @param runEngine Function used to transform or provide run engine.
+     * @return The resulting [OCRRunResult] for recognize result.
+     */
     private suspend fun recognizeResult(runEngine: () -> OCREngineResult): OCRRunResult {
         return withContext(Dispatchers.IO) {
             val result = runEngine()
@@ -111,6 +154,9 @@ class PaddleOCR private constructor(
         }
     }
 
+    /**
+     * Computes release.
+     */
     suspend fun release() {
         withContext(Dispatchers.IO) {
             engine.release()

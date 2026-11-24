@@ -124,6 +124,20 @@ test("consultations reuse active ticket numbers and reserve new numbers after st
   assert.equal(next.ticketNumber, first.ticketNumber + 1);
   assert.notEqual(next.consultationConversationId, first.consultationConversationId);
 });
+test("consultation request assigns the available staff member with the lowest active consult tickets", async () => {
+  const f = prepared(), api = f.load("safetyConsultations");
+  f.users.set("staff2", {uid: "staff2", customClaims: {role: "STAFF"}});
+  for (const id of ["staff", "staff2"]) {
+    f.profiles.set(id, Object.assign(f.profiles.get(id) || {}, {username: `${id}_name`, role: "STAFF", fullName: id, email: `${id}@example.invalid`, dob: "1990-01-01"}));
+  }
+  f.records.set("safetyStaff/staff", {available: true, activeCount: 1});
+  f.records.set("safetyStaff/staff2", {available: true, activeCount: 4});
+  f.records.set("safetyPlans/existing-owner", {ownerUid: "existing-owner", staffUid: "staff", consultationRequested: true, consultationConversationId: "plan-consult-existing"});
+  f.records.set("conversations/plan-consult-existing", {type: "SUPPORT", supportOrigin: "PLAN_CONSULT", staffUid: "staff"});
+  f.records.set("safetyPlans/owner", {ownerUid: "owner", fields: {}, consultationRequested: false});
+  const assigned = (await api.safetyPlanConsult({data: {action: "request"}})).plan;
+  assert.equal(assigned.staffUid, "staff2");
+});
 test("support closing rejects personal and unrelated organization accounts", async () => {
   const f = prepared();
   const id = "support-owner-fixture";
@@ -132,4 +146,23 @@ test("support closing rejects personal and unrelated organization accounts", asy
   f.setCaller({uid: "outsider", role: "ADMIN"});
   await assert.rejects(f.api.staffSupportClose({data: {conversationId: id}}), {code: "permission-denied"});
   await assert.rejects(f.api.staffSupportClose({data: {conversationId: "invalid"}}), {code: "invalid-argument"});
+});
+
+test("replaying a support request reuses its ticket and never reopens a canceled chat", async () => {
+  const f = prepared(), api = f.load("supportTickets");
+  Object.assign(f.profiles.get("staff"), {email: "staff@example.invalid", dob: "1990-01-01"});
+  const requestKey = "240e6184-6365-443c-beb9-1912a94ef8ab";
+  const request = {data: {action: "request", requestKey}};
+  const first = (await api.staffSupportRequest(request)).ticket;
+  const replay = (await api.staffSupportRequest(request)).ticket;
+  assert.equal(replay.conversationId, first.conversationId);
+  assert.equal(replay.ticketNumber, first.ticketNumber);
+  assert.equal(f.records.get("safetyStaff/staff").activeCount, 1);
+  await api.staffSupportRequest({data: {action: "stop", conversationId: first.conversationId}});
+  const closed = (await api.staffSupportRequest(request)).ticket;
+  assert.equal(closed.requested, false);
+  assert.equal(f.records.get("safetyStaff/staff").activeCount, 0);
+  const next = (await api.staffSupportRequest({data: {action: "request"}})).ticket;
+  assert.notEqual(next.conversationId, first.conversationId);
+  assert.equal(next.ticketNumber, first.ticketNumber + 1);
 });

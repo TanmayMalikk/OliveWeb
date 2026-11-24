@@ -2,8 +2,6 @@
 package com.olive.app.ui.users.user.documents
 
 import kotlin.time.Duration.Companion.milliseconds
-
-
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -12,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentDataSource
+import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.DocumentListSource
@@ -31,9 +30,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import java.io.File
+import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.safety.withDecryptedMetadata
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
+import com.olive.app.security.UnlockedAccountKeyset
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import org.json.JSONObject
 
 internal data class SafetyDocumentsState(
     val ownerUid: String? = null,
@@ -66,27 +79,47 @@ internal class SafetyDocumentsController(
     private var generation = 0
     private var subscription: ChatSubscription? = null
     private var initialLoadTimeout: Job? = null
+    private var allSnapshotDocuments: List<SafetyDocument> = emptyList()
     private val evidenceWrites = mutableMapOf<String, CompletableDeferred<Unit>>()
-    var state by mutableStateOf(SafetyDocumentsState())
-        private set
+    private val stateMutableFlow = MutableStateFlow(SafetyDocumentsState())
+    val stateFlow: StateFlow<SafetyDocumentsState> = stateMutableFlow.asStateFlow()
+    private var stateSnapshot by mutableStateOf(stateMutableFlow.value)
+    var state: SafetyDocumentsState
+        get() = stateSnapshot
+        private set(value) {
+            stateMutableFlow.value = value
+            stateSnapshot = value
+        }
 
-    // Clears old document state before loading a different account owner.
+    /**
+     * Clears old document state before loading a different account owner.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     fun prepare(ownerUid: String) {
         initialLoadTimeout?.cancel()
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         evidenceWrites.clear()
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
 
-    // Watches the owner's allowed documents and updates the screen as Firebase changes.
+    /**
+     * Watches the owner's allowed documents and updates the screen as Firebase changes.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param username Account username.
+     * @param localMode Whether to apply local mode.
+     */
     fun load(ownerUid: String, username: String, localMode: Boolean) {
         if (state.ownerUid != ownerUid) {
             initialLoadTimeout?.cancel()
             subscription?.close()
             subscription = null
             generation++
+            allSnapshotDocuments = emptyList()
             state = SafetyDocumentsState(ownerUid = ownerUid)
         }
         if (localMode || repository == null) return
@@ -105,11 +138,14 @@ internal class SafetyDocumentsController(
         subscription = repository.observeFor(ownerUid, { snapshot ->
             // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
-                val documents = snapshot.documents.map { incoming ->
-                    if (incoming.id in state.evidenceUpdates) incoming.copy(
-                        evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
-                    ) else incoming
-                }
+                allSnapshotDocuments = snapshot.documents
+                val documents = snapshot.documents
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
+                    .map { incoming ->
+                        if (incoming.id in state.evidenceUpdates) incoming.copy(
+                            evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
+                        ) else incoming
+                    }
                 if (snapshot.source == DocumentListSource.SERVER) {
                     awaitingServer = false
                     initialLoadTimeout?.cancel()
@@ -138,7 +174,15 @@ internal class SafetyDocumentsController(
         })
     }
 
-    // Queues a file selected from Android storage for encrypted upload.
+    /**
+     * Queues a file selected from Android storage for encrypted upload.
+     *
+     * @param uri Content or file URI identifying the selected local item.
+     * @param identity Authenticated account identity containing UID and username.
+     * @param fallbackError Fallback error supplied to [upload].
+     * @param ocrReview OCR review supplied to [upload].
+     * @param tags Collection of tags values to process.
+     */
     fun upload(
         uri: Uri,
         identity: AccountIdentity,
@@ -147,14 +191,26 @@ internal class SafetyDocumentsController(
         tags: Set<String> = emptySet(),
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         transfers.queueDocument(uri, identity, ocrReview, tags, onQueued = {
             state = state.copy(loading = false, error = null)
             if (subscription == null) load(identity.uid, identity.username, false)
         }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
-    // Queues a camera photo, video, or OCR document for encrypted upload.
+    /**
+     * Queues a camera photo, video, or OCR document for encrypted upload.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param name Field, key, or display name.
+     * @param mimeType MIME content type of the payload.
+     * @param identity Authenticated account identity containing UID and username.
+     * @param fallbackError Fallback error supplied to [uploadCaptured].
+     * @param kind Kind supplied to [uploadCaptured].
+     * @param ocr Optional OCR supplied to [uploadCaptured].
+     * @param tags Collection of tags values to process.
+     * @param onComplete Callback invoked when complete changes or occurs.
+     */
     fun uploadCaptured(
         file: File,
         name: String,
@@ -167,7 +223,7 @@ internal class SafetyDocumentsController(
         onComplete: () -> Unit
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         val review = when {
             kind != MediaKind.DOCUMENT -> OcrReview.NOT_APPLICABLE
             ocr == null -> OcrReview.NOT_RUN
@@ -184,7 +240,12 @@ internal class SafetyDocumentsController(
             onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
-    // Downloads and decrypts an allowed document, then opens its in-app viewer.
+    /**
+     * Downloads and decrypts an allowed document, then opens its in-app viewer.
+     *
+     * @param document Safety document metadata record.
+     * @param onReady Callback invoked when ready changes or occurs.
+     */
     fun download(document: SafetyDocument, onReady: (SafetyDocument, File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         if (!beginOpening(document.id)) return
@@ -213,7 +274,13 @@ internal class SafetyDocumentsController(
         }
     }
 
-    // Opens a document shared through an encrypted conversation.
+    /**
+     * Opens a document shared through an encrypted conversation.
+     *
+     * @param viewerUid Firebase UID of the viewing account.
+     * @param documentId Unique identifier of the safety document.
+     * @param onReady Callback invoked when ready changes or occurs.
+     */
     fun openShared(
         viewerUid: String,
         documentId: String,
@@ -252,22 +319,59 @@ internal class SafetyDocumentsController(
         }
     }
 
-    // User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
-    fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
-        checkNotNull(repository).delete(document, ownerUid)
+    /**
+     * User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     */
+    fun delete(document: SafetyDocument, ownerUid: String) {
+        if (state.ownerUid != ownerUid) return
+        val previous = state.files
+        val previousAll = allSnapshotDocuments
+        allSnapshotDocuments = previousAll.filterNot { it.id == document.id }
+        state = state.copy(files = previous.filterNot { it.id == document.id }, error = null)
+        val reconciled = if (previousAll.isNotEmpty()) allSnapshotDocuments else state.files
+        media?.onDocumentSnapshot(ownerUid, reconciled, true)
+        scope.launch {
+            runCatching {
+                checkNotNull(repository).delete(document, ownerUid)
+            }.onFailure {
+                if (state.ownerUid == ownerUid) {
+                    allSnapshotDocuments = previousAll
+                    state = state.copy(files = previous, error = localizedFailure(it))
+                }
+            }
+        }
     }
 
+    /**
+     * Builds available offline.
+     *
+     * @param document Safety document metadata record.
+     */
     fun makeAvailableOffline(document: SafetyDocument) {
         val viewerUid = state.ownerUid ?: return
         run { checkNotNull(media).makeAvailableOffline(document, viewerUid) }
     }
 
+    /**
+     * Removes offline copy.
+     *
+     * @param document Safety document metadata record.
+     */
     fun removeOfflineCopy(document: SafetyDocument) {
         val viewerUid = state.ownerUid ?: return
         run { checkNotNull(media).removeOfflineCopy(document, viewerUid) }
     }
 
-    // Updates the Evidence toggle immediately, then confirms it with the server or rolls it back.
+    /**
+     * Updates the Evidence toggle immediately, then confirms it with the server or rolls it back.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param evidence Whether to apply evidence.
+     */
     fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
         if (state.ownerUid != ownerUid || document.ownerUid != ownerUid ||
             document.id in state.evidenceUpdates || document.evidence == evidence) return
@@ -308,12 +412,22 @@ internal class SafetyDocumentsController(
         }
     }
 
-    // The emergency button builds a PDF, encrypts it, and adds it to the user's Documents list.
+    /**
+     * The emergency button builds a PDF, encrypts it, and adds it to the user's Documents list.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     * @param entries Collection of entries values to process.
+     * @param location Function used to transform or provide location.
+     * @param onAlertSent Callback invoked when alert sent changes or occurs.
+     * @param onFinished Callback invoked when finished changes or occurs.
+     */
     fun createEmergencyReport(
         identity: AccountIdentity,
         profile: UserProfile,
         entries: List<PrivateEntry>,
         location: suspend () -> EmergencyReportLocation?,
+        onAlertSent: () -> Unit = {},
         onFinished: (Result<Unit>) -> Unit,
     ) {
         val ownerUid = identity.uid
@@ -338,6 +452,9 @@ internal class SafetyDocumentsController(
                     )
                 }
                 emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                if (token == generation && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid) {
+                    onAlertSent()
+                }
                 val pressedLocation = location()
                 check(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid && token == generation) {
                     "The account changed. Try again."
@@ -345,7 +462,8 @@ internal class SafetyDocumentsController(
                 val incidents = emergencyIncidents(entries)
                 // A just-selected Evidence checkbox must reach the server before the export rereads it.
                 evidenceWrites.values.toList().forEach { it.await() }
-                val available = repository?.listFor(ownerUid)?.documents ?: state.files
+                val available = (repository?.listFor(ownerUid)?.documents ?: state.files)
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
                 val relevantIds = incidents.flatMapTo(linkedSetOf()) { it.attachmentIds }.apply {
                     addAll(available.filter(SafetyDocument::evidence).map(SafetyDocument::id))
                 }
@@ -411,7 +529,14 @@ internal class SafetyDocumentsController(
         }
     }
 
-    // User safety document controller: Shares the selected item. It requires the active feature controller before continuing.
+    /**
+     * User safety document controller: Shares the selected item. It requires the active feature controller before continuing.
+     *
+     * @param document Safety document metadata record.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     * @param onComplete Callback invoked when complete changes or occurs.
+     */
     fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -421,7 +546,13 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
-    // Gives assigned safety-plan staff and admins encrypted access without exposing upload controls.
+    /**
+     * Gives assigned safety-plan staff and admins encrypted access without exposing upload controls.
+     *
+     * @param documents Collection of documents values to process.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param recipients Key-value mapping of recipients entries.
+     */
     fun grantPlanAccess(
         documents: List<SafetyDocument>,
         ownerUid: String,
@@ -440,22 +571,36 @@ internal class SafetyDocumentsController(
         if (!granted) lastFailure?.let { throw it }
     }
 
-    // Changes a document failure into a clear message shown on the Safe App screen.
+    /**
+     * Changes a document failure into a clear message shown on the Safe App screen.
+     *
+     * @param message Chat message or remote payload, or null when not provided.
+     */
     fun reportError(message: String?) {
         state = state.copy(error = message)
     }
 
-    // Clears the current document viewer and its error message.
+    /**
+     * Clears the current document viewer and its error message.
+     */
     fun clear() {
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         media?.clearState()
         File(applicationContext.cacheDir, "opened-documents").listFiles()?.forEach(File::delete)
         state = SafetyDocumentsState()
     }
 
-    // Runs one document task, reports its error, and refreshes the list when needed.
+    /**
+     * Runs one document task, reports its error, and refreshes the list when needed.
+     *
+     * @param refreshAfter Whether to apply refresh after.
+     * @param fallbackError Optional fallback error supplied to [run].
+     * @param onComplete Callback invoked when complete changes or occurs.
+     * @param operation Action or callback executed for operation.
+     */
     private fun run(
         refreshAfter: Boolean = false,
         fallbackError: String? = null,
@@ -480,18 +625,33 @@ internal class SafetyDocumentsController(
         }
     }
 
-    // Reloads the owner's document list after a write finishes.
+    /**
+     * Reloads the owner's document list after a write finishes.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     private suspend fun refresh(ownerUid: String) {
         val snapshot = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) {
-            state = state.copy(files = snapshot.documents, source = snapshot.source,
-                lastSyncedAt = snapshot.lastSyncedAt, error = null)
+            allSnapshotDocuments = snapshot.documents
+            state = state.copy(
+                files = snapshot.documents.filterNot(SafetyDocument::isChatOnlyMedia),
+                source = snapshot.source,
+                lastSyncedAt = snapshot.lastSyncedAt,
+                error = null,
+            )
             media?.onDocumentSnapshot(ownerUid, snapshot.documents,
                 snapshot.source == DocumentListSource.SERVER)
         }
     }
 
-    // Opens a saved document after its encrypted content is ready.
+    /**
+     * Opens a saved document after its encrypted content is ready.
+     *
+     * @param document Safety document metadata record.
+     * @param viewerUid Firebase UID of the viewing account.
+     * @return The resulting [OpenedMedia] for open document.
+     */
     private suspend fun openDocument(document: SafetyDocument, viewerUid: String): OpenedMedia =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
@@ -499,6 +659,12 @@ internal class SafetyDocumentsController(
             OpenedMedia(document, checkNotNull(repository).download(applicationContext, document))
         }
 
+    /**
+     * Starts opening.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @return `true` if begin opening, or `false` otherwise.
+     */
     private fun beginOpening(documentId: String): Boolean {
         if (documentId in state.openingDocumentIds) return false
         state = state.copy(
@@ -509,6 +675,12 @@ internal class SafetyDocumentsController(
         return true
     }
 
+    /**
+     * Finishes opening.
+     *
+     * @param documentId Unique identifier of the safety document.
+     * @param token Authentication, push notification, or session token.
+     */
     private fun finishOpening(documentId: String, token: Int) {
         if (token == generation) {
             state = state.copy(openingDocumentIds = state.openingDocumentIds - documentId)
@@ -534,6 +706,12 @@ internal class SafetyDocumentsController(
         }
     }
 
+    /**
+     * Persists updated metadata for a single recovered document.
+     *
+     * @param ownerUid Firebase UID of the signed-in document owner.
+     * @param document Document record whose local metadata and key wrappers were recovered.
+     */
     private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
         if (state.ownerUid == ownerUid) {
             state = state.copy(files = state.files.map { if (it.id == document.id) document else it })
@@ -541,6 +719,12 @@ internal class SafetyDocumentsController(
         scope.launch(Dispatchers.IO) { repository?.rememberRecovered(ownerUid, document) }
     }
 
+    /**
+     * Computes localized failure.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @return The resulting localized failure string.
+     */
     private fun localizedFailure(failure: Throwable): String {
         return failureMessageResolver(failure)
     }
@@ -573,5 +757,88 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed
         null -> R.string.documents_open_failed
+    }
+}
+
+internal data class MediaAccessRecoveryResult(
+    val documents: List<SafetyDocument>,
+    val failedIds: Set<String>,
+    val pendingSyncIds: Set<String>,
+)
+
+/**
+ * Selects authorized media whose account wrapper can provision the current device.
+ *
+ * @param documents Encrypted media records visible to the account.
+ * @param viewerUid Active Firebase account identifier.
+ * @param deviceId Stable identifier derived from the current device encryption key.
+ * @return Distinct media records missing this device's wrapped DEK.
+ */
+internal fun recoverableMediaDocuments(
+    documents: List<SafetyDocument>,
+    viewerUid: String,
+    deviceId: String,
+): List<SafetyDocument> = documents.filter { document ->
+    document.objectKey.isNotBlank() &&
+        viewerUid in document.allowedUsers &&
+        document.accountWrappedKeys[viewerUid] != null &&
+        document.deviceWrappedKeys["$viewerUid--$deviceId"].isNullOrBlank()
+}.distinctBy(SafetyDocument::id)
+
+/** Restores media DEKs for only the current device while keeping payload bytes untouched. */
+internal class EncryptedMediaAccessRecovery(
+    private val repository: MediaTicketDataSource,
+) {
+    /**
+     * Restores authenticated metadata and device wrappers with one unlocked account keyset.
+     *
+     * @param documents Authorized encrypted media records visible to the account.
+     * @param viewerUid Active Firebase account identifier.
+     * @param keyset Account private key unlocked for this foreground recovery operation.
+     * @return Locally restored records, rejected IDs, and wrappers awaiting server synchronization.
+     */
+    suspend fun restore(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult = coroutineScope {
+        val deviceId = KeyManager.deviceId()
+        val deviceMapKey = "$viewerUid--$deviceId"
+        val publicKey = KeyManager.getOrCreatePublicKey()
+        val gate = Semaphore(4)
+        val candidates = recoverableMediaDocuments(documents, viewerUid, deviceId)
+        val outcomes = candidates.map { document ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    runCatching {
+                        val accountWrapper = checkNotNull(document.accountWrappedKeys[viewerUid])
+                        check(accountWrapper.keyId == keyset.keyId && accountWrapper.epoch == keyset.epoch) {
+                            "Account keyset does not match encrypted media"
+                        }
+                        val documentKey = accountWrapper.unwrap(keyset)
+                        val deviceWrapper = KeyManager.wrapKey(documentKey, publicKey)
+                        val metadataResolved = if (document.encryptedMetadata.isBlank()) document else {
+                            document.withDecryptedMetadata(
+                                JSONObject(EncryptionUtils.decryptText(document.encryptedMetadata, documentKey)),
+                            )
+                        }
+                        val resolved = metadataResolved.copy(
+                            deviceWrappedKeys = document.deviceWrappedKeys + (deviceMapKey to deviceWrapper),
+                        )
+                        val synced = runCatching {
+                            repository.updateDeviceKeys(document.id, mapOf(deviceMapKey to deviceWrapper))
+                        }.isSuccess
+                        Triple(resolved, synced, document.id)
+                    }
+                }
+            }
+        }.awaitAll()
+        val restored = outcomes.mapNotNull { it.getOrNull() }
+        val restoredIds = restored.mapTo(mutableSetOf()) { it.third }
+        MediaAccessRecoveryResult(
+            documents = restored.map { it.first },
+            failedIds = candidates.mapTo(mutableSetOf(), SafetyDocument::id) - restoredIds,
+            pendingSyncIds = restored.filterNot { it.second }.mapTo(mutableSetOf()) { it.third },
+        )
     }
 }

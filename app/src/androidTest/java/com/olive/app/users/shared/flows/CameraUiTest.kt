@@ -49,5 +49,15 @@ class CameraUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("camera_shutter").performClick()
         waitFor("camera_save")
         compose.onNodeWithTag("camera_save").assertIsDisplayed()
+        compose.onNodeWithTag("camera_retake").performClick()
+        waitFor("camera_ready")
+
+        compose.onNodeWithTag("camera_mode_document").performClick()
+        compose.onNodeWithTag("camera_shutter").performClick()
+        compose.waitUntil(60_000) { compose.onAllNodesWithTag("camera_save").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("camera_save").performClick()
+        waitFor("camera_upload_error")
+        compose.onNodeWithTag("camera_retake").performClick()
+        compose.onNodeWithTag("camera_upload_error").assertDoesNotExist()
     }
 }

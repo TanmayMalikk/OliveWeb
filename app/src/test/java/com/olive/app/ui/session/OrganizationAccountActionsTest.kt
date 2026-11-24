@@ -2,6 +2,7 @@ package com.olive.app.ui.session
 
 import com.olive.app.data.account.*
 import com.olive.app.support.SessionRuntimeFixture
+import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -22,17 +23,20 @@ class OrganizationAccountActionsTest {
     }
 
     @Test
-    fun adminLoadsDashboardTotalsAndLoadsDirectoriesOnlyWhenRequested() = runBlocking<Unit> {
+    fun adminLoadsIndependentDatasetsWithoutBlockingThePortal() = runBlocking<Unit> {
         fixture().use { f ->
             f.runtime.organization.refreshAdminSummary()
-            f.await { !f.runtime.state.busy }
+            f.await { f.runtime.state.adminCounts == totals }
+            assertFalse(f.runtime.state.busy)
             assertEquals(totals, f.runtime.state.adminCounts)
             verify(f.admin, never()).accounts()
             f.runtime.organization.refreshAdminAccounts()
-            f.await { !f.runtime.state.busy }
+            f.await { f.runtime.adminPreloader.accountsReady }
+            assertFalse(f.runtime.state.busy)
             assertEquals(listOf(staff), f.runtime.state.adminAccounts)
             f.runtime.organization.refreshAdminStaff()
-            f.await { !f.runtime.state.busy }
+            f.await { f.runtime.adminPreloader.staffReady }
+            assertFalse(f.runtime.state.busy)
             verify(f.admin).staffAccounts()
         }
     }
@@ -82,6 +86,32 @@ class OrganizationAccountActionsTest {
             assertEquals(updated, f.runtime.state.profile)
             assertEquals("Fixture Admin", f.runtime.state.coverFullName)
             assertEquals("ui_profile_updated", f.runtime.state.message)
+        }
+    }
+
+    @Test
+    fun organizationEnrollmentRejectsInvalidEmailThenOpensTheStaffPortalAfterSaving() = runBlocking<Unit> {
+        SessionRuntimeFixture(AccountRole.STAFF).use { fixture ->
+            val session = fixture.runtime
+            val identity = AccountIdentity("new-staff", "fixture_staff")
+            val completed = UserProfile("fixture_staff", "Fixture Staff", "", "", "2000-01-01", "English", "", "Alberta", "",
+                role = AccountRole.STAFF, email = "fixture@example.test")
+            session.enrollment = null
+            session.pendingIdentity = identity
+            session.state.screen = SessionScreen.OrganizationProfileSetup
+            session.screenHistory += SessionScreen.ReturningCredentials
+            session.organization.saveOrganizationProfile("Fixture Staff", "2000-01-01", "invalid", "")
+            assertEquals(SessionScreen.OrganizationProfileSetup, session.state.screen)
+            assertTrue(session.state.message.orEmpty().contains("real_email"))
+            verifyNoInteractions(fixture.admin)
+            `when`(fixture.admin.completeOrganizationProfile("Fixture Staff", "2000-01-01", "fixture@example.test", "5550100"))
+                .thenReturn(completed)
+            session.organization.saveOrganizationProfile(" Fixture Staff ", "2000-01-01", " fixture@example.test ", " 5550100 ")
+            fixture.await { !session.state.busy }
+            assertEquals(SessionScreen.Portal, session.state.screen)
+            assertEquals(identity.uid, session.enrollment?.uid)
+            assertEquals(completed, session.state.profile)
+            assertTrue(session.screenHistory.isEmpty())
         }
     }
 }

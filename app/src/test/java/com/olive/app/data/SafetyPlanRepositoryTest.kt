@@ -1,6 +1,20 @@
 package com.olive.app.data
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import androidx.work.ListenableWorker.Result as WorkResult
+import androidx.work.WorkerParameters
+import androidx.work.impl.WorkManagerImpl
+import androidx.work.impl.utils.taskexecutor.TaskExecutor
+import androidx.work.workDataOf
 import com.google.android.gms.tasks.Tasks
+import com.olive.app.BuildConfig
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -12,12 +26,14 @@ import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SnapshotMetadata
 import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
+import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.safety.SafetyField
-import com.olive.app.data.safety.SafetyPlan
-import com.olive.app.data.safety.SafetyPlanRepository
+import com.olive.app.data.safety.*
+import com.olive.app.support.TestAndroidKeyStore
+import java.util.concurrent.Executor
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -25,8 +41,11 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.*
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class SafetyPlanRepositoryTest {
     private val functions = mock(FirebaseFunctions::class.java)
     private val firestore = mock(FirebaseFirestore::class.java)
@@ -168,5 +187,143 @@ class SafetyPlanRepositoryTest {
         val capture = ArgumentCaptor.captor<EventListener<DocumentSnapshot>>()
         verify(reference).addSnapshotListener(eq(MetadataChanges.INCLUDE), capture.capture())
         return capture.value
+    }
+
+    @Test
+    fun syncWorkerEnqueuesAndHandlesSyncAttachmentAndErrors() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val baseApp = RuntimeEnvironment.getApplication()
+            val work = mock(WorkManagerImpl::class.java)
+            WorkManagerImpl.setDelegate(work)
+            try {
+                SafetyPlanSyncWorker.enqueue(baseApp, "owner", "owner")
+                SafetyPlanSyncWorker.enqueueAttachment(baseApp, "owner", "doc-1")
+                val expectedWork = if (BuildConfig.FIREBASE_CONFIGURED) 2 else 0
+                assertEquals(expectedWork, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
+            } finally {
+                WorkManagerImpl.setDelegate(null)
+            }
+
+            val app = spy(baseApp)
+            val connectivity = mock(ConnectivityManager::class.java)
+            val network = mock(Network::class.java)
+            val capabilities = mock(NetworkCapabilities::class.java)
+            var currentActiveNetwork: Network? = null
+            var currentInput = workDataOf()
+            doReturn(connectivity).`when`(app).getSystemService(Context.CONNECTIVITY_SERVICE)
+            `when`(connectivity.activeNetwork).thenAnswer { currentActiveNetwork }
+            `when`(connectivity.getNetworkCapabilities(network)).thenReturn(capabilities)
+            `when`(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)).thenReturn(true)
+            `when`(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)).thenReturn(true)
+
+            val auth = mock(FirebaseAuth::class.java)
+            val user = mock(FirebaseUser::class.java)
+            var currentAuthUid = "owner"
+            `when`(user.uid).thenAnswer { currentAuthUid }
+            `when`(auth.currentUser).thenReturn(user)
+
+            val store = SafetyPlanStore(baseApp, false)
+            val checklistKey = "primary_documents"
+            val docTag = safetyChecklistAttachmentTag(checklistKey, "row-1")
+            val doc = SafetyDocument("doc-1", "owner", "", "Passport", "application/pdf", listOf("owner"), tags = listOf(docTag))
+            val remotePlan = SafetyPlan("owner", "Owner", mapOf(
+                checklistKey to SafetyField(writeSafetyChecklist(listOf(SafetyChecklistItem("row-1", "Passport"))), 1),
+            ))
+            store.write("owner", "owner", remotePlan)
+
+            val params = mock(WorkerParameters::class.java).apply {
+                `when`(backgroundExecutor).thenReturn(Executor(Runnable::run))
+                `when`(taskExecutor).thenReturn(mock(TaskExecutor::class.java))
+                `when`(inputData).thenAnswer { currentInput }
+            }
+            val worker = SafetyPlanSyncWorker(app, params)
+            if (!BuildConfig.FIREBASE_CONFIGURED) {
+                assertEquals(WorkResult.success(), worker.doWork())
+                return@runBlocking
+            }
+
+            val createdFirebaseApp = if (FirebaseApp.getApps(baseApp).isEmpty()) {
+                FirebaseApp.initializeApp(
+                    baseApp,
+                    FirebaseOptions.Builder()
+                        .setApplicationId("1:1234567890:android:abcdef123456")
+                        .setApiKey("AIzaSyTestKeyForUnitTestsOnly000000000")
+                        .setProjectId("olive-unit-test")
+                        .build(),
+                )
+            } else null
+            try {
+                mockStatic(FirebaseAuth::class.java).use { authSdk ->
+                    authSdk.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(auth)
+                    mockStatic(FirebaseFirestore::class.java).use { firestoreSdk ->
+                        firestoreSdk.`when`<FirebaseFirestore> { FirebaseFirestore.getInstance() }.thenReturn(firestore)
+                        currentInput = workDataOf()
+                        assertEquals(WorkResult.failure(), worker.doWork())
+                        currentInput = workDataOf("actor" to "owner")
+                        assertEquals(WorkResult.failure(), worker.doWork())
+                        currentInput = workDataOf("actor" to "other", "owner" to "owner")
+                        assertEquals(WorkResult.success(), worker.doWork())
+                        currentInput = workDataOf("actor" to "owner", "owner" to "owner")
+                        currentActiveNetwork = null
+                        assertEquals(WorkResult.retry(), worker.doWork())
+                        currentActiveNetwork = network
+
+                        mockConstruction(MediaRepository::class.java).use {
+                            mockConstruction(SafetyDocumentRepository::class.java) { docs, _ ->
+                                runBlocking {
+                                    `when`(docs.getFor("owner", "doc-1")).thenReturn(doc)
+                                }
+                            }.use { docsMock ->
+                                var syncCalls = 0
+                                mockConstruction(SafetyPlanRepository::class.java) { repo, _ ->
+                                    val denied = mock(FirebaseFunctionsException::class.java).also {
+                                        `when`(it.code).thenReturn(FirebaseFunctionsException.Code.PERMISSION_DENIED)
+                                    }
+                                    val invalid = mock(FirebaseFunctionsException::class.java).also {
+                                        `when`(it.code).thenReturn(FirebaseFunctionsException.Code.INVALID_ARGUMENT)
+                                    }
+                                    runBlocking {
+                                        `when`(repo.get("owner")).thenReturn(
+                                            remotePlan.copy(fields = mapOf(
+                                                checklistKey to SafetyField(writeSafetyChecklist(listOf(SafetyChecklistItem("row-1", "Passport", attachmentIds = listOf("doc-1")))), 2),
+                                            )),
+                                        )
+                                        `when`(repo.mediaRecipients()).thenReturn(mapOf("staff-1" to "staff_user"))
+                                        `when`(repo.sync(any<SafetyPlan>() ?: remotePlan, any())).thenAnswer { invocation ->
+                                            when (++syncCalls) {
+                                                1, 2 -> invocation.getArgument<SafetyPlan>(0)
+                                                3 -> throw denied
+                                                4 -> throw invalid
+                                                else -> throw IllegalStateException("Network")
+                                            }
+                                        }
+                                    }
+                                }.use {
+                                    currentInput = workDataOf("actor" to "owner", "owner" to "owner")
+                                    assertEquals(WorkResult.success(), worker.doWork())
+
+                                    currentInput = workDataOf("actor" to "owner", "owner" to "owner", "attachment" to "doc-1")
+                                    assertEquals(WorkResult.success(), worker.doWork())
+                                    verify(docsMock.constructed().first()).grantAccess(doc, "owner", "staff-1", "staff_user", true)
+
+                                    currentAuthUid = "staff"
+                                    currentInput = workDataOf("actor" to "staff", "owner" to "owner")
+                                    store.write("staff", "owner", remotePlan)
+                                    assertEquals(WorkResult.success(), worker.doWork())
+                                    assertNull(store.read("staff", "owner"))
+
+                                    currentAuthUid = "owner"
+                                    currentInput = workDataOf("actor" to "owner", "owner" to "owner")
+                                    assertEquals(WorkResult.failure(), worker.doWork())
+                                    assertEquals(WorkResult.retry(), worker.doWork())
+                                }
+                            }
+                        }
+                    }
+                }
+            } finally {
+                createdFirebaseApp?.delete()
+            }
+        }
     }
 }

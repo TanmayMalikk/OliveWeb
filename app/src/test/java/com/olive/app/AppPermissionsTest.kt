@@ -13,4 +13,11 @@ class AppPermissionsTest {
         assertFalse(shouldRequestNotifications(enabled = true, asked = true, granted = false))
         assertFalse(shouldRequestNotifications(enabled = true, asked = false, granted = true))
     }
+    @Test
+    fun settingsFallbackRequiresAnEarlierRequestAndNoRemainingSystemPrompt() {
+        assertFalse(shouldOpenLocationSettings(false, false, false))
+        assertFalse(shouldOpenLocationSettings(true, true, false))
+        assertFalse(shouldOpenLocationSettings(true, false, true))
+        assertTrue(shouldOpenLocationSettings(true, false, false))
+    }
 }

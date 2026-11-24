@@ -39,7 +39,12 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     private var pendingDocumentFile: File? = null
     private var documentGeneration = 0
 
-    // Connects CameraX to this camera screen.
+    /**
+     * Connects CameraX to this camera screen.
+     *
+     * @param owner Owner supplied to [bind].
+     * @param preview Preview supplied to [bind].
+     */
     fun bind(owner: LifecycleOwner, preview: PreviewView) {
         viewModelScope.launch {
             _ready.value = false
@@ -49,7 +54,12 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Switches between the front and back camera.
+    /**
+     * Switches between the front and back camera.
+     *
+     * @param owner Owner supplied to [flip].
+     * @param preview Preview supplied to [flip].
+     */
     fun flip(owner: LifecycleOwner, preview: PreviewView) {
         if (_busy.value || _recording.value) return
         viewModelScope.launch {
@@ -71,18 +81,31 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Moves the camera one zoom step closer while keeping the preview stable.
+    /**
+     * Moves the camera one zoom step closer while keeping the preview stable.
+     */
     fun zoomIn() = changeZoom(1.25f)
 
-    // Moves the camera one zoom step farther away without going below its normal view.
+    /**
+     * Moves the camera one zoom step farther away without going below its normal view.
+     */
     fun zoomOut() = changeZoom(0.8f)
 
-    // Uses the two-finger camera gesture to smoothly change CameraX's real optical zoom ratio.
+    /**
+     * Uses the two-finger camera gesture to smoothly change CameraX's real optical zoom ratio.
+     *
+     * @param multiplier Multiplier supplied to [zoomBy].
+     */
     fun zoomBy(multiplier: Float) {
         if (!multiplier.isFinite()) return
         changeZoom(multiplier.coerceIn(0.8f, 1.25f))
     }
 
+    /**
+     * Computes change zoom.
+     *
+     * @param multiplier Multiplier supplied to [changeZoom].
+     */
     private fun changeZoom(multiplier: Float) {
         if (!_ready.value || (_busy.value && !_recording.value)) return
         runCatching { camera.changeZoom(multiplier) }
@@ -90,7 +113,12 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
             .onFailure { _error.value = it.localizedMessage ?: "Camera zoom is unavailable" }
     }
 
-    // Takes a photo and sends it to the capture preview.
+    /**
+     * Takes a photo and sends it to the capture preview.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param onCaptured Callback invoked when captured changes or occurs.
+     */
     fun capturePhoto(file: File, onCaptured: (File) -> Unit) {
         viewModelScope.launch {
             _busy.value = true
@@ -101,7 +129,12 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Takes a document photo and runs OCR before previewing it.
+    /**
+     * Takes a document photo and runs OCR before previewing it.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param onCaptured Callback invoked when captured changes or occurs.
+     */
     fun captureDocument(file: File, onCaptured: (File, File, OcrResult) -> Unit) {
         if (documentJob?.isActive == true) return
         val generation = ++documentGeneration
@@ -144,7 +177,13 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Starts or stops video recording for the Safe App camera.
+    /**
+     * Starts or stops video recording for the Safe App camera.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param includeAudio Whether to include audio.
+     * @param onCaptured Callback invoked when captured changes or occurs.
+     */
     fun startVideo(file: File, includeAudio: Boolean, onCaptured: (File) -> Unit) {
         _error.value = null
         runCatching {
@@ -164,14 +203,20 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Stops video recording and sends the saved clip to the preview.
+    /**
+     * Stops video recording and sends the saved clip to the preview.
+     */
     fun stopVideo() = camera.stopVideo()
-    // Dismisses the current camera error after the user acknowledges or retries it.
+    /**
+     * Dismisses the current camera error after the user acknowledges or retries it.
+     */
     fun clearError() {
         _error.value = null
     }
 
-    // Stops camera work and removes temporary files when the screen closes.
+    /**
+     * Stops camera work and removes temporary files when the screen closes.
+     */
     fun leaveCamera() {
         documentGeneration++
         documentJob?.cancel()
@@ -185,7 +230,9 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         _busy.value = false
     }
 
-    // Releases camera and OCR work when the camera screen closes.
+    /**
+     * Releases camera and OCR work when the camera screen closes.
+     */
     override fun onCleared() {
         leaveCamera()
         camera.release()
@@ -197,7 +244,13 @@ private const val PORTRAIT_PAGE_WIDTH = 1240
 private const val PORTRAIT_PAGE_HEIGHT = 1754
 private const val PAGE_MARGIN = 48f
 
-// Creates a real one-page PDF while keeping the camera photo upright and inside the page edges.
+/**
+ * Creates a real one-page PDF while keeping the camera photo upright and inside the page edges.
+ *
+ * @param photo Photo supplied to [convertDocumentPhotoToPdf].
+ * @param pdfFile PDF file supplied to [convertDocumentPhotoToPdf].
+ * @return The resulting [File] for convert document photo to PDF.
+ */
 internal fun convertDocumentPhotoToPdf(photo: File, pdfFile: File): File {
     val source = decodeUprightDocumentPhoto(photo)
         ?: error("The captured document image could not be read")
@@ -237,7 +290,12 @@ internal fun convertDocumentPhotoToPdf(photo: File, pdfFile: File): File {
     }
 }
 
-// Reads CameraX's EXIF flag and rotates or flips the pixels before they enter the PDF.
+/**
+ * Reads CameraX's EXIF flag and rotates or flips the pixels before they enter the PDF.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @return The resulting [Bitmap], or `null` if unavailable.
+ */
 private fun decodeUprightDocumentPhoto(file: File): Bitmap? {
     val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
     val orientation = runCatching {
@@ -278,7 +336,14 @@ internal enum class BuiltInCameraFile(
     DOCUMENT("OliveDoc", "pdf"),
 }
 
-// Adds the capture date and time so a new camera file never replaces an older one.
+/**
+ * Adds the capture date and time so a new camera file never replaces an older one.
+ *
+ * @param type Type supplied to [builtInCameraFileName].
+ * @param timestampMillis Duration or timestamp for timestamp, in milliseconds.
+ * @param timeZone Time zone supplied to [builtInCameraFileName].
+ * @return The resulting built in camera file name string.
+ */
 internal fun builtInCameraFileName(
     type: BuiltInCameraFile,
     timestampMillis: Long = System.currentTimeMillis(),

@@ -4,38 +4,47 @@
   <meta charset="utf-8">
   <title>olive-map-loading</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org">
-  <link rel="stylesheet" href="leaflet.css">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com; connect-src https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com; worker-src blob:">
+  <link rel="stylesheet" href="mapbox-gl.css">
   <style>
-    html,body{height:100%;width:100%;margin:0;background:#f1ede4}
-    #map{height:100vh;width:100%;min-height:100%;margin:0;background:#f1ede4}
-    .leaflet-container .leaflet-control-attribution{font:12px/1.4 sans-serif;background:#fff;color:#253322}
-    .leaflet-control-attribution a{color:#314b28;text-decoration:underline}
-    .leaflet-popup-content-wrapper,.leaflet-tooltip{background:#fff;color:#253322;border:1px solid #5d6952}
-    .leaflet-popup-content,.leaflet-tooltip{font-size:14px}
-    .olive-live-marker{background:transparent;border:0}
+    html,body{height:100%;width:100%;margin:0;overflow:hidden;background:#f1ede4}
+    #map{position:fixed;inset:0;width:100%;height:100%;margin:0;visibility:hidden;background:#f1ede4}
+    .mapboxgl-ctrl-attrib{font:12px/1.4 sans-serif;background:rgba(255,255,255,.85);color:#253322}
+    .mapboxgl-ctrl-attrib a{color:#314b28;text-decoration:underline}
+    .mapboxgl-popup-content{background:#fff;color:#253322;border:1px solid #5d6952;font-size:14px;
+      padding:8px 12px;border-radius:10px}
+    .olive-live-marker{position:absolute;top:0;left:0;margin:0;padding:0;display:grid;place-items:center;background:transparent;border:0;cursor:pointer}
+    .olive-live-dot,.olive-last-known-dot,.olive-own-live-dot,.olive-contact-dot{position:relative;z-index:2;
+      box-sizing:border-box}
     .olive-live-dot{border-radius:50%;background:#c52b25;
       box-shadow:0 0 0 2px rgba(117,22,19,.5);animation:olivePulse 2.4s ease-in-out infinite}
     .olive-last-known-dot{border-radius:50%;background:#c52b25;
       box-shadow:0 0 0 2px rgba(117,22,19,.5)}
-    .olive-own-live-dot{border-radius:28%;background:#1769aa;
-      box-shadow:0 0 0 2px rgba(14,66,111,.5);animation:oliveBluePulse 2.4s ease-in-out infinite}
+    .olive-own-live-dot{border-radius:50%;background:#1a73e8;
+      box-shadow:0 0 0 2px rgba(14,66,111,.45),0 2px 6px rgba(0,0,0,.35);
+      animation:oliveBluePulse 2.4s ease-in-out infinite}
     .olive-contact-dot{border-radius:28%;background:#314b28;
       box-shadow:0 0 0 2px rgba(39,68,33,.35)}
+    .olive-heading-cone{position:absolute;left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;
+      z-index:0;pointer-events:none;transform-origin:center center;display:none}
+    .olive-heading-cone svg{width:100%;height:100%;display:block}
     @keyframes olivePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(117,22,19,.45)}
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(197,43,37,.12)}}
     @keyframes oliveBluePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(14,66,111,.45)}
-      50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(23,105,170,.14)}}
-    .olive-service-marker{display:grid;place-items:center;background:transparent;border:0}
+      50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(26,115,232,.18)}}
+    .olive-service-marker{position:absolute;top:0;left:0;margin:0;padding:0;display:grid;place-items:center;width:28px;height:28px;background:transparent;
+      border:0;cursor:pointer}
     .olive-service-dot{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#258142;
       box-shadow:0 0 0 2px #175c2c;animation:oliveServiceBreath 3.6s ease-in-out infinite}
-    @keyframes oliveServiceBreath{0%,100%{opacity:.65;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
+    .olive-service-dot.olive-service-saved{width:16px;height:16px;background:#c62828;border:2px solid #fff;
+      box-shadow:0 0 0 2.5px #ffd54f,0 2px 6px rgba(0,0,0,.35)}
+    @keyframes oliveServiceBreath{0%,100%{opacity:.78;transform:scale(.94)}50%{opacity:1;transform:scale(1.04)}}
     @media (prefers-reduced-motion:reduce){.olive-live-dot,.olive-own-live-dot,.olive-service-dot{animation:none}}
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <script src="leaflet.js"></script>
+  <script src="mapbox-gl.js"></script>
   <script src="map.js"></script>
 </body>
 </html>

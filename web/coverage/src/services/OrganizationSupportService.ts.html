@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>6/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>6/7</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -105,16 +105,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -122,7 +122,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -130,25 +130,25 @@
 import { cloudMode, firebase } from "./AccountService";
 &nbsp;
 // Calls a role-checked function so the browser cannot grant itself staff access.
-async function <span class="fstat-no" title="function not covered" >callSupport&lt;T&gt;(n</span>ame: string, input: unknown) {
-<span class="cstat-no" title="statement not covered" >  if (!cloudMode)</span>
+async function callSupport&lt;T&gt;(name: string, input: unknown) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!cloudMode)
 <span class="cstat-no" title="statement not covered" >    throw new Error("Support inbox requires a shared Firebase account.");</span>
-  const { functions } = <span class="cstat-no" title="statement not covered" >await firebase()</span>;
-  const { httpsCallable } = <span class="cstat-no" title="statement not covered" >await import("firebase/functions");</span>
-<span class="cstat-no" title="statement not covered" >  return (await httpsCallable(functions, name)(input)).data as T;</span>
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  return (await httpsCallable(functions, name)(input)).data as T;
 }
 &nbsp;
 // Staff: adds an administrator to this existing support conversation.
-export async function <span class="fstat-no" title="function not covered" >requestAdministratorHelp(c</span>onversationId: string) {
-<span class="cstat-no" title="statement not covered" >  return callSupport&lt;{ conversationId: string; adminUid: string }&gt;(</span>
+export async function requestAdministratorHelp(conversationId: string) {
+  return callSupport&lt;{ conversationId: string; adminUid: string }&gt;(
     "safetySupportAdmin",
     { conversationId },
   );
 }
 &nbsp;
 // Staff: closes the active ticket and archives its conversation for every participant.
-export async function <span class="fstat-no" title="function not covered" >closeSupportTicket(c</span>onversationId: string) {
-<span class="cstat-no" title="statement not covered" >  return callSupport&lt;{ conversationId: string }&gt;("staffSupportClose", {</span>
+export async function closeSupportTicket(conversationId: string) {
+  return callSupport&lt;{ conversationId: string }&gt;("staffSupportClose", {
     conversationId,
   });
 }
@@ -159,7 +159,7 @@ export async function <span class="fstat-no" title="function not covered" >close
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-11T04:59:54.108Z
+                at 2026-11-20T02:20:04.261Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -17,6 +17,11 @@ import com.olive.app.notification.OliveNotificationManager
 //specifically an override of it. However onNewToken is now deprecated so the linter is out of date looking for that.
 @SuppressLint("MissingFirebaseInstanceTokenRefresh")
 class OliveFirebaseMessagingService : FirebaseMessagingService() {
+    /**
+     * Handles registration completion with the updated Firebase installation identifier.
+     *
+     * @param installationId Installation ID supplied to [onRegistered].
+     */
     override fun onRegistered(installationId: String) {
         super.onRegistered(installationId)
         runCatching { VoipPushTokenRegistration.onTokenRefreshed(this, installationId) }
@@ -27,6 +32,11 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
         AppUpdateScheduler.registerForUpdates(this)
     }
 
+    /**
+     * Processes an incoming Firebase Cloud Messaging data or notification payload.
+     *
+     * @param message Chat message or remote payload.
+     */
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         val invalidation = syncInvalidationFrom(data)
@@ -63,6 +73,11 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
+    /**
+     * Displays call.
+     *
+     * @param data Key-value mapping of data entries.
+     */
     private fun showCall(data: Map<String, String>) {
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val recipientId = data["recipientId"] ?: return

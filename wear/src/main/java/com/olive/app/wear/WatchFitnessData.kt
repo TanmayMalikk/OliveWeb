@@ -11,6 +11,12 @@ internal object WatchFitnessData {
     const val SESSION = "/olive/account/session"
     const val DAILY = "/olive/fitness/daily"
     const val ACTIVITY = "/olive/fitness/watch-activity"
+    /**
+     * Computes preferences.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting preferences.
+     */
     fun prefs(context: Context) = context.getSharedPreferences("watch_fitness", Context.MODE_PRIVATE)
     private val accountFields = setOf("step_date", "steps_today", "active_steps", "passive_steps", "heart_rate_date",
         "heart_rate_latest", "heart_rate_peak", "heart_rate_lowest", "heart_rate_total", "heart_rate_samples",
@@ -18,10 +24,23 @@ internal object WatchFitnessData {
         "calorie_goal", "protein_goal", "carbohydrate_goal", "fat_goal", "calories", "protein", "carbohydrates",
         "fat", "fiber", "sugar", "sodium")
 
+    /**
+     * Computes cache.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [SharedPreferences] instance.
+     */
     private fun cache(context: Context, uid: String): SharedPreferences {
         val key = MessageDigest.getInstance("SHA-256").digest(uid.toByteArray()).joinToString("") { "%02x".format(it) }
         return context.getSharedPreferences("watch_account_$key", Context.MODE_PRIVATE)
     }
+    /**
+     * Stores the watch fitness data on shared preferences editor.
+     *
+     * @param key Lookup key or cryptographic key.
+     * @param value Input value to store, parse, or format, or null when not provided.
+     */
     private fun SharedPreferences.Editor.put(key: String, value: Any?) {
         when (value) {
             is String -> putString(key, value); is Int -> putInt(key, value)
@@ -29,12 +48,24 @@ internal object WatchFitnessData {
             is Boolean -> putBoolean(key, value)
         }
     }
+    /**
+     * Saves the watch fitness data.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     private fun save(context: Context) {
         val local = prefs(context)
         val uid = local.getString("active_account_id", null) ?: return
         cache(context, uid).edit(commit = true) { local.all.filterKeys { it in accountFields }.forEach { (key, value) -> put(key, value) } }
     }
 
+    /**
+     * Computes session.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param data Data supplied to [session].
+     * @return `true` if session, or `false` otherwise.
+     */
     @Synchronized fun session(context: Context, data: DataMap): Boolean {
         val local = prefs(context)
         val updated = data.getLong("updatedAt")
@@ -61,6 +92,12 @@ internal object WatchFitnessData {
         return changed
     }
 
+    /**
+     * Computes daily.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param data Data supplied to [daily].
+     */
     @Synchronized fun daily(context: Context, data: DataMap) {
         val local = prefs(context)
         if (!matchesWatchSession(local.getString("active_account_id", null), local.getString("sessionId", null),
@@ -79,10 +116,25 @@ internal object WatchFitnessData {
         save(context)
     }
 
+    /**
+     * Computes accepts.
+     *
+     * @param local Local supplied to [accepts].
+     * @param timestamp Epoch timestamp in milliseconds.
+     * @return The resulting accepts.
+     */
     private fun accepts(local: SharedPreferences, timestamp: Long) = local.contains("active_account_id") &&
         timestamp >= local.getLong("session_started_at", Long.MAX_VALUE) &&
         java.time.Instant.ofEpochMilli(timestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == LocalDate.now()
 
+    /**
+     * Computes steps.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param raw Raw supplied to [steps].
+     * @param timestamp Epoch timestamp in milliseconds.
+     * @param passive Whether to apply passive.
+     */
     @Synchronized fun steps(context: Context, raw: Int, timestamp: Long, passive: Boolean) {
         val local = prefs(context)
         if (!accepts(local, timestamp) || raw < 0) return
@@ -104,6 +156,13 @@ internal object WatchFitnessData {
         save(context)
     }
 
+    /**
+     * Computes heart.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param bpm BPM supplied to [heart].
+     * @param timestamp Epoch timestamp in milliseconds.
+     */
     @Synchronized fun heart(context: Context, bpm: Int, timestamp: Long) {
         val local = prefs(context)
         if (!accepts(local, timestamp) || bpm !in 30..240 || timestamp <= local.getLong("last_heart_at", 0L)) return
@@ -120,6 +179,12 @@ internal object WatchFitnessData {
         save(context)
     }
 
+    /**
+     * Computes snapshot.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [WatchFitnessState] instance.
+     */
     fun snapshot(context: Context): WatchFitnessState {
         val local = prefs(context)
         if (!local.contains("active_account_id")) return WatchFitnessState(heartRateStatus = "Open Olive on your phone")
@@ -146,6 +211,12 @@ internal object WatchFitnessData {
     }
 
     private var lastTileUpdate = 0L
+    /**
+     * Refreshes tiles.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param force Whether to apply force.
+     */
     private fun refreshTiles(context: Context, force: Boolean = false) {
         val now = System.currentTimeMillis()
         if (!force && now - lastTileUpdate < 15_000L) return
@@ -156,6 +227,11 @@ internal object WatchFitnessData {
             updater.requestUpdate(OliveVitalsTileService::class.java)
         }
     }
+    /**
+     * Publishes the watch fitness data.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun publish(context: Context) {
         refreshTiles(context)
         val local = prefs(context)
@@ -172,5 +248,14 @@ internal object WatchFitnessData {
     }
 }
 
+/**
+ * Computes matches watch session.
+ *
+ * @param activeUid Optional active user ID supplied to [matchesWatchSession].
+ * @param activeSession Optional active session supplied to [matchesWatchSession].
+ * @param incomingUid Optional incoming user ID supplied to [matchesWatchSession].
+ * @param incomingSession Optional incoming session supplied to [matchesWatchSession].
+ * @return The resulting matches watch session.
+ */
 internal fun matchesWatchSession(activeUid: String?, activeSession: String?, incomingUid: String?, incomingSession: String?) =
     !activeUid.isNullOrBlank() && !activeSession.isNullOrBlank() && activeUid == incomingUid && activeSession == incomingSession

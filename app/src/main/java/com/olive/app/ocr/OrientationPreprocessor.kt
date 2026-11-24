@@ -29,8 +29,7 @@ import kotlinx.coroutines.sync.withLock
    OrientationPreprocessor: Runs an isolated ultra-lightweight ONNX model (224x224)
    to detect document rotation and automatically stand the byte stream upright.
  */
-class OrientationPreprocessor(context: Context) : AutoCloseable {
-
+private class OnnxOrientationClassifier(context: Context) : AutoCloseable {
     private val ortEnv = OrtEnvironment.getEnvironment()
     private val ortSession: OrtSession
 
@@ -41,8 +40,48 @@ class OrientationPreprocessor(context: Context) : AutoCloseable {
     }
 
     /**
+     * Evaluates the ONNX orientation classifier for a normalized image tensor buffer.
+     *
+     * @param floatBuffer Planar CHW normalized image buffer.
+     * @param inputShape Tensor shape array.
+     * @return Predicted layout orientation class index.
+     */
+    fun classify(floatBuffer: FloatBuffer, inputShape: LongArray): Int =
+        OnnxTensor.createTensor(ortEnv, floatBuffer, inputShape).use { inputTensor ->
+            ortSession.run(mapOf("x" to inputTensor)).use { outputs ->
+                val logits = ((outputs[0] as? OnnxTensor)?.value as? Array<*>)?.firstOrNull() as? FloatArray
+                logits?.indices?.maxByOrNull { logits[it] } ?: 0
+            }
+        }
+
+    /** Closes the underlying ONNX Runtime session. */
+    override fun close() {
+        ortSession.close()
+    }
+}
+
+/*
+   OrientationPreprocessor: Runs an isolated ultra-lightweight ONNX model (224x224)
+   to detect document rotation and automatically stand the byte stream upright.
+ */
+class OrientationPreprocessor private constructor(
+    private val onnxClassifier: OnnxOrientationClassifier?,
+    private val classifyOverride: ((FloatBuffer, LongArray) -> Int)?,
+    private val onClose: () -> Unit,
+) : AutoCloseable {
+    constructor(context: Context) : this(OnnxOrientationClassifier(context), null, {})
+
+    internal constructor(
+        classifyOrientation: (FloatBuffer, LongArray) -> Int,
+        closeSession: () -> Unit = {},
+    ) : this(null, classifyOrientation, closeSession)
+
+    /**
      * Inspects document orientation, rotates pixels if needed,
      * and returns clean, right-side-up image bytes.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [ByteArray] instance.
      */
     fun process(imageBytes: ByteArray): ByteArray {
         var rawBitmap: Bitmap? = null
@@ -76,14 +115,8 @@ class OrientationPreprocessor(context: Context) : AutoCloseable {
 
             // 3. Fire ONNX Runtime inference pass
             val inputShape = longArrayOf(1, 3, 224, 224)
-            val predictedClass =
-                OnnxTensor.createTensor(ortEnv, floatBuffer, inputShape).use { inputTensor ->
-                    ortSession.run(mapOf("x" to inputTensor)).use { outputs ->
-                        @Suppress("UNCHECKED_CAST")
-                        val logits = (outputs[0] as OnnxTensor).value as Array<FloatArray>
-                        logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
-                    }
-                }
+            val predictedClass = classifyOverride?.invoke(floatBuffer, inputShape)
+                ?: checkNotNull(onnxClassifier).classify(floatBuffer, inputShape)
 
 
             // Map layout classes to correction angles needed to stand upright
@@ -139,14 +172,20 @@ class OrientationPreprocessor(context: Context) : AutoCloseable {
         }
     }
 
-    // Closes the active feature for orientation preprocessor.
+    /**
+     * Closes the active feature for orientation preprocessor.
+     */
     override fun close() {
-        ortSession.close()
+        onnxClassifier?.close()
+        onClose()
     }
 
     /**
      * Packs standard 32-bit pixel integers into normalized floating point math streams
      * utilizing planar CHW ordering required by Paddle architecture.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [FloatBuffer] for bitmap to float buffer.
      */
     private fun bitmapToFloatBuffer(bitmap: Bitmap): FloatBuffer {
         val width = bitmap.width
@@ -195,46 +234,57 @@ Class PaddleOcrManager
     Purpose: Delegates directly to the official com.paddle.ocr.PaddleOCR SDK module,
     returning pure raw text output without per-line confidence annotations.
  */
-class PaddleOcrManager(private val context: Context) {
+class PaddleOcrManager @JvmOverloads constructor(
+    private val context: Context,
+    private val initOpenCv: () -> Unit = { check(OpenCVUtils.init()) { "OpenCV initialization failed" } },
+    private val straightenerFactory: (Context) -> OrientationPreprocessor = ::OrientationPreprocessor,
+    private val ocrFactory: suspend (Context) -> PaddleOCR = { ctx ->
+        PaddleOCR.create(
+            context = ctx,
+            config = PaddleOCRConfig(
+                detImgMode = "BGR",
+                detLimitSideLen = 960,
+                detLimitType = "max",
+                detMaxSideLimit = 960,
+                detThresh = 0.3f,
+                detBoxThresh = 0.6f,
+                detUnclipRatio = 1.5f,
+                detMaxCandidates = 3000,
+                detUseDilation = false,
+                detScoreMode = "fast",
+                detBoxType = "quad",
+                recScoreThresh = 0.0f,
+                recBatchSize = 1,
+            ),
+            engineConfig = EngineConfig(
+                numThreads = 4
+            ),
+            detModelAssetPath = "models/det/inference.onnx",
+            recModelAssetPath = "models/rec/inference.onnx",
+            recConfigAssetPath = "models/rec/inference.yml"
+        )
+    },
+) {
 
     private var paddleOcr: PaddleOCR? = null
     private var straightener: OrientationPreprocessor? = null
     private val mutex = Mutex()
     private var released = false
 
-    // Starts the OCR engine once and reuses that initialized instance for later scans.
+    /**
+     * Starts the OCR engine once and reuses that initialized instance for later scans.
+     *
+     * @return The resulting [PaddleOCR] for ensure initialized.
+     */
     private suspend fun ensureInitialized(): PaddleOCR {
         check(!released) { "OCR engine has been released" }
         // Create the OCR engine only once, the first time a document needs it.
         if (paddleOcr == null) {
             // Turn an unexpected ensure initialized failure into a readable message.
             try {
-                OpenCVUtils.init(context.applicationContext)
-                straightener = OrientationPreprocessor(context.applicationContext)
-                paddleOcr = PaddleOCR.create(
-                    context = context,
-                    config = PaddleOCRConfig(
-                        detImgMode = "BGR",
-                        detLimitSideLen = 960,
-                        detLimitType = "max",
-                        detMaxSideLimit = 960,
-                        detThresh = 0.3f,
-                        detBoxThresh = 0.6f,
-                        detUnclipRatio = 1.5f,
-                        detMaxCandidates = 3000,
-                        detUseDilation = false,
-                        detScoreMode = "fast",
-                        detBoxType = "quad",
-                        recScoreThresh = 0.0f,
-                        recBatchSize = 1,
-                    ),
-                    engineConfig = EngineConfig(
-                        numThreads = 4
-                    ),
-                    detModelAssetPath = "models/det/inference.onnx",
-                    recModelAssetPath = "models/rec/inference.onnx",
-                    recConfigAssetPath = "models/rec/inference.yml"
-                )
+                initOpenCv()
+                straightener = straightenerFactory(context.applicationContext)
+                paddleOcr = ocrFactory(context)
             } catch (e: Exception) {
                 runCatching { straightener?.close() }
                 straightener = null
@@ -245,11 +295,21 @@ class PaddleOcrManager(private val context: Context) {
         return paddleOcr!!
     }
 
-    // Paddle ocr manager: Reads text from the selected document image. It prepares the picture before the app reads or saves it.
+    /**
+     * Paddle ocr manager: Reads text from the selected document image. It prepares the picture before the app reads or saves it.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [OcrResult] for recognize document.
+     */
     suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult =
         recognizeDocumentWithPreview(imageBytes).second
 
-    // Paddle ocr manager: Reads text and builds a preview for the selected document image. It prepares the picture before the app reads or saves it.
+    /**
+     * Paddle ocr manager: Reads text and builds a preview for the selected document image. It prepares the picture before the app reads or saves it.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [Pair] for recognize document with preview.
+     */
     suspend fun recognizeDocumentWithPreview(imageBytes: ByteArray): Pair<ByteArray, OcrResult> =
         withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -292,7 +352,9 @@ class PaddleOcrManager(private val context: Context) {
             }
         }
 
-    // Releases the resources used by the feature for paddle ocr manager. It prepares the picture before the app reads or saves it.
+    /**
+     * Releases the resources used by the feature for paddle ocr manager. It prepares the picture before the app reads or saves it.
+     */
     suspend fun release() = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (released) return@withLock

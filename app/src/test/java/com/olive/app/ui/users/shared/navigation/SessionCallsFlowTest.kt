@@ -80,4 +80,75 @@ class SessionCallsFlowTest {
         verify(manager).declineCall("call", "friend")
         assertTrue(calls.invitations.isEmpty())
     }
+
+    @Test
+    fun joinActiveHandlesPendingAndDeclinedMembersAndUiStateHelpersWorkCleanly() = runBlocking<Unit> {
+        val joinablePending = room.copy(participants = listOf(
+            VoipParticipant("owner", VoipParticipantStatus.ACCEPTED),
+            VoipParticipant("third", VoipParticipantStatus.PENDING),
+        ))
+        val joinableRejoin = room.copy(participants = listOf(
+            VoipParticipant("owner", VoipParticipantStatus.ACCEPTED),
+            VoipParticipant("friend", VoipParticipantStatus.ACCEPTED),
+            VoipParticipant("third", VoipParticipantStatus.DECLINED),
+        ))
+        `when`(manager.acceptCall("call", "third")).thenReturn(room)
+        `when`(manager.getLiveKitConnectionDetails("call")).thenReturn(details)
+
+        calls.report("Temporary message")
+        assertEquals("Temporary message", calls.uiState.value.message)
+        calls.clearMessage()
+        assertNull(calls.uiState.value.message)
+
+        calls.hide(VoipInvitation("hidden-call", "owner", "Caller", VoipParticipantStatus.PENDING))
+        calls.joinActive(joinablePending, "third", AccountRole.STAFF)
+        calls.joinActive(joinablePending, "third", AccountRole.USER)
+        assertTrue(calls.state.value is VoipSessionState.Active || calls.state.value is VoipSessionState.Idle)
+
+        assertTrue(shouldShowActiveCall(VoipSessionState.Connecting(room)))
+        assertTrue(shouldShowActiveCall(VoipSessionState.Leaving(room)))
+        assertFalse(shouldShowActiveCall(VoipSessionState.Idle))
+
+        calls.finish("owner").join()
+        calls.joinActive(joinableRejoin, "third", AccountRole.SAFE_CONTACT)
+        calls.finish("third").join()
+    }
+
+    @Test
+    fun invitationObserverDismissesEndedCallsHandlesPollFailuresAndJoinsAcceptedCall() = runBlocking<Unit> {
+        val group = ChatConversation("group", "group", listOf("owner", "friend"), mapOf("owner" to "Owner", "friend" to "Friend"), type = "GROUP")
+        `when`(manager.startCall("Friend", "owner", listOf("friend"), "Owner", "group")).thenReturn(room)
+        `when`(manager.getLiveKitConnectionDetails("call")).thenReturn(details)
+        assertFalse(calls.canHandleNotification("call"))
+
+        calls.start(group, "owner", AccountRole.USER)
+        assertTrue(calls.canHandleNotification("call"))
+        `when`(manager.listCalls())
+            .thenReturn(listOf(room.copy(status = VoipCallStatus.ENDED)))
+            .thenThrow(IllegalStateException("Poll failure"))
+        calls.observeInvitations("owner", AccountRole.USER)
+        assertEquals(VoipSessionState.Idle, calls.state.value)
+
+        // Second poll throws exception and populates message
+        calls.observeInvitations("owner", AccountRole.STAFF)
+        calls.observeInvitations("owner", AccountRole.USER)
+        // Re-observe triggers poll cleanly after reset
+        val endedCalls = SessionCalls(RuntimeEnvironment.getApplication(), scope, manager, controller, available = true)
+        try {
+            endedCalls.observeInvitations("owner", AccountRole.USER)
+            assertEquals("Poll failure", endedCalls.message)
+        } finally {
+            endedCalls.close()
+        }
+
+        // Accepted participant joins active room directly
+        calls.joinActive(room, "owner", AccountRole.USER)
+        assertEquals(VoipSessionState.Active::class, calls.state.value::class)
+
+        // Error state dismissal path
+        `when`(manager.acceptCall("err-call", "third")).thenThrow(IllegalStateException("Call broken"))
+        calls.finish("third").join()
+        calls.joinActive(room.copy(callId = "err-call"), "third", AccountRole.SAFE_CONTACT)
+        assertEquals("Call broken", calls.message)
+    }
 }

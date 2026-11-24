@@ -67,18 +67,36 @@ class FitnessCoverDiaryUiTest {
     }
 
     @Test
+    fun coachTabLocksChatWhenSubscriptionIsUnavailable() {
+        mount()
+        compose.onNodeWithContentDescription(label(R.string.fitness_coach_tab)).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_locked").assertIsDisplayed()
+        compose.onNodeWithText(label(R.string.fitness_coach_sign_in)).assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        compose.onNodeWithText(label(R.string.fitness_coach_apply)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(label(R.string.home)).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_locked").assertDoesNotExist()
+    }
+
+    @Test
     fun manualFoodCanBeLoggedEditedAndRemovedAndWaterChangesPersist() {
         mount()
         compose.onNodeWithContentDescription(label(R.string.nutrition)).performClick()
+        compose.onNodeWithContentDescription(label(R.string.nutrition_water_progress, 0, 2000)).performClick()
         compose.onNodeWithContentDescription(label(R.string.nutrition_water_minus)).assertIsNotEnabled()
-        compose.onNodeWithContentDescription(label(R.string.nutrition_water_plus)).performClick()
+        compose.onNodeWithContentDescription(label(R.string.fitness_diary_add_volume, 250)).performClick()
+        compose.onNodeWithText(label(R.string.save)).performClick()
         compose.onNodeWithContentDescription(label(R.string.nutrition_water_progress, 250, 2000)).assertExists()
+        compose.onNodeWithContentDescription(label(R.string.nutrition_water_progress, 250, 2000)).performClick()
         compose.onNodeWithContentDescription(label(R.string.nutrition_water_minus)).performClick()
+        compose.onNodeWithText(label(R.string.save)).performClick()
         assertEquals(0, fitness.snapshot().waterTodayMl)
-        compose.onNodeWithText(label(R.string.add_food)).performClick()
+        val lunch = hasTestTag("fitness_log_LUNCH")
+        compose.onNodeWithTag("fitness_today").performScrollToNode(lunch)
+        compose.onNode(lunch).performClick()
         compose.onNodeWithTag("nutrition_manual_entry").performClick()
         val proceed = compose.onNodeWithTag("manual_food_continue")
-        proceed.assertIsNotEnabled()
+        proceed.assertIsEnabled().performClick()
         compose.onNodeWithTag("manual_food_name").performTextInput("Synthetic oat bar")
         compose.onNodeWithTag("manual_food_serving").performTextInput("1 bar (40 g)")
         LabelNutrient.entries.filter { it.required }.forEach { nutrient ->
@@ -89,6 +107,7 @@ class FitnessCoverDiaryUiTest {
         compose.onNodeWithText(label(R.string.add_food)).performClick()
         val initial = fitness.snapshot().foodsToday.single()
         assertEquals(140f, initial.food.calories, 0f)
+        assertEquals(com.olive.app.ui.covers.fitness.MealType.LUNCH, initial.meal)
 
         val diary = compose.onNodeWithTag("fitness_today")
         val edit = hasContentDescription(label(R.string.nutrition_edit_food))

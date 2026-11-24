@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_diary_log">سجّل</string>
+    <string name="fitness_diary_log_meal">سجّل في %1$s</string>
+    <string name="fitness_diary_breakfast">الفطور</string>
+    <string name="fitness_diary_lunch">الغداء</string>
+    <string name="fitness_diary_dinner">العشاء</string>
+    <string name="fitness_diary_snacks">وجبات خفيفة</string>
+    <string name="fitness_diary_energy">%1$s سعرة حرارية</string>
+    <string name="fitness_diary_remaining">متبقي %1$s سعرة حرارية</string>
+    <string name="fitness_diary_volume">%1$d مل</string>
+    <string name="fitness_diary_water_total">إجمالي الماء اليوم</string>
+    <string name="fitness_diary_custom_water">كمية مخصصة</string>
+    <string name="fitness_diary_add_volume">أضف %1$d مل من الماء</string>
+    <string name="fitness_diary_food_removed">تمت إزالة الطعام</string>
+    <string name="fitness_diary_undo">تراجع</string>
+</resources>

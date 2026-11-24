@@ -22,6 +22,7 @@ internal class SessionRuntimeFixture(
     role: AccountRole = AccountRole.USER,
     val documents: SafetyDocumentDataSource? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+    localMode: Boolean = false,
     accountKeysetsOverride: com.olive.app.data.account.AccountKeysetRepository? = null,
     opaqueRecoveryOverride: com.olive.app.data.account.OpaqueRecoveryRepository? = null,
 ) : AutoCloseable {
@@ -47,7 +48,7 @@ internal class SessionRuntimeFixture(
         runtime = SessionRuntime(application, scope, SessionDataSources(
             accounts, admin, messaging, secureChat, secureDocuments, null, documents, null, null,
             accountKeysetsOverride, opaqueRecoveryOverride,
-        ), localMode = false, prioritySyncOverride = PrioritySyncCoordinator(application, null))
+        ), localMode = localMode, prioritySyncOverride = PrioritySyncCoordinator(application, null))
         runtime.enrollment = DeviceEnrollment("owner", "", role)
         runtime.state.accountRole = role
         runtime.state.coverUsername = "fixture_owner"

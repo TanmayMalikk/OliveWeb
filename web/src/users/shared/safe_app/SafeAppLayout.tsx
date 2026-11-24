@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from 
 import {
   History as HistoryIcon,
   ArrowLeft,
+  BookOpen,
   Menu,
   X,
   FileLock2,
@@ -20,6 +21,7 @@ import {
   PhoneCall,
 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
+import { extendIdleTimeoutOptions } from "../../../session/useSessionSecurity";
 import { Button, Modal } from "../../../components/SharedComponents";
 import type { Page } from "../../../domain/DomainModels";
 import { accounts } from "../../../services/AccountService";
@@ -31,6 +33,12 @@ import Profile from "./AccountProfilePage";
 import SettingsPage from "./AccountSettingsPage";
 import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
+import WalkthroughPage from "./WalkthroughPage";
+import { WalkthroughActionContext, WalkthroughCoachmark } from "./WalkthroughCoachmark";
+import {
+  firstWalkthroughStepForTopic,
+  walkthroughTourStepsForRole,
+} from "./WalkthroughCatalog";
 import {
   DocumentsPage,
   LocationPage,
@@ -58,6 +66,7 @@ const navigation: { label: string; items: NavItem[] }[] = [
   { label: "Account", items: [
     { page: "Profile", label: "My profile", icon: UserRound },
     { page: "Activity", label: "Account activity", icon: HistoryIcon },
+    { page: "Walkthrough", label: "Walkthrough", icon: BookOpen },
     { page: "Settings", label: "Settings", icon: Settings },
   ] },
 ];
@@ -79,6 +88,7 @@ const pages: Record<Page, ComponentType> = {
   Home, Notes, Contacts, Profile, Settings: SettingsPage, Activity,
   SafetyPlan, Documents: DocumentsPage, Location: LocationPage,
   Hotlines: HotlinesPage, StaffHelp: StaffHelpPage, Messages,
+  Walkthrough: WalkthroughPage,
 };
 
 export default function SafeApp() {
@@ -89,6 +99,7 @@ export default function SafeApp() {
   const heading = useRef<HTMLHeadingElement>(null);
   const previousPage = useRef(s.page);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTourStepId, setActiveTourStepId] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState(0);
   const [dismissedAt, setDismissedAt] = useState(0);
   useEffect(() => {
@@ -117,14 +128,53 @@ export default function SafeApp() {
   const title = s.page === "Home"
     ? isSafeContact ? "Safe contact space" : "Your Safe Space"
     : groups.flatMap(({ items }) => items).find(({ page }) => page === s.page)?.label;
-  const navigate = (page: Page) => {
+  const navigate = (page: Page, clearTour = true) => {
     setMenuOpen(false);
     s.clearMessage();
+    if (clearTour) setActiveTourStepId(null);
     if (s.page === page) heading.current?.focus();
     s.setPage(page);
   };
+  const startTour = (targetId: string) => {
+    const steps = walkthroughTourStepsForRole(p.role);
+    const step = steps.find((item) => item.id === targetId) ?? firstWalkthroughStepForTopic(p.role, targetId);
+    if (!step) return;
+    setActiveTourStepId(step.id);
+    if (s.page !== step.tourPage) navigate(step.tourPage, false);
+  };
+  useEffect(() => {
+    if (!uid) return;
+    const key = `olive-walkthrough-seen:${uid}`;
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(key) === "1";
+      if (!seen) window.localStorage.setItem(key, "1");
+    } catch {
+      seen = true;
+    }
+    if (!seen) {
+      const firstStep = walkthroughTourStepsForRole(p.role)[0];
+      if (firstStep) {
+        setActiveTourStepId(firstStep.id);
+        if (s.page !== firstStep.tourPage) navigate(firstStep.tourPage, false);
+      }
+    }
+  }, [uid]);
+  const activeTourStep = activeTourStepId
+    ? walkthroughTourStepsForRole(p.role).find((step) => step.id === activeTourStepId)
+    : undefined;
+  const triggerQuickExit = () => {
+    setActiveTourStepId(null);
+    s.quickExit();
+  };
 
   return (
+    <WalkthroughActionContext.Provider
+      value={{
+        stepId: activeTourStep?.id ?? null,
+        action: activeTourStep?.action ?? null,
+      }}
+    >
     <div className="safe-shell private-shell">
       <aside className="safe-sidebar" data-menu-open={menuOpen}>
         <button className="safe-brand" type="button" onClick={() => navigate("Home")}>
@@ -185,23 +235,60 @@ export default function SafeApp() {
             </div>
           )}
           <Suspense fallback={<p role="status">Opening {title?.toLowerCase()}…</p>}>
-            <CurrentPage />
+            {s.page === "Walkthrough" ? <WalkthroughPage onStartTour={startTour} /> : <CurrentPage />}
           </Suspense>
         </main>
         <footer className="safe-footer">
-          <button className="text-link" onClick={() => void s.perform(s.signOut)}>Sign out</button>
+          <button className="text-link" onClick={() => { setActiveTourStepId(null); void s.perform(s.signOut); }}>Sign out</button>
         </footer>
       </div>
       {p.role === "USER" && (
-        <Button variant="exit floating-quick-exit" onClick={s.quickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>
+        <Button variant="exit floating-quick-exit" onClick={triggerQuickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>
+      )}
+      {s.idleSeconds === null && (
+        <WalkthroughCoachmark
+          role={p.role}
+          activeStepId={activeTourStepId}
+          onAdvance={(nextId) => {
+            if (!nextId) navigate("Home");
+            else startTour(nextId);
+          }}
+          onOpenContents={() => {
+            setActiveTourStepId(null);
+            navigate("Walkthrough");
+          }}
+          onSkip={() => setActiveTourStepId(null)}
+        />
       )}
       {s.idleSeconds !== null && (
         <Modal title="Your Safe Space is about to lock" onClose={s.noteInteraction}>
-          <p>Little Grove will reopen in {s.idleSeconds} seconds.</p>
-          <Button onClick={s.noteInteraction}>Stay here</Button>
-          {p.role === "USER" && <Button variant="quiet" onClick={s.quickExit}>Quick Exit</Button>}
+          <div data-idle-modal="true" style={{ display: "grid", gap: "0.75rem" }}>
+            <p style={{ margin: 0 }}>Little Grove will reopen in {s.idleSeconds} seconds.</p>
+            {p.role === "USER" && extendIdleTimeoutOptions(s.idleTimeoutSeconds).length > 0 && (
+              <div style={{ display: "grid", gap: "0.4rem" }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 600 }}>Extend idle timeout</span>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  {extendIdleTimeoutOptions(s.idleTimeoutSeconds).map((seconds) => (
+                    <Button
+                      key={seconds}
+                      variant="outline"
+                      data-testid={`idle-extend-${seconds}`}
+                      onClick={() => void s.perform(() => s.setIdleTimeoutSeconds(seconds))}
+                    >
+                      {seconds === 450 ? "7 min 30 sec" : `${seconds / 60} min`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <Button onClick={s.noteInteraction}>Stay here</Button>
+              {p.role === "USER" && <Button variant="quiet" onClick={triggerQuickExit}>Quick Exit</Button>}
+            </div>
+          </div>
         </Modal>
       )}
     </div>
+    </WalkthroughActionContext.Provider>
   );
 }

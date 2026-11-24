@@ -39,23 +39,6 @@ it("serves one install identity on supported aliases and rejects unknown covers"
   expect(await (await get("/api/health")).json()).toEqual({ ok: true });
 });
 
-it("rejects impossible map coordinates before reaching Geoapify and proxies valid tiles", async () => {
-  for (const path of ["/api/map-tiles/1/2/0.png", "/api/map-tiles/2/-1/0.png", "/api/map-tiles/no/0/0.png"]) {
-    expect((await get(path)).status).toBe(400);
-  }
-  expect(upstream).not.toHaveBeenCalled();
-  const bytes = Uint8Array.of(137, 80, 78, 71);
-  upstream.mockResolvedValueOnce(new Response(bytes, { headers: { "content-type": "image/png" } }));
-  const tile = await get("/api/map-tiles/1/0/1.png");
-  expect(tile.headers.get("cache-control")).toBe("public, max-age=86400");
-  expect(tile.headers.get("content-type")).toBe("image/png");
-  expect(new Uint8Array(await tile.arrayBuffer())).toEqual(bytes);
-  const [target] = upstream.mock.calls[0];
-  expect(target.href).toBe("https://maps.geoapify.com/v1/tile/osm-bright/1/0/1.png?apiKey=test-map-key");
-  upstream.mockResolvedValueOnce(new Response(null, { status: 503 }));
-  expect((await get("/api/map-tiles/1/0/1.png")).status).toBe(502);
-});
-
 it("normalizes address suggestions, drops invalid results and reverse geocodes a pin", async () => {
   expect((await get("/api/locations?q=x")).status).toBe(400);
   expect(upstream).not.toHaveBeenCalled();
@@ -82,9 +65,8 @@ it("normalizes address suggestions, drops invalid results and reverse geocodes a
   expect((await get("/api/locations?q=Edmonton")).status).toBe(502);
 });
 
-it("returns service unavailable for maps without a key and never makes an upstream request", async () => {
+it("returns service unavailable for address search without a key", async () => {
   vi.stubEnv("GEOAPIFY_API_KEY", "");
-  expect((await get("/api/map-tiles/0/0/0.png")).status).toBe(503);
   expect((await get("/api/locations?q=Edmonton")).status).toBe(503);
   expect(upstream).not.toHaveBeenCalled();
 });

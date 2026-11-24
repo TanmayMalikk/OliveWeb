@@ -41,4 +41,18 @@
     <string name="location_sharing_until">共享至 %1$s</string>
     <string name="location_ten_seconds_testing">10 秒（测试）</string>
     <string name="location_notification_sharing_text">您的实时位置共享正在进行。</string>
+    <string name="location_gps_destination_title">自由 GPS 目的地</string>
+    <string name="location_gps_destination_hint">地址或坐标（纬度, 经度）</string>
+    <string name="location_gps_start_route">开始导航</string>
+    <string name="location_gps_clear_destination">清除目的地</string>
+    <string name="location_gps_coordinates_label">坐标：%1$s</string>
+    <string name="location_gps_coordinates_hint">直接导航至此坐标</string>
+    <string name="location_gps_no_match">未找到该地址或坐标。请输入纬度、经度或选择一个建议。</string>
+    <string name="location_gps_searching">正在搜索地址…</string>
+    <string name="location_route_driving">驾车</string>
+    <string name="location_route_walking">步行</string>
+    <string name="location_compass_north_up">正北朝上</string>
+    <string name="location_compass_heading_up">随行进方向旋转</string>
+    <string name="location_compass_toggle_north_desc">地图已锁定正北朝上。点击可随步行方向旋转。</string>
+    <string name="location_compass_toggle_heading_desc">地图随步行方向旋转。点击可锁定正北朝上。</string>
 </resources>

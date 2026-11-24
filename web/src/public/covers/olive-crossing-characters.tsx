@@ -111,41 +111,13 @@ export function getOliveCharacter(id: string): OliveCharacter {
 export function VoxelOlive({
   character,
   facing = "up",
-  crashed = false,
-  splashed = false,
 }: {
   character: OliveCharacter;
   facing?: CrossingDirection;
-  crashed?: boolean;
-  splashed?: boolean;
 }) {
   const eyeShiftX = facing === "left" ? -3 : facing === "right" ? 3 : 0;
   const eyeShiftY = facing === "up" ? -1.5 : facing === "down" ? 2 : 0.5;
   const sideFlip = facing === "left" ? -1 : 1;
-
-  if (splashed) {
-    return (
-      <g className="crossing-splash">
-        <ellipse rx="20" ry="11" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.85" />
-        <ellipse rx="13" ry="7" fill="none" stroke="#c8ecfa" strokeWidth="2" />
-        <rect x="-9" y="-4" width="18" height="8" rx="3" fill={character.bodyTop} opacity="0.85" />
-        <circle cx="-11" cy="-9" r="2.5" fill="#eaf8ff" />
-        <circle cx="12" cy="-11" r="2.2" fill="#eaf8ff" />
-        <circle cx="4" cy="-14" r="1.8" fill="#ffffff" />
-      </g>
-    );
-  }
-
-  if (crashed) {
-    return (
-      <g>
-        <ellipse rx="21" ry="11" fill={character.bodyFront} stroke={character.stroke} strokeWidth="2" />
-        <ellipse cx="0" cy="-1" rx="14" ry="7" fill={character.bodyTop} />
-        <ellipse cx="3" cy="-2" rx="5" ry="3" fill={character.crestFill} />
-        <path d="M-8-3L-4 1M-4-3L-8 1M4-3L8 1M8-3L4 1" stroke="#fffef2" strokeWidth="1.8" strokeLinecap="round" />
-      </g>
-    );
-  }
 
   return (
     <g>

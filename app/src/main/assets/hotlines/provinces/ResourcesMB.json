@@ -18,7 +18,7 @@
         "Desc": "24/7 specialized support line for survivors of sexual assault and domestic violence.",
         "Phone": "1-888-292-7565",
         "hours": "24/7",
-        "url": "https://wcwrc.ca/"
+        "url": "https://klinic.mb.ca/"
       }
     },
     "Shelters": {
@@ -34,12 +34,52 @@
         "hours": "24/7",
         "url": "https://willowplaceshelter.ca/"
       }
+    },
+    "LegalAid": {
+      "Legal Aid Manitoba (Winnipeg Application Centre)": {
+        "Desc": "Legal representation and family law assistance for eligible Manitoba residents.",
+        "Phone": "204-985-8511",
+        "hours": "Mon-Thu 9:00 AM - 4:00 PM; Fri 9:00 AM - 12:30 PM CT",
+        "address": "4th Floor, 287 Broadway, Winnipeg, MB R3C 0R9",
+        "lat": 49.8886,
+        "lng": -97.1394,
+        "url": "https://www.legalaid.mb.ca/"
+      }
+    },
+    "Counseling": {
+      "Klinic Community Health Drop-In Counselling": {
+        "Desc": "Free drop-in counselling, trauma support, and health clinic services in Winnipeg.",
+        "Phone": "204-784-4090",
+        "hours": "Mon-Thu 9:00 AM - 8:00 PM; Fri 9:00 AM - 4:00 PM; Sat 10:00 AM - 4:00 PM CT",
+        "address": "167 Sherbrook St, Winnipeg, MB R3C 2B7",
+        "lat": 49.8861,
+        "lng": -97.1604,
+        "url": "https://klinic.mb.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Shared Health Adult Crisis Response Centre": {
+        "Desc": "24/7 walk-in mental health crisis centre and mobile crisis response for adults.",
+        "Phone": "204-940-1781",
+        "hours": "24/7",
+        "address": "817 Bannatyne Ave, Winnipeg, MB R3E 0Y1",
+        "lat": 49.9032,
+        "lng": -97.1578,
+        "url": "https://sharedhealthmb.ca/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
+      }
     }
   },
   "Brandon": {
     "Hotlines": {
       "Westman Region Crisis Line": {
-        "Desc": "24/7 crisis line and safety planning for women and families in Westman region.",
+        "Desc": "24/7 crisis line and safety planning for women and families in the Westman region.",
         "Phone": "1-877-977-0007",
         "Text": "204-400-4007",
         "hours": "24/7",
@@ -47,12 +87,39 @@
       }
     },
     "Shelters": {
-      "YMCA Brandon Westman Women's Shelter": {
+      "YWCA Brandon Westman Women's Shelter": {
         "Desc": "24/7 emergency shelter, crisis line, and safety planning for women and children.",
         "Phone": "1-877-977-0007",
         "Text": "204-400-4007",
         "hours": "24/7",
         "url": "https://www.ywcabrandon.ca/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Manitoba (Brandon Office)": {
+        "Desc": "Toll-free legal aid application line and regional family law office.",
+        "Phone": "1-866-800-8056",
+        "hours": "Mon-Thu 9:00 AM - 4:00 PM; Fri 9:00 AM - 12:30 PM CT",
+        "url": "https://www.legalaid.mb.ca/"
+      }
+    },
+    "Counseling": {
+      "YWCA Brandon Women's Resource Outreach": {
+        "Desc": "Support groups, safety planning, and community referrals for women and families.",
+        "Phone": "204-571-3680",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM CT",
+        "address": "148 11th St, Brandon, MB R7A 4J4",
+        "lat": 49.8453,
+        "lng": -99.9542,
+        "url": "https://www.ywcabrandon.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Westman Mobile Crisis Services": {
+        "Desc": "24/7 mental health and emergency family crisis response across Western Manitoba.",
+        "Phone": "1-888-379-7699",
+        "hours": "24/7",
+        "url": "https://www.prairiemountainhealth.ca/"
       }
     }
   }

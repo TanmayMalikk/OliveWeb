@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { accountKeysetSession, firebase } from "./AccountService";
 import { database } from "./LocalDataStore";
+import { authorizeMessagingPeer } from "./FriendInviteService";
 import { accountKeysetWrappers } from "./AccountKeysetCrypto";
 import type { Identity } from "../domain/DomainModels";
 export interface DirectoryUser {
@@ -208,14 +209,6 @@ export async function unwrapRoomKeyBytes(uid: string, value: string) {
     base64ToBytes(value),
   ));
 }
-// Turns the opened room-key bytes into the AES key used to read and send chat messages.
-export async function unwrapRoomKey(uid: string, value: string) {
-  const raw = await unwrapRoomKeyBytes(uid, value);
-  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
-    "encrypt",
-    "decrypt",
-  ]);
-}
 // Registers this account and browser for secure chat. It saves only the public key in Firebase.
 export async function register(identity: Identity) {
   const { db } = await firebase();
@@ -253,6 +246,7 @@ export async function searchUser(
 ): Promise<DirectoryUser | null> {
   if (!/^[a-z0-9_]{4,24}$/.test(username.trim().toLowerCase()))
     throw new Error("Enter the exact 4–24 character username.");
+  await authorizeMessagingPeer(username);
   const { db } = await firebase();
   const row = await getDoc(
     doc(db, "messageDirectory", username.trim().toLowerCase()),
@@ -522,6 +516,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   const directory = await Promise.all(conversationData.participantIds.map(async (uid) => {
     const username = conversationData.participantUsernames[uid];
     if (!username) return [uid, ""] as const;
+    await authorizeMessagingPeer(username);
     const row = await getDoc(doc(db, "messageDirectory", username.toLowerCase()));
     return [uid, row.get("uid") === uid ? String(row.data()?.publicKey ?? "") : ""] as const;
   }));
@@ -590,6 +585,7 @@ async function shareRoomKeyWithParticipants(id: string, conversation: Conversati
   for (const uid of conversation.participantIds) {
     const username = conversation.participantUsernames[uid]?.trim().toLowerCase();
     if (!username) continue;
+    await authorizeMessagingPeer(username);
     const devices = await getDocs(collection(db, "messageDirectory", username, "devices"));
     let batch = writeBatch(db);
     let count = 0;

@@ -1,6 +1,7 @@
 // Fitness cover users with a connected watch: shows today's heart-rate summary.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveCard as Card
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,7 +61,35 @@ import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-// Shows daily heart-rate ranges, averages, and watch status.
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.runtime.*
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
+import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.work.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.ZoneId
+import java.util.concurrent.TimeUnit
+
+/**
+ * Shows daily heart-rate ranges, averages, and watch status.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -139,7 +167,13 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     }
 }
 
-// Draws up to 14 days of heart-rate ranges and the selected-day summary.
+/**
+ * Draws up to 14 days of heart-rate ranges and the selected-day summary.
+ *
+ * @param history Collection of history values to process.
+ * @param selectedDate Selected date supplied to [HeartRateGraphCard].
+ * @param onDateSelected Callback invoked when date selected changes or occurs.
+ */
 @Composable
 private fun HeartRateGraphCard(
     history: List<HeartRateVitals>,
@@ -376,7 +410,12 @@ private fun HeartRateGraphCard(
     }
 }
 
-// Explains whether recent Wear OS heart-rate data is available.
+/**
+ * Explains whether recent Wear OS heart-rate data is available.
+ *
+ * @param vitals Vitals supplied to [WatchStatusCard].
+ * @param watchConnected Whether to apply watch connected.
+ */
 @Composable
 private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
@@ -444,7 +483,11 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     }
 }
 
-// Shows peak, lowest, resting, and average heart rate for the selected day.
+/**
+ * Shows peak, lowest, resting, and average heart rate for the selected day.
+ *
+ * @param vitals Vitals supplied to [VitalsGrid].
+ */
 @Composable
 private fun VitalsGrid(vitals: HeartRateVitals) {
     val bpm = stringResource(R.string.fitness_bpm)
@@ -480,7 +523,14 @@ private fun VitalsGrid(vitals: HeartRateVitals) {
     }
 }
 
-// Draws one heart-rate value with its label and unit.
+/**
+ * Draws one heart-rate value with its label and unit.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param unit Unit supplied to [VitalsMetricCard].
+ */
 @Composable
 private fun VitalsMetricCard(
     modifier: Modifier,
@@ -512,7 +562,11 @@ private fun VitalsMetricCard(
     }
 }
 
-// Shows setup help when no Wear OS data has been received.
+/**
+ * Shows setup help when no Wear OS data has been received.
+ *
+ * @param message Chat message or remote payload.
+ */
 @Composable
 private fun WatchMessageCard(message: String) {
     Card(
@@ -525,5 +579,170 @@ private fun WatchMessageCard(message: String) {
             modifier = Modifier.padding(20.dp),
             color = Ink,
         )
+    }
+}
+
+internal object FitnessHealthConnect {
+    private val readLock = Mutex()
+    val permissions = setOf(HealthPermission.getReadPermission(StepsRecord::class),
+        HealthPermission.getReadPermission(HeartRateRecord::class))
+
+    /**
+     * Checks whether Health Connect is available on the device.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting available.
+     */
+    fun available(context: Context) = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
+
+    /**
+     * Computes permissions for.
+     *
+     * @param client Client supplied to [permissionsFor].
+     * @return List of resulting permissions for items.
+     */
+    fun permissionsFor(client: HealthConnectClient): Set<String> =
+        if (client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) {
+            permissions + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        } else permissions
+
+    /**
+     * Schedules the fitness health connect.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [schedule].
+     */
+    fun schedule(context: Context, owner: String) {
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork("fitness-health-${fitnessAccountKey(owner)}",
+            ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<FitnessHealthWorker>(15, TimeUnit.MINUTES)
+                .setInputData(workDataOf("uid" to owner)).build())
+    }
+
+    /**
+     * Reads the fitness health connect.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param owner Owner supplied to [read].
+     * @param background Whether to apply background.
+     * @param authenticatedUid Function used to transform or provide authenticated user ID.
+     * @param healthProvider Function used to transform or provide health provider.
+     * @return The resulting read.
+     */
+    suspend fun read(
+        context: Context,
+        owner: String,
+        background: Boolean = false,
+        authenticatedUid: () -> String? = ::fitnessAuthenticatedUid,
+        healthProvider: () -> HealthConnectClient? = {
+            if (available(context)) HealthConnectClient.getOrCreate(context) else null
+        },
+    ) = readLock.withLock { withContext(Dispatchers.IO) {
+        if (!FitnessAccountSync.ready.value || authenticatedUid() != owner) return@withContext
+        val client = healthProvider() ?: return@withContext
+        val granted = client.permissionController.getGrantedPermissions()
+        if (background && HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND !in granted) return@withContext
+        if (permissions.none { it in granted }) return@withContext
+        val session = context.getSharedPreferences(FitnessWatchSync.SYNC_PREFERENCES, Context.MODE_PRIVATE)
+        val startedAt = session.getLong("accountStartedAt", System.currentTimeMillis())
+        val token = session.getString("sessionId", null)
+        val today = LocalDate.now()
+        val local = fitnessPreferences(context, owner)
+        val dayStart = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val windowKey = "_hc_window_${today}_$startedAt"
+        val baseKey = "_hc_base_${today}_$startedAt"
+        if (!local.contains(baseKey)) local.edit(commit = true) {
+            putLong(windowKey, System.currentTimeMillis())
+            putInt(baseKey, FitnessStore(context, owner).snapshot().stepsToday)
+        }
+        val start = maxOf(dayStart, startedAt, local.getLong(windowKey, startedAt))
+        if (start >= System.currentTimeMillis()) return@withContext
+        val time = TimeRangeFilter.between(Instant.ofEpochMilli(start), Instant.now())
+        val steps = if (HealthPermission.getReadPermission(StepsRecord::class) in granted) {
+            val result = client.aggregate(AggregateRequest(metrics = setOf(StepsRecord.COUNT_TOTAL), timeRangeFilter = time))
+            ((result[StepsRecord.COUNT_TOTAL] ?: 0L) + local.getInt(baseKey, 0)).coerceIn(0, 500_000).toInt()
+        } else 0
+        val samples = mutableListOf<HeartRateSample>()
+        if (HealthPermission.getReadPermission(HeartRateRecord::class) in granted) {
+            var page: String? = null
+            val lastRead = local.getLong("_hc_read_$today", start)
+            do {
+                val result = client.readRecords(ReadRecordsRequest(HeartRateRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(Instant.ofEpochMilli(maxOf(start, lastRead)), Instant.now()),
+                    pageToken = page))
+                result.records.forEach { record -> record.samples.forEach { sample ->
+                    if (sample.time.toEpochMilli() > lastRead && sample.beatsPerMinute in 30..240)
+                        samples += HeartRateSample(sample.time.toEpochMilli(), sample.beatsPerMinute.toInt())
+                } }
+                page = result.pageToken?.takeIf(String::isNotBlank)
+            } while (page != null)
+        }
+        // Reads begun in an old login session cannot be applied to a new session, including A -> B -> A.
+        if (authenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
+        FitnessStore(context, owner).recordHealthConnect(steps, samples, today)
+        samples.maxOfOrNull { it.recordedAt }?.let { last -> local.edit { putLong("_hc_read_$today", last) } }
+    } }
+}
+
+internal class FitnessHealthWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
+    override suspend fun doWork(): Result {
+        val owner = inputData.getString("uid") ?: return Result.failure()
+        if (fitnessAuthenticatedUid() != owner) return Result.success()
+        return try { FitnessHealthConnect.read(applicationContext, owner, background = true); Result.success() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: SecurityException) { Result.success() }
+        catch (_: Exception) { Result.retry() }
+    }
+}
+
+/**
+ * Composes the fitness health connection UI element.
+ *
+ * @param accountId Account ID supplied to [FitnessHealthConnection].
+ * @param enabled Whether this feature or control is currently enabled.
+ */
+@Composable
+internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var checked by androidx.compose.runtime.saveable.rememberSaveable(accountId) { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
+        FitnessHealthConnect.schedule(context, accountId)
+    }
+    LaunchedEffect(accountId, enabled, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            // Check once per cover visit, before launching: dismissal or permission-screen return must not loop.
+            if (checked || !enabled || accountId == "guest" ||
+                fitnessAuthenticatedUid() != accountId || !FitnessHealthConnect.available(context)) return@repeatOnLifecycle
+            try {
+                val client = HealthConnectClient.getOrCreate(context)
+                val wanted = FitnessHealthConnect.permissionsFor(client)
+                val missing = wanted - client.permissionController.getGrantedPermissions()
+                checked = true
+                if (missing.isNotEmpty()) launcher.launch(missing)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+              catch (_: Exception) { /* An unavailable provider must not prevent the cover from opening. */ }
+        }
+    }
+}
+
+internal class FitnessHealthPrivacyActivity : androidx.activity.ComponentActivity() {
+    /**
+     * Initializes the component and sets up its state or UI when created by Android.
+     *
+     * @param savedInstanceState Previously saved instance state bundle, or null on a fresh creation.
+     */
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(android.widget.TextView(this).apply {
+            text = getString(R.string.fitness_health_privacy)
+            textSize = 18f
+            setPadding(32, 48, 32, 32)
+        })
     }
 }

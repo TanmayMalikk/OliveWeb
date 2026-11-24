@@ -133,6 +133,12 @@ function isTemporaryEmail(email) {
   return /@(users|safe|staff|admin)\.olive\.invalid$/i.test(email || "");
 }
 
+// Validates a real email address accepted for contact and notifications.
+function validEmail(value) {
+  const email = text(value, 254).toLowerCase();
+  return email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !isTemporaryEmail(email);
+}
+
 // Checks the required profile fields for the selected account role.
 function profileComplete(role, profile) {
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
@@ -183,7 +189,14 @@ function defaultProfile(username, role, input, email) {
         ? isTemporaryEmail(email)
           ? ""
           : email
-        : "",
+        : validEmail(input.email)
+          ? text(input.email, 254).toLowerCase()
+          : "",
+    emailCommunicationConsent: Boolean(
+      (role === "USER" || role === "SAFE_CONTACT") &&
+        input.emailCommunicationConsent === true &&
+        validEmail(input.email),
+    ),
     phone: text(input.phone, 40),
   };
 }
@@ -198,6 +211,7 @@ module.exports = {
   organizationEmailKey,
   roleFromUser,
   isTemporaryEmail,
+  validEmail,
   profileComplete,
   defaultProfile,
   protectedAccount,

@@ -2,7 +2,9 @@
 package com.olive.app.ui.covers.news
 
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.NewsArticleMetadata
 import com.olive.app.data.news.fallbackNewsTopic
+import com.olive.app.data.news.isSecureNewsUrl
 import com.olive.app.data.news.parseNewsArticleMetadata
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -173,5 +175,53 @@ class NewsArticleMetadataTest {
         assertEquals("Politics", fallbackNewsTopic("Message ahead of separation referendum"))
         assertEquals("Sports", fallbackNewsTopic("Hockey championship begins"))
         assertEquals("World", fallbackNewsTopic("Latest developments", "World"))
+    }
+
+    @Test
+    fun metadataAppliesMissingFieldsWithoutOverwritingFeedDetailsAndRejectsUnsafeUrls() {
+        val metadata = NewsArticleMetadata(
+            publisherUrl = "https://publisher.example/final",
+            imageUrl = "https://publisher.example/cover.jpg",
+            topic = "Science",
+            isPaywalled = false,
+            description = "Detailed summary",
+        )
+        assertEquals(metadata, NewsArticleMetadata.fromJson(metadata.toJson()))
+        val feedArticle = NewsArticle(
+            title = "Headline",
+            summary = "",
+            link = "https://news.google.com/rss/articles/1",
+            source = "Publisher",
+            published = "Today",
+        )
+        val enriched = metadata.applyTo(feedArticle)
+        assertEquals("https://publisher.example/final", enriched.publisherUrl)
+        assertEquals("https://publisher.example/cover.jpg", enriched.imageUrl)
+        assertEquals("Science", enriched.topic)
+        assertEquals(false, enriched.isPaywalled)
+        assertEquals("Detailed summary", enriched.summary)
+
+        val existing = enriched.apply { }
+        val preserved = NewsArticleMetadata().applyTo(existing)
+        assertEquals(existing, preserved)
+
+        assertTrue(isSecureNewsUrl("https://publisher.example/story"))
+        assertFalse(isSecureNewsUrl("http://publisher.example/story"))
+        assertFalse(isSecureNewsUrl("https://user@publisher.example/story"))
+        assertFalse(isSecureNewsUrl("not a url"))
+    }
+
+    @Test
+    fun extractsActualWordCountFromArticleMarkup() {
+        val words = (1..600).joinToString(" ") { "word$it" }
+        val html = """
+            <html><body>
+                <article>
+                    <p>$words</p>
+                </article>
+            </body></html>
+        """.trimIndent()
+        val result = parseNewsArticleMetadata(html, url)
+        assertEquals(600, result.wordCount)
     }
 }

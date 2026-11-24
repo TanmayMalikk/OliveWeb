@@ -12,6 +12,7 @@ import com.google.firebase.storage.StorageReference
 import com.olive.app.data.media.*
 import com.olive.app.data.safety.*
 import com.olive.app.security.EncryptionUtils
+import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -29,8 +30,32 @@ class SafetyDocumentRepositorySdkTest {
     private val firestore = mock(FirebaseFirestore::class.java)
     private val storage = mock(FirebaseStorage::class.java)
     private val media = mock(MediaTicketDataSource::class.java)
-    private val repository = SafetyDocumentRepository(firestore, storage, media)
+    private val repository = SafetyDocumentRepository(firestore, storage, media) { }
     private val key = EncryptionUtils.generateSymmetricKey()
+
+    @Test
+    fun serverDocumentListUsesAuthoritativeMembershipAndReturnsNewestFirst() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val files = mock(CollectionReference::class.java)
+            val query = mock(Query::class.java)
+            val result = mock(QuerySnapshot::class.java)
+            `when`(firestore.collection("files")).thenReturn(files)
+            `when`(files.whereArrayContains("allowed_users", "owner")).thenReturn(query)
+            val base = mapOf("owner_id" to "owner", "file_type" to "text/plain", "allowed_users" to listOf("owner"))
+            val older = row("earlier", base + ("file_name" to "Earlier fixture"))
+            val newer = row("latest", base + ("file_name" to "Latest fixture"))
+            val invalid = row("invalid", emptyMap())
+            `when`(older.getTimestamp("created_at")).thenReturn(com.google.firebase.Timestamp(java.util.Date(1L)))
+            `when`(newer.getTimestamp("created_at")).thenReturn(com.google.firebase.Timestamp(java.util.Date(2L)))
+            `when`(result.documents).thenReturn(listOf(older, invalid, newer))
+            `when`(query.get(Source.SERVER)).thenReturn(Tasks.forResult(result))
+            val snapshot = repository.listFor("owner")
+            assertEquals(DocumentListSource.SERVER, snapshot.source)
+            assertEquals(listOf("latest", "earlier"), snapshot.documents.map(SafetyDocument::id))
+            assertNotNull(snapshot.lastSyncedAt)
+            verify(query).get(Source.SERVER)
+        }
+    }
 
     @Test
     fun recoveredMetadataAndEvidenceAreReadFromAnAuthorizedServerDocument() = withDeviceKey {
@@ -124,7 +149,7 @@ class SafetyDocumentRepositorySdkTest {
     }
 
     @Test
-    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = withDeviceKey {
+    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = TestAndroidKeyStore.install().use {
         val files = mock(CollectionReference::class.java)
         val query = mock(Query::class.java)
         val registration = mock(ListenerRegistration::class.java)
@@ -141,10 +166,16 @@ class SafetyDocumentRepositorySdkTest {
         `when`(snapshot.metadata).thenReturn(metadata)
         `when`(metadata.isFromCache).thenReturn(true)
         val legacy = row("legacy", mapOf("owner_id" to "owner", "file_name" to "Legacy.txt", "file_type" to "text/plain", "allowed_users" to listOf("owner")))
-        `when`(snapshot.documents).thenReturn(listOf(legacy))
+        val encrypted = row("encrypted", encryptedFields())
+        `when`(snapshot.documents).thenReturn(listOf(legacy, encrypted))
         capture.value.onEvent(snapshot, null)
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals("Legacy.txt", updates.single().documents.single().name)
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (updates.isEmpty() && System.nanoTime() < deadline) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        val names = updates.single().documents.map(SafetyDocument::name).toSet()
+        assertEquals(setOf("Legacy.txt", "Private sample.pdf"), names)
         assertEquals(DocumentListSource.FIRESTORE_CACHE, updates.single().source)
         capture.value.onEvent(null, FirebaseFirestoreException("No access", FirebaseFirestoreException.Code.PERMISSION_DENIED))
         assertEquals(listOf("No access"), errors)
@@ -282,10 +313,36 @@ class SafetyDocumentRepositorySdkTest {
         assertTrue(runCatching { repository.download(context, document.copy(objectKey = "encrypted/file")) }.isFailure)
     }
 
-    private fun encryptedFields(): Map<String, Any> {
-        val metadata = JSONObject().put("name", "Private sample.pdf").put("mimeType", "application/pdf")
+    @Test
+    fun chatOnlyMetadataAndLegacyVoiceNamesAreClassifiedWithoutAffectingNormalAudio() = withDeviceKey {
+        runBlocking {
+            val fields = encryptedFields(
+                name = "Recording.m4a",
+                mimeType = "audio/mp4",
+                chatOnly = true,
+            )
+            reference("voice", fields)
+            val tagged = repository.getFor("owner", "voice")
+            assertTrue(tagged.chatOnly)
+            assertTrue(tagged.isChatOnlyMedia())
+
+            val base = SafetyDocument("id", "owner", "", "Voice message.m4a", "audio/mp4", listOf("owner"))
+            assertTrue(base.isChatOnlyMedia())
+            assertTrue(base.copy(name = "voice message").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Recording.m4a").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Voice message.pdf", mimeType = "application/pdf").isChatOnlyMedia())
+        }
+    }
+
+    private fun encryptedFields(
+        name: String = "Private sample.pdf",
+        mimeType: String = "application/pdf",
+        chatOnly: Boolean = false,
+    ): Map<String, Any> {
+        val metadata = JSONObject().put("name", name).put("mimeType", mimeType)
             .put("tags", org.json.JSONArray(listOf("evidence", "safety")))
             .put("ocrText", "Recognized sample").put("ocrConfidence", .8).put("ocrSuccessful", true)
+            .apply { if (chatOnly) put("chatOnly", true) }
         return mapOf(
             "owner_id" to "owner", "object_key" to "encrypted/file", "allowed_users" to listOf("owner", "trusted"),
             "account_recovery_ready" to true, "evidence" to true, "encrypted_metadata" to EncryptionUtils.encryptText(metadata.toString(), key),

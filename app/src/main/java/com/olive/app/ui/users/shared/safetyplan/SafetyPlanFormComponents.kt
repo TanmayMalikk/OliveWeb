@@ -1,6 +1,11 @@
 // All safe-app roles: draws editable safety-plan fields.
 package com.olive.app.ui.users.shared.safetyplan
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.content.Context
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -23,26 +28,46 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.safety.SAFETY_SECTIONS
+import com.olive.app.data.safety.SAFETY_CHECKLIST_SECTIONS
 import com.olive.app.data.safety.SafetyChecklistItem
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.mergeTailoredChecklistItems
 import com.olive.app.data.safety.readSafetyChecklist
 import com.olive.app.data.safety.readSafetyPlanContact
 import com.olive.app.data.safety.safetyChecklistAttachments
 import com.olive.app.data.safety.safetyPlanContactItem
+import com.olive.app.data.safety.safetyPlanDefaultsFromIntake
+import com.olive.app.data.safety.safetyPlanManagedSectionPrompts
+import com.olive.app.data.safety.safetyPlanSectionPrompts
 import com.olive.app.data.safety.writeSafetyChecklist
+import com.olive.app.ui.session.SessionSafetyPlans
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
 
+/**
+ * Composes the safety checklist progress UI element.
+ *
+ * @param prepared Prepared supplied to [SafetyChecklistProgress].
+ * @param total Total supplied to [SafetyChecklistProgress].
+ * @param summary Whether to apply summary.
+ */
 @Composable
 internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
     val fraction = if (total > 0) prepared.toFloat() / total else 0f
     val count = stringResource(R.string.safety_prepared_count, prepared, total)
+    val progressLabel = stringResource(R.string.a11y_safety_progress, prepared, total)
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+            .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier)
+            .clearAndSetSemantics {
+                contentDescription = progressLabel
+                stateDescription = "${(fraction * 100).toInt()}%"
+                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+            },
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (summary) {
@@ -64,8 +89,7 @@ internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean
         if (summary || total > 0) LinearProgressIndicator(
             progress = { fraction },
             modifier = Modifier.fillMaxWidth().height(if (summary) 10.dp else 6.dp)
-                .border(1.dp, OliveDivider, CircleShape)
-                .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier),
+                .border(1.dp, OliveDivider, CircleShape),
             color = OliveGreen,
             trackColor = SageGreen,
             strokeCap = StrokeCap.Round,
@@ -74,7 +98,22 @@ internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean
     }
 }
 
-// Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
+/**
+ * Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
+ *
+ * @param plan Safety plan data model.
+ * @param fieldKey Field key supplied to [SafetyChecklistSection].
+ * @param onEdit Callback invoked when edit changes or occurs.
+ * @param onSyncNow Callback invoked when sync now changes or occurs.
+ * @param contacts Collection of contact records.
+ * @param contactsEditable Whether to apply contacts editable.
+ * @param onContactsChange Callback invoked when contacts change changes or occurs.
+ * @param editable Whether to apply editable.
+ * @param attachmentsEditable Whether to apply attachments editable.
+ * @param onUploadDocument Callback invoked when upload document changes or occurs.
+ * @param documents Collection of documents values to process.
+ * @param onOpenDocument Callback invoked when open document changes or occurs.
+ */
 @Composable
 internal fun SafetyChecklistSection(
     plan: SafetyPlan, fieldKey: String, onEdit: (String, String) -> Unit,
@@ -186,7 +225,24 @@ internal fun SafetyChecklistSection(
     }
 }
 
-// shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
+/**
+ * Shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
+ *
+ * @param item Item supplied to [ChecklistRow].
+ * @param heading Heading supplied to [ChecklistRow].
+ * @param sectionKey Section key supplied to [ChecklistRow].
+ * @param index Zero-based item index.
+ * @param editable Whether to apply editable.
+ * @param onChecked Callback invoked when checked changes or occurs.
+ * @param onText Callback invoked when text changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ * @param onSyncNow Callback invoked when sync now changes or occurs.
+ * @param attachments Collection of attachments values to process.
+ * @param onRemoveAttachment Callback invoked when remove attachment changes or occurs.
+ * @param attachmentsEditable Whether to apply attachments editable.
+ * @param onOpenAttachment Callback invoked when open attachment changes or occurs.
+ * @param onUploadDocument Callback invoked when upload document changes or occurs.
+ */
 @Composable
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
@@ -288,7 +344,15 @@ private fun ChecklistRow(
     }
 }
 
-// Lets the user choose which trusted contacts may view this safety plan.
+/**
+ * Lets the user choose which trusted contacts may view this safety plan.
+ *
+ * @param items Collection of items values to process.
+ * @param contacts Collection of contact records.
+ * @param editable Whether to apply editable.
+ * @param onItemsChange Callback invoked when items change changes or occurs.
+ * @param onContactsChange Callback invoked when contacts change changes or occurs.
+ */
 @Composable
 private fun SafetyPlanContactPicker(
     items: List<SafetyChecklistItem>,
@@ -302,6 +366,7 @@ private fun SafetyPlanContactPicker(
     var adding by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
+    var relationship by remember { mutableStateOf("") }
     Text(
         stringResource(R.string.safety_selected_contacts, selected.size),
         style = MaterialTheme.typography.labelMedium,
@@ -347,6 +412,9 @@ private fun SafetyPlanContactPicker(
                                     .semantics { contentDescription = selectionDescription })
                             Column(Modifier.weight(1f)) {
                                 Text(contact.name, style = MaterialTheme.typography.titleSmall)
+                                if (contact.relationship.isNotBlank()) {
+                                    Text(contact.relationship, style = MaterialTheme.typography.bodySmall, color = Muted)
+                                }
                                 Text(
                                     contact.details,
                                     style = MaterialTheme.typography.bodySmall,
@@ -388,30 +456,60 @@ private fun SafetyPlanContactPicker(
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.add_a_contact))
         } else OutlinedCard(Modifier.fillMaxWidth()) {
+            var showContactErrors by remember { mutableStateOf(false) }
+            var contactShake by remember { mutableIntStateOf(0) }
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     stringResource(R.string.add_a_contact),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.semantics { heading() })
-                Field(stringResource(R.string.contact_name), name, "safety_contact_name") {
+                Field(
+                    stringResource(R.string.contact_name),
+                    name,
+                    "safety_contact_name",
+                    error = if (showContactErrors && name.isBlank()) stringResource(R.string.ui_name_required) else null,
+                    shakeTrigger = contactShake,
+                ) {
                     name = it.take(120)
+                    showContactErrors = false
                 }
+                Field(
+                    stringResource(R.string.contact_relationship),
+                    relationship,
+                    "safety_contact_relationship",
+                ) { relationship = it.take(120) }
                 Field(
                     stringResource(R.string.phone_or_email),
                     details,
-                    "safety_contact_details"
-                ) { details = it.take(200) }
+                    "safety_contact_details",
+                    error = if (showContactErrors && details.isBlank()) stringResource(R.string.enter_a_name_and_a_phone_number_or_email) else null,
+                    shakeTrigger = contactShake,
+                ) {
+                    details = it.take(200)
+                    showContactErrors = false
+                }
                 Button(
                     onClick = {
-                        val contact =
-                            SafeContact(UUID.randomUUID().toString(), name.trim(), details.trim())
-                        onContactsChange?.invoke(contacts + contact)
-                        onItemsChange(items + safetyPlanContactItem(contact))
-                        name = ""
-                        details = ""
-                        adding = false
+                        if (name.isBlank() || details.isBlank()) {
+                            showContactErrors = true
+                            contactShake += 1
+                        } else {
+                            val contact = SafeContact(
+                                UUID.randomUUID().toString(),
+                                name.trim(),
+                                details.trim(),
+                                relationship = relationship.trim(),
+                            )
+                            onContactsChange?.invoke(contacts + contact)
+                            onItemsChange(items + safetyPlanContactItem(contact))
+                            name = ""
+                            details = ""
+                            relationship = ""
+                            showContactErrors = false
+                            adding = false
+                        }
                     },
-                    enabled = name.isNotBlank() && details.isNotBlank(),
+                    enabled = true,
                     modifier = Modifier.fillMaxWidth().testTag("safety_save_contact")
                 ) {
                     Text(stringResource(R.string.safety_save_and_select_contact))
@@ -420,6 +518,7 @@ private fun SafetyPlanContactPicker(
                     onClick = {
                         name = ""
                         details = ""
+                        relationship = ""
                         adding = false
                     },
                     modifier = Modifier.testTag("safety_cancel_contact")
@@ -445,53 +544,70 @@ private fun SafetyPlanContactPicker(
 // All safe-app roles: shows who can view a shared safety plan.
 
 
-// Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable.
-// https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
-internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false): Map<String, String> = buildMap {
-    listOf("primary", "backup").forEach { plan ->
-        SAFETY_SECTIONS.forEach { section ->
-            val prompts = when (section) {
-                "documents" -> safetyDocumentSuggestions(context) + if (hasAffectedPeople) {
-                    listOf(context.getString(R.string.safety_documents_dependants))
-                } else emptyList()
-                "finances" -> listOf(
-                    context.getString(R.string.safety_finances_access),
-                    context.getString(R.string.safety_finances_costs),
-                    context.getString(R.string.safety_finances_support),
-                )
-                "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()
-                "destination" -> context.resources.getStringArray(R.array.safety_destination_checklist)
-                    .toList()
+/**
+ * Adaptable prompts informed by PHAC safety-planning guidance and the user's onboarding questionnaire;
+ * all starting text remains editable. https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param hasAffectedPeople Whether affected family members were listed during personal setup.
+ * @param intake Onboarding questionnaire selections used to tailor documents and subsections.
+ * @return Map containing the resulting safety defaults entries.
+ */
+internal fun safetyDefaults(
+    context: Context,
+    hasAffectedPeople: Boolean = false,
+    intake: SafetyPlanIntake = SafetyPlanIntake(),
+): Map<String, String> = safetyPlanDefaultsFromIntake(context, intake, hasAffectedPeople)
 
-                "travel" -> context.resources.getStringArray(R.array.safety_travel_checklist)
-                    .toList()
-
-                "contacts" -> context.resources.getStringArray(R.array.safety_contacts_checklist)
-                    .toList()
-
-                "aftercare" -> context.resources.getStringArray(R.array.safety_aftercare_checklist)
-                    .toList()
-
-                else -> emptyList()
+/**
+ * Updates both primary and backup plans from updated questionnaire selections by adding newly
+ * relevant items and removing unedited default/questionnaire items that no longer apply, while
+ * preserving the user's edits, checkmarks, custom rows, and document attachments.
+ *
+ * @param context Android context used to resolve localized checklist strings.
+ * @param controller Active safety-plan controller managing edits and sync.
+ * @param intake Updated questionnaire selections.
+ * @param hasAffectedPeople Whether affected family members were listed in the user's profile.
+ * @param documents Vault documents used to protect checklist items with uploaded attachments.
+ */
+internal fun applySafetyIntakeToPlan(
+    context: Context,
+    controller: SessionSafetyPlans,
+    intake: SafetyPlanIntake,
+    hasAffectedPeople: Boolean,
+    documents: List<SafetyDocument> = emptyList(),
+) {
+    val activePlan = controller.plan ?: return
+    var changed = false
+    listOf("primary", "backup").forEach { planPrefix ->
+        SAFETY_CHECKLIST_SECTIONS.filterNot { it == "contacts" }.forEach { section ->
+            val key = "${planPrefix}_$section"
+            val existing = activePlan.fields[key]?.value ?: return@forEach
+            val tailored = safetyPlanSectionPrompts(context, section, intake, hasAffectedPeople)
+            val removable = safetyPlanManagedSectionPrompts(context, section)
+            val protectedIds = if (section == "documents" && documents.isNotEmpty()) {
+                readSafetyChecklist(existing)
+                    .filter { safetyChecklistAttachments(key, it, documents).isNotEmpty() }
+                    .mapTo(mutableSetOf()) { it.id }
+            } else {
+                emptySet()
             }
-            put(
-                "${plan}_$section",
-                writeSafetyChecklist(prompts.map {
-                    SafetyChecklistItem(
-                        UUID.randomUUID().toString(),
-                        it
-                    )
-                })
-            )
+            val updated = mergeTailoredChecklistItems(existing, tailored, removable, protectedIds)
+            if (updated != existing) {
+                controller.edit(key, updated)
+                changed = true
+            }
         }
     }
+    if (changed) controller.flushEdits()
 }
 
-// Loads the safety document suggestions needed by the safety plan.
-private fun safetyDocumentSuggestions(context: Context) =
-    context.resources.getStringArray(R.array.safety_document_checklist).toList()
-
-// Formats the safety section label shown by the safety plan.
+/**
+ * Formats the safety section label shown by the safety plan.
+ *
+ * @param section Section supplied to [safetySectionLabel].
+ * @return The resulting safety section label.
+ */
 internal fun safetySectionLabel(section: String) = when (section) {
     "destination" -> R.string.safety_destination
     "travel" -> R.string.safety_travel
@@ -504,7 +620,12 @@ internal fun safetySectionLabel(section: String) = when (section) {
     else -> R.string.safety_aftercare
 }
 
-// Returns the safety section hint used by the safety plan.
+/**
+ * Returns the safety section hint used by the safety plan.
+ *
+ * @param section Section supplied to [safetySectionHint].
+ * @return The resulting safety section hint.
+ */
 internal fun safetySectionHint(section: String) = when (section) {
     "destination" -> R.string.safety_destination_hint
     "travel" -> R.string.safety_travel_hint
@@ -513,7 +634,16 @@ internal fun safetySectionHint(section: String) = when (section) {
     else -> null
 }
 
-// Linking is always explicit; names, phone numbers and email addresses are never used to infer an account.
+/**
+ * Linking is always explicit; names, phone numbers and email addresses are never used to infer an account.
+ *
+ * @param friends List of friend records.
+ * @param selectedUid Selected user ID supplied to [TrustedContactLinkPicker].
+ * @param unavailableUids Collection of unavailable uids values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param tag Tag supplied to [TrustedContactLinkPicker].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 internal fun TrustedContactLinkPicker(
     friends: List<Friend>, selectedUid: String, unavailableUids: Set<String>,

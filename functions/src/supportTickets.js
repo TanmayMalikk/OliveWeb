@@ -71,7 +71,12 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   if (caller.role !== "USER" || !["request", "stop"].includes(action)) {
     throw new HttpsError("permission-denied", "Owner only.");
   }
-  const newConversationId = supportConversationId(caller.uid, SUPPORT);
+  const requestKey = request.data?.requestKey;
+  if (action === "request" && requestKey !== undefined &&
+      (typeof requestKey !== "string" || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(requestKey))) {
+    throw new HttpsError("invalid-argument", "Invalid support request key.");
+  }
+  const newConversationId = supportConversationId(caller.uid, SUPPORT, requestKey);
   const requestedConversationId = typeof request.data?.conversationId === "string" ?
     request.data.conversationId : "";
   const reference = db.collection("supportRequests").doc(
@@ -102,6 +107,11 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   const staffCandidates = await candidates();
   const ticket = await db.runTransaction(async transaction => {
     const chat = await transaction.get(db.collection("conversations").doc(newConversationId));
+    if (chat.get("closedAt")) {
+      return {ownerUid: caller.uid, requested: false, staffUid: "", conversationId: ""};
+    }
+    const existing = (await transaction.get(reference)).data();
+    if (existing) return existing;
     const references = new Map(staffCandidates.map(staff => [
       staff.uid, db.collection("safetyStaff").doc(staff.uid),
     ]));

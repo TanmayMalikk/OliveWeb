@@ -1,54 +1,87 @@
 // Fitness cover users: shows today's summary, step progress, and the goals shortcut.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
-// Shows a quick summary of steps, calories, macros, and goals.
+/**
+ * Shows a quick summary of steps, calories, macros, and goals.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ * @param onGoals Callback invoked when goals changes or occurs.
+ * @param showGoalQuestionnairePrompt Whether to show the guided initial goal questionnaire card.
+ * @param onStartQuestionnaire Callback invoked to open the initial goal setup questionnaire.
+ * @param onDismissQuestionnaire Callback invoked when the user dismisses the setup prompt.
+ */
 @Composable
-internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
+internal fun FitnessHomePage(
+    snapshot: FitnessSnapshot,
+    onGoals: () -> Unit,
+    showGoalQuestionnairePrompt: Boolean = false,
+    onStartQuestionnaire: () -> Unit = {},
+    onDismissQuestionnaire: () -> Unit = {},
+) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val summaryDescription = buildString {
         append(stringResource(R.string.today_summary))
@@ -68,6 +101,15 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
                 color = FitnessSubtle,
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+        if (showGoalQuestionnairePrompt) {
+            item {
+                FitnessGoalSetupCard(
+                    onStartQuestionnaire = onStartQuestionnaire,
+                    onManualGoals = onGoals,
+                    onDismiss = onDismissQuestionnaire,
+                )
+            }
         }
         item {
             Card(
@@ -94,32 +136,107 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
             }
         }
         item { StepSummaryCard(snapshot) }
-        item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = FitnessWarmCard,
-                    contentColor = FitnessText,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onGoals,
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+        if (!showGoalQuestionnairePrompt) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = FitnessWarmCard,
+                        contentColor = FitnessText,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGoals,
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.goals), style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.edit_fitness_goals), color = FitnessSubtle)
+                    Row(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.goals), style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.edit_fitness_goals), color = FitnessSubtle)
+                        }
+                        Icon(Icons.Outlined.Settings, null, tint = FitnessAccent)
                     }
-                    Icon(Icons.Outlined.Settings, null, tint = FitnessAccent)
                 }
             }
         }
     }
 }
-// Draws one large summary value on the fitness home page.
+
+/**
+ * Renders the dismissible onboarding card inviting the user to configure fitness goals.
+ *
+ * @param onStartQuestionnaire Runs when the user begins the guided fitness goal setup.
+ * @param onManualGoals Runs when the user chooses to enter fitness goals manually.
+ * @param onDismiss Runs when the user dismisses the dialog.
+ */
+@Composable
+private fun FitnessGoalSetupCard(
+    onStartQuestionnaire: () -> Unit,
+    onManualGoals: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = FitnessWarmCard, contentColor = FitnessText),
+        modifier = Modifier.fillMaxWidth().testTag("fitness_goal_setup_card"),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.AutoAwesome, null, tint = FitnessAccent)
+                    Text(
+                        stringResource(R.string.fitness_questionnaire_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag("fitness_dismiss_questionnaire"),
+                ) {
+                    Icon(Icons.Outlined.Close, stringResource(R.string.fitness_questionnaire_dismiss))
+                }
+            }
+            Text(
+                stringResource(R.string.fitness_questionnaire_card_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FitnessSubtle,
+            )
+            Button(
+                onClick = onStartQuestionnaire,
+                modifier = Modifier.fillMaxWidth().testTag("fitness_start_questionnaire"),
+            ) {
+                Text(stringResource(R.string.fitness_questionnaire_start))
+            }
+            OutlinedButton(
+                onClick = onManualGoals,
+                modifier = Modifier.fillMaxWidth().testTag("fitness_edit_goals_manual"),
+            ) {
+                Text(stringResource(R.string.edit_fitness_goals))
+            }
+        }
+    }
+}
+/**
+ * Draws one large summary value on the fitness home page.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ * @param icon Icon supplied to [SummaryMetric].
+ */
 @Composable
 private fun SummaryMetric(value: String, label: String, icon: ImageVector) {
     Row(
@@ -139,7 +256,11 @@ private fun SummaryMetric(value: String, label: String, icon: ImageVector) {
     }
 }
 
-// fitness cover shows this step summary card view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this step summary card view so the user can view its details and use its actions.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
 @Composable
 private fun StepSummaryCard(snapshot: FitnessSnapshot) {
     val progress = (snapshot.stepsToday.toFloat() / snapshot.profile.stepGoal).coerceIn(0f, 1f)
@@ -207,5 +328,243 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
                 )
             }
         }
+    }
+}
+
+internal val TextStyle.tabularDigits: TextStyle
+    get() = copy(fontFeatureSettings = "tnum")
+
+internal val TextStyle.balancedHeadline: TextStyle
+    get() = copy(lineBreak = LineBreak.Heading)
+
+// Two cubic segments per corner keep curvature flat where each corner joins a straight edge.
+internal val FitnessContinuousCorners = GenericShape { size, _ ->
+    val w = size.width
+    val h = size.height
+    val r = minOf(w, h) * 0.19f
+    val middle = r * 0.16f
+    val near = r * 0.32f
+    val far = r * 0.64f
+    moveTo(r, 0f)
+    lineTo(w - r, 0f)
+    cubicTo(w - far, 0f, w - near, 0f, w - middle, middle)
+    cubicTo(w, near, w, far, w, r)
+    lineTo(w, h - r)
+    cubicTo(w, h - far, w, h - near, w - middle, h - middle)
+    cubicTo(w - near, h, w - far, h, w - r, h)
+    lineTo(r, h)
+    cubicTo(far, h, near, h, middle, h - middle)
+    cubicTo(0f, h - near, 0f, h - far, 0f, h - r)
+    lineTo(0f, r)
+    cubicTo(0f, far, 0f, near, middle, middle)
+    cubicTo(near, 0f, far, 0f, r, 0f)
+    close()
+}
+
+/**
+ * Shows daily water intake and opens the water logging controls.
+ *
+ * @param totalMl Water logged today in milliliters.
+ * @param goalMl Daily water goal in milliliters.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onAdd Receives the saved intake adjustment and daily goal in milliliters.
+ */
+@Composable
+internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val fraction = (totalMl.toFloat() / goalMl.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val description = stringResource(R.string.nutrition_water_progress, totalMl, goalMl)
+    TextButton(
+        onClick = { open = true },
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 6.dp),
+        modifier = Modifier.semantics {
+            contentDescription = description
+            progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+        },
+    ) {
+        WaterGlass(fraction, Modifier.size(42.dp, 56.dp))
+        Column(Modifier.padding(start = 4.dp).clearAndSetSemantics { }) {
+            Text(stringResource(R.string.nutrition_water), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.fitness_diary_volume, totalMl), style = MaterialTheme.typography.bodySmall.tabularDigits)
+        }
+    }
+    if (open) WaterLogDialog(totalMl, goalMl, enabled, onDismiss = { open = false }) { amount, goal ->
+        onAdd(amount, goal)
+        open = false
+    }
+}
+
+/**
+ * Displays the water log dialog overlay.
+ *
+ * @param totalMl Total ml supplied to [WaterLogDialog].
+ * @param goalMl Goal ml supplied to [WaterLogDialog].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onSave Callback invoked when save changes or occurs.
+ */
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun WaterLogDialog(
+    totalMl: Int,
+    goalMl: Int,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Int, Int) -> Unit,
+) {
+    var adjustment by rememberSaveable { mutableIntStateOf(0) }
+    var customVisible by rememberSaveable { mutableStateOf(false) }
+    var customAmount by rememberSaveable { mutableStateOf("") }
+    var goal by rememberSaveable { mutableStateOf(goalMl.toString()) }
+    val updatedGoal = goal.toIntOrNull()
+    val total = (totalMl.toLong() + adjustment).coerceAtLeast(0)
+    /**
+     * Changes the pending water adjustment within the allowed range and prevents a negative daily total.
+     *
+     * @param amount Amount supplied to [adjust].
+     */
+    fun adjust(amount: Int) {
+        adjustment = (adjustment + amount).coerceIn(-minOf(totalMl, 10_000), 10_000)
+    }
+    val sheet = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheet,
+        modifier = Modifier.testTag("fitness_water_sheet"),
+    ) {
+        Column(Modifier.fillMaxHeight(.86f).imePadding().padding(horizontal = 18.dp)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, stringResource(R.string.close)) }
+                Text(stringResource(R.string.nutrition_add_water), style = MaterialTheme.typography.titleLarge.balancedHeadline)
+            }
+            Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Card(
+                    shape = FitnessContinuousCorners,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(stringResource(R.string.fitness_diary_water_total), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.fitness_diary_volume, total), style = MaterialTheme.typography.headlineMedium.tabularDigits)
+                        WaterGlass(total.toFloat() / (updatedGoal?.coerceAtLeast(1) ?: goalMl), Modifier.size(60.dp, 80.dp))
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilledTonalIconButton(onClick = { adjust(-250) }, enabled = enabled && total > 0 && adjustment > -10_000) {
+                        Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
+                    }
+                    listOf(250, 500, 1000).forEach { amount ->
+                        val actionLabel = stringResource(R.string.fitness_diary_add_volume, amount)
+                        FilledTonalButton(
+                            modifier = Modifier.weight(1f).semantics {
+                                contentDescription = actionLabel
+                            },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            onClick = { adjust(amount) },
+                            enabled = enabled && adjustment <= 10_000 - amount,
+                        ) {
+                            Text(stringResource(R.string.fitness_diary_volume, amount), Modifier.clearAndSetSemantics { })
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { customVisible = !customVisible }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.fitness_diary_custom_water))
+                }
+                if (customVisible) {
+                    val amount = customAmount.toIntOrNull()
+                    OutlinedTextField(
+                        customAmount, { customAmount = it.filter(Char::isDigit).take(5) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text(stringResource(R.string.nutrition_water_amount)) },
+                        suffix = { Text(stringResource(R.string.nutrition_volume_unit)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { amount?.let { adjust(it); customAmount = ""; customVisible = false } },
+                                enabled = enabled && amount != null && amount in 1..minOf(10_000, 10_000 - adjustment),
+                            ) { Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_add_water)) }
+                        },
+                    )
+                }
+                OutlinedTextField(
+                    goal, { goal = it.filter(Char::isDigit).take(5) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(stringResource(R.string.nutrition_water_goal)) },
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = updatedGoal == null || updatedGoal !in 250..10_000,
+                )
+            }
+            Button(
+                onClick = { updatedGoal?.let { onSave(adjustment, it) } },
+                enabled = enabled && adjustment != 0 && updatedGoal != null && updatedGoal in 250..10_000,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            ) { Text(stringResource(R.string.save)) }
+        }
+    }
+}
+
+/**
+ * Draws an animated glass that fills as the user approaches the water goal.
+ *
+ * @param fraction Fraction supplied to [WaterGlass].
+ * @param modifier Compose modifier applied to the root layout.
+ */
+@Composable
+private fun WaterGlass(fraction: Float, modifier: Modifier) {
+    val target = (fraction).coerceIn(0f, 1f)
+    val fill by animateFloatAsState(target, animationSpec = tween(1000), label = "water_fill")
+    val outline = Color(0xFF176B9B)
+    val water = Color(0xFF258ED2)
+    val ripples = rememberInfiniteTransition(label = "water_ripples")
+    val phase by ripples.animateFloat(0f, (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "water_wave_phase")
+    Canvas(modifier) {
+        val glass = Path().apply {
+            moveTo(size.width * .12f, size.height * .08f); lineTo(size.width * .88f, size.height * .08f)
+            lineTo(size.width * .76f, size.height * .92f); lineTo(size.width * .24f, size.height * .92f); close()
+        }
+        drawPath(glass, Color(0xFFE4F3FC))
+        clipPath(glass) {
+            if (fill > 0f) {
+                val level = size.height * (.92f - .84f * fill)
+                val amplitude = minOf(1.8.dp.toPx(), size.height * .84f * fill / 3f)
+                /**
+                 * Computes wave.
+                 *
+                 * @param offset Offset supplied to [wave].
+                 * @return The resulting [Path] instance.
+                 */
+                fun wave(offset: Float): Path = Path().apply {
+                    moveTo(0f, size.height)
+                    for (step in 0..32) {
+                        val x = size.width * step / 32f
+                        val y = level + sin(x / size.width * 2f * PI.toFloat() + phase + offset) * amplitude
+                        lineTo(x, y)
+                    }
+                    lineTo(size.width, size.height)
+                    close()
+                }
+                drawPath(wave(PI.toFloat()), water.copy(alpha = .35f))
+                drawPath(wave(0f), water.copy(alpha = .85f))
+            }
+            drawLine(Color.White.copy(alpha = .8f), Offset(size.width * .24f, size.height * .2f),
+                Offset(size.width * .29f, size.height * .62f), strokeWidth = 1.5.dp.toPx())
+        }
+        drawPath(glass, outline, style = Stroke(2.dp.toPx()))
     }
 }

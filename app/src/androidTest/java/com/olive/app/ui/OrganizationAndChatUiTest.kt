@@ -2,8 +2,10 @@ package com.olive.app.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -11,32 +13,42 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
-import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.messaging.SUPPORT_TAG_PLAN_CONSULT
 import com.olive.app.data.messaging.SUPPORT_TAG_SUPPORT
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
+import com.olive.app.data.safety.SafetyConsultation
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.shared.OliveUndoOverlay
 import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.ui.users.admin.AdminAccounts
 import com.olive.app.ui.users.admin.AdminPortal
 import com.olive.app.ui.users.admin.EmergencyResponseScreen
 import com.olive.app.ui.users.staff.StaffPortal
+import com.olive.app.ui.users.staff.SafetyConsultations
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.admin.CreateAccountDialog
 import com.olive.app.ui.users.shared.messaging.ChatInfoDialog
 import com.olive.app.ui.users.shared.messaging.ChatPane
+import com.olive.app.ui.users.shared.messaging.CallHistoryRow
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.navigation.LocalQuickExit
+import com.olive.app.ui.users.shared.navigation.OliveRoot
+import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -84,6 +96,200 @@ class OrganizationAndChatUiTest {
     private fun scrollDialogTo(matcher: SemanticsMatcher) {
         val scroll = hasScrollToIndexAction()
         compose.onNode(scroll).performScrollToNode(matcher)
+    }
+
+    @Test
+    fun callHistoryOffersJoinOnlyForAnActiveJoinableCall() {
+        val active = VoipCall(
+            "active-call", "Fixture group", "member", emptyList(),
+            conversationId = "chat", createdAt = 2,
+        )
+        var joins = 0
+        compose.setContent {
+            OliveTheme {
+                Column {
+                    CallHistoryRow(active, canJoin = true) { joins++ }
+                    CallHistoryRow(active.copy(callId = "ended", status = VoipCallStatus.ENDED), canJoin = true)
+                }
+            }
+        }
+        compose.onNodeWithTag("join_call_active-call").assertIsEnabled().performClick()
+        compose.onNodeWithTag("join_call_ended").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, joins) }
+    }
+
+    @Test
+    fun rootRoutesOrganizationAndSafeContactRolesWithoutCoverOrQuickExit() {
+        val session = session(AccountRole.STAFF) {
+            runtime.enrollment = DeviceEnrollment("staff", "", AccountRole.STAFF)
+            runtime.state.screen = SessionScreen.Portal
+        }
+        compose.setContent { OliveTheme { OliveRoot(session) } }
+        compose.onNodeWithText(text(R.string.staff_panel)).assertIsDisplayed()
+        compose.onNodeWithTag("cover_root").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+
+        compose.runOnIdle {
+            session.runtime.enrollment = DeviceEnrollment("admin", "", AccountRole.ADMIN)
+            session.runtime.state.accountRole = AccountRole.ADMIN
+        }
+        compose.onNodeWithText(text(R.string.admin_panel)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.staff_panel)).assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+
+        compose.runOnIdle {
+            session.runtime.enrollment = DeviceEnrollment("contact", "", AccountRole.SAFE_CONTACT)
+            session.runtime.state.accountRole = AccountRole.SAFE_CONTACT
+            session.runtime.state.profile = UserProfile(
+                "fixture_contact", "Fixture Contact", "", "", "2000-01-01", "English", "", "Edmonton", "",
+                role = AccountRole.SAFE_CONTACT,
+            )
+            session.runtime.state.page = SafePage.Home
+            session.runtime.state.screen = SessionScreen.Safe
+        }
+        compose.onNodeWithTag("safe_contact_profile").assertIsDisplayed()
+        compose.onNodeWithTag("cover_root").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+    }
+
+    @Test
+    fun idleWarningCanKeepTheUserOnTheSafeScreenOrExitToTheirCover() {
+        val session = session(AccountRole.USER) {
+            runtime.enrollment = DeviceEnrollment("countdown-fixture", "")
+            runtime.pinAuthorizedUid = "countdown-fixture"
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.profile = UserProfile(
+                "fixture_owner", "Fixture Owner", "", "", "2000-01-01", "English", "", "Edmonton", "",
+            )
+            runtime.state.page = SafePage.Home
+            runtime.state.screen = SessionScreen.Safe
+            noteInteraction()
+        }
+        compose.setContent { OliveTheme { OliveRoot(session) } }
+        compose.onNodeWithTag("safe_home_content").assertIsDisplayed()
+        compose.runOnIdle { session.runtime.state.idleCountdownSeconds = 9 }
+        val countdown = compose.onNodeWithText(text(R.string.locking_soon))
+        countdown.assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.stay_here)).performClick()
+        countdown.assertDoesNotExist()
+        compose.onNodeWithTag("safe_home_content").assertIsDisplayed()
+
+        compose.runOnIdle { session.runtime.state.idleCountdownSeconds = 9 }
+        countdown.assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.quick_exit)).performClick()
+        compose.onNodeWithTag("cover_root").assertIsDisplayed()
+        countdown.assertDoesNotExist()
+        compose.runOnIdle { session.coverEmergencyConfirmation = "different-account" to 1L }
+        compose.onNodeWithTag("cover_emergency_done").assertDoesNotExist()
+        compose.runOnIdle { session.coverEmergencyConfirmation = "countdown-fixture" to 2L }
+        compose.onNodeWithTag("cover_emergency_done").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.friend_invite_done)).assertIsDisplayed()
+    }
+
+    @Test
+    fun groupActionsOfferPrivateNotesOnlyForFriendsAndArchiveCanBeUndone() {
+        val owner = "action-owner"
+        val session = session(AccountRole.USER) {
+            runtime.enrollment = DeviceEnrollment(owner, "")
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.friends = listOf(Friend("linked", "friend", "Trusted friend"))
+            runtime.state.conversations = listOf(ChatConversation(
+                id = "action-chat",
+                friendshipId = "",
+                participantIds = listOf(owner, "friend", "unlinked"),
+                participantUsernames = mapOf(owner to "Owner", "friend" to "Trusted friend", "unlinked" to "Unlinked member"),
+                type = "GROUP",
+            ))
+        }
+        compose.setContent {
+            OliveTheme {
+                OliveUndoOverlay(scopeKey = owner, enabled = true) { MessagesScreen(session) }
+            }
+        }
+        val list = compose.onNode(hasScrollToIndexAction())
+        val row = hasTestTag("conversation_action-chat")
+        list.performScrollToNode(row)
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.private_note)).performClick()
+        compose.onNodeWithText("Trusted friend").assertIsDisplayed()
+        compose.onNodeWithTag("save_private_contact_note").assertIsNotEnabled()
+        compose.onNodeWithTag("private_contact_note_text").performTextReplacement("Synthetic private note")
+        compose.onNodeWithTag("save_private_contact_note").assertIsEnabled()
+        compose.onNodeWithText(text(R.string.cancel)).performClick()
+
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.archive_chat)).performClick()
+        compose.onNode(row).assertDoesNotExist()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.undo_action)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.undo_action)).performClick()
+        list.performScrollToNode(row)
+        compose.onNode(row).assertIsDisplayed()
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.archive_chat)).performClick()
+        val archive = hasTestTag("archived_chats")
+        list.performScrollToNode(archive)
+        compose.onNode(archive).performClick()
+        list.performScrollToNode(row)
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.unarchive_chat)).performClick()
+        compose.onNode(row).assertDoesNotExist()
+        list.performScrollToNode(archive)
+        compose.onNode(archive).performClick()
+        list.performScrollToNode(row)
+        compose.onNode(row).assertIsDisplayed()
+    }
+
+    @Test
+    fun adminConsultationGroupsToggleIndependentlyAndKeepOwnerNamesPrivate() {
+        val session = session(AccountRole.ADMIN) {
+            runtime.state.screen = SessionScreen.Portal
+            runtime.enrollment = DeviceEnrollment("admin", "")
+            safetyPlans.consultations = listOf(
+                SafetyConsultation("owner-a", "Private owner A", "ticket-a", "staff", "Assigned staff", 42L),
+                SafetyConsultation("owner-b", "Private owner B"),
+            )
+        }
+        compose.setContent { OliveTheme { SafetyConsultations(session) {} } }
+        val assigned = compose.onNodeWithText("${text(R.string.safety_assigned_to_staff)} (1)")
+        val waiting = compose.onNodeWithText("${text(R.string.safety_waiting_for_staff)} (1)")
+        val assignedCard = compose.onNodeWithTag("safety_consultation_owner-a")
+        val waitingCard = compose.onNodeWithTag("safety_consultation_owner-b")
+        assignedCard.assertExists()
+        waitingCard.assertExists()
+        compose.onNodeWithText("Consult Ticket #42").assertExists()
+        compose.onNodeWithText(context.getString(R.string.safety_assigned_staff_value, "Assigned staff")).assertExists()
+        compose.onNodeWithText("Private owner", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("safety_staff_available").assertDoesNotExist()
+        assigned.performClick()
+        assignedCard.assertDoesNotExist()
+        waitingCard.assertExists()
+        waiting.performClick()
+        waitingCard.assertDoesNotExist()
+        assigned.performClick()
+        assignedCard.assertExists()
+    }
+
+    @Test
+    fun staffCanOpenAnAnonymousConsultationAndCancelCompletingIt() {
+        val session = session(AccountRole.STAFF) {
+            runtime.state.screen = SessionScreen.Portal
+            runtime.enrollment = DeviceEnrollment("staff", "")
+            safetyPlans.consultations = listOf(
+                SafetyConsultation("owner", "Private owner", "ticket", "staff", ticketNumber = 42L),
+            )
+        }
+        compose.setContent { OliveTheme { SafetyConsultations(session) {} } }
+        compose.onNodeWithTag("safety_staff_available").assertHasClickAction()
+        compose.onNodeWithTag("safety_consultation_owner").performClick()
+        compose.onNodeWithText("Private owner").assertDoesNotExist()
+        compose.waitUntil(5_000) { !session.safetyPlans.loadingPlan && session.safetyPlans.plan?.ownerUid == "owner" }
+        val complete = hasTestTag("complete_safety_consultation")
+        compose.onNodeWithTag("safety_plan_page").performScrollToNode(complete)
+        compose.onNode(complete).performClick()
+        compose.onNodeWithText(text(R.string.safety_complete_consultation_title)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.cancel)).performClick()
+        compose.onNodeWithText(text(R.string.safety_complete_consultation_title)).assertDoesNotExist()
+        compose.onNode(complete).assertIsEnabled()
     }
 
     @Test
@@ -184,6 +390,61 @@ class OrganizationAndChatUiTest {
     }
 
     @Test
+    fun chatAttachmentOptionsDoNotExposeDeletedEntries() {
+        val session = session(AccountRole.USER) {
+            runtime.enrollment = DeviceEnrollment("owner", "")
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.activeConversation = conversation("SUPPORT")
+            runtime.state.privateEntries = listOf(
+                PrivateEntry(id = "note", title = "Fixture note", body = "Synthetic"),
+                PrivateEntry(id = "deleted", title = "Trashed fixture", body = "Hidden", deletedAt = 1),
+                PrivateEntry(id = "incident", kind = PrivateEntryKind.Incident, title = "Fixture incident", body = "Synthetic"),
+            )
+        }
+        compose.setContent { OliveTheme { ChatPane(session, "owner", showBack = true, exit = {}, modifier = Modifier.fillMaxSize()) } }
+        val attach = compose.onNodeWithTag("attach_private_entry")
+        attach.performClick()
+        compose.onNodeWithTag("attachment_category_notes").performClick()
+        compose.onNodeWithText("Fixture note").assertIsDisplayed()
+        compose.onNodeWithText("Trashed fixture").assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.back)).performClick()
+        compose.onNodeWithText(text(R.string.incident_reports)).performClick()
+        compose.onNodeWithText("Fixture incident").assertIsDisplayed()
+        compose.onNodeWithText("Fixture note").assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.back)).performClick()
+        compose.onNodeWithText(text(R.string.saved_media)).performClick()
+        compose.onNodeWithText(text(R.string.documents_account_required)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.back)).performClick()
+        compose.onNodeWithText(text(R.string.shared_safety_plan)).performClick()
+        compose.onNodeWithTag("attachment_picker_title").assertDoesNotExist()
+    }
+
+    @Test
+    fun chatShowsSpecificUnsentAttachmentFailureAndRemovesComposerFromClosedTickets() {
+        val denied = ChatMessage("denied", "owner", "Owner", "Protected document", 1,
+            deliveryStatus = MessageDeliveryStatus.FAILED_PERMANENT,
+            deliveryFailureCode = "ATTACHMENT_ACCESS_REVOKED")
+        val session = session(AccountRole.USER) {
+            runtime.state.activeConversation = conversation("SUPPORT")
+            runtime.state.chatMessages = listOf(denied)
+        }
+        compose.setContent { OliveTheme { ChatPane(session, "owner", showBack = true, exit = null) } }
+        compose.onNodeWithTag("message_status_denied")
+            .assertTextContains(text(R.string.message_delivery_attachment_access_revoked))
+            .assertHasClickAction()
+        compose.runOnIdle {
+            session.runtime.state.chatMessages = listOf(denied.copy(deliveryStatus = MessageDeliveryStatus.SENDING))
+        }
+        compose.onNodeWithTag("message_status_denied", useUnmergedTree = true)
+            .assertTextContains(text(R.string.message_delivery_sending))
+            .assertHasNoClickAction()
+        compose.onNodeWithTag("send_message").assertIsNotEnabled()
+        compose.runOnIdle { session.runtime.state.activeConversation = conversation("SUPPORT", closedAt = 100) }
+        compose.onNodeWithTag("message_body").assertDoesNotExist()
+        compose.onNodeWithTag("attach_private_entry").assertDoesNotExist()
+    }
+
+    @Test
     fun personalMessageListsSeparateRequestsUnreadConversationsAndArchivedTickets() {
         val session = session(AccountRole.USER) {
             runtime.enrollment = DeviceEnrollment("fixture-owner", "")
@@ -194,12 +455,6 @@ class OrganizationAndChatUiTest {
                 FriendRequest("pending", "fixture-owner", "Owner", "other", "Pending friend", 1),
             )
             runtime.state.friends = listOf(Friend("saved-friend", "member", "Trusted friend"))
-            runtime.state.userSearchResults = listOf(
-                DirectoryUser("member", "Trusted friend"),
-                DirectoryUser("incoming", "New friend"),
-                DirectoryUser("other", "Pending friend"),
-                DirectoryUser("new", "Available friend"),
-            )
             val dm = conversation("DIRECT").copy(
                 participantIds = listOf("fixture-owner", "member"),
                 participantUsernames = mapOf("fixture-owner" to "Owner", "member" to "Trusted friend"),
@@ -218,8 +473,9 @@ class OrganizationAndChatUiTest {
             list.performScrollToNode(hasText(label))
             compose.onNodeWithText(label).performClick()
         }
-        list.performScrollToNode(hasText(text(R.string.add_friend)))
-        compose.onNodeWithText(text(R.string.add_friend)).assertIsEnabled()
+        list.performScrollToNode(hasTestTag("friend_invite_code"))
+        compose.onNodeWithTag("friend_invite_code").assertExists()
+        compose.onNodeWithTag("message_username").assertDoesNotExist()
         goTo(R.string.incoming_friend_requests)
         list.performScrollToNode(hasTestTag("accept_friend_ask"))
         compose.onNodeWithTag("accept_friend_ask").assertIsEnabled()
@@ -242,6 +498,27 @@ class OrganizationAndChatUiTest {
         list.performScrollToNode(hasTestTag("conversation_closed"))
         compose.onNodeWithTag("conversation_closed").assertIsDisplayed()
         compose.onNodeWithTag("conversation_unrelated").assertDoesNotExist()
+    }
+
+    @Test
+    fun reconnectBannerDisablesEmptyPasswordsAndDisappearsAfterReconnect() {
+        val session = session(AccountRole.USER) {
+            runtime.enrollment = DeviceEnrollment("reconnect-fixture", "")
+            runtime.state.messagingNeedsReconnect = true
+        }
+        compose.setContent { OliveTheme { MessagesScreen(session) } }
+        val list = compose.onNode(hasScrollToIndexAction())
+        val password = hasTestTag("messaging_reconnect_password")
+        val reconnect = hasTestTag("messaging_reconnect")
+        list.performScrollToNode(reconnect)
+        compose.onNode(reconnect).assertIsEnabled().performClick()
+        list.performScrollToNode(password)
+        compose.onNode(password).performTextReplacement("synthetic-password")
+        list.performScrollToNode(reconnect)
+        compose.onNode(reconnect).assertIsEnabled()
+        compose.runOnIdle { session.runtime.state.messagingNeedsReconnect = false }
+        compose.onNode(password).assertDoesNotExist()
+        compose.onNode(reconnect).assertDoesNotExist()
     }
 
     @Test
@@ -282,7 +559,8 @@ class OrganizationAndChatUiTest {
         compose.setContent { OliveTheme { AdminPortal(session) } }
         compose.onNodeWithContentDescription("12 ${text(R.string.admin_open_tickets)}").assertExists()
         compose.onNodeWithContentDescription("7 ${text(R.string.admin_closed_tickets)}").assertExists()
-        compose.onNode(hasText(text(R.string.emergency_response_title)) and hasClickAction()).performScrollTo().performClick()
+        val emergencyCard = text(R.string.admin_emergency_response) + ". " + text(R.string.admin_emergency_response_help)
+        compose.onNodeWithContentDescription(emergencyCard).assertHasClickAction().performScrollTo().performClick()
         compose.onNodeWithText(text(R.string.emergency_response_empty)).assertIsDisplayed()
         compose.onNodeWithContentDescription(text(R.string.back)).performClick()
         compose.onNodeWithText(text(R.string.admin_staff_management)).performScrollTo().performClick()
@@ -292,6 +570,28 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithContentDescription(workload).assertIsDisplayed()
         compose.onNodeWithContentDescription(text(R.string.ui_back)).performClick()
         compose.onNodeWithText(text(R.string.admin_panel)).assertIsDisplayed()
+    }
+
+    @Test
+    fun adminPortalOpensAccountsAndConfirmsDeletionOnlyAfterSelectingAnEligibleAccount() {
+        val session = session(AccountRole.ADMIN) {
+            runtime.enrollment = DeviceEnrollment("fixture-admin", "", AccountRole.ADMIN)
+            runtime.state.screen = SessionScreen.Portal
+            runtime.state.adminAccounts = listOf(
+                AdminAccountSummary("staff", "fixture_staff", AccountRole.STAFF, "Synthetic staff", "", "", true, false),
+            )
+        }
+        compose.setContent { OliveTheme { AdminPortal(session) } }
+        compose.onNodeWithText(text(R.string.accounts)).performScrollTo().performClick()
+        val staffRow = hasContentDescription("fixture_staff", substring = true)
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(staffRow)
+        compose.onNode(staffRow).assertExists()
+        compose.onNodeWithText(text(R.string.ui_delete), ignoreCase = true).performClick()
+        val confirmation = context.getString(R.string.ui_delete_value, "fixture_staff")
+        compose.onNodeWithText(confirmation).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.cancel)).performClick()
+        compose.onNodeWithText(confirmation).assertDoesNotExist()
+        compose.onNode(staffRow).assertExists()
     }
 
     @Test
@@ -307,7 +607,9 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { StaffPortal(session) } }
         compose.onNodeWithText(text(R.string.safety_inbox)).performClick()
-        compose.onNodeWithTag("safety_staff_available").assertIsDisplayed()
+        compose.onNodeWithTag("safety_staff_available").assertIsDisplayed().assertIsToggleable()
+            .assertContentDescriptionEquals(text(R.string.safety_available))
+        compose.onNodeWithText(text(R.string.safety_available)).assertDoesNotExist()
         compose.onNodeWithText(text(R.string.safety_back)).performClick()
         compose.onNodeWithContentDescription(text(R.string.account_settings)).performClick()
         compose.onNodeWithTag("organization_settings_name").assertTextContains("Fixture Name")
@@ -345,6 +647,21 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithText(text(R.string.emergency_response_reopen)).assertIsEnabled()
         compose.onNodeWithText(text(R.string.emergency_response_pdf)).assertIsEnabled()
         compose.onNodeWithText("Active test account").assertDoesNotExist()
+    }
+
+    @Test
+    fun failedEmergencyResolutionPreservesTheActiveRequestAndAllowsAnotherAttempt() {
+        val session = session(AccountRole.ADMIN) { runtime.state.screen = SessionScreen.Portal }
+        val alerts = listOf(EmergencyAlert("fixture", "owner", "Active fixture request", 100, ""))
+        compose.setContent { OliveTheme { EmergencyResponseScreen(session, alerts, null, {}, {}) } }
+        val resolve = compose.onNodeWithText(text(R.string.emergency_response_resolve))
+        resolve.performClick()
+        compose.onNodeWithText("Active fixture request").assertIsDisplayed()
+        resolve.assertIsEnabled()
+        compose.onNodeWithText(text(R.string.emergency_response_resolved)).performClick()
+        compose.onNodeWithText(text(R.string.emergency_response_empty)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.emergency_response_active)).performClick()
+        compose.onNodeWithText("Active fixture request").assertIsDisplayed()
     }
 
     @Test
@@ -404,7 +721,7 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { com.olive.app.ui.users.shared.organization.OrganizationProfileSetup(session) } }
         compose.onNodeWithTag("organization_full_name").performTextReplacement("Updated synthetic staff")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnIdle { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithTag("onboarding_next").performScrollTo().performClick()
         val email = compose.onNodeWithTag("organization_email")
         email.performTextInput("invalid")
@@ -412,7 +729,7 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithText(text(R.string.ui_invalid_email)).assertExists()
         email.performTextReplacement("staff@example.test")
         compose.onNodeWithTag("organization_phone").performTextInput("555-0100")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnIdle { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithTag("onboarding_back").performScrollTo().performClick()
         compose.onNodeWithTag("organization_full_name").assertTextContains("Updated synthetic staff")
         compose.onNodeWithTag("onboarding_next").performScrollTo().performClick()

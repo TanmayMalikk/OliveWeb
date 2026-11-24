@@ -62,13 +62,16 @@ class EmergencyReportDeliveryTest {
                 mockStatic(FirebaseAppCheck::class.java).use { checkStatic ->
                     checkStatic.`when`<FirebaseAppCheck> { FirebaseAppCheck.getInstance() }.thenReturn(appCheck)
                     val done = AtomicReference<Result<Unit>>()
+                    val confirmations = java.util.concurrent.atomic.AtomicInteger()
                     controller.createEmergencyReport(
-                        identity, profile, emptyList(), { error("Location must not be requested") }, done::set,
+                        identity, profile, emptyList(), { error("Location must not be requested") },
+                        onAlertSent = { confirmations.incrementAndGet() }, onFinished = done::set,
                     )
                     val failure = done.get()?.exceptionOrNull()
                     assertTrue(failure.toString(), failure is MediaDeviceVerificationException)
                     assertSame(outage, failure?.cause)
                     assertFalse(controller.state.loading)
+                    assertEquals(0, confirmations.get())
                     verifyNoInteractions(functions, media)
                 }
             }
@@ -124,9 +127,12 @@ class EmergencyReportDeliveryTest {
                                 DocumentListSnapshot(listOf(attachment, evidence, unrelated), DocumentListSource.SERVER),
                             )
                             val done = AtomicReference<Result<Unit>>()
-                            controller.createEmergencyReport(identity, profile, listOf(incident, note), { null }, done::set)
+                            val confirmations = java.util.concurrent.atomic.AtomicInteger()
+                            controller.createEmergencyReport(identity, profile, listOf(incident, note), { null },
+                                onAlertSent = { confirmations.incrementAndGet() }, onFinished = done::set)
                             fixture.await { mockingDetails(media).invocations.any { it.method.name == "queueFile" } || done.get() != null }
                             val queue = mockingDetails(media).invocations.single { it.method.name == "queueFile" }
+                            assertEquals(1, confirmations.get())
                             assertEquals(setOf(attachment.id, evidence.id), selected.get().keys)
                             verify(documents, never()).download(context, unrelated)
                             val request = mockingDetails(start).invocations.single { it.method.name == "call" }.arguments[0] as Map<*, *>

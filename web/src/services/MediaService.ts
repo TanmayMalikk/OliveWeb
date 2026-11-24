@@ -19,6 +19,7 @@ import {
   unwrapRoomKeyBytes,
 } from "./MessagingService";
 import { importKey } from "./EncryptionService";
+import { authorizeMessagingPeer } from "./FriendInviteService";
 import {
   accountKeysetWrappers,
   type AccountWrappedKey,
@@ -53,6 +54,7 @@ export type BrowserDocument = {
   key?: CryptoKey;
   evidence: boolean;
   tags?: string[];
+  chatOnly?: boolean;
 };
 
 // Turns stored Base64 text back into bytes before a file is decrypted.
@@ -198,6 +200,7 @@ export async function uploadBrowserDocument(
   file: File,
   identity: Identity,
   report: (fraction: number) => void = () => undefined,
+  options: { chatOnly?: boolean } = {},
 ) {
   if (!file.size || file.size > 248 * 1024 * 1024)
     throw new Error("Choose a file smaller than 248 MB.");
@@ -215,7 +218,8 @@ export async function uploadBrowserDocument(
           : file.type.startsWith("image/")
             ? "IMAGE"
             : file.type.startsWith("audio/") ? "AUDIO" : "DOCUMENT",
-        ocrReview: "NOT_RUN",
+        ocrReview: options.chatOnly ? "NOT_APPLICABLE" : "NOT_RUN",
+        ...(options.chatOnly ? { chatOnly: true } : {}),
       }),
     );
     const metadataIv = crypto.getRandomValues(new Uint8Array(12));
@@ -248,6 +252,7 @@ export async function uploadBrowserDocument(
 }
 
 async function wrapForDocumentRecipient(raw: Uint8Array, { uid, username }: { uid: string; username: string }) {
+  await authorizeMessagingPeer(username);
   const { db } = await firebase();
   const directory = doc(db, "messageDirectory", username.toLowerCase());
   const [account, devices, accountKeyset] = await Promise.all([
@@ -362,9 +367,16 @@ export async function publishVoiceMessage(
       ...recipients.map(({ uid, accountKey }) => [uid, accountKey]),
     ]);
     const deviceWrappedKeys = Object.assign({}, ...recipients.map(({ deviceKeys }) => deviceKeys));
+    const ownerAccountWrapper = accountWrappedKey(identity.uid, value);
+    const ownerAccountKeyset = ownerAccountWrapper ??
+      (await wrapForDocumentRecipient(raw, identity)).accountKeysetKey;
+    const accountWrappedKeys: Record<string, AccountWrappedKey> = Object.fromEntries([
+      [identity.uid, ownerAccountKeyset],
+      ...recipients.map(({ uid, accountKeysetKey }) => [uid, accountKeysetKey]),
+    ]);
     const { httpsCallable } = await import("firebase/functions");
     await httpsCallable(functions, "mediaShareInChat")({
-      ...message, recipientUids, wrappedKeys, deviceWrappedKeys,
+      ...message, recipientUids, wrappedKeys, deviceWrappedKeys, accountWrappedKeys,
     });
   } finally {
     raw.fill(0);
@@ -462,7 +474,21 @@ async function decryptMetadata(value: string, key: CryptoKey) {
     name?: unknown;
     mimeType?: unknown;
     tags?: unknown;
+    chatOnly?: unknown;
   };
+}
+
+// Excludes chat-only uploads (such as voice messages) from Document Storage lists while preserving direct chat playback.
+function isChatOnlyMedia(
+  document: Pick<BrowserDocument, "chatOnly" | "name" | "mimeType">,
+): boolean {
+  if (document.chatOnly === true) return true;
+  const mimeType = document.mimeType.split(";", 1)[0].trim().toLowerCase();
+  const name = document.name.trim().toLowerCase();
+  return (
+    mimeType.startsWith("audio/") &&
+    (name === "voice message" || name.startsWith("voice message."))
+  );
 }
 
 // Lists documents this signed-in account is allowed to open.
@@ -476,7 +502,9 @@ export async function listBrowserDocuments(
       where("allowed_users", "array-contains", identity.uid),
     ),
   );
-  return resolveBrowserDocuments(identity, snapshot.docs);
+  return (await resolveBrowserDocuments(identity, snapshot.docs)).filter(
+    (document) => !isChatOnlyMedia(document),
+  );
 }
 
 // Web safe-app documents: keeps phone and browser uploads visible as soon as Firestore records them.
@@ -497,7 +525,11 @@ export async function observeBrowserDocuments(
     (snapshot) => {
       const current = ++revision;
       void resolveBrowserDocuments(identity, snapshot.docs)
-        .then((documents) => { if (current === revision) onUpdate(documents); })
+        .then((documents) => {
+          if (current === revision) {
+            onUpdate(documents.filter((document) => !isChatOnlyMedia(document)));
+          }
+        })
         .catch((error) => {
           if (current === revision) onError(error instanceof Error ? error : new Error(String(error)));
         });
@@ -524,6 +556,7 @@ async function resolveBrowserDocuments(
       let name = "Encrypted document";
       let mimeType = "application/octet-stream";
       let tags: string[] = [];
+      let chatOnly = false;
       // New uploads keep their private details in one encrypted metadata value.
       if (encryptedStorage && typeof encryptedMetadata === "string") {
         try {
@@ -540,6 +573,7 @@ async function resolveBrowserDocuments(
             mimeType = metadata.mimeType;
           if (Array.isArray(metadata.tags))
             tags = metadata.tags.filter((tag): tag is string => typeof tag === "string");
+          if (metadata.chatOnly === true) chatOnly = true;
         } catch {
           key = undefined;
         }
@@ -567,6 +601,7 @@ async function resolveBrowserDocuments(
         key,
         evidence: value.evidence === true,
         tags,
+        chatOnly,
       };
     }),
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));

@@ -2,6 +2,35 @@
 import { expect, test } from "./coverageFixture";
 import AxeBuilder from "@axe-core/playwright";
 
+test("crossing keeps the selected character and can restart after the hawk", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/game");
+  await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
+  const character = page.getByRole("button", { name: "Select Sproutling", exact: true });
+  await character.click();
+  await expect(character).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => page.evaluate(async () => {
+    const path = "/src/services/CoverStateStore.ts";
+    const { readCover } = await import(path);
+    return readCover("olive-crossing-character", "");
+  })).toBe("sproutling");
+  await page.reload();
+  await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
+  await expect(character).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Start Olive Crossing" }).click();
+  const board = page.getByRole("group", { name: /Olive Crossing board/ });
+  await board.press("w");
+  await expect(page.getByRole("status")).toContainText("1 lanes cleared");
+  await board.press("Enter");
+  await expect(page.getByRole("status")).toContainText("Paused");
+  await page.getByRole("button", { name: "Resume Olive Crossing" }).click();
+  await expect(page.getByRole("status")).toContainText("1 lanes cleared");
+  for (let seconds = 0; seconds < 13; seconds++) await page.clock.runFor(1000);
+  await expect(page.getByText("Swooped by the orchard hawk", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Play Olive Crossing again" }).click();
+  await expect(page.getByRole("status")).toContainText("0 lanes cleared");
+});
+
 // Inputs: the values in this case. Expected: Olive Crossing supports keyboard play, pausing and restarting.
 test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   page,
@@ -34,11 +63,9 @@ test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   await expect(board).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(page.getByRole("status")).toContainText("1 lanes cleared");
-  await expect(page.locator(".crossing-player-hop")).toHaveCSS(
-    "animation-name",
-    "crossing-hop",
-  );
+  await expect(page.locator(".crossing-player")).toHaveAttribute("data-facing", "up");
   await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".crossing-player")).toHaveAttribute("data-facing", "left");
 
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Paused. Take your time.");

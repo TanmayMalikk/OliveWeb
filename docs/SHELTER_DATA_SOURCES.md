@@ -1,0 +1,11 @@
+# Public shelter listings
+
+The shelter additions use published service listings accessed on November 23, 2026.
+
+- British Columbia listings come from the [BC Housing Shelter Map](https://smap.bchousing.org/). The bundle includes year-round sites with a publicly displayed street address, coordinates, and a usable intake number. Eligibility comes from the listing. Call the shelter to confirm intake and availability.
+- Toronto listings come from the [City of Toronto public shelter map](https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/). Toronto Central Intake is the contact for placement for most entries. The [Red Door Family Shelter](https://www.reddoorshelter.ca/what-we-do/family-shelter/) has a provider-published location and family intake instructions. Contains information licensed under the [Open Government Licence – Toronto](https://open.toronto.ca/open-data-licence/).
+- Alberta listings come from [Alberta's shelter directory](https://www.alberta.ca/find-shelters) and the [Calgary Dream Centre](https://calgarydreamcentre.com/contact-us/). Coordinates come from the [City of Calgary parcel address dataset](https://data.calgary.ca/Base-Maps/Parcel-Address/9zvu-p8uz) and the [City of Edmonton property information dataset](https://data.edmonton.ca/City-Administration/Property-Information-Current-Calendar-Year-/dkk9-cj3x). Contains information licensed under the [Open Government Licence – City of Calgary](https://data.calgary.ca/d/Open-Data-Terms/u45n-7awa) and [Open Data Terms of Use – City of Edmonton](https://www.edmonton.ca/sites/default/files/public-files/documents/Web-version2.1-OpenDataAgreement.pdf).
+
+The app’s Service details action uses the listing’s `url`. Prefer a provider or program page, or the individual service record from a public referral directory when a provider page is unavailable. The `source` field preserves the original source for the listed location and contact information.
+
+Use a provider's or public agency's designated public shelter listing to verify addresses before adding pins. Keep withheld street addresses and coordinates out of the bundle. Published locations and hours can change, and the bundled directory does not track bed availability.

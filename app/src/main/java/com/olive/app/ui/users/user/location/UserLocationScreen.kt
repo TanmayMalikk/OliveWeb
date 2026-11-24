@@ -1,13 +1,19 @@
-// Safe-app users: shows live-location sharing and the user's map.
+// Safe-app users: shows live-location sharing, directory map places, free-use GPS routing, and compass view.
 package com.olive.app.ui.users.user.location
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,39 +21,42 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.*
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -62,88 +72,135 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
-import com.olive.app.data.location.LoadedSupportArea
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.location.NearbySupportService
-import com.olive.app.data.location.NearbySupportServices
-import com.olive.app.data.location.SupportMapCenter
+import com.olive.app.data.location.supportDistanceMeters
 import com.olive.app.data.messaging.Friend
-import com.olive.app.ui.shared.*
+import com.olive.app.data.safety.HotlineDirectory
+import com.olive.app.data.safety.HotlineResource
+import com.olive.app.data.safety.SavedHotlineStore
+import com.olive.app.data.safety.hotlineDialNumber
+import com.olive.app.ui.shared.AccessibleMessage
+import com.olive.app.ui.shared.Ink
+import com.olive.app.ui.shared.LoadingSkeleton
+import com.olive.app.ui.shared.LocalWalkthroughDirective
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.OliveOutline
+import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.SkeletonLayout
+import com.olive.app.ui.shared.SoftCardSurface
 import com.olive.app.ui.shared.oliveScrollbar
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+/**
+ * Renders the active route progress card with full-screen and stop-navigation controls.
+ *
+ * @param controller The controller that owns the screen's state and actions.
+ * @param state The current state used to render the component.
+ * @param displayedOwn The current user's location point shown on the map, if available.
+ * @param onOpenFullScreen Runs when the user requests the full-screen map.
+ */
 @Composable
-private fun BackgroundLocationButton(requestPermission: suspend () -> Boolean) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var explain by remember { mutableStateOf(false) }
-    var requesting by remember { mutableStateOf(false) }
-    val title = stringResource(R.string.location_background_access)
-    TextButton(onClick = { explain = true }, enabled = !requesting, modifier = Modifier.testTag("background_location")) {
-        Text(title)
-    }
-    if (explain) {
-        val help = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            stringResource(R.string.location_background_settings, context.packageManager.backgroundPermissionOptionLabel)
-        } else {
-            stringResource(R.string.location_background_dialog)
-        }
-        AlertDialog(
-            onDismissRequest = { explain = false },
-            title = { Text(title) },
-            text = { Text(help) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        explain = false
-                        requesting = true
-                        scope.launch {
-                            try {
-                                requestPermission()
-                            } finally {
-                                requesting = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.testTag("background_location_continue"),
-                ) { Text(stringResource(R.string.next)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { explain = false }) { Text(stringResource(R.string.cancel)) }
-            },
-        )
-    }
-}
-
-@Composable
-private fun PrivateRouteControls(controller: LocationMapController, state: LocationMapState) {
-    if (state.navigating) {
-        OutlinedButton(onClick = controller::stopNavigation, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.location_stop_navigation))
-        }
-        state.privateDestination?.let { destination ->
-            Text(destination.name, style = MaterialTheme.typography.labelLarge)
+private fun PrivateRouteControls(
+    controller: LocationMapController,
+    state: LocationMapState,
+    displayedOwn: MapLocationPoint?,
+    onOpenFullScreen: () -> Unit,
+) {
+    if (!state.navigating) return
+    Surface(
+        Modifier.fillMaxWidth().testTag("active_route_card"),
+        shape = RoundedCornerShape(18.dp),
+        color = SoftCardSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val progress = state.route?.let { r -> displayedOwn?.let { r.progress(it.latitude, it.longitude) } }
+            TripSummaryMetrics(
+                route = state.route,
+                progress = progress,
+                destinationName = state.privateDestination?.name.orEmpty(),
+                routeProfile = state.routeProfile,
+            )
             state.route?.let { route ->
-                state.ownPoint?.let { origin -> route.nextDirection(origin.latitude, origin.longitude) }
-                    ?.let { Text(stringResource(R.string.location_next_direction, it.text)) }
+                displayedOwn?.let { origin -> route.nextDirection(origin.latitude, origin.longitude) }
+                    ?.let {
+                        Text(
+                            stringResource(R.string.location_next_direction, it.text),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+            }
+            if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onOpenFullScreen,
+                    modifier = Modifier.weight(1f).height(44.dp).testTag("location_full_screen_navigation"),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                ) {
+                    Icon(Icons.Outlined.Fullscreen, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.location_full_screen_navigation),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
+                    onClick = controller::stopNavigation,
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(Icons.Outlined.Close, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.location_stop_navigation),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
 }
 
-// Shows the user and trusted-contact map, sharing controls, and route tools.
+/**
+ * Shows the user and trusted-contact map, sharing controls, directory places, and route tools.
+ *
+ * @param session The session view model supplying state and actions.
+ */
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
+    LocationMapScreen(session, session.locationMap)
+}
+
+/**
+ * Renders the location workspace bound to a specific [LocationMapController] instance.
+ *
+ * @param session The session view model supplying state and actions.
+ * @param controller The controller that owns the screen's state and actions.
+ */
+@Composable
+internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMapController) {
+    val context = LocalContext.current
     val profile = session.profile ?: return
     val uid = session.coverAccountId ?: return
-    val controller = session.locationMap
     val requestPermission = LocalLocationPermissionRequest.current
     val requestBackgroundPermission = LocalBackgroundLocationPermissionRequest.current
     val youLabel = stringResource(R.string.you)
@@ -153,83 +210,141 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     val routeUnavailable = stringResource(R.string.location_route_unavailable)
     val routeFailed = stringResource(R.string.location_route_failed)
     val routeNotConfigured = stringResource(R.string.location_route_not_configured)
+    var permissionResult by remember(uid) { mutableStateOf<Boolean?>(null) }
+    var foregroundDenied by remember(uid) { mutableStateOf(false) }
+    var explainBackground by remember(uid) { mutableStateOf(false) }
+    var offeredBackground by remember(uid) { mutableStateOf(false) }
+    val permissionScope = rememberCoroutineScope()
+
+    /**
+     * Prompts for location permission when needed and tracks foreground/background prompts.
+     *
+     * @param retry Whether to request foreground permission again even if a previous result exists.
+     * @return True when the current location permission is sufficient to open the map.
+     */
+    suspend fun requestMapAccess(retry: Boolean = false): Boolean {
+        val granted = if (retry || permissionResult == null) requestPermission() else permissionResult == true
+        permissionResult = granted
+        foregroundDenied = !granted
+        if (granted && profile.role == AccountRole.USER && requestBackgroundPermission != null && !offeredBackground) {
+            offeredBackground = true
+            explainBackground = true
+        }
+        return granted
+    }
+
     var durationDialog by remember { mutableStateOf(false) }
     var fullScreenMap by rememberSaveable(uid) { mutableStateOf(false) }
+    var showSavedOnly by rememberSaveable(uid) { mutableStateOf(false) }
+    var headingUp by rememberSaveable(uid) { mutableStateOf(false) }
+
     val configuration = LocationMapConfiguration(
         AccountIdentity(uid, profile.username), profile, session.messages.friends,
-        session.localMode, youLabel, savedLocationLabel
+        session.localMode, youLabel, savedLocationLabel,
     )
-    LaunchedEffect(uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
-        controller.open(configuration, requestPermission)
+    LaunchedEffect(controller, uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
+        controller.open(configuration) { requestMapAccess() }
     }
     DisposableEffect(controller) { onDispose(controller::closeMap) }
+
     val state = controller.state
     val displayedOwn = state.displayedOwn(profile.role)
     val points = listOfNotNull(displayedOwn, state.privateDestination) + state.contacts
     val liveUsers = state.contacts.filter { it.live }
     val origin = state.ownPoint
-    val serviceSearchEnabled = !session.localMode && profile.role == AccountRole.USER
-    var loadedAreas by remember(uid) { mutableStateOf(emptyList<LoadedSupportArea>()) }
-    var viewportCenter by remember(uid) { mutableStateOf<SupportMapCenter?>(null) }
-    var requestedArea by remember(uid) { mutableStateOf<SupportMapCenter?>(null) }
-    var failedArea by remember(uid) { mutableStateOf<SupportMapCenter?>(null) }
-    LaunchedEffect(uid, serviceSearchEnabled, origin != null) {
-        if (serviceSearchEnabled && origin != null && state.ownerUid == uid &&
-            loadedAreas.isEmpty() && requestedArea == null && failedArea == null
-        ) {
-            requestedArea = SupportMapCenter(origin.latitude, origin.longitude)
+
+    LaunchedEffect(origin != null, state.privateDestination) {
+        if (controller.consumePendingAutoStart()) {
+            controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed)
         }
     }
-    LaunchedEffect(uid, requestedArea) {
-        val center = requestedArea ?: return@LaunchedEffect
-        failedArea = null
-        try {
-            val result = NearbySupportServices.find(center.latitude, center.longitude)
-            loadedAreas = loadedAreas + LoadedSupportArea(center, result)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            failedArea = center
-        } finally {
-            requestedArea = null
-        }
-    }
-    val supportServices = remember(loadedAreas) { loadedAreas.flatMap { it.result.services }.distinctBy { it.id } }
-    val uncoveredCenter = viewportCenter?.takeIf { center ->
-        loadedAreas.isNotEmpty() && loadedAreas.none { it.covers(center) }
-    }
-    val onViewportChanged: ((Double, Double) -> Unit)? = if (serviceSearchEnabled) {
-        { latitude, longitude -> viewportCenter = SupportMapCenter(latitude, longitude) }
-    } else null
-    val loadMore: (() -> Unit)? = uncoveredCenter?.let { center ->
-        if (requestedArea == null) ({ requestedArea = center }) else null
-    }
-    var selectedService by remember(uid) { mutableStateOf<NearbySupportService?>(null) }
-    var showServiceList by remember(uid) { mutableStateOf(false) }
-    if (showServiceList) AlertDialog(
-        onDismissRequest = { showServiceList = false },
-        title = { Text(stringResource(R.string.nearby_support_title)) },
-        text = {
-            LazyColumn { items(supportServices, key = { it.id }) { service ->
-                TextButton(onClick = { selectedService = service; showServiceList = false }) { Text(service.name) }
-            } }
-        },
-        confirmButton = { TextButton(onClick = { showServiceList = false }) { Text(stringResource(R.string.close)) } },
+
+    val liveHeadingState = rememberDeviceHeadingState(
+        enabled = true,
+        latitude = origin?.latitude,
+        longitude = origin?.longitude,
+        gpsBearing = state.ownBearing,
+        gpsSpeedMetersPerSecond = state.ownSpeedMps,
     )
-    selectedService?.let { service -> AlertDialog(
-        onDismissRequest = { selectedService = null },
-        title = { Text(service.name) },
-        text = { Text(service.address) },
-        confirmButton = {
-            TextButton(onClick = {
-                selectedService = null
+
+    val directory by produceState<HotlineDirectory?>(null, context) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { HotlineDirectory.readBundled(context) }.getOrNull()
+        }
+    }
+    val savedVersion by SavedHotlineStore.updates.collectAsState()
+    val savedIds = remember(directory, uid, savedVersion) {
+        SavedHotlineStore.savedIds(context, uid, directory?.resources.orEmpty())
+    }
+    val directoryRegion = remember(directory, profile.address) {
+        directory?.regionFor(profile.address)
+    }
+    val directoryPlaces = remember(directory, directoryRegion, origin?.latitude, origin?.longitude) {
+        val mapped = directoryRegion?.let { directory?.mapLocations(region = it) }.orEmpty()
+        if (origin == null) mapped
+        else mapped.sortedBy {
+            supportDistanceMeters(origin.latitude, origin.longitude, it.latitude!!, it.longitude!!)
+        }
+    }
+    val savedMappedCount = remember(directoryPlaces, savedIds) {
+        directoryPlaces.count { it.id in savedIds }
+    }
+    val visibleDirectoryPlaces = remember(directoryPlaces, showSavedOnly, savedIds) {
+        if (showSavedOnly) directoryPlaces.filter { it.id in savedIds } else directoryPlaces
+    }
+    val supportServices = remember(profile.role, visibleDirectoryPlaces, savedIds) {
+        if (profile.role == AccountRole.USER) {
+            visibleDirectoryPlaces.map { place ->
+                NearbySupportService(
+                    id = place.id,
+                    name = place.name,
+                    address = place.address,
+                    latitude = place.latitude!!,
+                    longitude = place.longitude!!,
+                    saved = place.id in savedIds,
+                )
+            }
+        } else emptyList()
+    }
+
+    var selectedResource by remember(uid) { mutableStateOf<HotlineResource?>(null) }
+    var showDirectoryList by remember(uid) { mutableStateOf(false) }
+    val wt = LocalWalkthroughDirective.current
+    var wtPopup by remember(uid) { mutableStateOf<String?>(null) }
+    LaunchedEffect(wt?.stepId, wt?.action) {
+        if (wt?.action == "location_open_directory") { showDirectoryList = true; durationDialog = false; wtPopup = "dir" }
+        else if (wt?.action == "location_open_duration") { durationDialog = true; showDirectoryList = false; wtPopup = "dur" }
+        else if (wtPopup != null) { showDirectoryList = false; durationDialog = false; wtPopup = null }
+    }
+
+    if (wt?.action != null) { /* handled below after Column */ }
+    selectedResource?.let { resource ->
+        DirectoryPlaceDetailDialog(
+            resource = resource,
+            saved = resource.id in savedIds,
+            onToggleSave = { SavedHotlineStore.toggle(context, uid, resource.id) },
+            onDial = {
+                hotlineDialNumber(resource.phoneUri)?.let { dial ->
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", dial, null)))
+                    }
+                }
+            },
+            onStartNavigation = {
+                val lat = resource.latitude ?: return@DirectoryPlaceDetailDialog
+                val lng = resource.longitude ?: return@DirectoryPlaceDetailDialog
+                selectedResource = null
                 controller.stopNavigation()
-                controller.selectPrivateDestination(service.name, service.latitude, service.longitude)
+                controller.selectPrivateDestination(resource.name, lat, lng)
                 controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed)
-            }) { Text(stringResource(R.string.location_start_navigation)) }
-        },
-        dismissButton = { TextButton(onClick = { selectedService = null }) { Text(stringResource(R.string.cancel)) } },
-    ) }
+            },
+            onDismiss = { selectedResource = null },
+        )
+    }
+
+    val selectSupportMarker: (NearbySupportService) -> Unit = { service ->
+        selectedResource = directoryPlaces.firstOrNull { it.id == service.id }
+    }
     val navigationTarget = state.privateDestination ?: liveUsers.firstOrNull { it.uid == state.navigationTargetUid }
     if (fullScreenMap) {
         BackHandler { fullScreenMap = false }
@@ -245,63 +360,92 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             onExitFullScreen = { fullScreenMap = false },
             onStopNavigation = controller::stopNavigation,
             supportServices = supportServices,
-            onSupportSelected = { selectedService = it },
-            onViewportCenterChanged = onViewportChanged,
-            onLoadMoreSupport = loadMore,
-            loadingMoreSupport = requestedArea != null && loadedAreas.isNotEmpty(),
+            onSupportSelected = selectSupportMarker,
+            headingUp = headingUp,
+            headingState = liveHeadingState,
+            onToggleHeadingUp = { headingUp = !headingUp },
+            showSavedOnly = showSavedOnly,
+            savedCount = savedMappedCount,
+            onToggleSavedOnly = if (profile.role == AccountRole.USER) ({ showSavedOnly = !showSavedOnly }) else null,
+            routeProfile = state.routeProfile,
+            onUserGesture = { if (headingUp) headingUp = false },
         )
         return
     }
 
     Column(
         Modifier.fillMaxSize()
-            .then(if (profile.role == AccountRole.USER) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
-            .then(if (profile.role == AccountRole.USER) Modifier.padding(bottom = 88.dp) else Modifier),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(bottom = if (profile.role == AccountRole.USER) 88.dp else 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("location_back")) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                    stringResource(R.string.ui_previous_safe_page)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ui_previous_safe_page))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.location_map),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    stringResource(if (profile.role == AccountRole.USER) R.string.location_map_user_help else R.string.location_map_contact_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                stringResource(R.string.location_map),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() })
         }
-        Text(
-            stringResource(if (profile.role == AccountRole.USER) R.string.location_map_user_help else R.string.location_map_contact_help),
-            style = MaterialTheme.typography.bodyMedium, color = Muted
+        if (foregroundDenied) Button(
+            onClick = { permissionScope.launch { if (requestMapAccess(retry = true)) controller.open(configuration) { true } } },
+            modifier = Modifier.fillMaxWidth().testTag("map_allow_location"),
+        ) { Text(stringResource(R.string.app_permissions_request, stringResource(R.string.app_permissions_location))) }
+        if (profile.role == AccountRole.USER && requestBackgroundPermission != null) BackgroundLocationButton(
+            requestBackgroundPermission, explainBackground, { explainBackground = false },
+        )
+        FreeUseGpsDestinationCard(
+            controller = controller,
+            state = state,
+            directoryPlaces = if (profile.role == AccountRole.USER) directoryPlaces else emptyList(),
+            routeNotConfigured = routeNotConfigured,
+            routeUnavailable = routeUnavailable,
+            routeFailed = routeFailed,
         )
         Surface(
-            Modifier.fillMaxWidth().then(
-                if (profile.role == AccountRole.USER) Modifier.height(300.dp)
-                else Modifier.weight(1f).heightIn(min = 280.dp)
-            ),
+            Modifier.fillMaxWidth().height(if (profile.role == AccountRole.USER) 360.dp else 250.dp).walkthroughTarget("location_map_card"),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 2.dp
+            shadowElevation = 2.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
                 InteractiveLocationMap(
-                    points,
-                    Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)),
-                    displayedOwn?.uid,
+                    points = points,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)),
+                    ownPointUid = displayedOwn?.uid,
                     showOwnPointInBlue = profile.role == AccountRole.SAFE_CONTACT,
                     route = state.route,
                     navigationActive = state.navigating,
                     supportServices = supportServices,
-                    onSupportSelected = { selectedService = it },
-                    onViewportCenterChanged = onViewportChanged,
+                    onSupportSelected = selectSupportMarker,
+                    headingUp = headingUp,
+                    headingState = liveHeadingState,
+                    onToggleHeadingUp = { headingUp = !headingUp },
+                    fitSupportServices = showSavedOnly && savedMappedCount > 0,
+                    onUserGesture = { if (headingUp) headingUp = false },
                 )
                 IconButton(
                     onClick = { fullScreenMap = true },
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp).testTag("location_expand_map"),
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                        .shadow(4.dp, CircleShape)
+                        .border(BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)), CircleShape)
+                        .testTag("location_expand_map"),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = Paper,
+                        contentColor = Ink,
                     ),
                 ) {
                     Icon(Icons.Outlined.Fullscreen, stringResource(R.string.location_expand_map))
@@ -309,132 +453,153 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             }
         }
         if (profile.role == AccountRole.USER) {
-            when {
-                requestedArea != null -> LoadingSkeleton(SkeletonLayout.NearbySupport)
-                failedArea != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.nearby_support_failed), Modifier.weight(1f))
-                    TextButton(onClick = { requestedArea = uncoveredCenter ?: failedArea }) {
-                        Text(stringResource(R.string.retry))
-                    }
-                }
-                loadMore != null -> OutlinedButton(onClick = loadMore, modifier = Modifier.testTag("load_more_hotline_locations")) {
-                    Text(stringResource(R.string.load_more_hotline_locations))
-                }
-                loadedAreas.isEmpty() && serviceSearchEnabled && (origin != null || state.locating || state.ownerUid != uid) ->
-                    LoadingSkeleton(SkeletonLayout.NearbySupport)
-                loadedAreas.isEmpty() && origin == null -> Text(
-                    stringResource(R.string.nearby_support_location_required), style = MaterialTheme.typography.bodySmall,
-                )
-                supportServices.isEmpty() -> Text(stringResource(R.string.nearby_support_empty), style = MaterialTheme.typography.bodySmall)
-            }
-            if (supportServices.isNotEmpty()) TextButton(
-                onClick = { showServiceList = true },
-                modifier = Modifier.testTag("nearby_support_list"),
-            ) { Text(stringResource(R.string.loaded_hotline_locations, supportServices.size)) }
-            PrivateRouteControls(controller, state)
-            if (requestBackgroundPermission != null) BackgroundLocationButton(requestBackgroundPermission)
-            if (state.navigating) OutlinedButton(onClick = { fullScreenMap = true }) {
-                Text(stringResource(R.string.location_full_screen_navigation))
-            }
+            DirectoryMapFilterRow(
+                visibleCount = visibleDirectoryPlaces.size,
+                savedMappedCount = savedMappedCount,
+                showSavedOnly = showSavedOnly,
+                headingUp = headingUp,
+                onToggleSavedOnly = { showSavedOnly = !showSavedOnly },
+                onToggleHeadingUp = { headingUp = !headingUp },
+                onOpenDirectoryList = { showDirectoryList = true },
+            )
+            PrivateRouteControls(
+                controller = controller,
+                state = state,
+                displayedOwn = displayedOwn,
+                onOpenFullScreen = { fullScreenMap = true },
+            )
             Surface(
                 Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                color = SoftCardSurface
+                shape = RoundedCornerShape(18.dp),
+                color = SoftCardSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        stringResource(R.string.share_live_location_with),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        stringResource(R.string.location_contacts_selected, state.selected.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted
-                    )
-                    if (session.messages.loadingIndex) LoadingSkeleton(SkeletonLayout.Contacts, rows = 1)
-                    else {
-                        LocationShareFriendPicker(
-                            accountId = uid,
-                            friends = session.messages.friends,
-                            contactNames = profile.contacts.associate { it.linkedUid to it.name },
-                            selected = state.selected,
-                            enabled = !state.liveActive && !state.working,
-                            onSelectionChange = controller::selectContact,
-                        )
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.share_live_location_with), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.location_contacts_selected, state.selected.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Muted,
+                            )
+                        }
                     }
+                    if (session.messages.loadingIndex) LoadingSkeleton(SkeletonLayout.Contacts, rows = 1)
+                    else LocationShareFriendPicker(
+                        accountId = uid,
+                        friends = session.messages.friends,
+                        contactNames = profile.contacts.associate { it.linkedUid to it.name },
+                        selected = state.selected,
+                        enabled = !state.liveActive && !state.working,
+                        onSelectionChange = controller::selectContact,
+                    )
                     if (state.liveActive) Text(
-                        stringResource(
-                            R.string.location_sharing_until,
-                            formatShareTime(state.expiresAt)
-                        ),
-                        style = MaterialTheme.typography.bodySmall, color = OliveGreen
+                        stringResource(R.string.location_sharing_until, formatShareTime(state.expiresAt)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OliveGreen,
+                    )
+                    if (!state.liveActive) Button(
+                        onClick = { durationDialog = true },
+                        enabled = state.selected.isNotEmpty() && !state.working && !session.localMode,
+                        modifier = Modifier.fillMaxWidth().testTag("start_location_sharing"),
+                    ) {
+                        Icon(Icons.Outlined.LocationOn, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.start_sharing_location))
+                    } else Button(
+                        onClick = controller::stopSharing,
+                        modifier = Modifier.fillMaxWidth().testTag("stop_location_sharing"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    ) { Text(stringResource(R.string.stop_sharing_location)) }
+                    if (session.localMode) Text(
+                        stringResource(R.string.location_firebase_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
                     )
                 }
             }
-            if (!state.liveActive) Button(
-                onClick = { durationDialog = true },
-                enabled = state.selected.isNotEmpty() && !state.working && !session.localMode,
-                modifier = Modifier.fillMaxWidth().testTag("start_location_sharing")
-            ) {
-                Icon(Icons.Outlined.LocationOn, null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.start_sharing_location)
-                )
-            } else Button(
-                onClick = controller::stopSharing,
-                modifier = Modifier.fillMaxWidth().testTag("stop_location_sharing"),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text(stringResource(R.string.stop_sharing_location)) }
             if (durationDialog) ShareDurationDialog(
-                onDismiss = { durationDialog = false },
+                inWindow = wtPopup == "dur",
+                onDismiss = { durationDialog = false; wtPopup = null },
                 onSelected = { durationMillis ->
-                    durationDialog = false
-                    controller.startSharing(
-                        configuration,
-                        durationMillis,
-                        requestPermission,
-                        permissionRequired,
-                        startFailed
-                    )
-                })
-            if (session.localMode) Text(
-                stringResource(R.string.location_firebase_required),
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted
+                    durationDialog = false; wtPopup = null
+                    controller.startSharing(configuration, durationMillis, requestPermission, permissionRequired, startFailed)
+                },
             )
         } else {
             Surface(
                 Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
+                shape = RoundedCornerShape(18.dp),
                 color = SoftCardSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        stringResource(R.string.safe_contact_live_location),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        stringResource(R.string.safe_contact_live_location_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted
-                    )
-                    if (liveUsers.isEmpty()) Text(
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.safe_contact_live_location),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilterChip(
+                            selected = headingUp,
+                            onClick = { headingUp = !headingUp },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (headingUp) R.string.location_compass_heading_up
+                                        else R.string.location_compass_north_up
+                                    ),
+                                    maxLines = 1,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(16.dp))
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Paper,
+                                labelColor = Ink,
+                                iconColor = OliveGreen,
+                                selectedContainerColor = OliveGreen,
+                                selectedLabelColor = Paper,
+                                selectedLeadingIconColor = Paper,
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = headingUp,
+                                borderColor = OliveOutline.copy(alpha = 0.65f),
+                                selectedBorderColor = OliveGreen,
+                            ),
+                            modifier = Modifier.testTag("map_heading_chip"),
+                        )
+                    }
+                    Text(stringResource(R.string.safe_contact_live_location_help), style = MaterialTheme.typography.bodySmall, color = Muted)
+                    state.privateDestination?.let { destination ->
+                        Text(
+                            destination.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (liveUsers.isEmpty() && state.privateDestination == null) Text(
                         stringResource(R.string.location_no_shared_users),
                         style = MaterialTheme.typography.bodySmall,
                         color = Muted,
-                    ) else {
-                        Text(
-                            stringResource(R.string.location_navigation_destination),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                    ) else if (liveUsers.isNotEmpty()) {
+                        Text(stringResource(R.string.location_navigation_destination), style = MaterialTheme.typography.labelLarge)
                         Row(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             liveUsers.forEach { point ->
                                 FilterChip(
-                                    selected = point.uid == state.navigationTargetUid,
+                                    selected = state.privateDestination == null && point.uid == state.navigationTargetUid,
                                     onClick = { controller.selectNavigationTarget(point.uid) },
                                     label = { Text(point.name) },
                                     enabled = !state.navigating,
@@ -443,63 +608,68 @@ internal fun LocationMapScreen(session: SessionViewModel) {
                         }
                     }
                     state.route?.takeIf { state.navigating }?.let { route ->
-                        val progress = displayedOwn?.let {
-                            route.progress(it.latitude, it.longitude)
-                        }
-                        Text(
-                            stringResource(
-                                R.string.location_route_summary,
-                                formatRouteDistance(progress?.distanceMeters ?: route.distanceMeters),
-                                formatRouteDuration(progress?.durationSeconds ?: route.durationSeconds),
-                            ),
-                            style = MaterialTheme.typography.titleSmall,
+                        val progress = displayedOwn?.let { route.progress(it.latitude, it.longitude) }
+                        TripSummaryMetrics(
+                            route = route,
+                            progress = progress,
+                            destinationName = navigationTarget?.name.orEmpty(),
+                            routeProfile = state.routeProfile,
                         )
-                        displayedOwn?.let { own ->
-                            route.nextDirection(own.latitude, own.longitude)
-                        }?.let { direction ->
+                        displayedOwn?.let { route.nextDirection(it.latitude, it.longitude) }?.let { direction ->
                             Text(
                                 stringResource(R.string.location_next_direction, direction.text),
                                 style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                     if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
-                    Button(
-                        onClick = {
-                            if (state.navigating) controller.stopNavigation()
-                            else controller.startNavigation(
-                                notConfiguredMessage = routeNotConfigured,
-                                unavailableMessage = routeUnavailable,
-                                failedMessage = routeFailed,
-                            )
-                        },
-                        enabled = state.navigating || (!state.routeWorking && state.ownPoint != null && state.navigationTargetUid != null),
-                        modifier = Modifier.fillMaxWidth().testTag("location_navigate"),
-                    ) {
-                        Icon(Icons.Outlined.Navigation, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (state.navigating) R.string.location_stop_navigation else R.string.location_start_navigation))
+                    if (state.navigating) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedButton(
+                                onClick = { fullScreenMap = true },
+                                modifier = Modifier.weight(1f).height(44.dp).testTag("location_full_screen_navigation"),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            ) {
+                                Icon(Icons.Outlined.Fullscreen, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.location_full_screen_navigation),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Button(
+                                onClick = controller::stopNavigation,
+                                modifier = Modifier.weight(1f).height(44.dp).testTag("location_navigate"),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            ) {
+                                Icon(Icons.Outlined.Close, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.location_stop_navigation),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { controller.startNavigation(routeNotConfigured, routeUnavailable, routeFailed) },
+                            enabled = !state.routeWorking && state.ownPoint != null && (state.navigationTargetUid != null || state.privateDestination != null),
+                            modifier = Modifier.fillMaxWidth().testTag("location_navigate"),
+                        ) {
+                            Icon(Icons.Outlined.Navigation, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.location_start_navigation))
+                        }
                     }
-                    if (state.navigating) OutlinedButton(
-                        onClick = { fullScreenMap = true },
-                        modifier = Modifier.fillMaxWidth().testTag("location_full_screen_navigation"),
-                    ) {
-                        Icon(Icons.Outlined.Fullscreen, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.location_full_screen_navigation))
-                    }
-                    Text(
-                        stringResource(R.string.location_route_privacy),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                    )
+                    Text(stringResource(R.string.location_route_privacy), style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.share_saved_location), style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.share_saved_location_help), style = MaterialTheme.typography.bodySmall, color = Muted)
@@ -510,8 +680,31 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         state.error?.let { AccessibleMessage(it) }
         state.routeError?.let { AccessibleMessage(it) }
     }
+    if (showDirectoryList) {
+        DirectoryPlacesListDialog(
+            places = visibleDirectoryPlaces,
+            savedIds = savedIds,
+            onToggleSave = { SavedHotlineStore.toggle(context, uid, it.id) },
+            onSelect = {
+                selectedResource = it
+                showDirectoryList = false; wtPopup = null
+            },
+            inWindow = wtPopup == "dir",
+            onDismiss = { showDirectoryList = false; wtPopup = null },
+        )
+    }
 }
 
+/**
+ * Renders the searchable friend picker used to choose live-location recipients.
+ *
+ * @param accountId The account ID that owns the key or record.
+ * @param friends The accepted friends available for the operation.
+ * @param contactNames The display names associated with sharing recipients.
+ * @param selected Whether this item is currently selected.
+ * @param enabled Whether the control or feature is enabled.
+ * @param onSelectionChange Runs when the selected contacts change.
+ */
 @Composable
 internal fun LocationShareFriendPicker(
     accountId: String,
@@ -525,7 +718,6 @@ internal fun LocationShareFriendPicker(
         Text(stringResource(R.string.location_no_friends), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-
     var query by rememberSaveable(accountId) { mutableStateOf("") }
     val search = query.trim().removePrefix("@")
     val matches = friends.filter { friend ->
@@ -544,7 +736,6 @@ internal fun LocationShareFriendPicker(
         Text(stringResource(R.string.location_no_matching_friends), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-
     val listState = rememberLazyListState()
     LaunchedEffect(search) { listState.scrollToItem(0) }
     val rowHeight = 56.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)

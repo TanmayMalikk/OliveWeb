@@ -1,23 +1,37 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data.safety
 
-import com.olive.app.data.sync.cloudStringMap
-
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.PublicKey
 import javax.crypto.SecretKey
 import java.util.UUID
 import android.content.Context
 import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.media.requireIdentity
+import com.olive.app.data.network.cloudStringMap
+import com.olive.app.data.network.decodeJsonObject
+import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
+import com.olive.app.security.child
+import kotlinx.serialization.Serializable
 import org.json.JSONArray
 import kotlin.collections.iterator
 
@@ -79,6 +93,9 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     /**
      * Revokes a recipient's access to a shared entry.
      * Deletes their wrapped AES key and removes them from the Firestore security rules array.
+     *
+     * @param entryId Unique identifier of the private entry or note.
+     * @param recipientUid Firebase UID of the recipient account.
      */
     suspend fun revokeAccessToEntry(entryId: String, recipientUid: String) {
         firestore.collection("privateEntries").document(entryId).update(
@@ -90,6 +107,10 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
     /**
      * Retrieves and decrypts a shared Private Entry.
+     *
+     * @param entryId Unique identifier of the private entry or note.
+     * @param currentUid Current user ID supplied to [loadAndDecryptEntry].
+     * @return The resulting [PrivateEntry] for load and decrypt entry.
      */
     suspend fun loadAndDecryptEntry(entryId: String, currentUid: String): PrivateEntry {
         val snapshot = firestore.collection("privateEntries").document(entryId).get().await()
@@ -120,7 +141,218 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         )
     }
 
+    /**
+     * Replaces the non-owner recipient list for a shared private entry, or deletes the cloud copy when
+     * all recipients are revoked so revoked contacts immediately lose access.
+     *
+     * @param entry The private entry to save, display, or share.
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
+     */
+    suspend fun updateMultiRecipientEntry(
+        entry: PrivateEntry,
+        ownerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val nonOwnerRecipients = recipientPublicKeys.filterKeys { it != ownerUid }
+        if (nonOwnerRecipients.isEmpty()) {
+            revokeAllRecipients(entry.id, ownerUid)
+            return
+        }
+        val documentRef = firestore.collection("privateEntries").document(entry.id)
+        val existing = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
+        }
+        val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
+        val documentKey: SecretKey = existingWrapped[ownerUid]?.let { runCatching { KeyManager.unwrapKey(it) }.getOrNull() }
+            ?: EncryptionUtils.generateSymmetricKey()
+        val payload = entry.toJson().toString()
+        val ciphertext = EncryptionUtils.encryptText(payload, documentKey)
+        val ownerPublicKey = recipientPublicKeys[ownerUid] ?: KeyManager.getOrCreatePublicKey()
+        val wrappedKeysMap = linkedMapOf(
+            ownerUid to (existingWrapped[ownerUid] ?: KeyManager.wrapKey(documentKey, ownerPublicKey)),
+        )
+        for ((uid, publicKey) in nonOwnerRecipients) {
+            wrappedKeysMap[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        val secureEntry = mapOf(
+            "id" to entry.id,
+            "ownerUid" to ownerUid,
+            "ciphertext" to ciphertext,
+            "wrappedKeys" to wrappedKeysMap,
+            "allowedUsers" to wrappedKeysMap.keys.toList(),
+            "createdAt" to (existing?.get("createdAt") ?: FieldValue.serverTimestamp()),
+            "updatedAt" to FieldValue.serverTimestamp(),
+        )
+        documentRef.set(secureEntry).await()
+    }
+
+    /**
+     * Deletes the shared cloud record for an owned entry when the entry is trashed or all recipients are revoked.
+     *
+     * @param entryId The ID of the private entry.
+     * @param ownerUid The UID of the account that owns the data.
+     */
+    suspend fun revokeAllRecipients(entryId: String, ownerUid: String) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        try {
+            val snapshot = documentRef.get().await()
+            if (snapshot.exists() && snapshot.getString("ownerUid") == ownerUid) {
+                documentRef.delete().await()
+            }
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code !in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) throw error
+        }
+    }
+
+    /**
+     * Grants access to any current conversation participants (such as an escalated Admin or newly added friend)
+     * who were not yet wrapped on a previously shared private entry.
+     *
+     * @param entryId The ID of the private entry.
+     * @param callerUid The UID of the signed-in account making the request.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
+     */
+    suspend fun ensureRecipientsHaveAccess(
+        entryId: String,
+        callerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        val snapshot = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) return
+            throw error
+        }
+        val existingAllowed = (snapshot.get("allowedUsers") as? List<*>)
+            .orEmpty().filterIsInstance<String>().toSet()
+        if (!snapshot.exists() || callerUid !in existingAllowed) return
+        val existingWrapped = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
+        val missing = recipientPublicKeys.filterKeys { uid ->
+            uid != callerUid && (uid !in existingWrapped || uid !in existingAllowed)
+        }
+        if (missing.isEmpty()) return
+        val callerWrappedKey = existingWrapped[callerUid] ?: return
+        val documentKey = runCatching { KeyManager.unwrapKey(callerWrappedKey) }.getOrNull() ?: return
+        val updatedWrapped = existingWrapped.toMutableMap()
+        for ((uid, publicKey) in missing) {
+            updatedWrapped[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        documentRef.update(
+            mapOf(
+                "wrappedKeys" to updatedWrapped,
+                "allowedUsers" to updatedWrapped.keys.toList(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    /**
+     * Streams private entries shared with [currentUid] alongside the recipient map for entries owned by [currentUid].
+     *
+     * @param currentUid The UID of the currently signed-in account.
+     * @param onUpdate Receives the latest decoded entries or snapshot.
+     * @param onError Receives any error raised while observing or decoding entries.
+     * @return The Firestore listener registration that can stop the observation.
+     */
+    internal fun observeUserSharedEntries(
+        currentUid: String,
+        onUpdate: (PrivateEntriesSnapshot) -> Unit,
+        onError: (String) -> Unit = {},
+    ): ListenerRegistration {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        var job: Job? = null
+        val registration = firestore.collection("privateEntries")
+            .whereArrayContains("allowedUsers", currentUid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                job?.cancel()
+                if (error != null) {
+                    onError(error.localizedMessage.orEmpty())
+                    return@addSnapshotListener
+                }
+                val docs = snapshot?.documents.orEmpty()
+                job = scope.launch {
+                    val parsed = withContext(Dispatchers.Default) {
+                        decodeSharedEntriesSnapshot(docs, currentUid)
+                    }
+                    onUpdate(parsed)
+                }
+            }
+        return ListenerRegistration {
+            registration.remove()
+            scope.cancel()
+        }
+    }
+
+    /**
+     * Unwraps and decrypts shared private entries visible to [currentUid].
+     *
+     * @param documents The document repository used to access shared attachments.
+     * @param currentUid The UID of the currently signed-in account.
+     * @return The decrypted shared entries and the recipient metadata visible to the active account.
+     */
+    private fun decodeSharedEntriesSnapshot(
+        documents: List<DocumentSnapshot>,
+        currentUid: String,
+    ): PrivateEntriesSnapshot {
+        val sharedWithMe = mutableListOf<SharedPrivateEntry>()
+        val ownedRecipients = linkedMapOf<String, List<String>>()
+        for (doc in documents) {
+            val ownerUid = doc.getString("ownerUid").orEmpty()
+            if (ownerUid.isBlank()) continue
+            val allowed = (doc.get("allowedUsers") as? List<*>)
+                .orEmpty().filterIsInstance<String>()
+            if (currentUid !in allowed) continue
+            if (ownerUid == currentUid) {
+                val others = allowed.filter { it != currentUid }.distinct()
+                if (others.isNotEmpty()) ownedRecipients[doc.id] = others
+                continue
+            }
+            val wrappedKeys = doc.get("wrappedKeys").cloudStringMap() ?: continue
+            val wrapped = wrappedKeys[currentUid] ?: continue
+            val ciphertext = doc.getString("ciphertext")?.takeIf(String::isNotBlank) ?: continue
+            val entry = runCatching {
+                val key = KeyManager.unwrapKey(wrapped)
+                val plaintext = EncryptionUtils.decryptText(ciphertext, key)
+                val json = JSONObject(plaintext)
+                if (json.has("timestamp")) PrivateEntry.fromJson(json)
+                else PrivateEntry(
+                    id = doc.id,
+                    title = json.optString("title", ""),
+                    body = json.optString("body", ""),
+                )
+            }.getOrNull() ?: continue
+            if (entry.deletedAt == null) {
+                sharedWithMe += SharedPrivateEntry(entry = entry, ownerUid = ownerUid)
+            }
+        }
+        sharedWithMe.sortByDescending { it.entry.updatedAt }
+        return PrivateEntriesSnapshot(
+            sharedWithMe = sharedWithMe,
+            ownedSharedRecipients = ownedRecipients,
+        )
+    }
+
 }
+
+internal data class SharedPrivateEntry(
+    val entry: PrivateEntry,
+    val ownerUid: String,
+)
+
+internal data class PrivateEntriesSnapshot(
+    val sharedWithMe: List<SharedPrivateEntry> = emptyList(),
+    val ownedSharedRecipients: Map<String, List<String>> = emptyMap(),
+)
 
 // Safe-app users and support staff: defines safety-plan fields and conflict data.
 
@@ -140,6 +372,7 @@ internal val SAFETY_CHECKLIST_SECTIONS =
 internal val SAFETY_FIELD_KEYS =
     listOf("primary", "backup").flatMap { plan -> SAFETY_SECTIONS.map { "${plan}_$it" } }
 
+@Serializable
 internal data class SafetyField(
     val value: String, val revision: Long = 0, val mutationId: String? = null,
     val conflictValue: String? = null, val conflictRevision: Long? = null,
@@ -147,37 +380,37 @@ internal data class SafetyField(
     val clientSequence: Long = 0,
     val baseValue: String? = null,
 ) {
-    // Safety: Converts this record into JSON.
-    fun toJson(): JSONObject =
-        JSONObject().put("value", value).put("revision", revision).put("mutationId", mutationId)
-            .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
-            .put("writerId", writerId).put("writerUid", writerUid)
-            .put("clientSequence", clientSequence)
-            .put("baseValue", baseValue)
+    /**
+     * Safety: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
     companion object {
-        // Rebuilds this safety-plan record from protected JSON data.
-        fun fromJson(json: JSONObject) = SafetyField(
-            json.getString("value"),
-            json.optLong("revision"),
-            json.optString("mutationId").takeIf { it.isNotEmpty() },
-            json.optString("conflictValue")
-                .takeIf { json.has("conflictValue") && !json.isNull("conflictValue") },
-            json.optLong("conflictRevision")
-                .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") },
-            json.optString("writerId").takeIf { it.isNotEmpty() },
-            json.optString("writerUid").takeIf { it.isNotEmpty() },
-            json.optLong("clientSequence"),
-            json.optString("baseValue").takeIf { json.has("baseValue") && !json.isNull("baseValue") },
-        )
+        /**
+         * Rebuilds this safety-plan record from protected JSON data.
+         *
+         * @param json JSON object containing serialized fields.
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(json: JSONObject): SafetyField = json.decodeJsonObject<SafetyField>().let {
+            it.copy(
+                mutationId = it.mutationId?.takeIf(String::isNotEmpty),
+                writerId = it.writerId?.takeIf(String::isNotEmpty),
+                writerUid = it.writerUid?.takeIf(String::isNotEmpty),
+            )
+        }
     }
 }
 
+@Serializable
 internal data class SafetyConflict(val value: String, val mutationId: String)
 
+@Serializable
 internal data class SafetyPlan(
     val ownerUid: String,
-    val ownerName: String,
+    val ownerName: String = "",
     val fields: Map<String, SafetyField>,
     val staffUid: String = "",
     val staffName: String = "",
@@ -197,75 +430,40 @@ internal data class SafetyPlan(
     val hasConflicts get() = pendingConflicts.isNotEmpty() || fields.values.any { it.conflictRevision != null }
     val pending get() = fields.values.any { it.mutationId != null && it.conflictRevision == null } ||
         (shareAction.isNotEmpty() && (shareAction == "stop" || !hasEdits))
-    // Safety: Converts this record into JSON.
-    fun toJson(): JSONObject = JSONObject().put("ownerUid", ownerUid).put("ownerName", ownerName)
-        .put(
-            "fields",
-            JSONObject().also { json ->
-                fields.forEach { (key, field) ->
-                    json.put(
-                        key,
-                        field.toJson()
-                    )
-                }
-            })
-        .put("staffUid", staffUid).put("staffName", staffName)
-        .put("adminUid", adminUid).put("adminName", adminName)
-        .put("consultationRequested", consultationRequested).put("shareAction", shareAction)
-        .put("safeContactUids", JSONArray(safeContactUids))
-        .put("safeContactNames", JSONObject(safeContactNames))
-        .put("supportSafeContactUid", supportSafeContactUid)
-        .put("consultationConversationId", consultationConversationId)
-        .put("plansCompletedAt", plansCompletedAt)
-        .put("pendingConflicts", JSONObject(pendingConflicts.mapValues { (_, conflict) ->
-            JSONObject().put("value", conflict.value).put("mutationId", conflict.mutationId)
-        }))
-        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> JSONArray(ids) }))
+    /**
+     * Safety: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
     companion object {
-        // Rebuilds a safety plan from its encrypted JSON fields.
+        /**
+         * Rebuilds a safety plan from its encrypted JSON fields.
+         *
+         * @param json JSON object containing serialized fields.
+         * @return Parsed instance constructed from the JSON data.
+         */
         fun fromJson(json: JSONObject): SafetyPlan {
-            val fields = json.getJSONObject("fields")
-            return SafetyPlan(
-                json.getString("ownerUid"),
-                json.optString("ownerName"),
-                SAFETY_FIELD_KEYS.mapNotNull { key ->
-                    fields.optJSONObject(key)?.let { key to SafetyField.fromJson(it) }
-                }.toMap(),
-                json.optString("staffUid"),
-                json.optString("staffName"),
-                json.optString("adminUid"),
-                json.optString("adminName"),
-                json.optBoolean("consultationRequested"),
-                json.optString("shareAction"),
-                json.optJSONArray("safeContactUids")
-                    ?.let { array -> (0 until array.length()).map(array::getString) }.orEmpty(),
-                json.optJSONObject("safeContactNames")
-                    ?.let { names -> names.keys().asSequence().associateWith(names::getString) }
-                    .orEmpty(),
-                json.optString("supportSafeContactUid"),
-                json.optString("consultationConversationId"),
-                json.optJSONObject("pendingConflicts")?.let { conflicts ->
-                    SAFETY_FIELD_KEYS.mapNotNull { key ->
-                        conflicts.optJSONObject(key)?.let {
-                            key to SafetyConflict(it.getString("value"), it.getString("mutationId"))
-                        }
-                    }.toMap()
-                }.orEmpty(),
-                json.optLong("plansCompletedAt"),
-                json.optJSONObject("resolvedConflicts")?.let { resolved ->
-                    SAFETY_FIELD_KEYS.mapNotNull { key ->
-                        resolved.optJSONArray(key)?.let { ids ->
-                            key to (0 until ids.length()).map(ids::getString)
-                        }
-                    }.toMap()
-                }.orEmpty(),
+            val decoded = json.decodeJsonObject<SafetyPlan>()
+            return decoded.copy(
+                fields = decoded.fields.filterKeys { it in SAFETY_FIELD_KEYS },
+                pendingConflicts = decoded.pendingConflicts.filterKeys { it in SAFETY_FIELD_KEYS },
+                resolvedConflicts = decoded.resolvedConflicts.filterKeys { it in SAFETY_FIELD_KEYS },
             )
         }
     }
 }
 
-// Never discard a draft because another device or staff member changed the same section.
+/**
+ * Never discard a draft because another device or staff member changed the same section.
+ *
+ * @param current Current supplied to [mergeSafetyPlan].
+ * @param sent Sent supplied to [mergeSafetyPlan].
+ * @param remote Remote supplied to [mergeSafetyPlan].
+ * @param ownerEditing Whether to apply owner editing.
+ * @return The resulting [SafetyPlan] for merge safety plan.
+ */
 internal fun mergeSafetyPlan(
     current: SafetyPlan,
     sent: SafetyPlan,
@@ -333,7 +531,14 @@ internal fun mergeSafetyPlan(
     )
 }
 
-// Keeps an optimistic on-screen draft above intermediate listener echoes until its latest mutation is acknowledged.
+/**
+ * Keeps an optimistic on-screen draft above intermediate listener echoes until its latest mutation is acknowledged.
+ *
+ * @param visible Whether the UI component should be visible, or null when not provided.
+ * @param stored Stored supplied to [mergeVisibleSafetyPlan].
+ * @param actorUid Firebase UID of the account performing the action.
+ * @return The resulting [SafetyPlan] for merge visible safety plan.
+ */
 internal fun mergeVisibleSafetyPlan(
     visible: SafetyPlan?,
     stored: SafetyPlan,
@@ -342,7 +547,15 @@ internal fun mergeVisibleSafetyPlan(
     mergeSafetyPlan(it, it, stored)
 } ?: stored
 
-// Gives the safety plan the safety fields with defaults it needs.
+/**
+ * Gives the safety plan the safety fields with defaults it needs.
+ *
+ * @receiver The safety-plan field to update.
+ * @param value Input value to store, parse, or format.
+ * @param activeWriterId Active writer ID supplied to [edit].
+ * @param activeWriterUid Active writer user ID supplied to [edit].
+ * @return The resulting [SafetyField] instance.
+ */
 internal fun SafetyField.edit(
     value: String,
     activeWriterId: String = UUID.randomUUID().toString(),
@@ -362,7 +575,13 @@ internal fun SafetyField.edit(
     )
 }
 
-// Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
+/**
+ * Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
+ *
+ * @param existing Key-value mapping of existing entries.
+ * @param defaults Key-value mapping of defaults entries.
+ * @return Map containing the resulting safety fields with defaults entries.
+ */
 internal fun safetyFieldsWithDefaults(
     existing: Map<String, SafetyField>,
     defaults: Map<String, String>
@@ -406,9 +625,34 @@ data class IndexedDocuments(
 )
 
 interface DocumentIndexDataSource {
+    /**
+     * Reads the document index data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [IndexedDocuments] instance.
+     */
     fun read(uid: String): IndexedDocuments
+    /**
+     * Computes replace.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documents Collection of documents values to process.
+     * @param syncedAt Synced at supplied to [replace].
+     * @return The resulting [IndexedDocuments] instance.
+     */
     fun replace(uid: String, documents: List<SafetyDocument>, syncedAt: Long): IndexedDocuments
+    /**
+     * Removes the document index data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     fun remove(uid: String, documentId: String)
+    /**
+     * Purges the document index data source.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     fun purge(uid: String)
 }
 
@@ -416,6 +660,12 @@ interface DocumentIndexDataSource {
 class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource {
     constructor(context: Context) : this(EncryptedVault(context.applicationContext, "document-index"))
 
+    /**
+     * Reads the document index store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting [IndexedDocuments] instance.
+     */
     override fun read(uid: String): IndexedDocuments {
         requireIdentity(uid)
         val account = safeRoot().optJSONObject(ACCOUNTS)?.optJSONObject(uid)
@@ -427,6 +677,14 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
         return IndexedDocuments(documents, account.optLong(LAST_SYNCED_AT).takeIf { it > 0 })
     }
 
+    /**
+     * Computes replace.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documents Collection of documents values to process.
+     * @param syncedAt Synced at supplied to [replace].
+     * @return The resulting [IndexedDocuments] instance.
+     */
     override fun replace(uid: String, documents: List<SafetyDocument>, syncedAt: Long): IndexedDocuments {
         requireIdentity(uid)
         require(syncedAt > 0)
@@ -440,6 +698,12 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
         return IndexedDocuments(accessible.sortedByDescending(SafetyDocument::createdAt), syncedAt)
     }
 
+    /**
+     * Removes the document index store.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param documentId Unique identifier of the safety document.
+     */
     override fun remove(uid: String, documentId: String) {
         requireIdentity(uid, documentId)
         runCatching { vault.update { root ->
@@ -447,12 +711,22 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
         } }.onFailure { vault.clear() }
     }
 
+    /**
+     * Purges the document index store.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     override fun purge(uid: String) {
         requireIdentity(uid)
         runCatching { vault.update { it.optJSONObject(ACCOUNTS)?.remove(uid) } }
             .onFailure { vault.clear() }
     }
 
+    /**
+     * Returns the safe root.
+     *
+     * @return JSON object representing safe root.
+     */
     private fun safeRoot(): JSONObject = try { vault.read() } catch (_: Exception) {
         vault.clear()
         JSONObject()
@@ -465,6 +739,13 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
     }
 }
 
+/**
+ * Converts safety document into index JSON.
+ *
+ * @receiver The document whose index metadata or sharing scope is read.
+ * @param viewerUid Firebase UID of the viewing account.
+ * @return JSON object representing to index JSON.
+ */
 private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
     requireIdentity(viewerUid, id)
     require(ownerUid.isNotBlank() && ownerUid.length <= MAX_ID_LENGTH)
@@ -492,6 +773,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("encryptionVersion", encryptionVersion)
         .put("accountRecoveryReady", accountRecoveryReady)
         .put("evidence", evidence)
+        .put("chatOnly", chatOnly)
         .put("tags", JSONArray(tags.distinct().take(20)))
         .apply {
             ocrText?.take(MAX_OCR_TEXT)?.let { put("ocrText", it) }
@@ -500,6 +782,14 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         }
 }
 
+/**
+ * Converts JSON object into document.
+ *
+ * @receiver The JSON object containing the stored fields.
+ * @param viewerUid Firebase UID of the viewing account.
+ * @param id ID supplied to [toDocument].
+ * @return The resulting [SafetyDocument] for to document.
+ */
 private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument {
     requireIdentity(viewerUid, id)
     val allowed = getJSONArray("allowedUsers").let { values ->
@@ -545,17 +835,8 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         evidence = optBoolean("evidence"),
         tags = tags,
         accountWrappedKeys = accountWrappedKey?.let { mapOf(viewerUid to it) }.orEmpty(),
+        chatOnly = optBoolean("chatOnly"),
     )
-}
-
-@Suppress("SameParameterValue")
-// Linter Believes 'name' is always doumentindexStore.accounts which is dynamic.
-private fun JSONObject.child(name: String): JSONObject =
-    optJSONObject(name) ?: JSONObject().also { put(name, it) }
-
-private fun requireIdentity(uid: String, id: String? = null) {
-    require(uid.isNotBlank() && uid.length <= MAX_ID_LENGTH)
-    id?.let { require(it.isNotBlank() && it.length <= MAX_ID_LENGTH) }
 }
 
 private const val MAX_ID_LENGTH = 160

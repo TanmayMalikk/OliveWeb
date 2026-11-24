@@ -1,6 +1,9 @@
 // Fitness cover users: starts and controls private GPS-tracked outdoor workouts.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,17 +41,14 @@ import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageMetadata
-import com.olive.app.data.account.AccountSyncRepository
-import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
-// Shows workout type, live controls, route, and recent outdoor workouts.
+/**
+ * Shows workout type, live controls, route, and recent outdoor workouts.
+ *
+ * @param accountId Account ID supplied to [FitnessOutdoorWorkoutCard].
+ * @param enabled Whether this feature or control is currently enabled.
+ */
 @Composable
 internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -93,7 +93,11 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
-    // Starts GPS tracking now, or asks for precise location first.
+    /**
+     * Starts GPS tracking now, or asks for precise location first.
+     *
+     * @param type Type supplied to [startWorkout].
+     */
     fun startWorkout(type: OutdoorWorkoutType) {
         val preciseLocationGranted = ContextCompat.checkSelfPermission(
             context,
@@ -194,7 +198,12 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     }
 }
 
-// Draws the workout type selector for the fitness cover.
+/**
+ * Draws the workout type selector for the fitness cover.
+ *
+ * @param selected Selected supplied to [WorkoutTypeSelector].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun WorkoutTypeSelector(
     selected: OutdoorWorkoutType,
@@ -211,7 +220,14 @@ private fun WorkoutTypeSelector(
         }
     }
 }
-// Draws one selectable walking, running, cycling, or hiking option.
+/**
+ * Draws one selectable walking, running, cycling, or hiking option.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param type Type supplied to [WorkoutTypeChip].
+ * @param selected Selected supplied to [WorkoutTypeChip].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun WorkoutTypeChip(
     modifier: Modifier,
@@ -234,7 +250,16 @@ private fun WorkoutTypeChip(
         modifier = modifier,
     )
 }
-// Shows live distance, duration, pace, map, pause, and finish controls.
+/**
+ * Shows live distance, duration, pace, map, pause, and finish controls.
+ *
+ * @param workout Workout supplied to [ActiveWorkoutContent].
+ * @param currentTime Current time supplied to [ActiveWorkoutContent].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onPause Callback invoked when pause changes or occurs.
+ * @param onResume Callback invoked when resume changes or occurs.
+ * @param onFinish Callback invoked when finish changes or occurs.
+ */
 @Composable
 private fun ActiveWorkoutContent(
     workout: OutdoorWorkoutSnapshot,
@@ -285,7 +310,12 @@ private fun ActiveWorkoutContent(
     }
 }
 
-// Draws the workout location map for the fitness cover.
+/**
+ * Draws the workout location map for the fitness cover.
+ *
+ * @param workout Workout supplied to [WorkoutLocationMap].
+ * @param elapsedMillis Duration or timestamp for elapsed, in milliseconds.
+ */
 @Composable
 private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: Long) {
     val points = workout.route
@@ -332,7 +362,11 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
     }
 }
 
-// Shows up to five recent outdoor workouts.
+/**
+ * Shows up to five recent outdoor workouts.
+ *
+ * @param workouts Collection of workouts values to process.
+ */
 @Composable
 private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
     Column(
@@ -388,7 +422,12 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
         }
     }
 }
-// Draws one live workout value and its label.
+/**
+ * Draws one live workout value and its label.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ */
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
     Column(
@@ -402,7 +441,12 @@ private fun WorkoutMetric(value: String, label: String) {
     }
 }
 
-// Formats the workout type label shown by the fitness cover.
+/**
+ * Formats the workout type label shown by the fitness cover.
+ *
+ * @param type Type supplied to [workoutTypeLabel].
+ * @return The localized name of the workout type.
+ */
 @Composable
 private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     // Gives each workout type its translated label.
@@ -414,11 +458,21 @@ private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     }
 )
 
-// Formats workout metres as kilometres.
+/**
+ * Formats workout metres as kilometres.
+ *
+ * @param distanceMeters Distance meters supplied to [formatDistance].
+ * @return The resulting format distance.
+ */
 private fun formatDistance(distanceMeters: Double) =
     String.format(Locale.ROOT, "%.2f km", distanceMeters / 1_000.0)
 
-// Formats workout time as hours, minutes, and seconds.
+/**
+ * Formats workout time as hours, minutes, and seconds.
+ *
+ * @param elapsedMillis Duration or timestamp for elapsed, in milliseconds.
+ * @return The resulting format duration string.
+ */
 private fun formatDuration(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis / 1_000L
     val hours = totalSeconds / 3_600L
@@ -431,95 +485,25 @@ private fun formatDuration(elapsedMillis: Long): String {
     }
 }
 
-// Formats average workout pace in minutes per kilometre.
+/**
+ * Formats average workout pace in minutes per kilometre.
+ *
+ * @param pace Optional pace supplied to [formatPace].
+ * @return The resulting format pace.
+ */
 private fun formatPace(pace: Double?) = pace?.let {
     val minutes = it.toInt()
     val seconds = ((it - minutes) * 60.0).toInt().coerceIn(0, 59)
     String.format(Locale.ROOT, "%d:%02d /km", minutes, seconds)
 } ?: "--"
 
-// Formats the completed workout date for recent history.
+/**
+ * Formats the completed workout date for recent history.
+ *
+ * @param timestamp Epoch timestamp in milliseconds.
+ * @return The resulting format workout date string.
+ */
 private fun formatWorkoutDate(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
 
 private const val FITNESS_WORKOUT_MAP_UID = "private-fitness-workout"
-
-// Fitness cover users: syncs the signed-in account's 14-day fitness summary for the web viewer.
-
-internal object FitnessCloudSync {
-    private const val MIN_SYNC_INTERVAL_MS = 30_000L
-    private val lastUploadAtByAccount = ConcurrentHashMap<String, Long>()
-    private val lastPayloadByAccount = ConcurrentHashMap<String, String>()
-
-    // Uploads only changed summaries and never more than once every 30 seconds.
-    suspend fun upload(accountId: String, snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) {
-        // Local previews and UI tests may not have a Firebase app; there is no cloud account to sync.
-        val user = try {
-            FirebaseAuth.getInstance().currentUser
-        } catch (_: IllegalStateException) {
-            return
-        } ?: return
-        if (accountId != user.uid) return
-        val summary = summaryJson(snapshot, history)
-        val payloadSignature = summary.toString()
-        val now = System.currentTimeMillis()
-        val lastUploadAt = lastUploadAtByAccount[accountId] ?: 0L
-        if (
-            payloadSignature == lastPayloadByAccount[accountId] ||
-            now - lastUploadAt < MIN_SYNC_INTERVAL_MS
-        ) return
-        summary.put("updatedAt", now)
-        val payload = summary.toString()
-        val bytes = payload.toByteArray(Charsets.UTF_8)
-        // Use the fallback when upload is unavailable.
-        try {
-            FirebaseStorage.getInstance().reference
-                .child("accounts/${user.uid}/fitness/summary.json")
-                .putBytes(
-                    bytes,
-                    StorageMetadata.Builder().setContentType("application/json")
-                        .setCustomMetadata("schemaVersion", "1").build(),
-                ).await()
-            AccountSyncRepository().notifyChanged(accountId)
-            lastPayloadByAccount[accountId] = payloadSignature
-            lastUploadAtByAccount[accountId] = now
-        } catch (_: Exception) {
-            // Fitness sync: a temporary network or Firebase failure must not close the cover app.
-        } finally {
-            bytes.fill(0)
-        }
-    }
-
-    // Converts today's fitness totals into the JSON sent to the watch.
-    private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
-        put("stepGoal", snapshot.profile.stepGoal)
-        put("calorieGoal", snapshot.profile.calorieGoal)
-        put("proteinGoal", snapshot.profile.proteinGoal)
-        put("carbohydrateGoal", snapshot.profile.carbohydrateGoal)
-        put("fatGoal", snapshot.profile.fatGoal)
-        put("watchConnected", snapshot.watchConnected)
-        put("days", JSONArray(history.map { day ->
-            JSONObject().apply {
-                put("date", day.date.toString())
-                put("steps", day.steps)
-                put("distanceKm", day.distanceKm.toDouble())
-                put("caloriesBurned", day.caloriesBurned.toDouble())
-                put("caloriesEaten", day.caloriesEaten.toDouble())
-                put("proteinGrams", day.proteinGrams.toDouble())
-                put("carbohydrateGrams", day.carbohydrateGrams.toDouble())
-                put("fatGrams", day.fatGrams.toDouble())
-            }
-        }))
-        put("vitals", JSONArray(snapshot.heartRateHistory.map { vitals ->
-            JSONObject().apply {
-                put("date", vitals.date.toString())
-                put("peakBpm", vitals.peakBpm)
-                put("lowestBpm", vitals.lowestBpm)
-                put("restingBpm", vitals.restingBpm ?: JSONObject.NULL)
-                put("averageBpm", vitals.averageBpm)
-                put("sampleCount", vitals.sampleCount)
-                put("lastUpdatedAt", vitals.lastUpdatedAt)
-            }
-        }))
-    }
-}

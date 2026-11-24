@@ -1,15 +1,15 @@
 // Cover users: shows cover settings and handles discreet entry into the safe app.
 package com.olive.app.ui.covers
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.*
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +27,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import android.media.AudioAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.widget.Toast
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.location.DeviceLocation
+import com.olive.app.location.AdminLocationService
+import com.olive.app.ui.users.shared.navigation.SessionScreen
+import com.olive.app.ui.users.user.documents.EmergencyReportLocation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -36,73 +55,93 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.shared.AddressFields
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.olive.app.ui.shared.Cream
-import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 
-// A tiny olive gives every cover the same private-entry shortcut without looking like a normal button.
-// Sighted users double-tap it. TalkBack users activate it with TalkBack's normal double-tap gesture.
+/**
+ * A tiny olive gives every cover the same private-entry shortcut without looking like a normal button. Sighted users double-tap it. TalkBack users activate it with TalkBack's normal double-tap gesture.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onEmergency Callback invoked when emergency changes or occurs.
+ * @param onEmergencyFeedback Callback invoked when emergency feedback changes or occurs.
+ */
 @Composable
 internal fun DiscreetCoverEntry(
     enabled: Boolean,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    onEmergency: (() -> Unit)? = null,
+    onEmergencyFeedback: (() -> Unit)? = null,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val platformConfiguration = LocalViewConfiguration.current
+    val holdConfiguration = remember(platformConfiguration) {
+        object : ViewConfiguration by platformConfiguration { override val longPressTimeoutMillis = 2_000L }
+    }
+    val emergencyAction = onEmergency?.let { action -> {
+        if (onEmergencyFeedback != null) onEmergencyFeedback()
+        else if (!performEmergencyVibration(context)) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        action()
+    } }
     val oliveLabel = stringResource(R.string.olive_icon)
-    Canvas(
-        modifier.size(48.dp)
-            .testTag("discreet_cover_olive")
-            .semantics {
-                contentDescription = oliveLabel
-                if (enabled) onClick {
-                    onOpen()
-                    true
+    CompositionLocalProvider(LocalViewConfiguration provides holdConfiguration) {
+        Canvas(
+            modifier.size(48.dp)
+                .testTag("discreet_cover_olive")
+                .semantics {
+                    contentDescription = oliveLabel
+                    if (enabled && emergencyAction != null) onLongClick { emergencyAction(); true }
+                    if (enabled) onClick {
+                        onOpen()
+                        true
+                    }
                 }
+                .pointerInput(enabled, onOpen, emergencyAction) {
+                    if (enabled) detectTapGestures(onDoubleTap = { onOpen() },
+                        onLongPress = emergencyAction?.let { action -> { _: Offset -> action() } })
+                }
+        ) {
+            val oliveWidth = 16.dp.toPx()
+            val oliveHeight = 21.dp.toPx()
+            val center = Offset(size.width * .58f, size.height * .58f)
+            rotate(-18f, center) {
+                drawOval(
+                    color = OliveGreen,
+                    topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
+                    size = Size(oliveWidth, oliveHeight),
+                )
             }
-            .pointerInput(enabled) {
-                if (enabled) detectTapGestures(onDoubleTap = { onOpen() })
+            rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
+                drawOval(
+                    color = SageGreen,
+                    topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
+                    size = Size(8.dp.toPx(), 4.dp.toPx()),
+                )
             }
-    ) {
-        val oliveWidth = 16.dp.toPx()
-        val oliveHeight = 21.dp.toPx()
-        val center = Offset(size.width * .58f, size.height * .58f)
-        rotate(-18f, center) {
-            drawOval(
-                color = OliveGreen,
-                topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
-                size = Size(oliveWidth, oliveHeight),
-            )
-        }
-        rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
-            drawOval(
-                color = SageGreen,
-                topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
-                size = Size(8.dp.toPx(), 4.dp.toPx()),
-            )
         }
     }
 }
 
-// Fitness and Game use this page for cover-account settings and the discreet entry olive.
+/**
+ * Fitness and Game use this page for cover-account settings and the discreet entry olive.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
     val scrollState = rememberScrollState()
-    BackHandler(onBack = onBack)
+    val back = rememberOliveBack(onBack = onBack)
     Scaffold(
         containerColor = Cream,
+        modifier = Modifier.oliveBackPreview(back),
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -116,46 +155,82 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).oliveScrollbar(scrollState)
+            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).oliveScrollbar(scrollState)
                 .verticalScroll(scrollState).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             CoverAccountPanel(session)
+            AppVersionFooter()
         }
     }
 }
 
-// Shows cover-account settings and the hidden olive used for private entry.
+/**
+ * Shows cover-account settings and the hidden olive used for private entry.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
     var birthday by rememberBirthdayInput(session.coverDob)
-    var showBirthdayErrors by remember(session.coverDob) { mutableStateOf(false) }
+    var showCoverErrors by remember(session.coverAccountId, session.coverDob) { mutableStateOf(false) }
+    var coverShake by remember(session.coverAccountId, session.coverDob) { mutableIntStateOf(0) }
     var address by remember(session.deliveryAddress) { mutableStateOf(session.deliveryAddress) }
+    val nameMissing = showCoverErrors && fullName.isBlank()
+    val nameShake = rememberFieldErrorShakeTrigger(
+        if (nameMissing) stringResource(R.string.ui_name_required) else null,
+        coverShake,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("@${session.coverUsername}")
         OutlinedTextField(
             fullName,
-            { fullName = it.take(120) },
+            {
+                fullName = it.take(120)
+                showCoverErrors = false
+            },
             label = { Text(stringResource(R.string.full_name)) },
             singleLine = true,
             enabled = !session.busy,
-            modifier = Modifier.fillMaxWidth().testTag("cover_full_name").onFocusChanged {
-                if (it.isFocused) session.recordSettingsInteraction(
-                    session.coverType.title,
-                    "Focused full name"
-                )
-            }.keepVisibleWhileTyping()
+            isError = nameMissing,
+            supportingText = if (nameMissing) ({ AccessibleMessage(stringResource(R.string.ui_name_required)) }) else null,
+            modifier = Modifier.fillMaxWidth().testTag("cover_full_name")
+                .oliveErrorShake(nameShake)
+                .onFocusChanged {
+                    if (it.isFocused) session.recordSettingsInteraction(
+                        session.coverType.title,
+                        "Focused full name"
+                    )
+                }.keepVisibleWhileTyping()
         )
-        BirthdayPicker(birthday, "cover_dob", !session.busy, showBirthdayErrors) { birthday = it }
+        BirthdayPicker(birthday, "cover_dob", !session.busy, showCoverErrors, shakeTrigger = coverShake) {
+            birthday = it
+            showCoverErrors = false
+        }
         Text(stringResource(R.string.location), style = MaterialTheme.typography.titleMedium)
-        AddressFields(address, cityOnlyRequired = true) { address = it }
+        AddressFields(
+            address,
+            cityOnlyRequired = true,
+            cityError = if (showCoverErrors && !address.locationValid) stringResource(R.string.ui_city_required) else null,
+            shakeTrigger = coverShake,
+        ) {
+            address = it
+            showCoverErrors = false
+        }
         Button(
             onClick = {
-                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                if (!showBirthdayErrors) session.saveCoverSettings(fullName, birthday, address)
+                val invalidDob = !InputPolicy.validDob(birthday)
+                val invalid = fullName.isBlank() || invalidDob || !address.locationValid
+                showCoverErrors = invalid
+                if (invalid) {
+                    coverShake += 1
+                    if (!invalidDob) session.saveCoverSettings(fullName, birthday, address)
+                } else {
+                    session.saveCoverSettings(fullName, birthday, address)
+                }
             },
-            enabled = !session.busy && fullName.isNotBlank() && address.locationValid,
+            enabled = !session.busy,
             modifier = Modifier.fillMaxWidth().testTag("cover_save_settings")
         ) {
             Text(stringResource(R.string.save_account_settings))
@@ -165,6 +240,8 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
         DiscreetCoverEntry(
             enabled = !session.busy,
             onOpen = session.account::beginDiscreetEntry,
+            onEmergency = if (session.coverAccountId != null && session.accountRole == AccountRole.USER)
+                session::sendCoverEmergency else null,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp),
         )
     }
@@ -172,7 +249,11 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
 
 // Android reads launcher names/icons from aliases; switch them here when the saved cover changes.
 internal object CoverLauncher {
-    // Keep Android Studio's Run target alive without touching the user's visible cover icon.
+    /**
+     * Keep Android Studio's Run target alive without touching the user's visible cover icon.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun ensureStudioLauncher(context: Context) {
         val manager = context.packageManager
         val component = ComponentName(context.packageName, "${context.packageName}.OliveLauncher")
@@ -184,11 +265,16 @@ internal object CoverLauncher {
             )
     }
 
-    // Switches the visible launcher icon to the selected cover app.
+    /**
+     * Switches the visible launcher icon to the selected cover app.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param selected Selected supplied to [apply].
+     * @param role Account role determining workspace permissions.
+     */
     fun apply(context: Context, selected: CoverType, role: AccountRole) {
         val manager = context.packageManager
         val aliases = listOf(
-            "GameLauncher",
             "NewsLauncher",
             "FitnessLauncher",
             "BranchLauncher",
@@ -200,7 +286,6 @@ internal object CoverLauncher {
             AccountRole.USER -> when (selected) {
                 CoverType.NEWS -> "NewsLauncher"
                 CoverType.FITNESS -> "FitnessLauncher"
-                CoverType.GAME -> "GameLauncher"
             }
         }
         val changes = aliases.map { name ->
@@ -232,95 +317,79 @@ internal object CoverLauncher {
     }
 }
 
-// Cover users: shows the olive game cover and its entry controls.
-
-/** A small, usable game cover. The nickname field also accepts the configured safe-entry phrase. */
-@Composable
-internal fun GameCover(
-    sessionViewModel: SessionViewModel? = null,
-    interactive: Boolean = true,
-    onEntryAttempt: (String) -> Boolean = { false },
-) {
-    var nickname by remember { mutableStateOf("") }
-    var score by rememberSaveable(sessionViewModel?.coverAccountId) { mutableIntStateOf(0) }
-    var settingsOpen by rememberSaveable(sessionViewModel?.coverAccountId) { mutableStateOf(false) }
-    if (settingsOpen && sessionViewModel != null) {
-        CoverSettingsPage(sessionViewModel) { settingsOpen = false }
-        return
-    }
-    BackHandler(interactive) { }
-    BoxWithConstraints(Modifier.fillMaxSize().background(WarmWhite).safeDrawingPadding()) {
-        val viewportHeight = maxHeight
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .heightIn(min = viewportHeight).padding(24.dp)
-                .testTag("game_cover"),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Row(
-                modifier = Modifier.semantics(mergeDescendants = true) { },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Icon(
-                        Icons.Outlined.SportsEsports,
-                        contentDescription = null,
-                        modifier = Modifier.padding(12.dp).size(34.dp).testTag("cover_brand_game"),
-                        tint = OliveGreen,
-                    )
-                }
-                Text(
-                    stringResource(R.string.game_cover_title),
-                    modifier = Modifier.weight(1f, fill = false).semantics { heading() },
-                    fontFamily = FontFamily.Serif,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = OliveGreen,
-                )
-                if (sessionViewModel != null) OutlinedIconButton(
-                    onClick = { settingsOpen = true },
-                    enabled = interactive,
-                    modifier = Modifier.testTag("game_settings"),
-                ) {
-                    Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.game_cover_instructions), color = Muted)
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = nickname,
-                onValueChange = { value ->
-                    nickname = if (onEntryAttempt(value)) "" else value.take(64)
-                },
-                enabled = interactive,
-                singleLine = true,
-                label = { Text(stringResource(R.string.game_player_name)) },
-                modifier = Modifier.fillMaxWidth().testTag("game_entry"),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { score++ },
-                enabled = interactive,
-                modifier = Modifier.defaultMinSize(minWidth = 112.dp, minHeight = 112.dp).testTag("game_olive"),
-                shape = CircleShape,
-            ) {
-                Text(stringResource(R.string.game_tap_olive))
-            }
-            Spacer(Modifier.height(12.dp))
-            Surface(
-                shape = CircleShape, color = PaleOlive, contentColor = Ink,
-                border = BorderStroke(1.dp, OliveDivider),
-            ) {
-                Text(
-                    stringResource(R.string.game_score, score),
-                    modifier = Modifier.testTag("game_score").padding(horizontal = 18.dp, vertical = 8.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+/**
+ * Send an explicitly requested report without unlocking or exposing the Safe App on the cover.
+ *
+ * @receiver The active session that supplies the emergency action.
+ */
+internal fun SessionViewModel.sendCoverEmergency() {
+    val uid = coverAccountId ?: return
+    if (accountRole != AccountRole.USER || screen != SessionScreen.Cover || busy || coverEmergencyInFlight) return
+    coverEmergencyInFlight = true
+    val token = runtime.epoch
+    /**
+     * Finishes the target.
+     *
+     * @param result Result payload delivered to the callback.
+     */
+    fun finish(result: Result<Unit>) {
+        coverEmergencyInFlight = false
+        if (coverAccountId == uid && runtime.epoch == token && result.isFailure) {
+            Toast.makeText(runtime.application, R.string.emergency_report_failed, Toast.LENGTH_LONG).show()
         }
     }
+    runtime.scope.launch {
+        try {
+            val (savedProfile, entries) = withContext(Dispatchers.IO) {
+                runtime.store.profile(uid) to runtime.store.privateEntries(uid)
+            }
+            if (coverAccountId != uid || runtime.epoch != token) {
+                coverEmergencyInFlight = false
+                return@launch
+            }
+            if (!localMode) runCatching { AdminLocationService.start(runtime.application, uid, savedProfile.fullName) }
+            documents.createEmergencyReport(AccountIdentity(uid, savedProfile.username), savedProfile, entries,
+                location = {
+                    DeviceLocation.currentCoordinates(runtime.application)?.let {
+                        EmergencyReportLocation(it.latitude, it.longitude, it.accuracy, it.timestamp)
+                    }
+                },
+                onAlertSent = {
+                    if (coverAccountId == uid && runtime.epoch == token) {
+                        val confirmation = uid to android.os.SystemClock.elapsedRealtime()
+                        coverEmergencyConfirmation = confirmation
+                        runtime.scope.launch {
+                            kotlinx.coroutines.delay(3_500)
+                            if (coverEmergencyConfirmation == confirmation) coverEmergencyConfirmation = null
+                        }
+                    }
+                },
+                onFinished = ::finish,
+            )
+        } catch (cancelled: CancellationException) {
+            coverEmergencyInFlight = false
+            throw cancelled
+        } catch (failure: Exception) {
+            finish(Result.failure(failure))
+        }
+    }
+}
+
+/**
+ * Amplitude is a hardware request; devices without amplitude control use their default strength.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @return `true` if perform emergency vibration, or `false` otherwise.
+ */
+@Suppress("DEPRECATION")
+internal fun performEmergencyVibration(context: Context): Boolean {
+    val vibrator = if (Build.VERSION.SDK_INT >= 31)
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    else context.getSystemService(Vibrator::class.java)
+    if (vibrator == null || !vibrator.hasVibrator()) return false
+    val amplitude = if (vibrator.hasAmplitudeControl()) 179 else VibrationEffect.DEFAULT_AMPLITUDE
+    val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+    vibrator.vibrate(VibrationEffect.createOneShot(120, amplitude), attributes)
+    return true
 }

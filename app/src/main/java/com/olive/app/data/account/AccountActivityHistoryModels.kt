@@ -12,53 +12,101 @@ import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
 import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.network.decodeJsonObject
+import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.security.*
 import java.time.Instant
 import java.util.UUID
 import kotlin.collections.get
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.tasks.await
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import org.json.JSONArray
 import org.json.JSONObject
 
 data class HistoryRecord(val category: String, val id: String, val json: String)
 
-// Keep the machine timestamp for sorting and add an ISO value humans can read in Firebase Storage.
+/**
+ * Keep the machine timestamp for sorting and add an ISO value humans can read in Firebase Storage.
+ *
+ * @receiver The JSON object containing the stored fields.
+ * @param name Field, key, or display name.
+ * @param value Input value to store, parse, or format.
+ * @return The same JSON object with the epoch and ISO timestamp fields set.
+ */
 private fun JSONObject.putReadableTime(name: String, value: Long) =
     put(name, value).put("${name}Iso", Instant.ofEpochMilli(value).toString())
 
+object PrivateEntryKindSerializer : KSerializer<PrivateEntryKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("PrivateEntryKind", PrimitiveKind.STRING)
+
+    /**
+     * Serializes the entry kind by name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The note or incident category to encode.
+     */
+    override fun serialize(encoder: Encoder, value: PrivateEntryKind) =
+        encoder.encodeString(value.name)
+
+    /**
+     * Deserializes the entry kind, falling back to [PrivateEntryKind.Note].
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded entry type, defaulting to Note when the stored name is unknown.
+     */
+    override fun deserialize(decoder: Decoder): PrivateEntryKind =
+        runCatching { PrivateEntryKind.valueOf(decoder.decodeString()) }.getOrDefault(PrivateEntryKind.Note)
+}
+
+@Serializable(with = PrivateEntryKindSerializer::class)
 enum class PrivateEntryKind { Note, Incident }
 
 // TESTING: 10 seconds; change to 30.days.inWholeMilliseconds for 30 days.
 val PRIVATE_ENTRY_TRASH_RETENTION_MS = 10.seconds.inWholeMilliseconds
 
+@Serializable
 data class PrivateEntryEdit(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
-    val changes: List<FieldChange>,
+    val changes: List<FieldChange> = emptyList(),
 ) {
-    // Account: Converts this record into JSON.
-    fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
-        .put("changes", JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
+    /**
+     * Account: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject().putReadableTime("timestamp", timestamp)
 
     companion object {
-        // Rebuilds this activity record from its saved JSON fields.
+        /**
+         * Rebuilds this activity record from its saved JSON fields.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
         fun fromJson(value: JSONObject): PrivateEntryEdit {
-            val rows = value.optJSONArray("changes") ?: JSONArray()
-            return PrivateEntryEdit(
-                value.optString("id", UUID.randomUUID().toString()), value.getLong("timestamp"),
-                (0 until rows.length()).map { FieldChange.fromJson(rows.getJSONObject(it)) })
+            value.getLong("timestamp")
+            return value.decodeJsonObject()
         }
     }
 }
 
 // Notes and incident records get their own timestamped account objects and never enter cover data.
+@Serializable
 data class PrivateEntry(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
     val updatedAt: Long = timestamp,
     val kind: PrivateEntryKind = PrivateEntryKind.Note,
-    val title: String,
+    val title: String = "",
     val body: String,
     val incidentDate: String = "",
     val incidentTime: String = "",
@@ -71,81 +119,90 @@ data class PrivateEntry(
     val deletedAt: Long? = null,
     val purgedAt: Long? = null,
 ) {
-    // Account: Converts this record into JSON.
-    fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
-        .putReadableTime("updatedAt", updatedAt)
-        .put("kind", kind.name).put("title", title).put("body", body).put("pinned", pinned)
-        .put("incidentDate", incidentDate).put("incidentTime", incidentTime)
-        .put("incidentLocation", incidentLocation)
-        .put("attachmentIds", JSONArray().also { rows -> attachmentIds.distinct().forEach(rows::put) })
-        // Add each changed profile field to the saved history record.
-        .put("edits", JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
-        .also {
-            incidentLatitude?.let { latitude -> it.put("incidentLatitude", latitude) }
-            incidentLongitude?.let { longitude -> it.put("incidentLongitude", longitude) }
-            if (deletedAt != null) it.putReadableTime("deletedAt", deletedAt)
-            if (purgedAt != null) it.putReadableTime("purgedAt", purgedAt)
-        }
+    /**
+     * Account: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject =
+        copy(attachmentIds = attachmentIds.distinct()).encodeToJsonObject()
+            .putReadableTime("timestamp", timestamp)
+            .putReadableTime("updatedAt", updatedAt)
+            .also { json ->
+                if (deletedAt != null) json.putReadableTime("deletedAt", deletedAt)
+                if (purgedAt != null) json.putReadableTime("purgedAt", purgedAt)
+            }
 
     companion object {
-        // Rebuilds this activity record from its saved JSON fields.
+        /**
+         * Rebuilds this activity record from its saved JSON fields.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
         fun fromJson(value: JSONObject): PrivateEntry {
-            val edits = value.optJSONArray("edits") ?: JSONArray()
-            val attachments = value.optJSONArray("attachmentIds") ?: JSONArray()
-            return PrivateEntry(
-                id = value.getString("id"),
-                timestamp = value.getLong("timestamp"),
-                updatedAt = value.optLong("updatedAt", value.getLong("timestamp")),
-                kind = value.optString("kind").takeIf(String::isNotBlank)
-                    ?.let { runCatching { PrivateEntryKind.valueOf(it) }.getOrNull() }
-                    ?: PrivateEntryKind.Note,
-                title = value.optString("title"),
-                body = value.getString("body"),
-                incidentDate = value.optString("incidentDate"),
-                incidentTime = value.optString("incidentTime"),
-                incidentLocation = value.optString("incidentLocation"),
-                incidentLatitude = value.optDouble("incidentLatitude", Double.NaN).takeIf(Double::isFinite),
-                incidentLongitude = value.optDouble("incidentLongitude", Double.NaN).takeIf(Double::isFinite),
-                attachmentIds = (0 until attachments.length()).mapNotNull { index ->
-                    attachments.optString(index).takeIf(String::isNotBlank)
-                }.distinct(),
-                pinned = value.optBoolean("pinned"),
-                edits = (0 until edits.length()).map {
-                    PrivateEntryEdit.fromJson(
-                        edits.getJSONObject(
-                            it
-                        )
-                    )
-                }
-                    .mapNotNull { edit ->
-                        edit.copy(changes = edit.changes.filterNot { it.field == "Pinned" })
-                            .takeIf { it.changes.isNotEmpty() }
-                    },
-                deletedAt = value.optLong("deletedAt").takeIf { it > 0L },
-                purgedAt = value.optLong("purgedAt").takeIf { it > 0L },
+            value.getString("id")
+            val timestamp = value.getLong("timestamp")
+            value.getString("body")
+            val decoded = value.decodeJsonObject<PrivateEntry>()
+            return decoded.copy(
+                updatedAt = if (value.has("updatedAt") && !value.isNull("updatedAt")) decoded.updatedAt else timestamp,
+                attachmentIds = decoded.attachmentIds.filter(String::isNotBlank).distinct(),
+                incidentLatitude = decoded.incidentLatitude?.takeIf(Double::isFinite),
+                incidentLongitude = decoded.incidentLongitude?.takeIf(Double::isFinite),
+                edits = decoded.edits.mapNotNull { edit ->
+                    edit.copy(changes = edit.changes.filterNot { it.field == "Pinned" })
+                        .takeIf { it.changes.isNotEmpty() }
+                },
+                deletedAt = decoded.deletedAt?.takeIf { it > 0L },
+                purgedAt = decoded.purgedAt?.takeIf { it > 0L },
             )
         }
     }
 }
 
-// Calculates elapsed time without letting Long boundary values wrap around.
+/**
+ * Calculates elapsed time without letting Long boundary values wrap around.
+ *
+ * @param timestamp Epoch timestamp in milliseconds.
+ * @param now Current epoch timestamp in milliseconds.
+ * @return The computed elapsed since numeric value.
+ */
 private fun elapsedSince(timestamp: Long, now: Long): Long {
     if (now <= timestamp) return 0L
     return runCatching { Math.subtractExact(now, timestamp) }.getOrDefault(Long.MAX_VALUE)
 }
 
-// Returns true after a trashed entry reaches the deletion limit.
+/**
+ * Returns true after a trashed entry reaches the deletion limit.
+ *
+ * @receiver The trashed private entry whose retention period is checked.
+ * @param now Current epoch timestamp in milliseconds.
+ * @return The resulting trash expired.
+ */
 fun PrivateEntry.trashExpired(now: Long = System.currentTimeMillis()) =
     deletedAt?.let { elapsedSince(it, now) >= PRIVATE_ENTRY_TRASH_RETENTION_MS } == true
 
-// Calculates how many full days remain before a trashed entry is deleted.
+/**
+ * Calculates how many full days remain before a trashed entry is deleted.
+ *
+ * @receiver The trashed private entry whose retention period is checked.
+ * @param now Current epoch timestamp in milliseconds.
+ * @return The computed trash days remaining numeric value.
+ */
 fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
     val remaining = (PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L)
     return ((remaining + 86_399_999L) / 86_400_000L).toInt()
 }
 
-// Calculates the remaining trash time for the live countdown.
+/**
+ * Calculates the remaining trash time for the live countdown.
+ *
+ * @receiver The trashed private entry whose retention period is checked.
+ * @param now Current epoch timestamp in milliseconds.
+ * @return The computed trash seconds remaining numeric value.
+ */
 fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
     return ((PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L) + 999L).div(
@@ -153,22 +210,28 @@ fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): 
     ).toInt()
 }
 
-data class FieldChange(val field: String, val before: String, val after: String) {
-    // Account: Converts this record into JSON.
-    fun toJson(): JSONObject =
-        JSONObject().put("field", field).put("before", before).put("after", after)
+@Serializable
+data class FieldChange(val field: String, val before: String = "", val after: String = "") {
+    /**
+     * Account: Converts this record into JSON.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
     companion object {
-        // Rebuilds this account record from protected JSON data.
-        fun fromJson(value: JSONObject) = FieldChange(
-            value.getString("field"),
-            value.optString("before"),
-            value.optString("after")
-        )
+        /**
+         * Rebuilds this account record from protected JSON data.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(value: JSONObject): FieldChange = value.decodeJsonObject()
     }
 }
 
 // Private account activity lives in the encrypted device vault; secrets are described, never copied in.
+@Serializable
 data class SettingsEvent(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -176,26 +239,29 @@ data class SettingsEvent(
     val action: String,
     val changes: List<FieldChange> = emptyList(),
 ) {
-    // Converts this account record into protected JSON data.
-    fun toJson(): JSONObject =
-        JSONObject().put("id", id).putReadableTime("timestamp", timestamp).put("area", area)
-            .put("action", action)
-            .put("changes", JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
+    /**
+     * Converts this account record into protected JSON data.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject().putReadableTime("timestamp", timestamp)
 
     companion object {
-        // Rebuilds this account record from protected JSON data.
+        /**
+         * Rebuilds this account record from protected JSON data.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
         fun fromJson(value: JSONObject): SettingsEvent {
-            val rows = value.optJSONArray("changes") ?: JSONArray()
-            return SettingsEvent(
-                value.getString("id"),
-                value.getLong("timestamp"),
-                value.getString("area"),
-                value.getString("action"),
-                (0 until rows.length()).map { FieldChange.fromJson(rows.getJSONObject(it)) })
+            value.getString("id")
+            value.getLong("timestamp")
+            return value.decodeJsonObject()
         }
     }
 }
 
+@Serializable
 data class TriggerEvent(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -203,26 +269,43 @@ data class TriggerEvent(
     val pinAttempts: Int = 0,
     val lastResult: String = "No PIN attempt",
 ) {
-    // Converts this account record into protected JSON data.
-    fun toJson(): JSONObject =
-        JSONObject().put("id", id).putReadableTime("timestamp", timestamp).put("source", source)
-            .put("pinAttempts", pinAttempts).put("lastResult", lastResult)
+    /**
+     * Converts this account record into protected JSON data.
+     *
+     * @return JSON object representing to JSON.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject().putReadableTime("timestamp", timestamp)
 
     companion object {
-        // Rebuilds this activity record from its saved JSON fields.
-        fun fromJson(value: JSONObject) = TriggerEvent(
-            value.getString("id"),
-            value.getLong("timestamp"),
-            value.getString("source"),
-            value.optInt("pinAttempts"),
-            value.optString("lastResult", "No PIN attempt")
-        )
+        /**
+         * Rebuilds this activity record from its saved JSON fields.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(value: JSONObject): TriggerEvent {
+            value.getString("id")
+            value.getLong("timestamp")
+            return value.decodeJsonObject()
+        }
     }
 }
 
-// Changes are recorded field by field so the history can show old and new values clearly.
+/**
+ * Changes are recorded field by field so the history can show old and new values clearly.
+ *
+ * @param before Before supplied to [profileChanges].
+ * @param after After supplied to [profileChanges].
+ * @return List of resulting profile changes items.
+ */
 fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> = buildList {
-    // Records a setting only when the old and new values differ.
+    /**
+     * Records a setting only when the old and new values differ.
+     *
+     * @param field Field supplied to [changed].
+     * @param old Old supplied to [changed].
+     * @param new New supplied to [changed].
+     */
     fun changed(field: String, old: String, new: String) {
         if (old != new) add(FieldChange(field, old, new))
     }
@@ -238,6 +321,12 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
     changed("Province / state", before.address.province, after.address.province)
     changed("Postal / ZIP", before.address.postalCode, after.address.postalCode)
     changed("Country", before.address.country, after.address.country)
+    changed("Email", before.email, after.email)
+    changed(
+        "Email notifications",
+        if (before.emailCommunicationConsent) "Enabled" else "Disabled",
+        if (after.emailCommunicationConsent) "Enabled" else "Disabled",
+    )
     changed("Cover app", before.coverType.title, after.coverType.title)
     if (before.triggerHash != after.triggerHash) add(
         FieldChange(
@@ -246,8 +335,20 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
             "Changed"
         )
     )
+    if (before.safetyIntake != after.safetyIntake) add(
+        FieldChange(
+            "Safety plan questionnaire",
+            "",
+            "Updated",
+        ),
+    )
     if (before.contacts != after.contacts) {
-        // Formats the summary shown by account storage.
+        /**
+         * Formats the summary shown by account storage.
+         *
+         * @param contacts Collection of contact records.
+         * @return The resulting summary.
+         */
         fun summary(contacts: List<SafeContact>) = contacts.joinToString("; ") {
             "${it.name}: ${it.details}${if (it.safeToStay) " (Safe to stay)" else ""}${if (it.linkedUid.isNotBlank()) " (Linked chat account)" else ""}"
         }
@@ -265,13 +366,31 @@ class FirebaseAccountRepository(
 ) : AccountRepository {
     private val accountSync = AccountSyncRepository()
 
-    // Change this path together with firebase/storage.rules and its tests.
+    /**
+     * Change this path together with firebase/storage.rules and its tests.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return The resulting profile object.
+     */
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
-    // Returns the Firebase Storage folder used by this account's history.
+    /**
+     * Returns the Firebase Storage folder used by this account's history.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param category Category supplied to [historyFolder].
+     * @return The resulting history folder.
+     */
     private fun historyFolder(uid: String, category: String) =
         storage.reference.child("accounts/$uid/history/$category")
 
-    // Change this alias only with an account migration or existing usernames will stop signing in.
+    /**
+     * Change this alias only with an account migration or existing usernames will stop signing in.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting [AccountIdentity] instance.
+     */
     override suspend fun create(
         username: String,
         password: String,
@@ -298,7 +417,14 @@ class FirebaseAccountRepository(
         return AccountIdentity(user.uid, normalized)
     }
 
-    // Account: Authenticates the account.
+    /**
+     * Account: Authenticates the account.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting [AccountIdentity] instance.
+     */
     override suspend fun authenticate(
         username: String,
         password: String,
@@ -340,7 +466,12 @@ class FirebaseAccountRepository(
         return AccountIdentity(user.uid, accountName)
     }
 
-    // Loads the signed-in account profile from this repository.
+    /**
+     * Loads the signed-in account profile from this repository.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting [UserProfile], or `null` if unavailable.
+     */
     override suspend fun profile(identity: AccountIdentity): UserProfile? {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         return try {
@@ -367,7 +498,12 @@ class FirebaseAccountRepository(
         }
     }
 
-    // Uploads the latest account profile to Firebase.
+    /**
+     * Uploads the latest account profile to Firebase.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     */
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         check(profile.username == identity.username) { "Profile account mismatch" }
@@ -382,7 +518,12 @@ class FirebaseAccountRepository(
         }
     }
 
-    // One object per event avoids overwriting another device's history.
+    /**
+     * One object per event avoids overwriting another device's history.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param record Record supplied to [saveHistoryRecord].
+     */
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) {
         check(auth.currentUser?.uid == identity.uid)
         require(record.category in setOf("settings", "triggers", "private_entries"))
@@ -399,7 +540,12 @@ class FirebaseAccountRepository(
         }
     }
 
-    // Loads private activity-history records for this account.
+    /**
+     * Loads private activity-history records for this account.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return List of resulting history records items.
+     */
     override suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord> {
         check(auth.currentUser?.uid == identity.uid)
         return listOf("settings", "triggers", "private_entries").flatMap { category ->
@@ -418,7 +564,13 @@ class FirebaseAccountRepository(
         }
     }
 
-    // Replaces the Firebase password after the current password is confirmed.
+    /**
+     * Replaces the Firebase password after the current password is confirmed.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param currentPassword Current password supplied to [changePassword].
+     * @param newPassword New password supplied to [changePassword].
+     */
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -437,22 +589,55 @@ class FirebaseAccountRepository(
         user.updatePassword(newPassword).await()
     }
 
-    // Account: Authenticates the accountd uid.
+    /**
+     * Account: Authenticates the accountd uid.
+     *
+     * @return The resulting authenticated user ID string, or `null` when unavailable.
+     */
     override fun authenticatedUid(): String? = auth.currentUser?.uid
-    // Checks the username and password, then returns the matching account.
+    /**
+     * Checks the username and password, then returns the matching account.
+     *
+     * @return The resulting authenticated username string, or `null` when unavailable.
+     */
     override fun authenticatedUsername(): String? =
         auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
 
+    /**
+     * Returns the authenticated role.
+     *
+     * @return The resulting [AccountRole], or `null` if unavailable.
+     */
     override suspend fun authenticatedRole(): AccountRole? {
         val claim = auth.currentUser?.getIdToken(false)?.await()?.claims?.get("role")
         return AccountRole.entries.firstOrNull { it.name == claim }
     }
 
-    // Account: Signs out the current account.
+    /**
+     * Account: Signs out the current account.
+     */
     override fun signOut() = auth.signOut()
 
-    // Converts a stored activity JSON record into short text suitable for the history screen.
+    /**
+     * Records this Android installation for cross-device sign-in notifications.
+     *
+     * @param deviceId The ID of the device participating in the operation.
+     * @param registerOnly Whether the request should only register this device.
+     */
+    override suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean) {
+        functions.getHttpsCallable("recordDeviceSignIn")
+            .call(mapOf("deviceId" to deviceId, "platform" to "APP", "registerOnly" to registerOnly))
+            .await()
+    }
+
+    /**
+     * Converts a stored activity JSON record into short text suitable for the history screen.
+     *
+     * @param category Category supplied to [readableHistory].
+     * @param raw Raw supplied to [readableHistory].
+     * @return The resulting readable history string.
+     */
     private fun readableHistory(category: String, raw: String): String {
         val value = JSONObject(raw)
         return when (category) {
@@ -463,11 +648,22 @@ class FirebaseAccountRepository(
         }.toString(2)
     }
 
-    // Converts account profile details into the JSON saved in protected storage.
+    /**
+     * Converts account profile details into the JSON saved in protected storage.
+     *
+     * @return The resulting JSON metadata.
+     */
     private fun jsonMetadata() = StorageMetadata.Builder().setContentType("application/json")
         .setCustomMetadata("schemaVersion", "2").setCustomMetadata("format", "pretty-json").build()
 
-    // Uploads profile JSON only when its content changed.
+    /**
+     * Uploads profile JSON only when its content changed.
+     *
+     * @param reference Reference supplied to [rewriteIfNeeded].
+     * @param current Current supplied to [rewriteIfNeeded].
+     * @param readable Readable supplied to [rewriteIfNeeded].
+     * @param limit Limit supplied to [rewriteIfNeeded].
+     */
     private suspend fun rewriteIfNeeded(
         reference: StorageReference,
         current: String,
@@ -494,31 +690,93 @@ class FirebaseAccountRepository(
 
 // The UI talks to this one doorway whether accounts are local test accounts or real Firebase accounts.
 interface AccountRepository {
-    // Creates a new account with the selected role.
+    /**
+     * Creates a new account with the selected role.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting [AccountIdentity] instance.
+     */
     suspend fun create(username: String, password: String, role: AccountRole): AccountIdentity
-    // Signs in with the supplied username and password.
+    /**
+     * Signs in with the supplied username and password.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting [AccountIdentity] instance.
+     */
     suspend fun authenticate(username: String, password: String, role: AccountRole): AccountIdentity
-    // Loads the signed-in account profile from this repository.
+    /**
+     * Loads the signed-in account profile from this repository.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting [UserProfile], or `null` if unavailable.
+     */
     suspend fun profile(identity: AccountIdentity): UserProfile?
-    // Saves the account profile in the selected account repository.
+    /**
+     * Saves the account profile in the selected account repository.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     */
     suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile)
-    // Adds one account activity record to storage.
+    /**
+     * Adds one account activity record to storage.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param record Record supplied to [saveHistoryRecord].
+     */
     suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord)
-    // Loads the private activity history saved for this account.
+    /**
+     * Loads the private activity history saved for this account.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return List of resulting history records items.
+     */
     suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord>
-    // Re-encrypts this account after its password changes.
+    /**
+     * Re-encrypts this account after its password changes.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param currentPassword Current password supplied to [changePassword].
+     * @param newPassword New password supplied to [changePassword].
+     */
     suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
         newPassword: String
     )
 
-    // Confirms that the supplied password belongs to this account ID.
+    /**
+     * Confirms that the supplied password belongs to this account ID.
+     *
+     * @return The resulting authenticated user ID string, or `null` when unavailable.
+     */
     fun authenticatedUid(): String?
-    // Returns the normalized username of the signed-in account.
+    /**
+     * Returns the normalized username of the signed-in account.
+     *
+     * @return The resulting authenticated username string, or `null` when unavailable.
+     */
     fun authenticatedUsername(): String?
+    /**
+     * Returns the authenticated role.
+     *
+     * @return The resulting [AccountRole], or `null` if unavailable.
+     */
     suspend fun authenticatedRole(): AccountRole? = null
-    // Signs out the current account and clears its repository session.
+    /**
+     * Records one device sign-in for cross-device security alerts.
+     *
+     * @param deviceId The ID of the device participating in the operation.
+     * @param registerOnly Whether the request should only register this device.
+     */
+    suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean = false) = Unit
+    /**
+     * Signs out the current account and clears its repository session.
+     */
     fun signOut()
 }
 
@@ -526,7 +784,14 @@ interface AccountRepository {
 internal class AccountSyncRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
-    // Watches one account marker and lets the session reload the matching Storage files.
+    /**
+     * Watches one account marker and lets the session reload the matching Storage files.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param onChange Callback invoked when the value or observed state changes.
+     * @param onError Callback invoked when an error occurs.
+     * @return Subscription or registration handle to close when observation is no longer needed.
+     */
     fun observe(uid: String, onChange: () -> Unit, onError: (Exception) -> Unit): ChatSubscription {
         val listener = firestore.collection("accountSync").document(uid)
             .addSnapshotListener { _, error ->
@@ -535,7 +800,11 @@ internal class AccountSyncRepository(
         return ChatSubscription { listener.remove() }
     }
 
-    // Raises the marker after a successful profile or history upload.
+    /**
+     * Raises the marker after a successful profile or history upload.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun notifyChanged(uid: String) {
         firestore.collection("accountSync").document(uid).set(
             mapOf("revision" to FieldValue.increment(1), "updatedAt" to FieldValue.serverTimestamp()),

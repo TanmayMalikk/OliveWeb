@@ -3,7 +3,7 @@
     "Hotlines": {
       "NWT Helpline": {
         "Desc": "Free 24/7 confidential helpline offering support, crisis management, and referrals for NWT residents.",
-        "Phone": "1-844-259-1793",
+        "Phone": "1-800-661-0844",
         "hours": "24/7",
         "url": "https://www.hss.gov.nt.ca/"
       }
@@ -14,6 +14,43 @@
         "Phone": "1-866-223-7775",
         "hours": "24/7",
         "url": "https://www.ywcanwt.ca/"
+      }
+    },
+    "LegalAid": {
+      "Northwest Territories Legal Aid Commission": {
+        "Desc": "Territorial legal aid applications, family law representation, and duty counsel.",
+        "Phone": "867-767-9361",
+        "hours": "Monday to Friday, 8:30 AM - 5:00 PM MT",
+        "address": "Suite 303, 4915 48th St, Yellowknife, NT X1A 2L9",
+        "lat": 62.4540,
+        "lng": -114.3718,
+        "url": "https://www.justice.gov.nt.ca/"
+      }
+    },
+    "Counseling": {
+      "Yellowknife Women's Society Centre": {
+        "Desc": "Daytime community support, housing advocacy, and trauma-informed referrals for women.",
+        "Phone": "867-873-2566",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM MT (Emergency shelter 24/7)",
+        "address": "5610 50th St, Yellowknife, NT X1A 2P7",
+        "lat": 62.4563,
+        "lng": -114.3665,
+        "url": "https://ykws.ca/"
+      }
+    },
+    "CrisisServices": {
+      "9-8-8 Suicide Crisis Helpline (NWT)": {
+        "Desc": "24/7 call and text crisis intervention and suicide prevention across the Northwest Territories.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
+      },
+      "Hope for Wellness Help Line": {
+        "Desc": "24/7 mental health counselling and crisis intervention for Indigenous Peoples.",
+        "Phone": "1-855-242-3310",
+        "hours": "24/7",
+        "url": "https://www.hopeforwellness.ca/"
       }
     }
   }

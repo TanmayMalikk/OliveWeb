@@ -3,6 +3,10 @@ package com.olive.app.notification
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
+import androidx.work.ListenableWorker.Result
+import androidx.work.WorkerParameters
+import androidx.work.impl.utils.taskexecutor.TaskExecutor
+import androidx.work.workDataOf
 import androidx.work.impl.WorkManagerImpl
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -18,6 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.util.concurrent.Executor
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35])
@@ -71,6 +76,43 @@ class NotificationLifecycleTest {
         assertEquals(1,mockingDetails(work).invocations.count { it.method.name=="enqueueUniqueWork" })
         LocalNotificationEventHandler.pauseForegroundListeners()
         assertTrue(db.listeners.all { it.closed })
+    }
+
+    @Test
+    fun explicitWorkerChecksPersistMarkersAndNotifyOnlyForNewIncomingMessages() = fixture { f, auth, db, work ->
+        val parameters = mock(WorkerParameters::class.java)
+        `when`(parameters.backgroundExecutor).thenReturn(Executor(Runnable::run))
+        `when`(parameters.taskExecutor).thenReturn(mock(TaskExecutor::class.java))
+        `when`(parameters.inputData).thenReturn(workDataOf())
+        val worker = LocalSafeUpdateCheckWorker(f.application, parameters)
+        val chat = "conversations/synthetic-chat"
+        db.records["friendLists/owner/friends/friend"] = mapOf("friendshipId" to "synthetic-chat")
+        db.records["friendLists/owner/friends/incomplete"] = emptyMap()
+        db.records[chat] = mapOf("lastMessageId" to "previous", "lastSenderUid" to "friend")
+        fun check() = runBlocking { assertEquals(Result.success(), worker.doWork()) }
+        fun alertCount() = mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" }
+
+        check()
+        assertEquals(0, alertCount())
+        db.records[chat] = mapOf("lastMessageId" to "outgoing", "lastSenderUid" to "owner")
+        check()
+        assertEquals(0, alertCount())
+        db.records[chat] = mapOf("lastMessageId" to "incoming", "lastSenderUid" to "friend")
+        check()
+        check()
+        assertEquals(1, alertCount())
+        val state = f.application.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
+        assertEquals("incoming", state.getString(LocalSafeUpdateCheckWorker.messageKey("owner", "synthetic-chat"), null))
+
+        `when`(parameters.inputData).thenReturn(workDataOf(
+            LocalSafeUpdateCheckWorker.KEY_SYNC_FCM_ONLY to true,
+            LocalSafeUpdateCheckWorker.KEY_FCM_TOKEN to "synthetic-worker-token",
+        ))
+        check()
+        assertTrue(db.records.values.any { it["token"] == "synthetic-worker-token" })
+        `when`(auth.currentUser).thenReturn(null)
+        check()
+        assertEquals(1, alertCount())
     }
 
     @Test

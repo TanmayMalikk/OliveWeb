@@ -1,11 +1,16 @@
 // Fitness cover users: shows nutrition totals, logged meals, and food search.
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import kotlin.time.Duration.Companion.milliseconds
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,21 +34,19 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.BakeryDining
+import androidx.compose.material.icons.outlined.FreeBreakfast
+import androidx.compose.material.icons.outlined.LunchDining
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,11 +55,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -74,27 +76,25 @@ import com.olive.app.R
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlinx.coroutines.launch
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.ui.graphics.Color
-import kotlin.math.PI
-import kotlin.math.sin
-import androidx.compose.animation.core.tween
-import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.semantics.*
 
-// Shows today's calorie and macro totals with meal logging.
+/**
+ * Shows today's calorie and macro totals with meal logging.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param padding Padding supplied to [TodayPage].
+ * @param onAddFood Callback invoked when add food changes or occurs.
+ * @param onRemoveFood Callback invoked when remove food changes or occurs.
+ * @param onAddWater Callback invoked when add water changes or occurs.
+ * @param onUpdateFood Callback invoked when update food changes or occurs.
+ * @param library Optional library supplied to [TodayPage].
+ * @param onOpenLibrary Callback invoked when open library changes or occurs.
+ * @param onLogMeal Callback invoked when log meal changes or occurs.
+ */
 @Composable
 internal fun TodayPage(
     snapshot: FitnessSnapshot,
@@ -106,6 +106,7 @@ internal fun TodayPage(
     onUpdateFood: (FoodLogEntry) -> Unit = {},
     library: FitnessFoodLibrary? = null,
     onOpenLibrary: (FoodLibrarySection) -> Unit = {},
+    onLogMeal: (MealType) -> Unit = { onAddFood() },
 ) {
     val savedFoods = rememberSavedFoods(library)
     var editingEntry by remember { mutableStateOf<FoodLogEntry?>(null) }
@@ -116,17 +117,17 @@ internal fun TodayPage(
             .testTag("fitness_today"),
         state = listState,
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.nutrition),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.balancedHeadline,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
                 )
-                Text(stringResource(R.string.daily_nutrition), color = FitnessSubtle)
+                Text(stringResource(R.string.today), color = FitnessSubtle)
             }
         }
         item {
@@ -155,21 +156,13 @@ internal fun TodayPage(
         MealType.entries.forEach { meal ->
             val entries = snapshot.foodsToday.filter { it.meal == meal }
             item {
-                Text(
-                    meal.displayName,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.semantics { heading() },
-                )
+                MealHeader(meal, entries, enabled) { onLogMeal(meal) }
             }
-            // Show the empty diary message until the user logs food.
-            if (entries.isEmpty()) {
-                item { Text(stringResource(R.string.no_food_logged), color = FitnessSubtle) }
-            } else {
-                items(entries, key = FoodLogEntry::logId) { entry ->
-                    LoggedFoodRow(entry, enabled, onEdit = { editingEntry = entry; editDetails = false }, onRemove = { onRemoveFood(entry.logId) })
-                }
+            items(entries, key = FoodLogEntry::logId) { entry ->
+                LoggedFoodRow(entry, enabled, onEdit = { editingEntry = entry; editDetails = false }, onRemove = { onRemoveFood(entry.logId) })
             }
         }
+        item { OtherNutrients(snapshot.nutrition) }
         item { ProviderAttribution() }
     }
     editingEntry?.let { entry ->
@@ -187,15 +180,90 @@ internal fun TodayPage(
 
 }
 
-// fitness cover shows this daily nutrition card view so the user can view its details and use its actions.
+/**
+ * Renders the meal header composable.
+ *
+ * @param meal Meal supplied to [MealHeader].
+ * @param entries Collection of entries values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onLog Callback invoked when log changes or occurs.
+ */
 @Composable
-internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
+private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boolean, onLog: () -> Unit) {
+    val label = meal.localizedName()
+    val icon = when (meal) {
+        MealType.BREAKFAST -> Icons.Outlined.FreeBreakfast
+        MealType.LUNCH -> Icons.Outlined.LunchDining
+        MealType.DINNER -> Icons.Outlined.Restaurant
+        MealType.SNACK -> Icons.Outlined.BakeryDining
+    }
+    val calories = entries.sumOf { (it.food.calories * it.servings).toDouble() }.toFloat()
+    Card(colors = CardDefaults.cardColors(containerColor = FitnessSurface), shape = RoundedCornerShape(18.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Icon(icon, null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                if (entries.isNotEmpty()) Text(
+                    stringResource(R.string.fitness_diary_energy, calories.displayAmount()),
+                    style = MaterialTheme.typography.bodySmall, color = FitnessSubtle,
+                )
+            }
+            val action = stringResource(R.string.fitness_diary_log_meal, label)
+            FilledTonalButton(onClick = onLog, enabled = enabled, modifier = Modifier
+                .testTag("fitness_log_${meal.name}").semantics { contentDescription = action }) {
+                Text(stringResource(R.string.fitness_diary_log), Modifier.clearAndSetSemantics { })
+            }
+        }
+    }
+}
+
+/**
+ * Looks up the localized display name for a meal type.
+ *
+ * @receiver The meal category to localize.
+ * @return The resulting localized name string.
+ */
+@Composable
+internal fun MealType.localizedName(): String = stringResource(when (this) {
+    MealType.BREAKFAST -> R.string.fitness_diary_breakfast
+    MealType.LUNCH -> R.string.fitness_diary_lunch
+    MealType.DINNER -> R.string.fitness_diary_dinner
+    MealType.SNACK -> R.string.fitness_diary_snacks
+})
+
+/**
+ * Renders the daily nutrition card composable.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
+@Composable
+private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CaloriesOverview(snapshot)
+        MacroOverview(snapshot)
+    }
+}
+
+/**
+ * Shows calories logged and progress toward the daily calorie goal.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
+@Composable
+private fun CaloriesOverview(snapshot: FitnessSnapshot) {
     val totals = snapshot.nutrition
     val profile = snapshot.profile
     val caloriesLabel = stringResource(R.string.calories)
-    var nutrientsExpanded by remember { mutableStateOf(false) }
+    val remaining = (profile.calorieGoal - totals.calories).coerceAtLeast(0f)
+    val remainingLabel = stringResource(R.string.fitness_diary_remaining, remaining.displayAmount())
     Card(
-        shape = RoundedCornerShape(28.dp),
+        shape = FitnessContinuousCorners,
         colors = CardDefaults.cardColors(containerColor = FitnessWarmCard),
     ) {
         Column(
@@ -205,19 +273,26 @@ internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics {
                     contentDescription = "$caloriesLabel, " +
-                        "${totals.calories.displayAmount()} of ${profile.calorieGoal} kcal"
+                        "${totals.calories.displayAmount()} / ${profile.calorieGoal} kcal, $remainingLabel"
                 },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Column {
-                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.calories), color = FitnessSubtle)
+                    Text(totals.calories.displayAmount(), style = MaterialTheme.typography.headlineMedium.tabularDigits, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.calorie_goal) + " · " +
+                            stringResource(R.string.fitness_diary_energy, profile.calorieGoal.toString()),
+                        style = MaterialTheme.typography.bodySmall.tabularDigits,
+                        color = FitnessSubtle,
+                    )
                 }
                 Text(
-                    "${profile.calorieGoal} kcal · ${stringResource(R.string.calorie_goal)}",
-                    color = FitnessSubtle,
-                    style = MaterialTheme.typography.labelLarge,
+                    remainingLabel, Modifier.weight(1f).padding(start = 8.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge.tabularDigits,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
             val calorieProgress = (totals.calories / profile.calorieGoal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
@@ -226,28 +301,74 @@ internal fun DailyNutritionCard(snapshot: FitnessSnapshot) {
                 modifier = Modifier.fillMaxWidth().height(9.dp).clip(CircleShape)
                     .clearAndSetSemantics { },
             )
-            NutritionProgress(stringResource(R.string.protein), totals.proteinGrams, profile.proteinGoal.toFloat(), "g")
-            NutritionProgress(stringResource(R.string.carbohydrates), totals.carbohydrateGrams, profile.carbohydrateGoal.toFloat(), "g")
-            NutritionProgress(stringResource(R.string.fat), totals.fatGrams, profile.fatGoal.toFloat(), "g")
-            HorizontalDivider()
-            TextButton(onClick = { nutrientsExpanded = !nutrientsExpanded }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.nutrition_other_nutrients), modifier = Modifier.weight(1f))
-                Icon(if (nutrientsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
-            }
-            if (nutrientsExpanded) {
-            NutritionAmountRow(stringResource(R.string.saturated_fat), totals.saturatedFatGrams, "g")
-            NutritionAmountRow(stringResource(R.string.trans_fat), totals.transFatGrams, "g")
-            NutritionAmountRow(stringResource(R.string.fiber), totals.fiberGrams, "g")
-            NutritionAmountRow(stringResource(R.string.sugar), totals.sugarGrams, "g")
-            NutritionAmountRow(stringResource(R.string.sodium), totals.sodiumMilligrams, "mg")
-            NutritionAmountRow(stringResource(R.string.cholesterol), totals.cholesterolMilligrams, "mg")
-            NutritionAmountRow(stringResource(R.string.potassium), totals.potassiumMilligrams, "mg")
+        }
+    }
+}
+
+/**
+ * Shows carbohydrates, fat, and protein against their daily goals.
+ *
+ * @param snapshot Firestore or data snapshot containing the latest state.
+ */
+@Composable
+private fun MacroOverview(snapshot: FitnessSnapshot) {
+    val totals = snapshot.nutrition
+    val profile = snapshot.profile
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = FitnessSurface)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
+            val stacked = maxWidth < 280.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f
+            val metrics = listOf(
+                Triple(R.string.carbohydrates, totals.carbohydrateGrams, profile.carbohydrateGoal),
+                Triple(R.string.fat, totals.fatGrams, profile.fatGoal),
+                Triple(R.string.protein, totals.proteinGrams, profile.proteinGoal),
+            )
+            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                metrics.forEach { (label, total, goal) -> NutritionProgress(stringResource(label), total, goal) }
+            } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                metrics.forEach { (label, total, goal) ->
+                    NutritionProgress(stringResource(label), total, goal, Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
-// Shows eaten, target, and remaining calories in one row.
+/**
+ * Shows the expandable breakdown of additional nutrients.
+ *
+ * @param totals Totals supplied to [OtherNutrients].
+ */
+@Composable
+private fun OtherNutrients(totals: NutritionTotals) {
+    var nutrientsExpanded by rememberSaveable { mutableStateOf(false) }
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = FitnessSurface)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { nutrientsExpanded = !nutrientsExpanded }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.nutrition_other_nutrients), modifier = Modifier.weight(1f))
+                Icon(if (nutrientsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
+            }
+            if (nutrientsExpanded) {
+            HorizontalDivider()
+                NutritionAmountRow(stringResource(R.string.saturated_fat), totals.saturatedFatGrams, "g")
+                NutritionAmountRow(stringResource(R.string.trans_fat), totals.transFatGrams, "g")
+                NutritionAmountRow(stringResource(R.string.fiber), totals.fiberGrams, "g")
+                NutritionAmountRow(stringResource(R.string.sugar), totals.sugarGrams, "g")
+                NutritionAmountRow(stringResource(R.string.sodium), totals.sodiumMilligrams, "mg")
+                NutritionAmountRow(stringResource(R.string.cholesterol), totals.cholesterolMilligrams, "mg")
+                NutritionAmountRow(stringResource(R.string.potassium), totals.potassiumMilligrams, "mg")
+                Spacer(Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Shows eaten, target, and remaining calories in one row.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param unit Unit supplied to [NutritionAmountRow].
+ */
 @Composable
 private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     Row(
@@ -257,24 +378,28 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label)
-        Text("${value.displayAmount()} $unit")
+        Text("${value.displayAmount()} $unit", style = MaterialTheme.typography.bodyMedium.tabularDigits)
     }
 }
-// Draws progress toward one calorie or macro goal.
-@Suppress("SameParameterValue") // unit is always 'g' for gram.
+/**
+ * Draws progress toward one calorie or macro goal.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param goal Goal supplied to [NutritionProgress].
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
-private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
-    val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+private fun NutritionProgress(label: String, value: Float, goal: Int, modifier: Modifier = Modifier) {
+    val progress = (value / goal.coerceAtLeast(1)).coerceIn(0f, 1f)
     Column(
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = "$label, ${value.displayAmount()} of ${goal.displayAmount()} $unit"
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = "$label, ${value.displayAmount()} / $goal g"
         },
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label)
-            Text("${value.displayAmount()} / ${goal.displayAmount()} $unit")
-        }
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text("${value.displayAmount()} / $goal g", style = MaterialTheme.typography.bodySmall.tabularDigits, color = FitnessSubtle)
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
@@ -282,7 +407,14 @@ private fun NutritionProgress(label: String, value: Float, goal: Float, unit: St
     }
 }
 
-// Shows one diary food with nutrients and a remove action.
+/**
+ * Shows one diary food with nutrients and a remove action.
+ *
+ * @param entry Entry supplied to [LoggedFoodRow].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onEdit Callback invoked when edit changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ */
 @Composable
 private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> Unit, onRemove: () -> Unit) {
     Card(
@@ -305,25 +437,37 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onEdit: () -> U
                     color = FitnessSubtle,
                 )
             }
-            IconButton(onClick = onEdit, enabled = enabled) {
+            IconButton(onClick = onEdit, enabled = enabled, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) {
                 Icon(Icons.Outlined.Edit, stringResource(R.string.nutrition_edit_food))
             }
-            IconButton(onClick = onRemove, enabled = enabled) {
+            IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) {
                 Icon(Icons.Outlined.Delete, stringResource(R.string.remove))
             }
         }
     }
 }
-// Searches nutrition providers and lets the user add a food result.
+/**
+ * Searches nutrition providers and lets the user add a food result.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param padding Padding supplied to [FoodSearchPage].
+ * @param onFoodAdded Callback invoked when food added changes or occurs.
+ * @param foodSource Optional food source supplied to [FoodSearchPage].
+ * @param library Optional library supplied to [FoodSearchPage].
+ * @param initialSection Initial section supplied to [FoodSearchPage].
+ * @param recentFoods Collection of recent foods values to process.
+ * @param initialMeal Optional initial meal supplied to [FoodSearchPage].
+ */
 @Composable
 internal fun FoodSearchPage(
     enabled: Boolean,
     padding: PaddingValues,
-    onFoodAdded: (NutritionFood, Float, MealType) -> Unit,
+    onFoodAdded: (NutritionFood, Float, MealType, String) -> Unit,
     foodSource: FoodNutritionDataSource? = null,
     library: FitnessFoodLibrary? = null,
     initialSection: FoodLibrarySection = FoodLibrarySection.Search,
     recentFoods: List<FoodLogEntry> = emptyList(),
+    initialMeal: MealType? = null,
 ) {
     val repository = remember(foodSource) { foodSource ?: FoodNutritionRepository() }
     val scope = rememberCoroutineScope()
@@ -358,6 +502,11 @@ internal fun FoodSearchPage(
         } finally { scanning = false }
     }, onError = { scanning = false; scanFailed = true })
     var page by remember { mutableIntStateOf(0) }
+    /**
+     * Searches the target.
+     *
+     * @param more Whether to apply more.
+     */
     fun search(more: Boolean = false) {
         if (loading) return
         loading = true
@@ -395,27 +544,25 @@ internal fun FoodSearchPage(
             emptyList()
         }
     }
-    val headingFocus = remember { FocusRequester() }
-
-    // Place TalkBack at the food-search heading when this submenu opens.
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        headingFocus.requestFocus()
-    }
+    val headingFocus = rememberEntryFocus(Unit)
 
     Column(
         Modifier.fillMaxSize().padding(padding).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            stringResource(R.string.find_food),
+            initialMeal?.let { stringResource(R.string.fitness_diary_log_meal, it.localizedName()) }
+                ?: stringResource(R.string.find_food),
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
+            modifier = Modifier.semantics { heading() },
         )
         if (library != null) Row(Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FoodLibrarySection.entries.forEach { option ->
                 FilterChip(selected = section == option, onClick = { section = option },
+                    modifier = Modifier.testTag("food_library_${option.name}").semantics { role = Role.Tab }
+                        .focusProperties { canFocus = true }.then(
+                        if (option == FoodLibrarySection.Search) Modifier.focusRequester(headingFocus) else Modifier),
                     enabled = enabled && !loading && !scanning, label = { Text(stringResource(option.label)) })
             }
         }
@@ -423,6 +570,7 @@ internal fun FoodSearchPage(
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(false to R.string.search_foods, true to R.string.nutrition_barcode).forEach { (mode, label) ->
                     FilterChip(selected = barcodeMode == mode, enabled = enabled && !loading && !scanning,
+                        modifier = if (library == null && !mode) Modifier.focusProperties { canFocus = true }.focusRequester(headingFocus) else Modifier,
                         onClick = { scanFailed = false; barcodeMode = mode; query = ""; searched = false; result = FoodSearchResult() },
                         label = { Text(stringResource(label)) })
                 }
@@ -469,8 +617,15 @@ internal fun FoodSearchPage(
             if (loading || scanning) {
                 LoadingSkeleton(SkeletonLayout.FoodResults)
             } else if (searched && result.foods.isEmpty()) {
-                val message = if (result.providerFailures >= 2) R.string.food_search_unavailable else R.string.no_food_results
+                val message = when {
+                    result.needsSignIn -> R.string.nutrition_sign_in_required
+                    result.providerFailures >= 2 -> R.string.food_search_unavailable
+                    else -> R.string.no_food_results
+                }
                 Text(stringResource(message))
+            }
+            if (!loading && result.needsSignIn && result.foods.isNotEmpty()) {
+                Text(stringResource(R.string.nutrition_sign_in_required), color = FitnessSubtle)
             }
             if (!loading && result.needsIpApproval) {
                 Text(stringResource(R.string.nutrition_ip_approval), color = MaterialTheme.colorScheme.error)
@@ -522,23 +677,30 @@ internal fun FoodSearchPage(
         onContinue = { food -> manualEntry = false; selectedFood = food },
     )
     selectedFood?.let { food ->
+        val logId = rememberSaveable(food.id) { java.util.UUID.randomUUID().toString() }
         AddFoodDialog(
             food = food,
             onDismiss = { selectedFood = null; previousEntry = null },
             onAdd = { choice, servings, meal ->
                 selectedFood = null
                 previousEntry = null
-                onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal)
+                onFoodAdded(choice.copy(servingOptions = emptyList()), servings, meal, logId)
             },
             initialServings = previousEntry?.servings ?: 1f,
-            initialMeal = previousEntry?.meal ?: MealType.BREAKFAST,
+            initialMeal = initialMeal ?: previousEntry?.meal ?: MealType.BREAKFAST,
             isSaved = savedFoods.any { it.id == food.id },
             onToggleSaved = library?.let { { saved: Boolean -> it.setSaved(food, saved) } },
         )
     }
 }
 
-// fitness cover shows this food search result card view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this food search result card view so the user can view its details and use its actions.
+ *
+ * @param food Food supplied to [FoodSearchResultCard].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onAdd Callback invoked when add changes or occurs.
+ */
 @Composable
 private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: () -> Unit) {
     val description = buildString {
@@ -602,90 +764,13 @@ private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: (
     }
 }
 
-// Shows the required FatSecret and Open Food Facts credits.
+/**
+ * Shows the required FatSecret and Open Food Facts credits.
+ */
 @Composable
 private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(stringResource(R.string.fatsecret_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
         Text(stringResource(R.string.open_food_facts_attribution), style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
-    }
-}
-
-@Composable
-internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val target = (totalMl.toFloat() / goalMl.coerceAtLeast(1)).coerceIn(0f, 1f)
-    val fill by animateFloatAsState(target, animationSpec = tween(1000), label = "water_fill")
-    val outline = Color(0xFF176B9B)
-    val water = Color(0xFF258ED2)
-    val ripples = rememberInfiniteTransition(label = "water_ripples")
-    val phase by ripples.animateFloat(0f, (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "water_wave_phase")
-    val description = stringResource(R.string.nutrition_water_progress, totalMl, goalMl)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-    Row(Modifier.clickable(enabled = enabled, role = Role.Button) { open = true }
-        .semantics { contentDescription = description; progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) }
-        .padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Canvas(Modifier.size(42.dp, 54.dp)) {
-            val glass = Path().apply {
-                moveTo(size.width * .12f, size.height * .08f); lineTo(size.width * .88f, size.height * .08f)
-                lineTo(size.width * .76f, size.height * .92f); lineTo(size.width * .24f, size.height * .92f); close()
-            }
-            drawPath(glass, Color(0xFFE4F3FC))
-            clipPath(glass) {
-                if (fill > 0f) {
-                    val level = size.height * (.92f - .84f * fill)
-                    val amplitude = minOf(1.8.dp.toPx(), size.height * .84f * fill / 3f)
-                    fun wave(offset: Float): Path = Path().apply {
-                        moveTo(0f, size.height)
-                        for (step in 0..32) {
-                            val x = size.width * step / 32f
-                            val y = level + sin(x / size.width * 2f * PI.toFloat() + phase + offset) * amplitude
-                            lineTo(x, y)
-                        }
-                        lineTo(size.width, size.height)
-                        close()
-                    }
-                    drawPath(wave(PI.toFloat()), water.copy(alpha = .35f))
-                    drawPath(wave(0f), water.copy(alpha = .85f))
-                }
-                drawLine(Color.White.copy(alpha = .8f), Offset(size.width * .24f, size.height * .2f),
-                    Offset(size.width * .29f, size.height * .62f), strokeWidth = 1.5.dp.toPx())
-            }
-            drawPath(glass, outline, style = Stroke(2.dp.toPx()))
-        }
-        Column(Modifier.padding(start = 6.dp)) {
-            Text(stringResource(R.string.nutrition_water), style = MaterialTheme.typography.labelLarge)
-            Text("$totalMl / $goalMl ml", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onAdd(-250, goalMl) }, enabled = enabled && totalMl > 0) {
-                androidx.compose.material3.Icon(Icons.Outlined.Remove, stringResource(R.string.nutrition_water_minus))
-            }
-            Text("250 ml", style = MaterialTheme.typography.labelSmall)
-            IconButton(onClick = { onAdd(250, goalMl) }, enabled = enabled) {
-                androidx.compose.material3.Icon(Icons.Outlined.Add, stringResource(R.string.nutrition_water_plus))
-            }
-        }
-    }
-    if (open) {
-        var amount by remember { mutableStateOf("250") }
-        var goal by remember { mutableStateOf(goalMl.toString()) }
-        AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.nutrition_add_water)) },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(amount, { amount = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_amount)) },
-                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(150, 250, 500).forEach { value ->
-                        SuggestionChip(onClick = { amount = value.toString() }, label = { Text("$value ml") })
-                    }
-                }
-                OutlinedTextField(goal, { goal = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_goal)) },
-                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            } },
-            confirmButton = { Button(onClick = { onAdd(amount.toInt(), goal.toInt()); open = false },
-                enabled = amount.toIntOrNull()?.let { it in 1..10000 } == true && goal.toIntOrNull()?.let { it in 250..10000 } == true) { Text(stringResource(R.string.nutrition_add_water)) } },
-            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } })
     }
 }

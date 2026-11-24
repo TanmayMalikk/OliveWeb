@@ -29,6 +29,13 @@ internal object PolygonUnclip {
     private const val EPS = 1e-6
     private const val ARC_TOLERANCE = 0.25
 
+    /**
+     * Expands the polygon unclip.
+     *
+     * @param points Collection of points values to process.
+     * @param unclipRatio Unclip ratio supplied to [unclip].
+     * @return List of resulting unclip items.
+     */
     fun unclip(points: List<Point>, unclipRatio: Float): List<Point> {
         if (points.size < 3) return points
 
@@ -74,6 +81,16 @@ internal object PolygonUnclip {
         return if (expanded.size >= 3) expanded else points
     }
 
+    /**
+     * Appends round join.
+     *
+     * @param output Output stream or target receiving processed data.
+     * @param center Center supplied to [appendRoundJoin].
+     * @param fromNormal From normal supplied to [appendRoundJoin].
+     * @param toNormal To normal supplied to [appendRoundJoin].
+     * @param distance Distance supplied to [appendRoundJoin].
+     * @param clockwiseInImageCoords Whether to apply clockwise in image coords.
+     */
     private fun appendRoundJoin(
         output: MutableList<Point>,
         center: Point,
@@ -104,12 +121,24 @@ internal object PolygonUnclip {
         }
     }
 
+    /**
+     * Computes arc step angle.
+     *
+     * @param distance Distance supplied to [arcStepAngle].
+     * @return The computed arc step angle numeric value.
+     */
     private fun arcStepAngle(distance: Double): Double {
         val ratio = (1.0 - ARC_TOLERANCE / distance).coerceIn(-1.0, 1.0)
         val step = 2.0 * acos(ratio)
         return if (step.isFinite() && step > EPS) step else PI / 8.0
     }
 
+    /**
+     * Appends point.
+     *
+     * @param output Output stream or target receiving processed data.
+     * @param point Point supplied to [appendPoint].
+     */
     private fun appendPoint(output: MutableList<Point>, point: Point) {
         val last = output.lastOrNull()
         if (last == null || hypot(point.x - last.x, point.y - last.y) > EPS) {
@@ -117,6 +146,12 @@ internal object PolygonUnclip {
         }
     }
 
+    /**
+     * Computes signed area.
+     *
+     * @param points Collection of points values to process.
+     * @return The computed signed area numeric value.
+     */
     private fun signedArea(points: List<Point>): Double {
         var sum = 0.0
         for (i in points.indices) {
@@ -127,6 +162,12 @@ internal object PolygonUnclip {
         return sum / 2.0
     }
 
+    /**
+     * Computes perimeter.
+     *
+     * @param points Collection of points values to process.
+     * @return The computed perimeter numeric value.
+     */
     private fun perimeter(points: List<Point>): Double {
         var length = 0.0
         for (i in points.indices) {

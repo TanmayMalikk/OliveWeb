@@ -2,6 +2,7 @@
 const { readFileSync, statSync } = require("node:fs");
 const { createHash } = require("node:crypto");
 const { applicationDefault, initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 const { getMessaging } = require("firebase-admin/messaging");
 
@@ -28,6 +29,16 @@ async function pruneOldReleases(bucket, manifest) {
     await file.delete({ ignoreNotFound: true, ifGenerationMatch: file.metadata.generation });
   }
   return obsolete.length;
+}
+
+function buildReleaseRecord({ versionCode, versionName, mandatory, releaseNotes, publishedAt }) {
+  return {
+    versionCode,
+    versionName: String(versionName),
+    mandatory: Boolean(mandatory),
+    releaseNotes: Array.isArray(releaseNotes) ? releaseNotes : [],
+    publishedAt: publishedAt || new Date().toISOString(),
+  };
 }
 
 function buildUpdateNotification({ versionCode, versionName }) {
@@ -153,6 +164,16 @@ async function publish(env = process.env) {
   console.log(`Removed ${pruned} obsolete Android release APK(s).`);
 
   try {
+    await getFirestore(app).collection("appReleases").doc("android").set(
+      buildReleaseRecord(manifest),
+      { merge: true },
+    );
+    console.log(`Recorded release metadata appReleases/android for ${versionName} (${versionCode}).`);
+  } catch (error) {
+    console.warn("Firestore appReleases/android update failed, continuing with published manifest:", error);
+  }
+
+  try {
     const messaging = getMessaging(app);
     const message = buildUpdateNotification({ versionCode, versionName });
     const messageId = await messaging.send(message);
@@ -171,6 +192,7 @@ if (require.main === module) {
 
 module.exports = {
   TOPIC_APP_UPDATES,
+  buildReleaseRecord,
   buildUpdateNotification,
   parseManifestConfig,
   pruneOldReleases,

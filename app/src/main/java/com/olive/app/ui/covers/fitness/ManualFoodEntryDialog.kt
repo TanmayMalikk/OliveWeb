@@ -1,5 +1,11 @@
 package com.olive.app.ui.covers.fitness
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.oliveErrorShake
+import com.olive.app.ui.shared.rememberFieldErrorShakeTrigger
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -24,11 +30,9 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,6 +64,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.olive.app.R
 import com.olive.app.ocr.PaddleOcrManager
 import com.olive.app.ui.shared.LoadingSkeleton
+import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.SkeletonLayout
 import java.io.File
 import java.util.UUID
@@ -67,6 +72,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
+/**
+ * Displays the manual food entry dialog overlay.
+ *
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onContinue Callback invoked when continue changes or occurs.
+ * @param initialFood Optional initial food supplied to [ManualFoodEntryDialog].
+ */
 @Composable
 internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (NutritionFood) -> Unit, initialFood: NutritionFood? = null) {
     val draftSaver = remember {
@@ -80,7 +92,7 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
     var scanning by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf<Int?>(null) }
     // Empty labels stay visually lighter than entered values; the outline identifies missing inputs.
-    val hintColor = Color(0xFF6B7268)
+    val hintColor = Muted
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedLabelColor = hintColor,
         focusedLabelColor = hintColor,
@@ -112,29 +124,34 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
                     }
                 }
                 Text(stringResource(R.string.nutrition_label_short), style = MaterialTheme.typography.bodySmall)
+                var manualShake by remember { mutableIntStateOf(0) }
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (scanning) LoadingSkeleton(SkeletonLayout.Form, rows = 2)
                     scanMessage?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
+                    val nameShake = rememberFieldErrorShakeTrigger(if (draft.name.isBlank()) "name" else null, manualShake)
                     OutlinedTextField(draft.name, { draft = draft.copy(name = it.take(160)) },
                         label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true,
                         colors = fieldColors, isError = draft.name.isBlank(),
-                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_name"))
+                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_name").oliveErrorShake(nameShake))
+                    val servingShake = rememberFieldErrorShakeTrigger(if (draft.serving.isBlank()) "serving" else null, manualShake)
                     OutlinedTextField(draft.serving, { draft = draft.copy(serving = it.take(120)) },
                         label = { Text(stringResource(R.string.nutrition_serving_short)) },
                         placeholder = { Text("1 bar (40 g)") }, singleLine = true,
                         colors = fieldColors, isError = draft.serving.isBlank(),
-                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_serving"))
+                        enabled = !scanning, modifier = Modifier.fillMaxWidth().testTag("manual_food_serving").oliveErrorShake(servingShake))
                     val fields = LabelNutrient.entries.filter { it.required || extras }
                     fields.chunked(2).forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             pair.forEach { field ->
                                 val value = draft.nutrients[field].orEmpty()
+                                val fieldInvalid = draft.amount(field) == null
+                                val fieldShake = rememberFieldErrorShakeTrigger(if (fieldInvalid) field.name else null, manualShake)
                                 OutlinedTextField(value, { draft = draft.copy(nutrients = draft.nutrients + (field to it.take(24))) },
                                     label = { Text(stringResource(field.label), style = MaterialTheme.typography.bodySmall) },
                                     suffix = { Text(field.unit) }, singleLine = true, enabled = !scanning,
-                                    colors = fieldColors, isError = draft.amount(field) == null,
+                                    colors = fieldColors, isError = fieldInvalid,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1f).testTag("manual_${field.name}"))
+                                    modifier = Modifier.weight(1f).testTag("manual_${field.name}").oliveErrorShake(fieldShake))
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
@@ -145,8 +162,15 @@ internal fun ManualFoodEntryDialog(onDismiss: () -> Unit, onContinue: (Nutrition
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                    Button(onClick = { draft.food()?.let(onContinue) }, enabled = !scanning && draft.valid,
-                        modifier = Modifier.testTag("manual_food_continue")) { Text(stringResource(R.string.nutrition_choose_portion)) }
+                    Button(
+                        onClick = {
+                            val food = draft.food()
+                            if (food == null) manualShake += 1
+                            else onContinue(food)
+                        },
+                        enabled = !scanning,
+                        modifier = Modifier.testTag("manual_food_continue"),
+                    ) { Text(stringResource(R.string.nutrition_choose_portion)) }
                 }
             }
         }
@@ -172,6 +196,12 @@ internal data class ManualNutritionDraft(
     val serving: String = "",
     val nutrients: Map<LabelNutrient, String> = emptyMap(),
 ) {
+    /**
+     * Parses the entered nutrient amount, treating a blank optional field as zero.
+     *
+     * @param field Field supplied to [amount].
+     * @return The computed amount number, or `null` if unavailable.
+     */
     fun amount(field: LabelNutrient): Float? {
         val raw = nutrients[field].orEmpty().trim()
         if (raw.isEmpty()) return if (field.required) null else 0f
@@ -182,6 +212,11 @@ internal data class ManualNutritionDraft(
     val valid: Boolean get() = name.isNotBlank() && serving.isNotBlank() &&
         LabelNutrient.entries.all { amount(it) != null }
 
+    /**
+     * Returns the food.
+     *
+     * @return The resulting [NutritionFood], or `null` if unavailable.
+     */
     fun food(): NutritionFood? {
         if (!valid) return null
         return NutritionFood(
@@ -207,7 +242,12 @@ internal data class NutritionLabelReading(
     val nutrients: Map<LabelNutrient, String>,
 )
 
-// OCR only proposes values. Missing fields remain blank for the user to check against the label.
+/**
+ * OCR only proposes values. Missing fields remain blank for the user to check against the label.
+ *
+ * @param text Text string to display, parse, or send.
+ * @return The resulting [NutritionLabelReading] for parse nutrition label.
+ */
 internal fun parseNutritionLabel(text: String): NutritionLabelReading {
     val lines = text.take(30_000).lines().map(String::trim).filter(String::isNotEmpty)
     val labels = mapOf(
@@ -264,13 +304,25 @@ internal fun parseNutritionLabel(text: String): NutritionLabelReading {
     return NutritionLabelReading(serving, values)
 }
 
+/**
+ * Copies a food's serving description and nutrient values into an editable manual draft.
+ *
+ * @param food Food supplied to [manualDraftFromFood].
+ * @return The resulting manual draft from food.
+ */
 internal fun manualDraftFromFood(food: NutritionFood) = ManualNutritionDraft(food.name, food.servingDescription,
     listOf(food.calories, food.proteinGrams, food.carbohydrateGrams, food.fatGrams,
         food.saturatedFatGrams, food.transFatGrams, food.fiberGrams, food.sugarGrams,
         food.sodiumMilligrams, food.cholesterolMilligrams, food.potassiumMilligrams)
         .mapIndexed { index, value -> LabelNutrient.entries[index] to java.math.BigDecimal(value.toString()).stripTrailingZeros().toPlainString() }.toMap())
 
-// Full-resolution camera input is private, bounded, and deleted after recognition or cancellation.
+/**
+ * Full-resolution camera input is private, bounded, and deleted after recognition or cancellation.
+ *
+ * @param onPhoto Callback invoked when photo changes or occurs.
+ * @param onError Callback invoked when an error occurs.
+ * @return The resulting [() -> Unit] for remember nutrition camera.
+ */
 @Composable
 internal fun rememberNutritionCamera(onPhoto: suspend (ByteArray) -> Unit, onError: () -> Unit): () -> Unit {
     val context = LocalContext.current
@@ -295,6 +347,9 @@ internal fun rememberNutritionCamera(onPhoto: suspend (ByteArray) -> Unit, onErr
             finally { withContext(NonCancellable + Dispatchers.IO) { file.delete() } }
         }
     }
+    /**
+     * Launches the target.
+     */
     fun launch() {
         scope.launch {
             var prepared: File? = null
@@ -327,6 +382,13 @@ internal fun rememberNutritionCamera(onPhoto: suspend (ByteArray) -> Unit, onErr
     }
 }
 
+/**
+ * Reads nutrition photo.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param bytes Raw byte array payload.
+ * @return The resulting read nutrition photo string.
+ */
 internal suspend fun readNutritionPhoto(context: android.content.Context, bytes: ByteArray): String {
     val engine = PaddleOcrManager(context.applicationContext)
     try {
@@ -336,6 +398,13 @@ internal suspend fun readNutritionPhoto(context: android.content.Context, bytes:
     } finally { withContext(NonCancellable) { engine.release() } }
 }
 
+/**
+ * Reads barcode photo.
+ *
+ * @param context Android context used to access system services, resources, or storage.
+ * @param bytes Raw byte array payload.
+ * @return The resulting read barcode photo string, or `null` when unavailable.
+ */
 internal suspend fun readBarcodePhoto(context: android.content.Context, bytes: ByteArray): String? {
     // Decode the bars first; OCR of printed digits is a fallback for a damaged barcode.
     val options = BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_EAN_13,
@@ -357,19 +426,36 @@ internal suspend fun readBarcodePhoto(context: android.content.Context, bytes: B
     return barcodeFromLabelText(readNutritionPhoto(context, bytes))?.padStart(13, '0')
 }
 
+/**
+ * Validates food barcode.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return `true` if valid food barcode, or `false` otherwise.
+ */
 internal fun validFoodBarcode(value: String): Boolean {
     if (value.length !in listOf(8, 12, 13) || value.any { !it.isDigit() }) return false
     val sum = value.dropLast(1).reversed().mapIndexed { index, digit -> digit.digitToInt() * if (index % 2 == 0) 3 else 1 }.sum()
     return (10 - sum % 10) % 10 == value.last().digitToInt()
 }
 
+/**
+ * Computes barcode from label text.
+ *
+ * @param text Text string to display, parse, or send.
+ * @return The resulting barcode from label text string, or `null` when unavailable.
+ */
 internal fun barcodeFromLabelText(text: String): String? {
     val candidates = Regex("""(?<![0-9])(?:[0-9][ \t-]*){8,}(?![0-9])""")
         .findAll(text).map { it.value.filter(Char::isDigit) }.filter(::validFoodBarcode).distinct().toList()
     return candidates.singleOrNull()
 }
 
-// Match the diary storage range and accept the decimal separator used by the keyboard locale.
+/**
+ * Match the diary storage range and accept the decimal separator used by the keyboard locale.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return The computed parse serving amount number, or `null` if unavailable.
+ */
 internal fun parseServingAmount(value: String): Float? {
     val clean = value.trim()
     if (!Regex("""(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)""").matches(clean)) return null
@@ -378,6 +464,12 @@ internal fun parseServingAmount(value: String): Float? {
 
 internal data class FoodPortion(val food: NutritionFood, val servings: Float)
 internal data class ServingBasis(val amount: Float, val unit: String)
+/**
+ * Computes serving basis.
+ *
+ * @param description Description supplied to [servingBasis].
+ * @return The resulting [ServingBasis], or `null` if unavailable.
+ */
 internal fun servingBasis(description: String): ServingBasis? {
     val match = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*(kg|ml|oz|g|l)\b""", RegexOption.IGNORE_CASE).find(description) ?: return null
     val raw = match.groupValues[1].replace(',', '.').toFloatOrNull() ?: return null
@@ -385,8 +477,22 @@ internal fun servingBasis(description: String): ServingBasis? {
     val amount = raw * if (unit == "kg" || unit == "l") 1000f else 1f
     return ServingBasis(amount, when(unit) { "kg" -> "g"; "l" -> "ml"; else -> unit }).takeIf { amount.isFinite() && amount > 0 }
 }
+/**
+ * Collects the distinct measurement units available across a food's serving options.
+ *
+ * @param food Food supplied to [servingUnits].
+ * @return The resulting serving units.
+ */
 internal fun servingUnits(food: NutritionFood) = (listOf(food) + food.servingOptions)
     .mapNotNull { servingBasis(it.servingDescription)?.unit }.distinct()
+/**
+ * Computes custom food portion.
+ *
+ * @param food Food supplied to [customFoodPortion].
+ * @param amount Amount supplied to [customFoodPortion].
+ * @param unit Unit supplied to [customFoodPortion].
+ * @return The resulting [FoodPortion], or `null` if unavailable.
+ */
 internal fun customFoodPortion(food: NutritionFood, amount: String, unit: String): FoodPortion? {
     val quantity = parseServingAmount(amount) ?: return null
     if (unit == "serving") return FoodPortion(food, quantity)
@@ -397,7 +503,19 @@ internal fun customFoodPortion(food: NutritionFood, amount: String, unit: String
     return FoodPortion(base.first, factor).takeIf { factor.isFinite() && factor in 0.0001f..10_000f }
 }
 
-// fitness cover shows this add food dialog view so the user can view its details and use its actions.
+/**
+ * Fitness cover shows this add food dialog view so the user can view its details and use its actions.
+ *
+ * @param food Food supplied to [AddFoodDialog].
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ * @param onAdd Callback invoked when add changes or occurs.
+ * @param initialServings Initial servings supplied to [AddFoodDialog].
+ * @param initialMeal Initial meal supplied to [AddFoodDialog].
+ * @param editing Whether to apply editing.
+ * @param onEditFood Callback invoked when edit food changes or occurs.
+ * @param isSaved Whether is saved.
+ * @param onToggleSaved Callback invoked when toggle saved changes or occurs.
+ */
 @Composable
 internal fun AddFoodDialog(
     food: NutritionFood,
@@ -473,7 +591,7 @@ internal fun AddFoodDialog(
                     FilterChip(
                         selected = meal == option,
                         onClick = { meal = option },
-                        label = { Text(option.displayName) },
+                        label = { Text(option.localizedName()) },
                         leadingIcon = if (meal == option) {
                             { com.olive.app.ui.shared.LocalizedIcon(Icons.Outlined.Check, null) }
                         } else null,
@@ -498,6 +616,12 @@ internal enum class FoodLibrarySection(val label: Int) {
     Saved(R.string.nutrition_saved_foods),
 }
 
+/**
+ * Keeps saved foods in Compose state and observes changes from the food library.
+ *
+ * @param library Optional library supplied to [rememberSavedFoods].
+ * @return List of resulting remember saved foods items.
+ */
 @Composable
 internal fun rememberSavedFoods(library: FitnessFoodLibrary?): List<SavedFood> {
     var saved by remember(library) { mutableStateOf(library?.savedFoods().orEmpty()) }
@@ -508,6 +632,13 @@ internal fun rememberSavedFoods(library: FitnessFoodLibrary?): List<SavedFood> {
     return saved
 }
 
+/**
+ * Shows whether a food is saved and lets the user toggle its saved state.
+ *
+ * @param saved Whether to apply saved.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onToggle Callback invoked when toggle changes or occurs.
+ */
 @Composable
 internal fun FoodBookmark(saved: Boolean, enabled: Boolean = true, onToggle: () -> Unit) {
     IconButton(onClick = onToggle, enabled = enabled) {
@@ -518,6 +649,16 @@ internal fun FoodBookmark(saved: Boolean, enabled: Boolean = true, onToggle: () 
     }
 }
 
+/**
+ * Adds recent search shortcuts and previously logged foods to the list.
+ *
+ * @receiver The lazy list scope that receives the item definitions.
+ * @param foods Collection of foods values to process.
+ * @param searches Collection of searches values to process.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onFood Callback invoked when food changes or occurs.
+ * @param onSearch Callback invoked when search changes or occurs.
+ */
 internal fun LazyListScope.recentFoodItems(
     foods: List<FoodLogEntry>,
     searches: List<RecentFoodSearch>,
@@ -539,6 +680,16 @@ internal fun LazyListScope.recentFoodItems(
     }
 }
 
+/**
+ * Adds saved foods or an empty-state message to the list.
+ *
+ * @receiver The lazy list scope that receives the item definitions.
+ * @param foods Collection of foods values to process.
+ * @param repository Repository supplied to [savedFoodItems].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onFood Callback invoked when food changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ */
 internal fun LazyListScope.savedFoodItems(
     foods: List<SavedFood>,
     repository: FoodNutritionDataSource,
@@ -552,6 +703,15 @@ internal fun LazyListScope.savedFoodItems(
     }
 }
 
+/**
+ * Renders the saved food row composable.
+ *
+ * @param saved Saved supplied to [SavedFoodRow].
+ * @param repository Repository supplied to [SavedFoodRow].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onFood Callback invoked when food changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ */
 @Composable
 private fun SavedFoodRow(
     saved: SavedFood,
@@ -590,6 +750,14 @@ private fun SavedFoodRow(
     }
 }
 
+/**
+ * Renders the food library row composable.
+ *
+ * @param food Food supplied to [FoodLibraryRow].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onOpen Callback invoked when open changes or occurs.
+ * @param onRemove Callback invoked when remove changes or occurs.
+ */
 @Composable
 private fun FoodLibraryRow(food: NutritionFood, enabled: Boolean, onOpen: () -> Unit, onRemove: (() -> Unit)? = null) {
     ListItem(

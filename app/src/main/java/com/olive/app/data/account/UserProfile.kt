@@ -5,6 +5,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.PropertyName
 import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.data.network.asStringKeyedMap
+import com.olive.app.data.network.decodeJsonObject
+import com.olive.app.data.network.encodeToJsonObject
+import com.olive.app.data.network.optionalInt
+import com.olive.app.data.network.optionalString
 import com.olive.app.security.*
 import com.olive.app.security.InputPolicy
 import java.time.LocalDate
@@ -12,19 +17,143 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
+
+private open class BoundedCoordinateSerializer(
+    name: String,
+    private val min: Double,
+    private val max: Double,
+) : KSerializer<Double?> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(name, PrimitiveKind.DOUBLE)
+
+    /**
+     * Serializes the nullable double coordinate.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The optional geographic coordinate to serialize.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    override fun serialize(encoder: Encoder, value: Double?) {
+        if (value == null) encoder.encodeNull() else encoder.encodeDouble(value)
+    }
+
+    /**
+     * Deserializes the coordinate, ensuring it falls within bounded limits.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded coordinate, or null if the stored value is absent or out of bounds.
+     */
+    override fun deserialize(decoder: Decoder): Double? {
+        val jsonDecoder = decoder as? JsonDecoder
+        val parsed = if (jsonDecoder != null) {
+            val element = jsonDecoder.decodeJsonElement()
+            if (element is JsonNull) null
+            else (element as? JsonPrimitive)?.let { it.doubleOrNull ?: it.content.toDoubleOrNull() }
+        } else {
+            runCatching { decoder.decodeDouble() }.getOrNull()
+        }
+        return parsed?.takeIf { it.isFinite() && it in min..max }
+    }
+}
+
+private object LatitudeSerializer : BoundedCoordinateSerializer("Latitude", -90.0, 90.0)
+private object LongitudeSerializer : BoundedCoordinateSerializer("Longitude", -180.0, 180.0)
+
+object AccountRoleSerializer : KSerializer<AccountRole> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("AccountRole", PrimitiveKind.STRING)
+    /**
+     * Serializes the account role name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The account role to store by name.
+     */
+    override fun serialize(encoder: Encoder, value: AccountRole) = encoder.encodeString(value.name)
+    /**
+     * Deserializes the account role from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The account role reconstructed from storage.
+     */
+    override fun deserialize(decoder: Decoder): AccountRole = AccountRole.fromStored(decoder.decodeString())
+}
+
+object CoverTypeSerializer : KSerializer<CoverType> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CoverType", PrimitiveKind.STRING)
+    /**
+     * Serializes the cover type name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The cover app selection to store by name.
+     */
+    override fun serialize(encoder: Encoder, value: CoverType) = encoder.encodeString(value.name)
+    /**
+     * Deserializes the cover type from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The cover app reconstructed from storage.
+     */
+    override fun deserialize(decoder: Decoder): CoverType = CoverType.fromStored(decoder.decodeString())
+}
+
+private object SafeContactListSerializer : KSerializer<List<SafeContact>> {
+    override val descriptor: SerialDescriptor = ListSerializer(SafeContact.serializer()).descriptor
+    /**
+     * Serializes the list of safe contacts.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The contacts to encode in the saved profile.
+     */
+    override fun serialize(encoder: Encoder, value: List<SafeContact>) =
+        encoder.encodeSerializableValue(ListSerializer(SafeContact.serializer()), value)
+
+    /**
+     * Deserializes the list of safe contacts, discarding invalid entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The valid contacts decoded from the stored list.
+     */
+    override fun deserialize(decoder: Decoder): List<SafeContact> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: return decoder.decodeSerializableValue(ListSerializer(SafeContact.serializer()))
+        val array = jsonDecoder.decodeJsonElement() as? JsonArray ?: return emptyList()
+        return array.mapNotNull { element ->
+            if (element !is JsonObject) null
+            else runCatching { jsonDecoder.json.decodeFromJsonElement(SafeContact.serializer(), element) }.getOrNull()
+        }
+    }
+}
 
 // A trusted person can optionally be linked to one explicitly accepted chat friend.
+@Serializable
 data class SafeContact(
-    val id: String,
-    val name: String,
-    val details: String,
+    val id: String = "",
+    val name: String = "",
+    val details: String = "",
     val safeToStay: Boolean = false,
-    val linkedUid: String = ""
+    val linkedUid: String = "",
+    val relationship: String = ""
 )
 
 // The account role decides which onboarding flow and app shell this person receives.
+@Serializable(with = AccountRoleSerializer::class)
 enum class AccountRole(val title: String, val description: String) {
     USER("User", "The person using the private cover and safe app"),
     SAFE_CONTACT("Safe Contact", "A trusted person helping someone"),
@@ -32,40 +161,59 @@ enum class AccountRole(val title: String, val description: String) {
     ADMIN("Admin", "An organization leader who oversees staff");
 
     companion object {
-        // Rebuilds an account role from its stored text value.
+        /**
+         * Rebuilds an account role from its stored text value.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting from stored.
+         */
         fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: USER
     }
 }
 
 // Pick the visible cover here; add another option before wiring its screen and launcher icon.
+@Serializable(with = CoverTypeSerializer::class)
 enum class CoverType(val title: String) {
-    NEWS("Daily Digest"), FITNESS("Fitness Tracker"), GAME("Game");
+    NEWS("Daily Digest"), FITNESS("Fitness Tracker");
 
     companion object {
-        // Rebuilds an account profile from its stored JSON fields.
+        /**
+         * Rebuilds an account profile from its stored JSON fields.
+         *
+         * @param value Input value to store, parse, or format.
+         * @return The resulting from stored.
+         */
         fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: FITNESS
     }
 }
 
 // This is the complete account profile; cover screens only get the small, normal-looking subset they need.
+@Serializable
 data class UserProfile(
-    val username: String,
-    val fullName: String,
-    val affectedNames: String,
-    val abuserName: String,
-    val dob: String,
-    val language: String,
-    val situation: String,
-    val region: String,
-    val triggerHash: String,
+    val username: String = "",
+    val fullName: String = "",
+    val affectedNames: String = "",
+    val abuserName: String = "",
+    val dob: String = "",
+    val language: String = "",
+    val situation: String = "",
+    val region: String = "",
+    val triggerHash: String = "",
+    @Serializable(with = SafeContactListSerializer::class)
     val contacts: List<SafeContact> = emptyList(),
     val address: DeliveryAddress = DeliveryAddress(),
     val coverType: CoverType = CoverType.FITNESS,
     val role: AccountRole = AccountRole.USER,
     val email: String = "",
+    val emailCommunicationConsent: Boolean = false,
     val phone: String = "",
+    val safetyIntake: SafetyPlanIntake = SafetyPlanIntake(),
 ) {
-    // Converts this account record into fields that Firebase can store.
+    /**
+     * Converts this account record into fields that Firebase can store.
+     *
+     * @return Map containing the resulting to map entries.
+     */
     fun toMap(): Map<String, Any> = mapOf(
         "address" to address.toMap(),
         "username" to username,
@@ -83,46 +231,33 @@ data class UserProfile(
                 "name" to it.name,
                 "details" to it.details,
                 "safeToStay" to it.safeToStay,
-                "linkedUid" to it.linkedUid
+                "linkedUid" to it.linkedUid,
+                "relationship" to it.relationship
             )
         },
         "coverType" to coverType.name,
         "role" to role.name,
         "email" to email,
+        "emailCommunicationConsent" to emailCommunicationConsent,
         "phone" to phone,
+        "safetyIntake" to safetyIntake.toMap(),
     )
 
-    // Converts this account record into protected JSON data.
-    fun toJson() = JSONObject(toMap())
+    /**
+     * Converts this account record into protected JSON data.
+     *
+     * @return JSON representation of this object.
+     */
+    fun toJson(): JSONObject = encodeToJsonObject()
 
     companion object {
-        // Rebuilds this account record from protected JSON data.
-        fun fromJson(j: JSONObject): UserProfile {
-            val contacts = j.optJSONArray("contacts") ?: JSONArray()
-            return UserProfile(
-                j.optString("username"),
-                j.optString("fullName"),
-                j.optString("affectedNames"),
-                j.optString("abuserName"),
-                j.optString("dob"),
-                j.optString("language"),
-                j.optString("situation"),
-                j.optString("region"),
-                j.optString("triggerHash"),
-                (0 until contacts.length()).mapNotNull {
-                    val c = contacts.optJSONObject(it) ?: return@mapNotNull null
-                    SafeContact(
-                        c.optString("id"), c.optString("name"), c.optString("details"),
-                        c.optBoolean("safeToStay"), c.optString("linkedUid")
-                    )
-                },
-                DeliveryAddress.fromJson(j.optJSONObject("address")),
-                CoverType.fromStored(j.optString("coverType")),
-                AccountRole.fromStored(j.optString("role")),
-                j.optString("email"),
-                j.optString("phone")
-            )
-        }
+        /**
+         * Rebuilds this account record from protected JSON data.
+         *
+         * @param j J supplied to [fromJson].
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(j: JSONObject): UserProfile = j.decodeJsonObject()
     }
 }
 
@@ -133,10 +268,14 @@ data class AccountIdentity(val uid: String, val username: String)
 data class FailedAttempt(val id: String, val timestamp: Long)
 
 // General location details used by profiles, safety resources, maps, and emergency reports.
+@Serializable
 data class DeliveryAddress(
     val line1: String = "", val line2: String = "", val city: String = "",
     val province: String = "", val postalCode: String = "", val country: String = "Canada",
-    val latitude: Double? = null, val longitude: Double? = null,
+    @Serializable(with = LatitudeSerializer::class)
+    val latitude: Double? = null,
+    @Serializable(with = LongitudeSerializer::class)
+    val longitude: Double? = null,
 ) {
     val locationValid
         get() = city.isNotBlank() && listOf(
@@ -161,7 +300,11 @@ data class DeliveryAddress(
     val generalLocation
         get() = listOf(city, province, country).filter { it.isNotBlank() }.joinToString(", ")
 
-    // Converts this account record into fields that Firebase can store.
+    /**
+     * Converts this account record into fields that Firebase can store.
+     *
+     * @return Map containing the resulting to map entries.
+     */
     fun toMap(): Map<String, Any> = buildMap {
         put("line1", line1)
         put("line2", line2)
@@ -177,17 +320,14 @@ data class DeliveryAddress(
     }
 
     companion object {
-        // Rebuilds this account record from protected JSON data.
-        fun fromJson(j: JSONObject?) =
-            if (j == null) DeliveryAddress() else DeliveryAddress(
-                j.optString("line1"),
-                j.optString("line2"),
-                j.optString("city"),
-                j.optString("province"),
-                j.optString("postalCode"),
-                j.optString("country", "Canada"),
-                j.optDouble("latitude").takeIf { it.isFinite() && it in -90.0..90.0 },
-                j.optDouble("longitude").takeIf { it.isFinite() && it in -180.0..180.0 })
+        /**
+         * Rebuilds this account record from protected JSON data.
+         *
+         * @param j Optional j supplied to [fromJson].
+         * @return Parsed instance constructed from the JSON data.
+         */
+        fun fromJson(j: JSONObject?): DeliveryAddress =
+            if (j == null) DeliveryAddress() else j.decodeJsonObject()
     }
 }
 
@@ -226,7 +366,7 @@ data class AdminAccountDraft(
     val dob: String = "",
     val email: String = "",
     val phone: String = "",
-    val language: String = "English",
+    val language: String = "",
     val city: String = "",
     val affectedNames: String = "",
     val abuserName: String = "",
@@ -234,44 +374,69 @@ data class AdminAccountDraft(
 )
 
 // Admin actions go through callable Functions so account deletion and role checks never trust the phone.
-class AdminRepository {
-    private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+class AdminRepository(private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1")) {
 
-    // Loads only dashboard totals so sign-in does not download every organization account.
-    suspend fun summary(): AccountCounts {
-        return parseAdminAccounts(
+
+    /**
+     * Fetches and parses one view from the adminListAccounts callable function.
+     *
+     * @param view Backend projection view (`SUMMARY`, `ACCOUNTS`, or `STAFF`).
+     * @return Parsed account counts and matching account summaries.
+     */
+    private suspend fun fetchAdminAccounts(view: String): Pair<AccountCounts, List<AdminAccountSummary>> =
+        parseAdminAccounts(
             functions.getHttpsCallable("adminListAccounts")
-                .call(mapOf("view" to "SUMMARY")).await().data
-        ).first
-    }
+                .call(mapOf("view" to view)).await().data
+        )
 
-    // Loads account rows only after the administrator opens the account directory.
-    suspend fun accounts(): List<AdminAccountSummary> {
-        return parseAdminAccounts(
-            functions.getHttpsCallable("adminListAccounts")
-                .call(mapOf("view" to "ACCOUNTS")).await().data
-        ).second
-    }
+    /**
+     * Loads only dashboard totals so sign-in does not download every organization account.
+     *
+     * @return The resulting [AccountCounts] instance.
+     */
+    suspend fun summary(): AccountCounts = fetchAdminAccounts("SUMMARY").first
 
-    // Loads staff rows and calculated workloads only on the Staff management screen.
-    suspend fun staffAccounts(): List<AdminAccountSummary> {
-        return parseAdminAccounts(
-            functions.getHttpsCallable("adminListAccounts")
-                .call(mapOf("view" to "STAFF")).await().data
-        ).second
-    }
+    /**
+     * Loads account rows only after the administrator opens the account directory.
+     *
+     * @return List of resulting accounts items.
+     */
+    suspend fun accounts(): List<AdminAccountSummary> = fetchAdminAccounts("ACCOUNTS").second
 
-    // Calls the protected backend to create a staff or admin account.
+    /**
+     * Loads staff rows and calculated workloads only on the Staff management screen.
+     *
+     * @return List of resulting staff accounts items.
+     */
+    suspend fun staffAccounts(): List<AdminAccountSummary> = fetchAdminAccounts("STAFF").second
+
+    /**
+     * Calls the protected backend to create a staff or admin account.
+     *
+     * @param value Input value to store, parse, or format.
+     */
     suspend fun create(value: AdminAccountDraft) {
         functions.getHttpsCallable("adminCreateAccount").call(adminAccountPayload(value)).await()
     }
 
-    // Calls the protected backend to delete an allowed staff or admin account.
+    /**
+     * Calls the protected backend to delete an allowed staff or admin account.
+     *
+     * @param uid Firebase UID of the target user account.
+     */
     suspend fun delete(uid: String) {
         functions.getHttpsCallable("adminDeleteAccount").call(mapOf("uid" to uid)).await()
     }
 
-    // Saves the organization profile so account storage can load it again.
+    /**
+     * Saves the organization profile so account storage can load it again.
+     *
+     * @param fullName Full name supplied to [completeOrganizationProfile].
+     * @param dob Date of birth supplied to [completeOrganizationProfile].
+     * @param email Email supplied to [completeOrganizationProfile].
+     * @param phone Phone supplied to [completeOrganizationProfile].
+     * @return The resulting [UserProfile] for complete organization profile.
+     */
     suspend fun completeOrganizationProfile(
         fullName: String,
         dob: String,
@@ -282,47 +447,57 @@ class AdminRepository {
             mapOf(
                 "fullName" to fullName, "dob" to dob, "email" to email, "phone" to phone,
             )
-        ).await().data.asMap()["profile"].asMap()
+        ).await().data.asStringKeyedMap()["profile"].asStringKeyedMap()
         FirebaseAuth.getInstance().currentUser?.reload()?.await()
         return UserProfile.fromJson(JSONObject(result))
     }
 }
 
-// Converts untrusted callable output into safe values before the admin screen reads it.
+/**
+ * Converts untrusted callable output into safe values before the admin screen reads it.
+ *
+ * @param raw Optional raw supplied to [parseAdminAccounts].
+ * @return The resulting [Pair] for parse admin accounts.
+ */
 internal fun parseAdminAccounts(raw: Any?): Pair<AccountCounts, List<AdminAccountSummary>> {
-    val root = raw.asMap()
-    val counts = root["counts"].asMap()
-    val tickets = root["tickets"].asMap()
+    val root = raw.asStringKeyedMap()
+    val counts = root["counts"].asStringKeyedMap()
+    val tickets = root["tickets"].asStringKeyedMap()
     val rows = root["accounts"] as? List<*> ?: emptyList<Any>()
     return AccountCounts(
-        counts.int("USER"),
-        counts.int("SAFE_CONTACT"),
-        counts.int("STAFF"),
-        counts.int("ADMIN"),
-        tickets.int("open"),
-        tickets.int("closed"),
+        counts.optionalInt("USER"),
+        counts.optionalInt("SAFE_CONTACT"),
+        counts.optionalInt("STAFF"),
+        counts.optionalInt("ADMIN"),
+        tickets.optionalInt("open"),
+        tickets.optionalInt("closed"),
     ) to rows.mapNotNull { row ->
-        row.asMap().takeIf { it.isNotEmpty() }?.let { value ->
+        row.asStringKeyedMap().takeIf { it.isNotEmpty() }?.let { value ->
             AdminAccountSummary(
-                value.string("uid"),
-                value.string("username"),
-                AccountRole.fromStored(value.string("role")),
-                value.string("fullName"),
-                value.string("email"),
-                value.string("phone"),
+                value.optionalString("uid"),
+                value.optionalString("username"),
+                AccountRole.fromStored(value.optionalString("role")),
+                value.optionalString("fullName"),
+                value.optionalString("email"),
+                value.optionalString("phone"),
                 value["profileComplete"] == true,
                 value["protected"] == true,
-                (value["assignedUsers"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
-                (value["safetyPlans"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
-                (value["completedSafetyPlans"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
-                (value["supportChats"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
-                (value["closedSupportChats"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
+                value.optionalInt("assignedUsers").coerceAtLeast(0),
+                value.optionalInt("safetyPlans").coerceAtLeast(0),
+                value.optionalInt("completedSafetyPlans").coerceAtLeast(0),
+                value.optionalInt("supportChats").coerceAtLeast(0),
+                value.optionalInt("closedSupportChats").coerceAtLeast(0),
             )
         }
     }
 }
 
-// Builds the exact server request for an account created from the admin screen.
+/**
+ * Builds the exact server request for an account created from the admin screen.
+ *
+ * @param value Input value to store, parse, or format.
+ * @return Map containing the resulting admin account payload entries.
+ */
 internal fun adminAccountPayload(value: AdminAccountDraft): Map<String, Any> = mapOf(
     "username" to value.username,
     "password" to value.password,
@@ -346,24 +521,28 @@ internal fun adminAccountPayload(value: AdminAccountDraft): Map<String, Any> = m
     ),
 )
 
-// Converts this account record into fields that Firebase can store.
-private fun Any?.asMap(): Map<String, Any?> =
-    (this as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }.orEmpty()
-
-// Reads a text field from an admin account response.
-private fun Map<String, Any?>.string(key: String) = this[key]?.toString().orEmpty()
-// Reads a number field from an admin account response.
-private fun Map<String, Any?>.int(key: String) = (this[key] as? Number)?.toInt() ?: 0
-
 // All account roles: loads and saves offline account profiles.
 
 // Handy for emulator testing: same account flow, but nothing leaves this installation.
 class LocalAccountRepository(private val vault: EncryptedVault) : AccountRepository {
-    // Uses one protected-storage key for the local account profile.
+    /**
+     * Uses one protected-storage key for the local account profile.
+     *
+     * @param username Account username.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting key.
+     */
     private fun key(username: String, role: AccountRole) =
         "${role.name}:${InputPolicy.username(username)}"
 
-    // Creates an encrypted local account for emulator or offline testing.
+    /**
+     * Creates an encrypted local account for emulator or offline testing.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting create.
+     */
     override suspend fun create(username: String, password: String, role: AccountRole) =
         withContext(Dispatchers.IO) {
             require(InputPolicy.validUsername(username)) { "Invalid username" }
@@ -386,7 +565,14 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             identity
         }
 
-    // Account: Authenticates the account.
+    /**
+     * Account: Authenticates the account.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting authenticate.
+     */
     override suspend fun authenticate(username: String, password: String, role: AccountRole) =
         withContext(Dispatchers.IO) {
             val normalized = InputPolicy.username(username)
@@ -405,23 +591,49 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             AccountIdentity(account.getString("uid"), normalized)
         }
 
-    // Loads the signed-in account profile from this repository.
+    /**
+     * Loads the signed-in account profile from this repository.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting profile.
+     */
     override suspend fun profile(identity: AccountIdentity) = withContext(Dispatchers.IO) {
         vault.read().optJSONObject("profiles")?.optJSONObject(identity.uid)
             ?.let(UserProfile::fromJson)
     }
 
-    // Saves the account profile in the selected account repository.
+    /**
+     * Saves the account profile in the selected account repository.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     */
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) =
         withContext(Dispatchers.IO) {
             vault.update { it.child("profiles").put(identity.uid, profile.toJson()) }
         }
 
-    // Adds one account activity record to storage.
+    /**
+     * Adds one account activity record to storage.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param record Record supplied to [saveHistoryRecord].
+     */
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
-    // Loads private activity-history records for this account.
+    /**
+     * Loads private activity-history records for this account.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting history records.
+     */
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
-    // Re-encrypts this account after its password changes.
+    /**
+     * Re-encrypts this account after its password changes.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param currentPassword Current password supplied to [changePassword].
+     * @param newPassword New password supplied to [changePassword].
+     */
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -450,11 +662,21 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
         }
     }
 
-    // Account: Authenticates the accountd uid.
+    /**
+     * Account: Authenticates the accountd uid.
+     *
+     * @return The resulting authenticated user ID string, or `null` when unavailable.
+     */
     override fun authenticatedUid(): String? = null
-    // Checks the username and password, then returns the matching account.
+    /**
+     * Checks the username and password, then returns the matching account.
+     *
+     * @return The resulting authenticated username string, or `null` when unavailable.
+     */
     override fun authenticatedUsername(): String? = null
-    // Account: Signs out the current account.
+    /**
+     * Account: Signs out the current account.
+     */
     override fun signOut() = Unit
 }
 
@@ -500,7 +722,13 @@ enum class AccountSetupStep { PersonalProfile, PrivateTrigger, DevicePin, Organi
 
 // Account rules stay pure here so sign-in aliases and first-login routing can be unit tested without Firebase.
 object AccountPolicy {
-    // Converts a username into its internal sign-in email.
+    /**
+     * Converts a username into its internal sign-in email.
+     *
+     * @param identifier Identifier supplied to [signInEmail].
+     * @param role Account role determining workspace permissions.
+     * @return The resulting sign in email string.
+     */
     fun signInEmail(identifier: String, role: AccountRole): String {
         val value = identifier.trim()
         if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN) && '@' in value) {
@@ -514,20 +742,41 @@ object AccountPolicy {
         return "${InputPolicy.username(value)}@$domain"
     }
 
-    // Recreates the hidden email format used by older personal accounts.
+    /**
+     * Recreates the hidden email format used by older personal accounts.
+     *
+     * @param username Account username.
+     * @return The resulting legacy user email.
+     */
     fun legacyUserEmail(username: String) = "${InputPolicy.username(username)}@users.olive.invalid"
 
-    // Finds missing personal details that must be completed before using the safe app.
+    /**
+     * Finds missing personal details that must be completed before using the safe app.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting personal profile needs setup.
+     */
     fun personalProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
             value.language.isBlank() || !value.address.locationValid
 
-    // Finds missing staff or admin details that must be completed before opening their portal.
+    /**
+     * Finds missing staff or admin details that must be completed before opening their portal.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting organization profile needs setup.
+     */
     fun organizationProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
             value.email.isBlank() || value.email.endsWith(".olive.invalid", true)
 
-    // Returns the setup rules for the selected account role.
+    /**
+     * Returns the setup rules for the selected account role.
+     *
+     * @param profile Account profile details, or null when not provided.
+     * @param role Account role determining workspace permissions.
+     * @return The resulting [AccountSetupStep] for next setup.
+     */
     fun nextSetup(profile: UserProfile?, role: AccountRole): AccountSetupStep {
         if (profile == null) {
             return if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
@@ -548,10 +797,208 @@ object AccountPolicy {
     }
 }
 
-// Incident dates describe past events; malformed or future dates must be corrected explicitly.
+/**
+ * Incident dates describe past events; malformed or future dates must be corrected explicitly.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param today Today supplied to [parseIncidentDate].
+ * @return The resulting [LocalDate], or `null` if unavailable.
+ */
 internal fun parseIncidentDate(value: String, today: LocalDate = LocalDate.now()): LocalDate? {
     val text = value.trim()
     if (!text.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) return null
     return runCatching { LocalDate.parse(text) }.getOrNull()
         ?.takeIf { it.year >= 1 && !it.isAfter(today) }
+}
+
+enum class ImmigrationStatus {
+    PREFER_NOT_TO_SAY,
+    CITIZEN,
+    PERMANENT_RESIDENT,
+    TEMPORARY_OR_SPONSORED,
+    REFUGEE_OR_CLAIMANT,
+    UNDOCUMENTED_OR_UNCERTAIN,
+}
+
+enum class DependantNeed {
+    CHILDREN,
+    ELDER_OR_ADULT_DEPENDANT,
+    PETS,
+}
+
+enum class FinancialSituation {
+    PREFER_NOT_TO_SAY,
+    INDEPENDENT,
+    SHARED_OR_MONITORED,
+    NO_INDEPENDENT_ACCESS,
+}
+
+enum class TransportSituation {
+    PREFER_NOT_TO_SAY,
+    OWN_VEHICLE,
+    PUBLIC_TRANSIT,
+    NEEDS_RIDE_SUPPORT,
+}
+
+enum class SafetyCircumstance {
+    LEGAL_OR_COURT_ORDERS,
+    MARRIAGE_OR_PARENTING,
+    PRESCRIPTIONS_OR_MEDICAL,
+    SHARED_LEASE_OR_MORTGAGE,
+}
+
+enum class AbuseType {
+    PHYSICAL,
+    EMOTIONAL_OR_PSYCHOLOGICAL,
+    FINANCIAL,
+    DIGITAL_OR_STALKING,
+    SEXUAL,
+    CULTURAL_OR_IMMIGRATION,
+}
+
+private open class SafeEnumSerializer<T : Enum<T>>(
+    serialName: String,
+    private val defaultValue: T,
+    private val parse: (String) -> T?,
+) : KSerializer<T> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
+
+    /**
+     * Serializes the enum entry by its name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The enum option to store by name.
+     */
+    override fun serialize(encoder: Encoder, value: T) = encoder.encodeString(value.name)
+
+    /**
+     * Deserializes the enum entry, falling back to [defaultValue] when unrecognized.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded enum constant, or the configured fallback when the stored name is unknown.
+     */
+    override fun deserialize(decoder: Decoder): T {
+        val raw = (decoder as? JsonDecoder)?.let { json ->
+            (json.decodeJsonElement() as? JsonPrimitive)?.takeIf { it.isString }?.content
+        } ?: runCatching { decoder.decodeString() }.getOrNull()
+        return raw?.let(parse) ?: defaultValue
+    }
+}
+
+private open class SafeEnumSetSerializer<T : Enum<T>>(
+    serialName: String,
+    private val parse: (String) -> T?,
+) : KSerializer<Set<T>> {
+    override val descriptor: SerialDescriptor = SetSerializer(String.serializer()).descriptor
+
+    /**
+     * Serializes the enum set as a sorted list of enum names.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The selected enum options to store as names.
+     */
+    override fun serialize(encoder: Encoder, value: Set<T>) =
+        encoder.encodeSerializableValue(ListSerializer(String.serializer()), value.map { it.name }.sorted())
+
+    /**
+     * Deserializes a JSON array of enum names into a set, ignoring unknown entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The set of recognized options from the stored enum names.
+     */
+    override fun deserialize(decoder: Decoder): Set<T> {
+        val json = decoder as? JsonDecoder
+            ?: return decoder.decodeSerializableValue(ListSerializer(String.serializer())).mapNotNull(parse).toSet()
+        val array = json.decodeJsonElement() as? JsonArray ?: return emptySet()
+        return array.mapNotNull { element ->
+            val name = (element as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return@mapNotNull null
+            parse(name)
+        }.toSet()
+    }
+}
+
+/**
+ * Returns the enum constant matching [name], or null when unrecognized.
+ *
+ * @param T The enum type to search for a matching constant.
+ * @param name The stored enum constant name to look up.
+ * @return The matching enum constant, or null when the name is unknown.
+ */
+private inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
+    enumValues<T>().firstOrNull { it.name == name }
+
+object ImmigrationStatusSerializer : KSerializer<ImmigrationStatus> by SafeEnumSerializer(
+    "ImmigrationStatus",
+    ImmigrationStatus.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object FinancialSituationSerializer : KSerializer<FinancialSituation> by SafeEnumSerializer(
+    "FinancialSituation",
+    FinancialSituation.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object TransportSituationSerializer : KSerializer<TransportSituation> by SafeEnumSerializer(
+    "TransportSituation",
+    TransportSituation.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object DependantNeedSetSerializer : KSerializer<Set<DependantNeed>> by SafeEnumSetSerializer(
+    "DependantNeedSet",
+    ::enumOrNull,
+)
+
+object SafetyCircumstanceSetSerializer : KSerializer<Set<SafetyCircumstance>> by SafeEnumSetSerializer(
+    "SafetyCircumstanceSet",
+    ::enumOrNull,
+)
+
+object AbuseTypeSetSerializer : KSerializer<Set<AbuseType>> by SafeEnumSetSerializer(
+    "AbuseTypeSet",
+    ::enumOrNull,
+)
+
+/**
+ * Private onboarding questionnaire answers that tailor the user's initial safety-plan documents and steps.
+ */
+@Serializable
+data class SafetyPlanIntake(
+    val completed: Boolean = false,
+    @Serializable(with = AbuseTypeSetSerializer::class)
+    val abuseTypes: Set<AbuseType> = emptySet(),
+    @Serializable(with = ImmigrationStatusSerializer::class)
+    val immigrationStatus: ImmigrationStatus = ImmigrationStatus.PREFER_NOT_TO_SAY,
+    @Serializable(with = DependantNeedSetSerializer::class)
+    val dependants: Set<DependantNeed> = emptySet(),
+    @Serializable(with = FinancialSituationSerializer::class)
+    val financialSituation: FinancialSituation = FinancialSituation.PREFER_NOT_TO_SAY,
+    @Serializable(with = TransportSituationSerializer::class)
+    val transportSituation: TransportSituation = TransportSituation.PREFER_NOT_TO_SAY,
+    @Serializable(with = SafetyCircumstanceSetSerializer::class)
+    val circumstances: Set<SafetyCircumstance> = emptySet(),
+) {
+    val hasAnySelection: Boolean
+        get() = abuseTypes.isNotEmpty() ||
+            immigrationStatus != ImmigrationStatus.PREFER_NOT_TO_SAY ||
+            dependants.isNotEmpty() ||
+            financialSituation != FinancialSituation.PREFER_NOT_TO_SAY ||
+            transportSituation != TransportSituation.PREFER_NOT_TO_SAY ||
+            circumstances.isNotEmpty()
+
+    /**
+     * Converts questionnaire answers into a plain map for structured Firebase profile storage.
+     *
+     * @return Map containing the serialized safety-intake fields.
+     */
+    fun toMap(): Map<String, Any> = mapOf(
+        "completed" to completed,
+        "abuseTypes" to abuseTypes.map { it.name }.sorted(),
+        "immigrationStatus" to immigrationStatus.name,
+        "dependants" to dependants.map { it.name }.sorted(),
+        "financialSituation" to financialSituation.name,
+        "transportSituation" to transportSituation.name,
+        "circumstances" to circumstances.map { it.name }.sorted(),
+    )
 }

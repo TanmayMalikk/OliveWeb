@@ -143,8 +143,11 @@ export function SessionProvider({
 
   useEffect(() => {
     const shellPath = mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
-    if (location.pathname !== shellPath || location.search || location.hash)
-      window.history.replaceState({}, "", shellPath);
+    const invite = mode === "download" ? new URLSearchParams(location.search).get("invite") : null;
+    const publicPath = invite && /^[A-Za-z0-9_-]{8,32}$/.test(invite)
+      ? `${shellPath}/?invite=${encodeURIComponent(invite)}` : shellPath;
+    if (location.pathname + location.search + location.hash !== publicPath)
+      window.history.replaceState({}, "", publicPath);
   }, [mode]);
 
   // Restores this browser's saved enrollment and continues a pending private entry.

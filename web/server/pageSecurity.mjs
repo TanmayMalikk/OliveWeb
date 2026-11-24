@@ -16,17 +16,17 @@ export function contentSecurityPolicy(publicNonce) {
     "default-src 'self'",
     publicNonce
       ? `script-src 'self' 'nonce-${publicNonce}' 'strict-dynamic' 'unsafe-eval' https://www.google.com https://www.gstatic.com`
-      : "script-src 'self' https://www.google.com https://www.gstatic.com",
+      : "script-src 'self' 'wasm-unsafe-eval' https://www.google.com https://www.gstatic.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data: blob:",
     publicNonce ? "media-src 'self' blob: https:" : "media-src 'self' blob:",
     publicNonce
       ? "connect-src 'self' blob: https: wss://*.firebaseio.com"
-      : "connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com",
+      : "connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com",
     publicNonce
       ? "frame-src blob: https:"
-      : "frame-src blob: https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org",
-    "worker-src 'self'",
+      : "frame-src blob: https://*.firebaseapp.com https://www.google.com",
+    publicNonce ? "worker-src 'self'" : "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

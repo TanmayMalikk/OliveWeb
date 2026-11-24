@@ -1,16 +1,62 @@
 // Tests stale actions and PIN retries cannot unlock the safe app.
 package com.olive.app
 
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import androidx.core.view.children
 import androidx.compose.ui.test.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.AccountRole
 import com.olive.app.security.EncryptedVault
+import com.olive.app.security.ScreenCapturePreferences
 import com.olive.app.security.child
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
 class PrivacySecurityFlowTest : OliveUiTestBase() {
+    @Test
+    fun captureProtectionSetsTheSecureFlagAndBlanksThePrivateRecentsPreview() {
+        register(username = "capture_fixture")
+        unlock()
+        val scenario = compose.activityRule.scenario
+        scenario.onActivity { activity ->
+            val session = ViewModelProvider(activity)[SessionViewModel::class.java]
+            ScreenCapturePreferences.setEnabled(activity, requireNotNull(session.coverAccountId), false)
+        }
+        click("safe_settings")
+        click("settings_tab_privacy")
+        val protection = compose.onNodeWithTag("block_screen_captures")
+        protection.performScrollTo().assertIsOff().performClick().assertIsOn()
+        fun secure(activity: OliveActivity) =
+            activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+        fun privacyCover(activity: OliveActivity) = (activity.window.decorView as ViewGroup)
+            .children.firstOrNull { it.elevation == Float.MAX_VALUE }
+        scenario.onActivity { activity ->
+            assertTrue(secure(activity))
+            activity.onUserLeaveHint()
+            val cover = requireNotNull(privacyCover(activity))
+            assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, cover.importantForAccessibility)
+        }
+        scenario.moveToState(Lifecycle.State.STARTED)
+        scenario.moveToState(Lifecycle.State.RESUMED)
+        waitCover()
+        compose.waitUntil(10_000) {
+            var removed = false
+            scenario.onActivity { removed = privacyCover(it) == null }
+            removed
+        }
+        unlock()
+        click("safe_settings")
+        click("settings_tab_privacy")
+        protection.performScrollTo().assertIsOn().performClick().assertIsOff()
+        scenario.onActivity { assertFalse(secure(it)) }
+    }
+
     // Checks the stale account actions and rapid pin attempts cannot unlock step with the test's sample data.
     @Test
     fun staleAccountActionsAndRapidPinAttemptsCannotUnlock() {

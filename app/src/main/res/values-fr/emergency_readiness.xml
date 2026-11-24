@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_readiness_title">Préparation aux urgences</string>
+    <string name="emergency_readiness_location">Autorisez la localisation pour inclure vos coordonnées dans un rapport d’urgence et aider les intervenants à vous trouver.</string>
+    <string name="emergency_readiness_device_location">Activez la localisation de l’appareil pour ajouter votre position au rapport d’urgence.</string>
+    <string name="emergency_readiness_background">Autorisez la localisation en arrière-plan pour que les administrateurs puissent continuer à voir votre position si vous quittez l’application.</string>
+    <string name="emergency_readiness_notifications">Activez les notifications pour voir l’avis lorsque le partage de position est actif.</string>
+    <string name="emergency_readiness_allow_location">Autoriser la localisation</string>
+    <string name="emergency_readiness_enable_location">Activer la localisation</string>
+    <string name="emergency_readiness_allow_background">Autoriser en arrière-plan</string>
+    <string name="emergency_readiness_notification_settings">Paramètres des notifications</string>
+    <string name="emergency_readiness_remind_later">Me le rappeler plus tard</string>
+    <string name="emergency_readiness_location_settings_path">Choisissez %1$s. Si Android affiche les informations de l’application, ouvrez Autorisations, puis Localisation.</string>
+</resources>

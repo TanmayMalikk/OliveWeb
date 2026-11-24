@@ -19,7 +19,7 @@ import java.util.Base64
 @RunWith(RobolectricTestRunner::class)
 class SecureChatRepositorySdkTest {
     private val transport = FirestoreTestDriver()
-    private val repository = SecureChatRepository(transport.db)
+    private val repository = SecureChatRepository(transport.db) { }
     private val conversation = ChatConversation("chat", "pair", listOf("owner", "friend"),
         mapOf("owner" to "owner_fixture", "friend" to "friend_fixture"))
 
@@ -245,6 +245,42 @@ class SecureChatRepositorySdkTest {
         assertTrue(errors.single().contains("authentication failed"))
         subscription.close()
         assertTrue(transport.listeners.all {it.closed})
+    }
+
+    @Test
+    fun deviceFallbackEnvelopeWrappingAndSupportDisplayNamesWorkCleanly() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val own = KeyManager.getOrCreatePublicKey()
+            val other = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair().public
+            val key = EncryptionUtils.generateSymmetricKey()
+            val mismatched = KeyManager.wrapKey(key, other)
+            val deviceEnvelope = KeyManager.wrapKey(key, own)
+            transport.records["conversations/chat"] = mapOf(
+                "participantIds" to conversation.participantIds,
+                "participantPublicKeys" to mapOf("owner" to "o", "friend" to "f"),
+                "roomKeys" to mapOf("owner" to mismatched, "friend" to mismatched),
+            )
+            transport.records["conversations/chat/deviceKeys/owner--${KeyManager.deviceId()}"] = mapOf(
+                "wrappedKey" to deviceEnvelope,
+            )
+            assertArrayEquals(key.encoded, repository.readyRoomKey(conversation, "owner")?.secretKey?.encoded)
+            assertEquals(deviceEnvelope, repository.wrappedRoomKey("chat", "owner"))
+
+            val support = ChatConversation(
+                id = "sup-1",
+                friendshipId = "",
+                participantIds = listOf("owner", "staff-1"),
+                participantUsernames = emptyMap(),
+                type = "SUPPORT",
+                ownerUid = "owner",
+                staffUid = "staff-1",
+            )
+            assertEquals("AnonStaff", support.senderDisplayName("staff-1", "StaffReal", com.olive.app.data.account.AccountRole.USER, "AnonStaff", "AnonAdmin"))
+            assertTrue(support.senderDisplayName("owner", "OwnerReal", com.olive.app.data.account.AccountRole.STAFF, "AnonStaff", "AnonAdmin").startsWith("Ticket #"))
+            assertEquals("Friend", support.senderDisplayName("friend-1", "FriendReal", com.olive.app.data.account.AccountRole.ADMIN, "AnonStaff", "AnonAdmin"))
+            assertEquals("FriendReal", support.senderDisplayName("friend-1", "FriendReal", com.olive.app.data.account.AccountRole.USER, "AnonStaff", "AnonAdmin"))
+            assertTrue(supportTicketNumber("sup-1").startsWith("#"))
+        }
     }
 
 }

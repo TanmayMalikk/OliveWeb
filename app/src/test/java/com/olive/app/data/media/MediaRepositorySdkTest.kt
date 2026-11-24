@@ -149,6 +149,35 @@ class MediaRepositorySdkTest {
             assertFalse(requests.last().second.containsKey("recoveryKeyToSeal"))
             assertEquals(accountWrapper().toMap(),
                 (requests.last().second["accountWrappedKeys"] as Map<*, *>)["owner"])
+
+            val outgoing = com.olive.app.data.messaging.OutgoingMessage("msg-1", "owner", "conv-1", "fixture_owner", "cipher", 123L)
+            repository.shareInChat(
+                "media",
+                outgoing,
+                listOf("peer"),
+                mapOf("peer" to "w"),
+                mapOf("peer--d" to "dw"),
+                mapOf("owner" to accountWrapper(), "peer" to accountWrapper()),
+            )
+            assertEquals("mediaShareInChat", requests.last().first)
+            assertEquals("conv-1", requests.last().second["conversationId"])
+
+            val revokedCallable = mock(HttpsCallableReference::class.java)
+            val denied = mock(com.google.firebase.functions.FirebaseFunctionsException::class.java).also {
+                `when`(it.code).thenReturn(com.google.firebase.functions.FirebaseFunctionsException.Code.PERMISSION_DENIED)
+            }
+            val internal = mock(com.google.firebase.functions.FirebaseFunctionsException::class.java).also {
+                `when`(it.code).thenReturn(com.google.firebase.functions.FirebaseFunctionsException.Code.INTERNAL)
+            }
+            `when`(revokedCallable.call(anyMap<String, Any>()))
+                .thenReturn(Tasks.forException(denied))
+                .thenReturn(Tasks.forException(internal))
+            `when`(functions.getHttpsCallable("mediaDownloadTicket")).thenReturn(revokedCallable)
+            val revoked = assertThrows(MediaAccessException::class.java) { runBlocking { repository.downloadTicket("media") } }
+            assertEquals(MediaAccessError.ACCESS_REVOKED, revoked.reason)
+            assertThrows(com.google.firebase.functions.FirebaseFunctionsException::class.java) {
+                runBlocking { repository.downloadTicket("media") }
+            }
         }
     }
 

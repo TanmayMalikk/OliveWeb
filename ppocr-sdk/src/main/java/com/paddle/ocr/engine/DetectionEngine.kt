@@ -37,6 +37,12 @@ class DetectionEngine(
         val inputShape: List<Int>,
     )
 
+    /**
+     * Computes detect.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [DetectionResult] instance.
+     */
     fun detect(bitmap: Bitmap): DetectionResult {
         return detect {
             DetPreprocessor.preprocess(
@@ -49,6 +55,12 @@ class DetectionEngine(
         }
     }
 
+    /**
+     * Computes detect.
+     *
+     * @param src Src supplied to [detect].
+     * @return The resulting [DetectionResult] instance.
+     */
     fun detect(src: Mat): DetectionResult {
         return detect {
             DetPreprocessor.preprocess(
@@ -61,6 +73,12 @@ class DetectionEngine(
         }
     }
 
+    /**
+     * Computes detect.
+     *
+     * @param preprocessor Function used to transform or provide preprocessor.
+     * @return The resulting [DetectionResult] instance.
+     */
     private fun detect(preprocessor: () -> DetPreprocessResult): DetectionResult {
         val preStart = System.currentTimeMillis()
         val preResult = preprocessor()

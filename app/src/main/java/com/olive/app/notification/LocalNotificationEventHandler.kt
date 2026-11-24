@@ -23,7 +23,7 @@ import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.olive.app.OliveActivity
 import com.olive.app.R
-import java.util.UUID
+import com.olive.app.data.network.persistentInstallationId
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlinx.coroutines.tasks.await
@@ -31,6 +31,11 @@ import kotlinx.coroutines.tasks.await
 // Syncs the device's FCM token to Firestore and checks conversation markers when requested.
 class LocalSafeUpdateCheckWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return Result.success()
         if (inputData.getBoolean(KEY_SYNC_FCM_ONLY, false)) {
@@ -80,13 +85,33 @@ class LocalSafeUpdateCheckWorker(context: Context, parameters: WorkerParameters)
         internal const val KEY_SYNC_FCM_ONLY = "sync_fcm_only"
         internal const val KEY_FCM_TOKEN = "fcm_token"
 
-        // Keeps the saved message key name in one place for app notifications.
+        /**
+         * Keeps the saved message key name in one place for app notifications.
+         *
+         * @param uid Firebase UID of the target user account.
+         * @param conversationId Unique identifier of the conversation or support ticket.
+         * @return The resulting message key.
+         */
         internal fun messageKey(uid: String, conversationId: String) = "last_message_${uid}_$conversationId"
 
-        // Keeps the saved initialized key name in one place for app notifications.
+        /**
+         * Keeps the saved initialized key name in one place for app notifications.
+         *
+         * @param uid Firebase UID of the target user account.
+         * @return The resulting initialized key.
+         */
         internal fun initializedKey(uid: String) = "message_baseline_ready_$uid"
 
-        // Sends the alert only when its account and feature are still active.
+        /**
+         * Sends the alert only when its account and feature are still active.
+         *
+         * @param previousId Optional previous ID supplied to [shouldScheduleNotification].
+         * @param currentId Current ID supplied to [shouldScheduleNotification].
+         * @param senderUid Firebase UID of the sending account.
+         * @param currentUid Current user ID supplied to [shouldScheduleNotification].
+         * @param baselineComplete Whether to apply baseline complete.
+         * @return `true` if should schedule notification, or `false` otherwise.
+         */
         internal fun shouldScheduleNotification(
             previousId: String?, currentId: String, senderUid: String, currentUid: String,
             baselineComplete: Boolean = true
@@ -109,7 +134,11 @@ object LocalNotificationEventHandler {
     private var activeUid: String? = null
     private var conversationIndexListener: ListenerRegistration? = null
 
-    // Starts FCM registration and foreground listeners for account events that create local notifications.
+    /**
+     * Starts FCM registration and foreground listeners for account events that create local notifications.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun start(context: Context) {
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid
         context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE).edit {
@@ -127,7 +156,12 @@ object LocalNotificationEventHandler {
         WorkManager.getInstance(context).enqueueUniqueWork(IMMEDIATE_WORK, ExistingWorkPolicy.REPLACE, immediate)
     }
 
-    // Schedules a background worker to register or refresh this device's FCM token in Firestore.
+    /**
+     * Schedules a background worker to register or refresh this device's FCM token in Firestore.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param token Authentication, push notification, or session token, or null when not provided.
+     */
     internal fun enqueueFcmTokenSync(context: Context, token: String?) {
         if (FirebaseAuth.getInstance().currentUser == null) return
         val input = Data.Builder()
@@ -141,7 +175,12 @@ object LocalNotificationEventHandler {
         WorkManager.getInstance(context).enqueueUniqueWork(FCM_TOKEN_WORK, ExistingWorkPolicy.REPLACE, request)
     }
 
-    // Saves a refreshed FCM installation token and syncs it to Firestore for the signed-in account.
+    /**
+     * Saves a refreshed FCM installation token and syncs it to Firestore for the signed-in account.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param token Authentication, push notification, or session token.
+     */
     internal fun onFcmTokenRefreshed(context: Context, token: String) {
         if (token.isBlank()) return
         context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
@@ -149,7 +188,13 @@ object LocalNotificationEventHandler {
         enqueueFcmTokenSync(context.applicationContext, token)
     }
 
-    // Writes the device's FCM token to Firestore so Cloud Functions can push update alerts.
+    /**
+     * Writes the device's FCM token to Firestore so Cloud Functions can push update alerts.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @param token Authentication, push notification, or session token.
+     */
     internal suspend fun saveFcmTokenToFirestore(context: Context, uid: String, token: String) {
         if (uid.isBlank() || token.isBlank()) return
         val devId = deviceId(context)
@@ -168,7 +213,15 @@ object LocalNotificationEventHandler {
         }
     }
 
-    // Evaluates whether an incoming FCM data payload should trigger a Safe App update notification.
+    /**
+     * Evaluates whether an incoming FCM data payload should trigger a Safe App update notification.
+     *
+     * @param data Key-value mapping of data entries.
+     * @param currentUid Optional current user ID supplied to [shouldHandleFcmNotification].
+     * @param previousMessageId Optional previous message ID supplied to [shouldHandleFcmNotification].
+     * @param hasNotificationPayload Whether has notification payload.
+     * @return `true` if should handle FCM notification, or `false` otherwise.
+     */
     internal fun shouldHandleFcmNotification(
         data: Map<String, String>, currentUid: String?, previousMessageId: String? = null,
         hasNotificationPayload: Boolean = false,
@@ -185,7 +238,14 @@ object LocalNotificationEventHandler {
                 messageId.isNotBlank() || data["conversationId"].orEmpty().isNotBlank() || hasNotificationPayload)
     }
 
-    // Handles an incoming FCM message by deduplicating its conversation marker and scheduling an alert.
+    /**
+     * Handles an incoming FCM message by deduplicating its conversation marker and scheduling an alert.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param data Key-value mapping of data entries.
+     * @param title Primary display title text, or null when not provided.
+     * @param body Body text content, or null when not provided.
+     */
     internal fun onFcmMessageReceived(
         context: Context, data: Map<String, String>, title: String? = null, body: String? = null,
     ) {
@@ -223,14 +283,20 @@ object LocalNotificationEventHandler {
         SafeUpdateNotificationScheduler.schedule(context.applicationContext)
     }
 
-    @Synchronized
-    private fun deviceId(context: Context): String {
-        val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
-        return preferences.getString(KEY_DEVICE_ID, null)?.takeIf { it.isNotBlank() }
-            ?: UUID.randomUUID().toString().also { preferences.edit { putString(KEY_DEVICE_ID, it) } }
-    }
+    /**
+     * Reads or creates the stable installation ID used by local notification handling.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting device ID string.
+     */
+    private fun deviceId(context: Context): String =
+        persistentInstallationId(context, LocalSafeUpdateCheckWorker.STATE_FILE, KEY_DEVICE_ID)
 
-    // Schedules the background check that refreshes safe update notifications.
+    /**
+     * Schedules the background check that refreshes safe update notifications.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     internal fun scheduleBackgroundCheck(context: Context) {
         if (!BACKGROUND_CHECKS_ENABLED) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
@@ -241,12 +307,21 @@ object LocalNotificationEventHandler {
         WorkManager.getInstance(context).enqueueUniqueWork(BACKGROUND_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
-    // Local accounts can sign out even when this build has no Firebase application.
+    /**
+     * Local accounts can sign out even when this build has no Firebase application.
+     *
+     * @param preferences Preferences supplied to [cancellationAccountId].
+     * @return `true` or `false` indicating cancellation account ID, or `null` if unknown.
+     */
     internal fun cancellationAccountId(preferences: SharedPreferences): String? =
         runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
             ?: preferences.getString(KEY_ACTIVE_UID, null)
 
-    // Cancels the scheduled notification check and removes the device's FCM token when signing out.
+    /**
+     * Cancels the scheduled notification check and removes the device's FCM token when signing out.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun cancel(context: Context) {
         stopForegroundListeners()
         val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
@@ -265,10 +340,16 @@ object LocalNotificationEventHandler {
         SafeUpdateNotificationScheduler.cancel(context)
     }
 
-    // The unlocked messaging UI has its own listeners; pause these to avoid reading the same documents twice.
+    /**
+     * The unlocked messaging UI has its own listeners; pause these to avoid reading the same documents twice.
+     */
     fun pauseForegroundListeners() = stopForegroundListeners()
 
-    // Live listeners detect updates while the process runs; FCM delivers push updates in the background.
+    /**
+     * Live listeners detect updates while the process runs; FCM delivers push updates in the background.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     private fun startForegroundListeners(context: Context) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         if (activeUid == uid && conversationIndexListener != null) return
@@ -288,7 +369,15 @@ object LocalNotificationEventHandler {
             }
     }
 
-    // Saves the last notified message ID so the same message is not announced twice.
+    /**
+     * Saves the last notified message ID so the same message is not announced twice.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @param conversationId Unique identifier of the conversation or support ticket.
+     * @param currentMessageId Current message ID supplied to [recordConversationMarker].
+     * @param senderUid Firebase UID of the sending account.
+     */
     private fun recordConversationMarker(
         context: Context, uid: String, conversationId: String, currentMessageId: String, senderUid: String
     ) {
@@ -303,7 +392,9 @@ object LocalNotificationEventHandler {
         preferences.edit { putString(key, currentMessageId) }
     }
 
-    // Removes account and message listeners when notification monitoring stops.
+    /**
+     * Removes account and message listeners when notification monitoring stops.
+     */
     private fun stopForegroundListeners() {
         conversationIndexListener?.remove()
         conversationIndexListener = null
@@ -326,6 +417,11 @@ object OliveNotificationManager {
     const val EXTRA_INCOMING_CALL_CALLER_ID = "com.olive.app.INCOMING_CALL_CALLER_ID"
     const val EXTRA_INCOMING_CALL_NAME = "com.olive.app.INCOMING_CALL_NAME"
 
+    /**
+     * Creates notification channels.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun createNotificationChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
@@ -343,7 +439,14 @@ object OliveNotificationManager {
         }
     }
 
-    // Displays a high-priority incoming call notification with a 20-second timeout.
+    /**
+     * Displays a high-priority incoming call notification with a 20-second timeout.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param callId Unique identifier of the VoIP call session.
+     * @param callerId Firebase UID of the caller initiating the call.
+     * @param callName Call name supplied to [showIncomingCall].
+     */
     fun showIncomingCall(context: Context, callId: String, callerId: String, callName: String) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
@@ -373,6 +476,13 @@ object OliveNotificationManager {
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }
 
+    /**
+     * Displays safe update.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param body Body text content.
+     * @param tag Optional tag supplied to [showSafeUpdate].
+     */
     fun showSafeUpdate(context: Context, body: Int = R.string.notification_safe_app_activity, tag: String? = null) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
@@ -402,6 +512,11 @@ object OliveNotificationManager {
 // Coalesces Safe App activity into a notification.
 class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
     Worker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override fun doWork(): Result {
         val uid = inputData.getString("uid") ?: return Result.success()
         if (FirebaseAuth.getInstance().currentUser?.uid != uid) return Result.success()
@@ -416,7 +531,11 @@ object SafeUpdateNotificationScheduler {
     internal const val MIN_DELAY_SECONDS = 5L
     internal const val MAX_DELAY_SECONDS = 10L
 
-    // Schedules the background task for safe update notification worker.
+    /**
+     * Schedules the background task for safe update notification worker.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun schedule(context: Context) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
@@ -426,12 +545,21 @@ object SafeUpdateNotificationScheduler {
         WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    // Cancels the active background notification timer.
+    /**
+     * Cancels the active background notification timer.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
-    // Spreads background checks across a small random delay to avoid bursts.
+    /**
+     * Spreads background checks across a small random delay to avoid bursts.
+     *
+     * @param random Random supplied to [randomDelaySeconds].
+     * @return The computed random delay seconds numeric value.
+     */
     internal fun randomDelaySeconds(random: Random = Random.Default): Long =
         random.nextLong(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS + 1)
 }

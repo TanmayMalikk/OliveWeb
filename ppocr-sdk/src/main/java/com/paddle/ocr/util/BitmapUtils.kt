@@ -25,6 +25,12 @@ import org.opencv.imgproc.Imgproc
 // Groups the data and actions for bitmap utils.
 object BitmapUtils {
 
+    /**
+     * Computes imdecode BGR.
+     *
+     * @param imageBytes Raw image bytes byte array.
+     * @return The resulting [Mat] for imdecode BGR.
+     */
     fun imdecodeBGR(imageBytes: ByteArray): Mat {
         val encoded = MatOfByte(*imageBytes)
         return try {
@@ -34,14 +40,32 @@ object BitmapUtils {
         }
     }
 
+    /**
+     * Computes bitmap to BGR mat.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [Mat] for bitmap to BGR mat.
+     */
     fun bitmapToBGRMat(bitmap: Bitmap): Mat {
         return bitmapToMat(bitmap, Imgproc.COLOR_RGBA2BGR)
     }
 
+    /**
+     * Computes bitmap to RGB mat.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @return The resulting [Mat] for bitmap to RGB mat.
+     */
     fun bitmapToRGBMat(bitmap: Bitmap): Mat {
         return bitmapToMat(bitmap, Imgproc.COLOR_RGBA2RGB)
     }
 
+    /**
+     * Computes BGR mat to bitmap.
+     *
+     * @param mat Mat supplied to [bgrMatToBitmap].
+     * @return The resulting [Bitmap] for BGR mat to bitmap.
+     */
     fun bgrMatToBitmap(mat: Mat): Bitmap {
         val rgba = Mat()
         return try {
@@ -54,6 +78,13 @@ object BitmapUtils {
         }
     }
 
+    /**
+     * Computes bitmap to mat.
+     *
+     * @param bitmap Bitmap image to process or render.
+     * @param colorConversionCode Color conversion code supplied to [bitmapToMat].
+     * @return The resulting [Mat] for bitmap to mat.
+     */
     private fun bitmapToMat(bitmap: Bitmap, colorConversionCode: Int): Mat {
         val bmp = bitmap.copy(Bitmap.Config.ARGB_8888, false)
         val rgba = Mat(bmp.height, bmp.width, CvType.CV_8UC4)

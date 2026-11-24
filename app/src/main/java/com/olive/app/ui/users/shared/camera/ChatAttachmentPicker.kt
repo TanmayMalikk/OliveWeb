@@ -1,6 +1,7 @@
 // All safe-app roles: lets chat participants choose a photo, video, or document.
 package com.olive.app.ui.users.shared.camera
 
+import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -33,7 +34,12 @@ import com.olive.app.ui.users.user.location.ShareDurationDialog
 
 private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
 
-// Shows photo, video, document, and camera choices for a chat attachment.
+/**
+ * Shows photo, video, document, and camera choices for a chat attachment.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AttachmentPicker(
@@ -46,7 +52,10 @@ internal fun AttachmentPicker(
     val requestLocationPermission = LocalLocationPermissionRequest.current
     var locationDuration by remember { mutableStateOf(false) }
     val titleFocus = remember { FocusRequester() }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
     val sheetTitle = if (selectedCategory == null) stringResource(R.string.share_attachment) else stringResource(
         R.string.select_attachment_category,
         stringResource(
@@ -76,7 +85,11 @@ internal fun AttachmentPicker(
         session.documents.load(uid, session.coverUsername, false)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = true,
+    ) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp).semantics { paneTitle = sheetTitle }) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

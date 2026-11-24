@@ -12,6 +12,8 @@ async function openPlan(page: Page, role = "owner", panel = "safety") {
     route.fulfill({ status: 307, headers: { location: "/tests/safetyPlanBindings.ts" } }));
   await page.route(/\/src\/users\/admin\/AdminAccountApi\.ts(?:\?|$)/, route =>
     route.fulfill({ status: 307, headers: { location: "/tests/adminAccountsBackend.ts" } }));
+  await page.route(/\/src\/services\/FriendInviteService\.ts(?:\?|$)/, route =>
+    route.fulfill({ status: 307, headers: { location: "/tests/socialBackend.ts" } }));
   await page.goto("/__test_safety_plan?" + new URLSearchParams({ role, panel }));
 }
 
@@ -100,6 +102,25 @@ test("safe contacts can switch shared plans and lose access when it is revoked",
   await expect(page.getByText("Other identification")).toHaveCount(0);
 });
 
+test("incident attachments can be uploaded, retry after failure and are marked as evidence", async ({ page }) => {
+  await openPlan(page, "owner", "notes");
+  await page.getByRole("button", { name: "New entry" }).click();
+  await page.getByRole("tab", { name: "Incident" }).click();
+  await page.getByLabel("Incident details (required)").fill("Synthetic incident with evidence");
+  await page.getByText("Add attachment", { exact: true }).click();
+  const attachment = page.locator('input[type="file"]');
+  await attachment.setInputFiles({ name: "empty.txt", mimeType: "text/plain", buffer: Buffer.alloc(0) });
+  await expect(page.getByRole("alert")).toHaveText("This file is empty.");
+  await attachment.setInputFiles({ name: "Evidence.txt", mimeType: "text/plain", buffer: Buffer.from("Synthetic evidence") });
+  await expect(page.getByRole("checkbox", { name: "Evidence.txt", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Save entry" }).click();
+  const entry = page.getByRole("button", { name: /Synthetic incident with evidence/ });
+  await expect(entry).toContainText("1 attached file");
+  await entry.click();
+  await page.getByText("Add attachment", { exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Evidence.txt · Evidence" })).toBeChecked();
+});
+
 test("documents persist evidence, report rejected uploads, and hide locked previews", async ({ page }) => {
   await openPlan(page, "owner", "documents");
   const original = page.getByRole("article").filter({ hasText: "Identification.txt" });
@@ -125,15 +146,15 @@ test("documents persist evidence, report rejected uploads, and hide locked previ
 });
 
 test("location page reports denied permission and shows the new location after retry", async ({ page, context }) => {
-  await page.route("https://www.openstreetmap.org/**", route => route.fulfill({ body: "Test map" }));
   await context.setGeolocation({ latitude: 53.5, longitude: -113.5, accuracy: 12 });
   await openPlan(page, "owner", "location");
   await expect(page.getByRole("alert")).toContainText("Location is unavailable.");
-  await expect(page.getByTitle("Current location map")).toHaveCount(0);
+  const map = page.getByRole("region", { name: "Current location map" });
+  await expect(map).toHaveCount(0);
   await context.grantPermissions(["geolocation"]);
   await page.getByRole("button", { name: "Update location" }).click();
-  await expect(page.getByTitle("Current location map")).toHaveAttribute("src", /marker=53\.5%2C-113\.5/);
-  await expect(page.getByText("Accuracy about 12 m")).toBeVisible();
+  await expect(map).toBeVisible();
+  await expect(page.getByText("Accuracy about 12 m · 53.5000, -113.5000")).toBeVisible();
 });
 
 test("assigned staff can update both checklists, preview an attachment and complete the consultation", async ({ page }) => {
@@ -174,10 +195,10 @@ test("staff can reply, escalate, and review closed tickets in the support inbox"
   await expect(reply).toHaveValue("");
   await chat.getByRole("button", { name: "Request admin help" }).click();
   await expect(timeline.getByText("Admin help requested")).toBeVisible();
-  await expect(list.getByRole("button", { name: /^Need Admins \(\d+\)$/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(list.getByRole("button", { name: /^Need Admins(?: \(\d+\))?$/ })).toHaveAttribute("aria-pressed", "true");
   await expect(chat.getByRole("button", { name: "Request admin help" })).toHaveCount(0);
 
-  await list.getByRole("button", { name: /^Plan Consults \(\d+\)$/ }).click();
+  await list.getByRole("button", { name: /^Plan Consults(?: \(\d+\))?$/ }).click();
   await list.getByRole("button", { name: /Consult Ticket #500/ }).click();
   await chat.getByRole("button", { name: "Close for everyone" }).click();
   await expect(list.getByRole("button", { name: /Consult Ticket #500/ })).toHaveCount(0);
@@ -187,41 +208,74 @@ test("staff can reply, escalate, and review closed tickets in the support inbox"
   await expect(reply).toHaveCount(0);
 });
 
-test("friend search distinguishes accepted and pending requests and keeps ticket chats separate", async ({ page }) => {
+test("invites replace friend discovery and keep existing requests and ticket chats separate", async ({ page }) => {
   await openPlan(page, "owner", "messages");
-  const find = async (name: string) => {
-    await page.getByRole("textbox", { name: "Find an exact username" }).fill(name);
-    await page.getByRole("button", { name: "Find person" }).click();
-  };
-  await find("nonexistent_user");
-  await expect(page.getByText("No matching account found.")).toBeVisible();
-  await find("Trusted");
-  await expect(page.getByText("Already friends")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Find an exact username" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Invite", exact: true }).click();
+  const invite = page.getByRole("dialog", { name: "Invite someone" });
+  await expect(invite.getByText("ExampleCode1", { exact: true })).toBeVisible();
+  await invite.getByRole("button", { name: "Refresh invite code" }).click();
+  await expect(invite.getByText("ExampleCode2", { exact: true })).toBeVisible();
+  await invite.getByRole("button", { name: "Close dialog" }).click();
+  const code = page.getByRole("textbox", { name: "Have an invite code? (optional)", exact: true });
+  await code.fill("ExpiredCode");
+  await page.getByRole("button", { name: "Add connection" }).click();
+  await expect(page.getByRole("alert")).toHaveText("This invite has expired or been used.");
+  await code.fill("FreshCode1");
+  await page.getByRole("button", { name: "Add connection" }).click();
+  await expect(page.getByRole("status")).toHaveText("Connected with new_contact. You can add another code.");
+  await expect(code).toHaveValue("");
 
   const requests = (handle: string) => page.locator(".request-row").filter({ hasText: handle });
   await requests("@request_contact").getByRole("button", { name: "Accept" }).click();
-  await find("request_contact");
-  await expect(requests("@request_contact").getByText("Already friends")).toBeVisible();
+  await expect(requests("@request_contact")).toHaveCount(0);
   await requests("@decline_contact").getByRole("button", { name: "Decline" }).click();
   await expect(requests("@decline_contact")).toHaveCount(0);
 
-  await find("new_contact");
-  await requests("@new_contact").getByRole("button", { name: "Add" }).click();
-  await expect(requests("@new_contact").getByText("Request pending")).toBeVisible();
-  await find("new_contact");
-  await expect(requests("@new_contact").getByText("Request sent")).toBeVisible();
-  await requests("@new_contact").getByRole("button", { name: "Cancel" }).click();
-  await expect(requests("@new_contact").getByText("Request pending")).toHaveCount(0);
-
   await page.getByRole("tab", { name: "DMs" }).press("End");
   await expect(page.getByRole("tab", { name: "Ticket chats" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("textbox", { name: "Find an exact username" })).toHaveCount(0);
+  await expect(code).toHaveCount(0);
   await page.getByRole("button", { name: /Support Ticket #499/ }).click();
   await expect(page.getByRole("heading", { name: "Support Ticket #499" })).toBeVisible();
   await page.getByRole("textbox", { name: "Write a message" }).fill("Archived draft");
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeDisabled();
   await page.getByRole("tab", { name: "Ticket chats" }).press("Home");
-  await expect(page.getByRole("textbox", { name: "Find an exact username" })).toBeVisible();
+  await expect(code).toBeVisible();
+});
+
+test("ticket owners open shared records, manage invited friends and can unsend their messages", async ({ page }) => {
+  await openPlan(page, "owner", "shared-messages");
+  await page.getByRole("tab", { name: "Ticket chats" }).click();
+  await page.getByRole("button", { name: /Support Ticket #501/ }).click();
+  const log = page.getByRole("log");
+  await log.getByRole("button", { name: /Shared fixture incident/ }).click();
+  const incident = page.getByRole("dialog", { name: "Private fixture incident" });
+  await expect(incident.getByText("Synthetic incident details")).toBeVisible();
+  await expect(incident.getByText(/Fixture location/)).toBeVisible();
+  await incident.getByRole("button", { name: "Open attached evidence" }).click();
+  const document = page.getByRole("dialog", { name: "Identification.txt" });
+  await expect(document.getByText("Private sample document")).toBeVisible();
+  await document.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await incident.getByRole("button", { name: "Close dialog" }).click();
+  await log.getByRole("button", { name: /Unavailable record/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "This protected record is not stored" })).toBeVisible();
+  await log.getByRole("button", { name: /Plan fixture/ }).click();
+  await log.getByRole("button", { name: /Shared live location/ }).click();
+  expect(await page.evaluate(() => (window as Window & { panelEvents?: unknown[][] }).panelEvents)).toEqual([
+    ["page", "SafetyPlan"], ["page", "Location"],
+  ]);
+  await page.getByRole("button", { name: "Manage added friends" }).click();
+  await expect(page.getByRole("button", { name: "Remove Staff" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove Guest Fixture" }).click();
+  await expect(page.getByText("No added friends to remove.")).toBeVisible();
+  await page.getByRole("button", { name: "Hide added friends" }).click();
+  await page.getByRole("textbox", { name: "Write a message" }).fill("Synthetic reply");
+  await page.getByRole("button", { name: "Send message" }).click();
+  const reply = log.locator("article").filter({ hasText: "Synthetic reply" });
+  await reply.getByRole("button", { name: "Unsend" }).click();
+  await expect(reply).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to conversations" }).click();
+  await expect(page.getByText("Select a ticket chat")).toBeVisible();
 });
 
 test("administrator filters accounts and confirms deletion only for eligible records", async ({ page }) => {

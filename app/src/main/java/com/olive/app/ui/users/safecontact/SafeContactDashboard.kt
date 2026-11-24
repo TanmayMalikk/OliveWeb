@@ -1,11 +1,17 @@
 // Safe contacts: shows the user’s shared safety information to a safe contact.
 package com.olive.app.ui.users.safecontact
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.safetyplan.SafeContactSafetyPlansScreen
+import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.SettingsEditor
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
 import com.olive.app.ui.users.user.location.LocationMapScreen
@@ -49,11 +55,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.olive.app.data.account.PrivateEntryKind
 
 
-// Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
+/**
+ * Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param exit Action or callback executed for exit.
+ * @param guideTopicId The optional walkthrough topic selected for this screen.
+ */
 @Composable
-internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
+internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
     val profile = session.profile ?: return
-    LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
+    LaunchedEffect(session.coverAccountId, session.coverUsername, session.localMode) {
+        session.messages.ensureMessagingObservation()
+        if (!session.localMode) {
+            session.ensureSharedEntriesObservation()
+            session.coverAccountId?.let { uid ->
+                session.documents.load(uid, session.coverUsername, false)
+            }
+        }
+    }
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
@@ -68,13 +88,18 @@ internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session, guideTopicId)
             else -> SafeContactHome(session)
         }
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
+/**
+ * Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun SafeContactHome(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -139,7 +164,7 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_notes_help),
             Icons.Outlined.Description,
             "safe_contact_notes",
-            0,
+            session.sharedPrivateEntries.size,
             { session.navigation.openSafePage(SafePage.Notes) })
         SafeContactActionCard(
             stringResource(R.string.messages),
@@ -160,8 +185,15 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_documents_help),
             Icons.Outlined.FolderOpen,
             "safe_contact_documents",
-            0,
+            session.documents.state.files.count { it.ownerUid != session.coverAccountId },
             { session.navigation.openSafePage(SafePage.Documents) })
+        SafeContactActionCard(
+            stringResource(R.string.support_walkthrough),
+            stringResource(R.string.walkthrough_subtitle),
+            Icons.Outlined.Description,
+            "safe_contact_walkthrough",
+            0,
+            { session.navigation.openSafePage(SafePage.Walkthrough) })
         if (session.pendingSync) Surface(
             Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.primaryContainer
@@ -191,7 +223,12 @@ private fun SafeContactHome(session: SessionViewModel) {
     }
 }
 
-// Shows the trusted contact's own profile and account actions.
+/**
+ * Shows the trusted contact's own profile and account actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -245,7 +282,11 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
     }
 }
 
-// safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
     val entry = session.viewedSharedEntry ?: return
@@ -327,7 +368,13 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
     }
 }
 
-// Shows one decrypted incident value as a familiar read-only form field inside chat.
+/**
+ * Shows one decrypted incident value as a familiar read-only form field inside chat.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param minLines Minimum lines supplied to [SharedIncidentField].
+ */
 @Composable
 private fun SharedIncidentField(label: String, value: String, minLines: Int = 1) {
     OutlinedTextField(
@@ -343,13 +390,18 @@ private fun SharedIncidentField(label: String, value: String, minLines: Int = 1)
 // Safe contacts: shows shared user details on safe-contact cards.
 
 
-// Shows the trusted contact's profile summary on their dashboard.
+/**
+ * Shows the trusted contact's profile summary on their dashboard.
+ *
+ * @param profile Account profile details.
+ * @param onClick Callback invoked when the control is activated.
+ */
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("safe_contact_identity"),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -396,16 +448,26 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
     }
 }
 
-// safe contact dashboard cards shows this safe contact action card view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard cards shows this safe contact action card view so the user can view its details and use its actions.
+ *
+ * @param label Accessible label or display caption.
+ * @param description Description supplied to [SafeContactActionCard].
+ * @param icon Icon supplied to [SafeContactActionCard].
+ * @param tag Tag supplied to [SafeContactActionCard].
+ * @param badgeCount Badge count supplied to [SafeContactActionCard].
+ * @param onClick Callback invoked when the control is activated.
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
 internal fun SafeContactActionCard(
     label: String, description: String, icon: ImageVector, tag: String, badgeCount: Int,
     onClick: () -> Unit, modifier: Modifier = Modifier
 ) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 104.dp).testTag(tag),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -444,7 +506,13 @@ internal fun SafeContactActionCard(
     }
 }
 
-// safe contact dashboard cards shows this safe contact profile row view so the user can view its details and use its actions.
+/**
+ * Safe contact dashboard cards shows this safe contact profile row view so the user can view its details and use its actions.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param icon Icon supplied to [SafeContactProfileRow].
+ */
 @Composable
 internal fun SafeContactProfileRow(label: String, value: String, icon: ImageVector) {
     Row(

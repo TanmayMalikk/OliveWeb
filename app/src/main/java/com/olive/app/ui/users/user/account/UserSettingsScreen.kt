@@ -2,6 +2,8 @@
 package com.olive.app.ui.users.user.account
 
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Newspaper
-import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -41,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -54,21 +54,26 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.security.IdlePolicy
+import com.olive.app.security.ScreenCapturePreferences
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.UserProfile
 import com.olive.app.ui.shared.AddressFields
+import com.olive.app.ui.shared.AppVersionFooter
 import com.olive.app.ui.shared.CardTintEnabled
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OlivePrivateLayout
 import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.FormColumn
 import com.olive.app.ui.users.shared.navigation.SafePermissionsSettings
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughSettingsTab
+import com.olive.app.ui.users.shared.onboarding.EmailConsentSection
 import com.olive.app.ui.shared.BirthdayPicker
 import com.olive.app.ui.shared.rememberBirthdayInput
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -77,13 +82,20 @@ import java.text.DateFormat
 import java.util.Date
 
 
-// Saves profile and situation edits from the user settings screen.
+/**
+ * Saves profile and situation edits from the user settings screen.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param profile Account profile details.
+ */
 @Composable
 internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
     val userRole = profile.role == AccountRole.USER
     val tabs = if (userRole) SettingsCategory.entries else accountSettingsTabs
     var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
+    val requestedTourTab = LocalWalkthroughSettingsTab.current
+    LaunchedEffect(requestedTourTab) { tabs.firstOrNull { it.tag == requestedTourTab }?.let { selectedTab = it } }
     val activeTab = selectedTab.takeIf { it in tabs } ?: SettingsCategory.Profile
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -92,14 +104,42 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var affected by remember { mutableStateOf(profile.affectedNames) }
     var abuserName by remember { mutableStateOf(profile.abuserName) }
     var birthday by rememberBirthdayInput(profile.dob)
-    var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
+    var showProfileErrors by remember(profile) { mutableStateOf(false) }
+    var profileShake by remember { mutableIntStateOf(0) }
+    var email by remember(profile.email) { mutableStateOf(profile.email) }
+    var emailConsent by remember(profile.emailCommunicationConsent) { mutableStateOf(profile.emailCommunicationConsent) }
     var situation by remember { mutableStateOf(profile.situation) }
     var address by remember { mutableStateOf(profile.address) }
     var trigger by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var triggerErrors by remember { mutableStateOf(false) }
+    var triggerShake by remember { mutableIntStateOf(0) }
+    var pendingTriggerCheck by remember { mutableStateOf(false) }
+    var triggerPinRejected by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var passwordErrors by remember { mutableStateOf(false) }
+    var passwordShake by remember { mutableIntStateOf(0) }
+    var pendingPasswordCheck by remember { mutableStateOf(false) }
+    var currentPasswordRejected by remember { mutableStateOf(false) }
+    val sessionErrorVersion = session.inputErrorVersion
+    var lastSeenErrorVersion by remember { mutableIntStateOf(sessionErrorVersion) }
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            if (pendingPasswordCheck) {
+                currentPasswordRejected = true
+                pendingPasswordCheck = false
+                passwordErrors = true
+            }
+            if (pendingTriggerCheck) {
+                triggerPinRejected = true
+                pendingTriggerCheck = false
+                triggerErrors = true
+            }
+        }
+    }
     val cacheUid = session.coverAccountId
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
@@ -114,11 +154,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             SafeBack(session)
-            Text(
-                uiText(R.string.settings),
-                modifier = Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.headlineSmall
-            )
+            SettingsHeading(Modifier.weight(1f))
         }
         SecondaryScrollableTabRow(
             selectedTabIndex = tabs.indexOf(activeTab),
@@ -134,7 +170,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             selectedTab = tab
                         }
                     },
-                    modifier = Modifier.testTag(tab.tag),
+                    modifier = Modifier.walkthroughTarget(tab.tag).testTag(tab.tag),
                     text = { Text(uiText(tab.label)) }
                 )
             }
@@ -143,7 +179,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
             FormColumn {
                 when (activeTab) {
                     SettingsCategory.Profile -> {
-                        if (userRole) SettingsSection(uiText(R.string.settings_category_cover_entry)) {
+                        if (userRole) SettingsSection(uiText(R.string.settings_category_cover_entry), targetId = "settings_card_cover_entry") {
                             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
                             CoverPicker(
                                 profile.coverType,
@@ -158,17 +194,22 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             HorizontalDivider()
                             SafeEntryMethodSettings(session)
                         }
-                        SettingsSection(uiText(R.string.settings_category_profile)) {
+                        SettingsSection(uiText(R.string.settings_category_profile), headerTargetId = "settings_card_profile_header") {
                             Field(
                                 uiText(R.string.full_name_required),
                                 fullName,
                                 "settings_full_name",
+                                error = if (showProfileErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                                shakeTrigger = profileShake,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused full name"
                                     )
-                                }) { fullName = it.take(120) }
+                                }) {
+                                    fullName = it.take(120)
+                                    showProfileErrors = false
+                                }
                             // User accounts can edit cover and private-entry settings here.
                             if (userRole) {
                                 Field(
@@ -192,7 +233,24 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                         )
                                     }) { abuserName = it.take(120) }
                             }
-                            BirthdayPicker(birthday, "settings_dob", !session.busy, showBirthdayErrors) { birthday = it }
+                            BirthdayPicker(birthday, "settings_dob", !session.busy, showProfileErrors, shakeTrigger = profileShake) { birthday = it }
+                            EmailConsentSection(
+                                email = email,
+                                consent = emailConsent,
+                                enabled = !session.busy,
+                                showErrors = showProfileErrors,
+                                requireConsentWhenEntered = false,
+                                emailTag = "settings_email",
+                                consentTag = "settings_email_consent",
+                                shakeTrigger = profileShake,
+                                onEmailChange = {
+                                    email = it
+                                    if (it.isBlank()) emailConsent = false
+                                    showProfileErrors = false
+                                },
+                                onConsentChange = { emailConsent = it },
+                                onFocusEmail = { session.recordSettingsInteraction("Olive Branch", "Focused email") },
+                            )
                             if (userRole) Field(
                                 uiText(R.string.brief_description_of_your_situation_optional_recommended),
                                 situation,
@@ -211,22 +269,47 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             AddressFields(
                                 address,
                                 cityOnlyRequired = true,
+                                cityError = if (showProfileErrors && !address.locationValid) uiText(R.string.ui_city_required) else null,
+                                shakeTrigger = profileShake,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused address: $it"
                                     )
-                                }) { address = it }
+                                }) {
+                                    address = it
+                                    showProfileErrors = false
+                                }
                             Button(onClick = save@{
-                                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                                if (showBirthdayErrors) return@save
+                                val invalidDob = !InputPolicy.validDob(birthday)
+                                val invalidEmail = email.isNotBlank() && !InputPolicy.validEmail(email)
+                                val invalidProfile = fullName.isBlank() || invalidDob || invalidEmail || !address.locationValid
+                                showProfileErrors = invalidProfile
+                                if (invalidProfile) {
+                                    profileShake += 1
+                                    if (!invalidDob && !invalidEmail) {
+                                        session.saveSettings(
+                                            fullName,
+                                            affected,
+                                            abuserName,
+                                            birthday,
+                                            situation,
+                                            address,
+                                            email = email,
+                                            emailCommunicationConsent = email.isNotBlank() && emailConsent,
+                                        )
+                                    }
+                                    return@save
+                                }
                                 session.saveSettings(
                                     fullName,
                                     affected,
                                     abuserName,
                                     birthday,
                                     situation,
-                                    address
+                                    address,
+                                    email = email,
+                                    emailCommunicationConsent = email.isNotBlank() && emailConsent,
                                 )
                             }, enabled = !session.busy, modifier = Modifier.testTag("save_settings")) {
                                 Text(
@@ -236,8 +319,21 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                         }
                     }
                     SettingsCategory.Password -> {
-                        SettingsSection(uiText(R.string.change_account_password)) {
+                        SettingsSection(uiText(R.string.change_account_password), targetId = "settings_card_password") {
                             Text(stringResource(R.string.your_username_cannot_be_changed))
+                            val currentPasswordError = when {
+                                currentPasswordRejected -> uiText(R.string.ui_incorrect_password)
+                                passwordErrors && currentPassword.isEmpty() -> uiText(R.string.enter_your_current_password)
+                                else -> null
+                            }
+                            val newPasswordError = when {
+                                !passwordErrors -> null
+                                !InputPolicy.passwordExcludesUsername(newPassword, profile.username) -> uiText(R.string.password_excludes_username)
+                                !InputPolicy.validAccountPassword(newPassword, profile.username) -> uiText(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                                else -> null
+                            }
+                            val confirmPasswordError = if (passwordErrors && confirmPassword != newPassword) uiText(R.string.the_new_passwords_do_not_match) else null
+                            val passwordShakeTrigger = passwordShake + sessionErrorVersion
                             Field(
                                 uiText(R.string.current_password),
                                 currentPassword,
@@ -245,12 +341,18 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = currentPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused current password"
                                     )
-                                }) { currentPassword = it.take(24) }
+                                }) {
+                                    currentPassword = it.take(24)
+                                    currentPasswordRejected = false
+                                    passwordErrors = false
+                                }
                             Field(
                                 uiText(R.string.new_password),
                                 newPassword,
@@ -258,12 +360,17 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = newPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused new password"
                                     )
-                                }) { newPassword = it.take(24) }
+                                }) {
+                                    newPassword = it.take(24)
+                                    passwordErrors = false
+                                }
                             Field(
                                 uiText(R.string.confirm_new_password),
                                 confirmPassword,
@@ -271,13 +378,28 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 secret = true,
                                 showSecretToggle = true,
                                 enabled = !session.busy,
+                                error = confirmPasswordError,
+                                shakeTrigger = passwordShakeTrigger,
                                 onFocus = {
                                     session.recordSettingsInteraction(
                                         "Olive Branch",
                                         "Focused password confirmation"
                                     )
-                                }) { confirmPassword = it.take(24) }
+                                }) {
+                                    confirmPassword = it.take(24)
+                                    passwordErrors = false
+                                }
                             Button(onClick = {
+                                currentPasswordRejected = false
+                                val validLocal = currentPassword.isNotEmpty() &&
+                                    InputPolicy.validAccountPassword(newPassword, profile.username) &&
+                                    confirmPassword == newPassword
+                                passwordErrors = !validLocal
+                                if (!validLocal) {
+                                    passwordShake += 1
+                                } else {
+                                    pendingPasswordCheck = true
+                                }
                                 session.changePassword(
                                     currentPassword,
                                     newPassword,
@@ -293,35 +415,62 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             }
                         }
                         if (userRole) {
-                            SettingsSection(uiText(R.string.entry_pin_setup)) {
+                            SettingsSection(uiText(R.string.entry_pin_setup), targetId = "settings_card_entry_pin") {
                                 SafeEntryPinSettings(session, entryPinDraft)
                             }
-                            SettingsSection(uiText(R.string.change_trigger_word)) {
+                            SettingsSection(uiText(R.string.change_trigger_word), targetId = "settings_card_trigger") {
+                                val triggerError = if (triggerErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null
+                                val triggerPinError = when {
+                                    triggerPinRejected -> uiText(R.string.enter_your_4_6_digit_pin)
+                                    triggerErrors && !session.account.usesDeviceLock && !InputPolicy.validPin(pin) -> uiText(R.string.ui_invalid_pin)
+                                    else -> null
+                                }
+                                val triggerShakeTrigger = triggerShake + sessionErrorVersion
                                 Text(stringResource(if (session.account.usesDeviceLock) R.string.entry_verify_trigger else R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))
                                 Field(
                                     uiText(R.string.new_trigger_word_or_phrase),
                                     trigger,
                                     "settings_trigger",
                                     secret = true,
+                                    error = triggerError,
+                                    shakeTrigger = triggerShakeTrigger,
                                     onFocus = {
                                         session.recordSettingsInteraction(
                                             "Olive Branch",
                                             "Focused trigger word"
                                         )
-                                    }) { trigger = it.take(64) }
+                                    }) {
+                                        trigger = it.take(64)
+                                        triggerErrors = false
+                                    }
                                 if (!session.account.usesDeviceLock) Field(
                                     uiText(R.string.current_pin),
                                     pin,
                                     "settings_pin",
                                     secret = true,
                                     numeric = true,
+                                    error = triggerPinError,
+                                    shakeTrigger = triggerShakeTrigger,
                                     onFocus = {
                                         session.recordSettingsInteraction(
                                             "Olive Branch",
                                             "Focused trigger-change PIN"
                                         )
-                                    }) { pin = it.filter { c -> c in '0'..'9' }.take(6) }
+                                    }) {
+                                        pin = it.filter { c -> c in '0'..'9' }.take(6)
+                                        triggerPinRejected = false
+                                        triggerErrors = false
+                                    }
                                 Button(onClick = {
+                                    triggerPinRejected = false
+                                    val validLocal = InputPolicy.validTrigger(trigger) &&
+                                        (session.account.usesDeviceLock || InputPolicy.validPin(pin))
+                                    triggerErrors = !validLocal
+                                    if (!validLocal) {
+                                        triggerShake += 1
+                                    } else if (!session.account.usesDeviceLock) {
+                                        pendingTriggerCheck = true
+                                    }
                                     if (session.account.usesDeviceLock) session.account.changeDeviceLockTrigger(trigger) else session.changeTrigger(
                                         trigger,
                                         pin
@@ -338,12 +487,16 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     }
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
-                            IdleTimeoutSetting(session)
-                            if (userRole) {
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_capture_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(uiText(R.string.cover_emergency_help_title), style = MaterialTheme.typography.titleMedium)
+                                Text(uiText(R.string.cover_emergency_help), style = MaterialTheme.typography.bodySmall)
                                 HorizontalDivider()
-                                PasswordRecoverySection(session)
+                                ScreenCaptureSetting(session.coverAccountId)
                             }
                             HorizontalDivider()
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_idle_group")) { IdleTimeoutSetting(session) }
+                            HorizontalDivider()
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_cache_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 stringResource(R.string.documents_recent_cache_title),
                                 style = MaterialTheme.typography.titleLarge,
@@ -368,10 +521,12 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     modifier = Modifier.testTag("recent_file_caching"),
                                 )
                             }
+                            }
                         }
                     SettingsCategory.Permissions -> SafePermissionsSettings()
                 }
                 Status(session)
+                AppVersionFooter()
             }
         }
     }
@@ -387,10 +542,37 @@ internal enum class SettingsCategory(val label: Int, val tag: String) {
 
 internal val accountSettingsTabs = listOf(SettingsCategory.Profile, SettingsCategory.Password, SettingsCategory.Permissions)
 
+/**
+ * Composes the settings heading UI element.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ */
 @Composable
-internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsHeading(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(R.string.settings),
+        modifier = modifier.semantics { heading() },
+        style = MaterialTheme.typography.headlineSmall,
+    )
+}
+
+/**
+ * Composes the settings section UI element.
+ *
+ * @param title Primary display title text.
+ * @param content Composable content lambda rendered inside this container.
+ * @param targetId The ID of the account or item selected for tracking.
+ * @param headerTargetId The ID used to associate the header with its walkthrough target.
+ */
+@Composable
+internal fun SettingsSection(
+    title: String,
+    targetId: String? = null,
+    headerTargetId: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (targetId != null) Modifier.walkthroughTarget(targetId) else Modifier),
         shape = OlivePrivateLayout.GroupShape,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -403,19 +585,30 @@ internal fun SettingsSection(title: String, content: @Composable ColumnScope.() 
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() }
+                modifier = Modifier.then(if (headerTargetId != null) Modifier.walkthroughTarget(headerTargetId) else Modifier).semantics { heading() }
             )
             content()
         }
     }
 }
 
+/**
+ * Composes the idle timeout setting UI element.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 private fun IdleTimeoutSetting(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val options = IdlePolicy.timeoutOptions
     var timeout by remember(session.coverAccountId) { mutableIntStateOf(session.idleTimeoutSeconds()) }
     val title = uiText(R.string.idle_lock_setting)
+    /**
+     * Computes duration.
+     *
+     * @param seconds Seconds supplied to [duration].
+     * @return The resulting duration string.
+     */
     fun duration(seconds: Int): String =
         if (seconds % 60 == 0) uiText(R.string.idle_lock_minutes, seconds / 60)
         else uiText(R.string.idle_lock_minutes_seconds, seconds / 60, seconds % 60)
@@ -446,7 +639,13 @@ private fun IdleTimeoutSetting(session: SessionViewModel) {
     }
 }
 
-// UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
+/**
+ * UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
+ *
+ * @param selected Selected supplied to [CoverPicker].
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param onSelect Callback invoked when select changes or occurs.
+ */
 @Composable
 internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (CoverType) -> Unit) {
     val uiText = rememberResourceText()
@@ -462,7 +661,6 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
     CoverType.entries.forEach { type ->
         val isSelected = selected == type
         val label = when (type) {
-            CoverType.GAME -> uiText(R.string.game_cover_app_olive_tap)
             CoverType.NEWS -> uiText(R.string.news_app_daily_digest)
             CoverType.FITNESS -> uiText(R.string.fitness_cover_choice)
         }
@@ -490,12 +688,32 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
                 when (type) {
                     CoverType.NEWS -> Icons.Outlined.Newspaper
                     CoverType.FITNESS -> Icons.Outlined.FitnessCenter
-                    CoverType.GAME -> Icons.Outlined.SportsEsports
                 }, null, Modifier.size(20.dp).testTag("cover_choice_icon_${type.name.lowercase()}")
             )
             Spacer(Modifier.width(8.dp))
             Text(label)
         }
+    }
+}
+
+/**
+ * Composes the screen capture setting UI element.
+ *
+ * @param uid Firebase UID of the target user account, or null when not provided.
+ */
+@Composable
+internal fun ScreenCaptureSetting(uid: String?) {
+    val context = LocalContext.current
+    val label = stringResource(R.string.privacy_block_captures)
+    var enabled by remember(uid) { mutableStateOf(ScreenCapturePreferences.enabled(context, uid)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.privacy_block_captures_help), style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = enabled, enabled = !uid.isNullOrBlank(), onCheckedChange = { value ->
+            uid?.let { ScreenCapturePreferences.setEnabled(context, it, value); enabled = value }
+        }, modifier = Modifier.testTag("block_screen_captures").semantics { contentDescription = label })
     }
 }
 

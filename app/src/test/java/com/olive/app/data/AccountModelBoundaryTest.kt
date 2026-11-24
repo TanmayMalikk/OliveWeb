@@ -1,16 +1,31 @@
-// Tests account profile serialization, enum compatibility, and malformed stored values.
+// Tests account profile serialization, enum compatibility, local repository flows, and malformed stored values.
 package com.olive.app.data
 
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.Address
+import com.olive.app.data.account.Contact
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.FieldChange
+import com.olive.app.data.account.HistoryRecord
+import com.olive.app.data.account.LocalAccountRepository
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.User
 import com.olive.app.data.account.UserProfile
+import com.olive.app.security.EncryptedVault
+import com.olive.app.support.TestAndroidKeyStore
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class AccountModelBoundaryTest {
     // Input: every current account role. Expected: storage names restore the exact role.
     @Test
@@ -110,5 +125,116 @@ class AccountModelBoundaryTest {
     fun locationLengthBoundaryIsExact() {
         assertTrue(DeliveryAddress(city = "x".repeat(160)).locationValid)
         assertFalse(DeliveryAddress(city = "x".repeat(161)).locationValid)
+    }
+
+    @Test
+    fun firestoreModelClassesAndProfileMapPreserveAllFields() {
+        val contact = Contact("c1", "Amina", "555-0100", "Sister")
+        val firestoreAddress = Address("1 St", "Apt 2", "Edmonton", "AB", "T5J0N3", "Canada")
+        val user = User(
+            uid = "u1",
+            username = "olive_user",
+            fullName = "Full Name",
+            affectedNames = "Affected",
+            dob = "2000-01-01",
+            language = "English",
+            situation = "Situation",
+            region = "Edmonton",
+            triggerHash = "hash",
+            contacts = listOf(contact),
+            address = firestoreAddress,
+            coverApp = "NEWS",
+        )
+        assertEquals("u1", user.uid)
+        assertEquals("olive_user", user.username)
+        assertEquals("Full Name", user.fullName)
+        assertEquals("Affected", user.affectedNames)
+        assertEquals("2000-01-01", user.dob)
+        assertEquals("English", user.language)
+        assertEquals("Situation", user.situation)
+        assertEquals("Edmonton", user.region)
+        assertEquals("hash", user.triggerHash)
+        assertEquals("c1", user.contacts.single().id)
+        assertEquals("Amina", user.contacts.single().name)
+        assertEquals("555-0100", user.contacts.single().phone)
+        assertEquals("Sister", user.contacts.single().details)
+        assertEquals("1 St", user.address?.line1)
+        assertEquals("Apt 2", user.address?.line2)
+        assertEquals("Edmonton", user.address?.city)
+        assertEquals("AB", user.address?.province)
+        assertEquals("T5J0N3", user.address?.postalCode)
+        assertEquals("Canada", user.address?.country)
+        assertEquals("NEWS", user.coverApp)
+
+        val defaultUser = User()
+        assertEquals("", defaultUser.uid)
+        val defaultContact = Contact()
+        assertEquals("", defaultContact.id)
+        val defaultAddr = Address()
+        assertEquals("", defaultAddr.country)
+
+        val profile = UserProfile(
+            username = "olive_user",
+            fullName = "Renée",
+            contacts = listOf(SafeContact("c1", "Amina", "555-0100", true, "uid-2", "Sister")),
+            address = DeliveryAddress(city = "Edmonton"),
+            role = AccountRole.SAFE_CONTACT,
+            coverType = CoverType.NEWS,
+            email = "a@b.ca",
+            phone = "555-0101",
+        )
+        val map = profile.toMap()
+        assertEquals("olive_user", map["username"])
+        assertEquals("SAFE_CONTACT", map["role"])
+        assertEquals("NEWS", map["coverType"])
+        assertEquals(FieldChange("Title", "A", "B"), FieldChange.fromJson(FieldChange("Title", "A", "B").toJson()))
+    }
+
+    @Test
+    fun localAccountRepositoryManagesAccountsProfilesAndPasswords() = runBlocking {
+        TestAndroidKeyStore.install().use {
+            val app = RuntimeEnvironment.getApplication()
+            val vault = EncryptedVault(app, "local-account-test")
+            val repo = LocalAccountRepository(vault)
+
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { repo.create("!", "ValidPass!123", AccountRole.USER) }
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { repo.create("olive_local", "weak", AccountRole.USER) }
+            }
+
+            val id = repo.create("Olive_Local", "ValidPass!123", AccountRole.USER)
+            assertEquals("olive_local", id.username)
+            assertThrows(IllegalStateException::class.java) {
+                runBlocking { repo.create("olive_local", "ValidPass!123", AccountRole.SAFE_CONTACT) }
+            }
+
+            assertEquals(id, repo.authenticate("olive_local", "ValidPass!123", AccountRole.USER))
+            assertThrows(IllegalStateException::class.java) {
+                runBlocking { repo.authenticate("olive_local", "WrongPass!123", AccountRole.USER) }
+            }
+            assertThrows(IllegalStateException::class.java) {
+                runBlocking { repo.authenticate("missing_user", "ValidPass!123", AccountRole.USER) }
+            }
+
+            val savedProfile = UserProfile(username = id.username, fullName = "Local Name", dob = "2000-01-01")
+            assertNull(repo.profile(id))
+            repo.saveProfile(id, savedProfile)
+            assertEquals(savedProfile, repo.profile(id))
+
+            repo.saveHistoryRecord(id, HistoryRecord("settings", "1", "{}"))
+            assertTrue(repo.historyRecords(id).isEmpty())
+
+            assertThrows(IllegalStateException::class.java) {
+                runBlocking { repo.changePassword(id, "WrongPass!123", "NewValid!123") }
+            }
+            repo.changePassword(id, "ValidPass!123", "NewValid!123")
+            assertEquals(id, repo.authenticate("olive_local", "NewValid!123", AccountRole.USER))
+
+            assertNull(repo.authenticatedUid())
+            assertNull(repo.authenticatedUsername())
+            repo.signOut()
+        }
     }
 }

@@ -44,6 +44,11 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    match /friendInviteOwners/{uid} {
+      allow get: if owner(uid);
+      allow list, write: if false;
+    }
+
     function safetyContactUidAt(values, index) {
       return values.size() <= index || (values[index] is string
         && values[index].size() > 0 && values[index].size() <= 128);
@@ -152,10 +157,7 @@ service cloud.firestore {
     match /accountKeysets/{uid} {
       // A first-run owner must be able to distinguish an absent keyset from an access denial.
       // Existing records still have to pass the ciphertext-envelope schema before being returned.
-      allow get: if owner(uid) && (
-        !exists(/databases/$(database)/documents/accountKeysets/$(uid))
-        || validAccountKeysetShape(resource.data, uid)
-      );
+      allow get: if owner(uid) && (resource == null || validAccountKeysetShape(resource.data, uid));
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
       // Allow idempotent SetOptions.merge() refreshes (only updatedAt may change) while preserving
@@ -187,7 +189,7 @@ service cloud.firestore {
     }
 
     match /accountKeyDirectories/{uid} {
-      allow get: if signedIn() && validAccountKeyDirectory(resource.data, uid);
+      allow get: if signedIn() && (resource == null || validAccountKeyDirectory(resource.data, uid));
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
         && request.resource.data.updatedAt == request.time
@@ -294,13 +296,15 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid','relationship'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
         && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
 
         && (!('phone' in c[i]) || (c[i].phone is string && c[i].phone.size() <= 40))
+
+        && (!('relationship' in c[i]) || (c[i].relationship is string && c[i].relationship.size() <= 120))
 
         && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
@@ -338,7 +342,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','phone'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','emailCommunicationConsent','phone'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -364,6 +368,10 @@ service cloud.firestore {
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 
         && (!('cover_app' in p) || p.cover_app is string)
+
+        && (!('email' in p) || (p.email is string && p.email.size() <= 254))
+
+        && (!('emailCommunicationConsent' in p) || p.emailCommunicationConsent is bool)
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -443,7 +451,6 @@ service cloud.firestore {
           && data.wrapped_keys is map
           && (!data.keys().hasAny(['device_wrapped_keys']) || data.device_wrapped_keys is map)
           && (!data.keys().hasAny(['account_wrapped_keys']) || (data.account_wrapped_keys is map
-            && data.account_wrapped_keys.keys().hasAll(data.allowed_users)
             && data.account_wrapped_keys.keys().hasOnly(data.allowed_users)))
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
@@ -509,13 +516,34 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid in resource.data.allowedUsers;
       allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid
         && validPrivateEntry(request.resource.data);
-      allow update: if signedIn() && request.auth.uid == resource.data.ownerUid
+      allow update: if signedIn()
         && request.resource.data.ownerUid == resource.data.ownerUid
-        && validPrivateEntry(request.resource.data);
+        && validPrivateEntry(request.resource.data)
+        && (request.auth.uid == resource.data.ownerUid ||
+          (request.auth.uid in resource.data.allowedUsers
+            && request.resource.data.ciphertext == resource.data.ciphertext
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.allowedUsers.hasAll(resource.data.allowedUsers)));
       allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
     }
 
-    // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
+    function messagingPeerAllowed(uid, username) {
+      let grant = /databases/$(database)/documents/messagingPeerAccess/$(request.auth.uid)/peers/$(uid);
+      return owner(uid) || validMessagingEmail(username)
+        || exists(/databases/$(database)/documents/friendships/$(request.auth.uid + '--' + uid))
+        || exists(/databases/$(database)/documents/friendships/$(uid + '--' + request.auth.uid))
+        || (exists(grant) && (
+          (get(grant).data.keys().hasAny(['organizationUsername'])
+            && get(grant).data.organizationUsername == username
+            && get(/databases/$(database)/documents/accountDirectory/$(username)).data.uid == uid
+            && get(/databases/$(database)/documents/accountDirectory/$(username)).data.role in ['STAFF', 'ADMIN'])
+          || (get(grant).data.keys().hasAny(['conversationId'])
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(get(grant).data.conversationId)).data.participantIds
+            && uid in get(/databases/$(database)/documents/conversations/$(get(grant).data.conversationId)).data.participantIds)
+        ));
+    }
+
+    // Public keys remain available to connected accounts, without username discovery.
     match /messageDirectory/{username} {
       function validDirectoryEntry() {
         return request.resource.data.keys().hasOnly(['uid','username','publicKey','updatedAt'])
@@ -525,7 +553,8 @@ service cloud.firestore {
           && validMessageUsername(username)
           && validMessagingEmail(username);
       }
-      allow get: if signedIn();
+      allow get: if signedIn() && (validMessagingEmail(username)
+        || (resource != null && messagingPeerAllowed(resource.data.uid, username)));
       allow list: if false;
       allow create: if owner(request.resource.data.uid) && validDirectoryEntry();
       allow update: if owner(resource.data.uid)
@@ -544,7 +573,8 @@ service cloud.firestore {
             && data.platform in ['ANDROID','WEB']
             && data.mgf1Digest in ['SHA-1','SHA-256'];
         }
-        allow get, list: if signedIn();
+        allow get, list: if signedIn() && messagingPeerAllowed(
+          get(/databases/$(database)/documents/messageDirectory/$(username)).data.uid, username);
         allow create: if owner(request.resource.data.uid) && validMessagingDevice(request.resource.data);
         allow update: if owner(resource.data.uid)
           && request.resource.data.uid == resource.data.uid
@@ -574,13 +604,7 @@ service cloud.firestore {
 
     match /friendRequests/{requestId} {
       allow read: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
-      allow create: if signedIn() && personalMessagingAccount()
-        && request.resource.data.senderUid == request.auth.uid
-        && requestId == request.resource.data.senderUid + '--' + request.resource.data.recipientUid
-        && validFriendRequest(request.resource.data)
-        && !exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid))
-        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.senderUid + '--' + request.resource.data.recipientUid))
-        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid));
+      allow create: if false;
       allow update: if false;
       allow delete: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
     }
@@ -667,6 +691,68 @@ service cloud.firestore {
       allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
       allow list: if owner(ownerUid);
       allow create, update: if owner(ownerUid) && validLiveShare(request.resource.data);
+      allow delete: if owner(ownerUid);
+    }
+
+    function liveLocationRecipientUidAt(values, index) {
+      return values.size() <= index || (values[index] is string
+        && values[index].size() > 0 && values[index].size() <= 128);
+    }
+
+    function validLiveLocationSession(data, ownerUid) {
+      return data.keys().hasAll(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.keys().hasOnly(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.ownerUid is string && data.ownerUid == ownerUid
+        && data.sessionId is string && data.sessionId.matches('^[A-Za-z0-9_-]{8,64}$')
+        && data.recipientUids is list && data.recipientUids.size() >= 1 && data.recipientUids.size() <= 25
+        && liveLocationRecipientUidAt(data.recipientUids, 0)
+        && liveLocationRecipientUidAt(data.recipientUids, 1)
+        && liveLocationRecipientUidAt(data.recipientUids, 2)
+        && liveLocationRecipientUidAt(data.recipientUids, 3)
+        && liveLocationRecipientUidAt(data.recipientUids, 4)
+        && liveLocationRecipientUidAt(data.recipientUids, 5)
+        && liveLocationRecipientUidAt(data.recipientUids, 6)
+        && liveLocationRecipientUidAt(data.recipientUids, 7)
+        && liveLocationRecipientUidAt(data.recipientUids, 8)
+        && liveLocationRecipientUidAt(data.recipientUids, 9)
+        && liveLocationRecipientUidAt(data.recipientUids, 10)
+        && liveLocationRecipientUidAt(data.recipientUids, 11)
+        && liveLocationRecipientUidAt(data.recipientUids, 12)
+        && liveLocationRecipientUidAt(data.recipientUids, 13)
+        && liveLocationRecipientUidAt(data.recipientUids, 14)
+        && liveLocationRecipientUidAt(data.recipientUids, 15)
+        && liveLocationRecipientUidAt(data.recipientUids, 16)
+        && liveLocationRecipientUidAt(data.recipientUids, 17)
+        && liveLocationRecipientUidAt(data.recipientUids, 18)
+        && liveLocationRecipientUidAt(data.recipientUids, 19)
+        && liveLocationRecipientUidAt(data.recipientUids, 20)
+        && liveLocationRecipientUidAt(data.recipientUids, 21)
+        && liveLocationRecipientUidAt(data.recipientUids, 22)
+        && liveLocationRecipientUidAt(data.recipientUids, 23)
+        && liveLocationRecipientUidAt(data.recipientUids, 24)
+        && data.active is bool && data.active == true
+        && data.startedAt is int && data.startedAt > 0
+        && data.expiresAt is int && data.expiresAt > data.startedAt
+        && data.expiresAt <= data.startedAt + 73 * 60 * 60 * 1000
+        && data.updatedAt == request.time;
+    }
+
+    // Active live-location session markers track bounded owner-managed sharing sessions.
+    match /liveLocationSessions/{ownerUid} {
+      function liveLocationSessionUser() {
+        return signedIn() && (
+          ('role' in request.auth.token && request.auth.token.role == 'USER')
+          || (!('role' in request.auth.token)
+            && 'email' in request.auth.token
+            && request.auth.token.email is string
+            && request.auth.token.email.matches('.*@users[.]olive[.]invalid'))
+        );
+      }
+      allow get: if owner(ownerUid);
+      allow list: if false;
+      allow create, update: if owner(ownerUid)
+        && liveLocationSessionUser()
+        && validLiveLocationSession(request.resource.data, ownerUid);
       allow delete: if owner(ownerUid);
     }
 
@@ -859,6 +945,11 @@ service cloud.firestore {
         (request.auth.token.role == 'ADMIN' || resource.data.ownerUid == request.auth.uid);
       allow write: if false;
     }
+    // Login device alerts, email delivery logs/cooldowns, and release metadata are server-only.
+    match /accountLoginDevices/{uid}/{document=**} { allow read, write: if false; }
+    match /emailNotificationLogs/{logId} { allow read, write: if false; }
+    match /emailCooldowns/{cooldownId} { allow read, write: if false; }
+    match /appReleases/{releaseId} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
 
   }

@@ -1,0 +1,16 @@
+<resources>
+    <string name="friend_invite">Invitar</string>
+    <string name="friend_invite_question">¿Tienes un código de invitación? (opcional)</string>
+    <string name="friend_invite_code">Código de invitación</string>
+    <string name="friend_invite_connect">Añadir contacto</string>
+    <string name="friend_invite_connecting">Conectando…</string>
+    <string name="friend_invite_connected">Conectado con %1$s. Puedes añadir otro código.</string>
+    <string name="friend_invite_unavailable">Esta invitación se usó o caducó. Actualiza para crear otra.</string>
+    <string name="friend_invite_expires">Caduca el %1$s</string>
+    <string name="friend_invite_once">Un solo uso. Válido durante 48 horas. Actualizar anula el código anterior.</string>
+    <string name="friend_invite_copy_code">Copiar código</string>
+    <string name="friend_invite_copy_link">Copiar enlace</string>
+    <string name="friend_invite_share">Compartir invitación</string>
+    <string name="friend_invite_refresh">Actualizar código de invitación</string>
+    <string name="friend_invite_done">Listo</string>
+</resources>

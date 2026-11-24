@@ -13,7 +13,11 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
-import CrossingBoard, { crossingCamera } from "./OliveCrossingBoard";
+import CrossingBoard, {
+  HOP_DURATION_SECONDS,
+  crossingCamera,
+  type CrossingHopAnimation,
+} from "./OliveCrossingBoard";
 import { GameOverlay } from "./GameOverlay";
 import { gameSfx } from "./game-audio";
 import {
@@ -74,6 +78,10 @@ export default function OliveCrossing() {
 
   const [hop, setHop] = useState(0);
   const [facing, setFacing] = useState<CrossingDirection>("up");
+  const [hopAnim, setHopAnim] = useState<CrossingHopAnimation | null>(null);
+  const hopAnimRef = useRef<CrossingHopAnimation | null>(null);
+  const clockRef = useRef(0);
+  const [clockSeconds, setClockSeconds] = useState(0);
   const [eagleLevel, setEagleLevel] = useState(0);
   const stallRef = useRef(0);
 
@@ -175,9 +183,25 @@ export default function OliveCrossing() {
       }
 
       const next = advanceCrossing(current, elapsed);
+      const clampedDelta = Math.min(Math.max(elapsed, 0), 0.05);
+      clockRef.current += clampedDelta;
+      setClockSeconds(clockRef.current);
+      if (hopAnimRef.current && clampedDelta > 0) {
+        const nextProgress = hopAnimRef.current.progress + clampedDelta / HOP_DURATION_SECONDS;
+        if (nextProgress >= 1) {
+          hopAnimRef.current = null;
+          setHopAnim(null);
+        } else {
+          const updatedAnim = { ...hopAnimRef.current, progress: nextProgress };
+          hopAnimRef.current = updatedAnim;
+          setHopAnim(updatedAnim);
+        }
+      }
       worldRef.current = next;
       setWorld(next);
       if (next.over && !current.over) {
+        hopAnimRef.current = null;
+        setHopAnim(null);
         phaseRef.current = "over";
         setPhase("over");
         playLossSound(next.deathReason);
@@ -215,6 +239,10 @@ export default function OliveCrossing() {
   const begin = useCallback(() => {
     setPreviousBest(best);
     stallRef.current = 0;
+    clockRef.current = 0;
+    setClockSeconds(0);
+    hopAnimRef.current = null;
+    setHopAnim(null);
     setEagleLevel(0);
     setFacing("up");
     const fresh = newCrossing();
@@ -235,6 +263,24 @@ export default function OliveCrossing() {
 
       const current = worldRef.current;
       const next = moveCrossing(current, direction);
+      const moved = next !== current;
+      const reducedMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      if (!reducedMotion && !next.over) {
+        const anim: CrossingHopAnimation = {
+          direction,
+          progress: 0,
+          offsetX: moved ? current.playerColumn - next.playerColumn : 0,
+          offsetY: !moved ? 0 : direction === "up" ? 1 : direction === "down" ? -1 : 0,
+          blocked: !moved,
+        };
+        hopAnimRef.current = anim;
+        setHopAnim(anim);
+      } else {
+        hopAnimRef.current = null;
+        setHopAnim(null);
+      }
       worldRef.current = next;
       setWorld(next);
 
@@ -278,24 +324,47 @@ export default function OliveCrossing() {
     }
   };
 
-  const handleKey = (key: string) => {
-    const directions: Record<string, CrossingDirection> = {
-      ArrowUp: "up",
-      ArrowDown: "down",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      w: "up",
-      s: "down",
-      a: "left",
-      d: "right",
+  const handleKey = useCallback(
+    (key: string) => {
+      const directions: Record<string, CrossingDirection> = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        w: "up",
+        s: "down",
+        a: "left",
+        d: "right",
+      };
+      const direction = directions[key.toLowerCase()] ?? directions[key];
+      if (direction) {
+        move(direction);
+        return true;
+      }
+      return false;
+    },
+    [move],
+  );
+
+  useEffect(() => {
+    if (phase !== "running") return;
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (handleKey(event.key)) event.preventDefault();
     };
-    const direction = directions[key.toLowerCase()] ?? directions[key];
-    if (direction) {
-      move(direction);
-      return true;
-    }
-    return false;
-  };
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
+  }, [phase, handleKey]);
 
   // Supports both swipe gestures anywhere on the board and intuitive tap-relative-to-olive hops.
   const handleBoardPointerUp = (clientX: number, clientY: number) => {
@@ -446,6 +515,8 @@ export default function OliveCrossing() {
           <CrossingBoard
             aspectRatio={aspectRatio}
             hop={hop}
+            hopAnim={hopAnim}
+            clockSeconds={clockSeconds}
             world={world}
             character={activeCharacter}
             facing={facing}

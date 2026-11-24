@@ -1,8 +1,11 @@
 package com.olive.app.ui.covers.fitness
 
 import android.content.Context
+import android.net.Uri
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataItem
 import com.google.android.gms.wearable.DataMap
 import com.google.android.gms.wearable.PutDataRequest
@@ -21,6 +24,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.time.LocalDate
@@ -69,6 +73,60 @@ class FitnessSummaryDeliveryTest {
                         assertTrue(firebase.records.containsKey("accountSync/$uid"))
                     }
                 }
+            }
+        }
+
+    @Test
+    fun phoneAcceptsOnlyCurrentWatchReadingsFromTheBoundAccountAndSession() =
+        signedIn("fitness-watch-listener") { context, uid ->
+            val prefs = context.getSharedPreferences(FitnessWatchSync.SYNC_PREFERENCES, Context.MODE_PRIVATE)
+            val now = System.currentTimeMillis()
+            val today = LocalDate.now()
+            val service = Robolectric.buildService(FitnessWatchListenerService::class.java)
+            try {
+                val listener = service.create().get()
+                val local = FitnessStore(context, uid)
+                fun deliver(type: Int, path: String, account: String = uid, session: String = "current",
+                            date: String = today.toString(), timestamp: Long = now) {
+                    val payload = DataMap().apply {
+                        putString("accountId", account)
+                        putString(FitnessWatchSync.SESSION_ID, session)
+                        putString("date", date)
+                        putInt("watchSteps", 2400)
+                        putInt("heartRate", 73)
+                        putLong("updatedAt", timestamp)
+                        putLong("heartRateAt", timestamp)
+                    }
+                    val item = mock(DataItem::class.java)
+                    `when`(item.uri).thenReturn(Uri.parse("wear://watch$path"))
+                    `when`(item.freeze()).thenReturn(item)
+                    `when`(item.data).thenReturn(payload.toByteArray())
+                    `when`(item.assets).thenReturn(emptyMap())
+                    val event = mock(DataEvent::class.java)
+                    `when`(event.type).thenReturn(type)
+                    `when`(event.dataItem).thenReturn(item)
+                    val buffer = mock(DataEventBuffer::class.java)
+                    `when`(buffer.iterator()).thenReturn(mutableListOf(event).iterator())
+                    listener.onDataChanged(buffer)
+                }
+
+                val path = FitnessWatchSync.WATCH_ACTIVITY_PATH
+                deliver(DataEvent.TYPE_DELETED, path)
+                deliver(DataEvent.TYPE_CHANGED, "/another-data-item")
+                deliver(DataEvent.TYPE_CHANGED, path)
+                assertEquals(0, local.snapshot().stepsToday)
+                prefs.edit().putString(FitnessWatchSync.ACTIVE_ACCOUNT_ID, uid)
+                    .putString(FitnessWatchSync.SESSION_ID, "current").putLong("accountStartedAt", now - 100).commit()
+                deliver(DataEvent.TYPE_CHANGED, path, account = "previous-owner")
+                deliver(DataEvent.TYPE_CHANGED, path, session = "previous-session")
+                deliver(DataEvent.TYPE_CHANGED, path, date = today.minusDays(1).toString())
+                deliver(DataEvent.TYPE_CHANGED, path, timestamp = now - 200)
+                assertEquals(0, local.snapshot().stepsToday)
+                deliver(DataEvent.TYPE_CHANGED, path)
+                assertEquals(2400, local.snapshot().stepsToday)
+                assertTrue(local.snapshot().watchConnected)
+            } finally {
+                service.destroy()
             }
         }
 

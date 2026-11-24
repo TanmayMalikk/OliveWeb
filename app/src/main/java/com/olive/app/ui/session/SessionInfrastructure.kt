@@ -19,7 +19,7 @@ import com.olive.app.data.account.FirebaseAccountRepository
 import com.olive.app.data.account.LocalAccountRepository
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.UserProfile
-import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.security.CoverStateStore
 import com.olive.app.data.location.AdminLocationRepository
 import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationSharingRepository
@@ -98,7 +98,15 @@ internal class SessionDataSources(
     val opaqueRecovery: OpaqueRecoveryRepository? = null,
 ) {
     companion object {
-        // Creates the cloud repository bundle used by a signed-in Firebase account.
+        /**
+         * Creates the cloud repository bundle used by a signed-in Firebase account.
+         *
+         * @param application Application supplied to [create].
+         * @param localMode Whether to apply local mode.
+         * @param vault Vault supplied to [create].
+         * @param documentIndex Document index supplied to [create].
+         * @return The resulting [SessionDataSources] instance.
+         */
         fun create(
             application: Application,
             localMode: Boolean,
@@ -130,18 +138,36 @@ internal class SessionDataSources(
 
 // Checks cover triggers and PINs; only a verified result for the current enrollment may authorize the safe area.
 internal class SessionAccess(private val runtime: SessionRuntime) {
-    // Detects a valid private-entry search for session access.
+    /**
+     * Detects a valid private-entry search for session access.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search, or `false` otherwise.
+     */
     fun interceptSearch(value: String): Boolean {
         val device = runtime.enrollment ?: return false
         return openTrigger(device, InputPolicy.matchesTrigger(value, device.triggerHash))
     }
 
+    /**
+     * Computes intercept search async.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return `true` if intercept search async, or `false` otherwise.
+     */
     suspend fun interceptSearchAsync(value: String): Boolean {
         val device = runtime.enrollment ?: return false
         val match = withContext(Dispatchers.Default) { InputPolicy.matchesTrigger(value, device.triggerHash) }
         return openTrigger(device, match)
     }
 
+    /**
+     * Opens trigger.
+     *
+     * @param device Device supplied to [openTrigger].
+     * @param match Whether to apply match.
+     * @return `true` if open trigger, or `false` otherwise.
+     */
     private fun openTrigger(device: DeviceEnrollment, match: Boolean): Boolean {
         with(runtime) {
             with(state) {
@@ -163,7 +189,9 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts the same locked PIN flow when the user double-taps the discreet olive on a cover.
+    /**
+     * Starts the same locked PIN flow when the user double-taps the discreet olive on a cover.
+     */
     fun beginDiscreetEntry() {
         with(runtime) {
             with(state) {
@@ -187,7 +215,12 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Rejects queued clicks from an old PIN screen or while verification/blackout is active.
+    /**
+     * Rejects queued clicks from an old PIN screen or while verification/blackout is active.
+     *
+     * @param pin User-entered PIN string.
+     * @param challenge Challenge supplied to [submitPin].
+     */
     fun submitPin(pin: String, challenge: Int) {
         with(runtime) {
             with(state) {
@@ -195,7 +228,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 if (device.role != AccountRole.USER || activeTriggerId == null || !device.allowsAppPin()) return
                 if (!InputPolicy.validPin(pin)) {
-                    message = runtime.application.getString(R.string.enter_your_4_6_digit_pin)
+                    failInput(runtime.application.getString(R.string.enter_your_4_6_digit_pin))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
@@ -208,12 +241,14 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                     }
                     if (epoch != token || screen != SessionScreen.Pin || challenge != pinChallengeVersion) return@runOperation
                     when (result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, usingAppPin = true)
+                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, verifiedPinLength = pin.length)
                         is PinResult.Rejected -> if (result.failures >= 5) navigation.quickExit() else {
-                            message = runtime.application.resources.getQuantityString(
-                                R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                                5 - result.failures,
-                                5 - result.failures
+                            failInput(
+                                runtime.application.resources.getQuantityString(
+                                    R.plurals.ui_incorrect_pin_value_attempts_remaining,
+                                    5 - result.failures,
+                                    5 - result.failures
+                                )
                             )
                         }
                     }
@@ -222,22 +257,30 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Rechecks identity, screen, and cancellation epoch after loading private data.
+    /**
+     * Rechecks identity, screen, and cancellation epoch after loading private data.
+     *
+     * @param device Device supplied to [unlockVerifiedDevice].
+     * @param token Authentication, push notification, or session token.
+     * @param expectedScreen Expected screen supplied to [unlockVerifiedDevice].
+     * @param challenge Optional challenge supplied to [unlockVerifiedDevice].
+     * @param verifiedPinLength Length recorded after successful app PIN verification, if used.
+     */
     internal suspend fun unlockVerifiedDevice(
         device: DeviceEnrollment,
         token: Long,
         expectedScreen: SessionScreen,
         challenge: Int? = null,
-        usingAppPin: Boolean = false
+        verifiedPinLength: Int? = null,
     ) {
         with(runtime) {
             with(state) {
-                if (usingAppPin && !device.allowsAppPin()) return
+                if (verifiedPinLength != null && !device.allowsAppPin()) return
                 val saved = withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
                 if (epoch != token || screen != expectedScreen || enrollment != device || privacyBlackout ||
-                    (challenge != null && challenge != pinChallengeVersion) ||
-                    (usingAppPin && !device.allowsAppPin())
+                    (challenge != null && challenge != pinChallengeVersion)
                 ) return
+                if (verifiedPinLength != null) enrollment = device.copy(pinLength = verifiedPinLength)
                 pinAuthorizedUid = device.uid
                 pinAuthorizedEpoch = token
                 busy = false
@@ -247,9 +290,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 history.refreshHistory(device.uid)
                 screenHistory.clear()
                 safePageHistory.clear()
-                page = SafePage.Home
-                screen = SessionScreen.Safe
-                unlockAnimationVersion++
+                enterSafeWithAnimation()
                 privacy.startIdleTimer()
             }
         }
@@ -259,9 +300,15 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
 // Holds an active biometric/device-credential unlock request.
 internal class DeviceLockRequest internal constructor(
     val challenge: DeviceAuthenticationChallenge,
-    val settingsChange: Boolean = false
+    val settingsChange: Boolean = false,
+    @androidx.annotation.StringRes val subtitleRes: Int? = null,
 ) {
     internal val result = CompletableDeferred<Cipher?>()
+    /**
+     * Completes the device lock request.
+     *
+     * @param cipher Optional cipher supplied to [complete].
+     */
     fun complete(cipher: Cipher?) {
         result.complete(cipher)
     }
@@ -271,7 +318,11 @@ internal class DeviceLockRequest internal constructor(
 internal class PasswordRecoveryUnlockRequest internal constructor() {
     internal val result = CompletableDeferred<String?>()
 
-    /** Delivers the entered recovery password or null if the prompt was dismissed. */
+    /**
+     * Delivers the entered recovery password or null if the prompt was dismissed.
+     *
+     * @param password Recovery password entered by the user, or `null` when cancelled.
+     */
     fun complete(password: String?) {
         result.complete(password)
     }
@@ -281,7 +332,12 @@ internal class PasswordRecoveryUnlockRequest internal constructor() {
 internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
     private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
 
-    // Authenticates the account for session device access.
+    /**
+     * Authenticates the account for session device access.
+     *
+     * @param enroll Whether to apply enroll.
+     * @param trigger Optional trigger supplied to [authenticate].
+     */
     fun authenticate(enroll: Boolean, trigger: String? = null): Unit = with(runtime) {
         with(state) {
             if (busy || privacyBlackout || accountRole != AccountRole.USER) return
@@ -342,6 +398,15 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Checks that a private-entry request still belongs to the same account and screen.
+     *
+     * @param token The session epoch captured when the request started.
+     * @param expected The screen that must still be active.
+     * @param uid The UID that must match the pending or enrolled account.
+     * @param enroll Whether to check the pending enrollment instead of the enrolled device.
+     * @return True when the original user session and screen are still active and visible.
+     */
     private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) = with(runtime) {
         epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&
             (if (enroll) pendingIdentity?.uid == uid else enrollment?.uid == uid)
@@ -362,7 +427,11 @@ internal class SessionRuntime(
     private val localStorage = SessionLocalStorage(application, localMode)
     val vault get() = localStorage.vault
 
-    // Checks whether Android has a PIN, pattern, password, or biometric lock.
+    /**
+     * Checks whether Android has a PIN, pattern, password, or biometric lock.
+     *
+     * @return The resulting phone secure.
+     */
     fun phoneSecure() =
         application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
 
@@ -399,7 +468,7 @@ internal class SessionRuntime(
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment
         set(value) {
-            if (activeEnrollment?.uid != value?.uid) messaging.stopMessaging()
+            if (activeEnrollment?.uid != value?.uid) { messaging.stopMessaging(); adminPreloader.clear() }
             activeEnrollment = value
         }
     var pendingIdentity: AccountIdentity? = null
@@ -433,6 +502,7 @@ internal class SessionRuntime(
     val entrySettings = SessionEntrySettings(this)
     val deviceAccess = SessionDeviceAccess(this)
     val navigation = SessionNavigation(this)
+    val adminPreloader = AdminDataPreloader(this)
     val organization = OrganizationAccounts(this)
     val messaging = SessionMessaging(this)
     val friendActions = FriendActions(this)
@@ -454,6 +524,12 @@ internal class SessionRuntime(
     val setupUsername get() = pendingIdentity?.username.orEmpty()
     val setupProfile get() = pendingProfile
     val usesCover get() = state.accountRole == AccountRole.USER
+    /**
+     * Checks whether conversation unread.
+     *
+     * @param conversation Conversation metadata including participants and ticket status.
+     * @return `true` if is conversation unread, or `false` otherwise.
+     */
     fun isConversationUnread(conversation: ChatConversation): Boolean {
         state.readMessageVersion
         val uid = enrollment?.uid ?: return false
@@ -465,6 +541,12 @@ internal class SessionRuntime(
                     null,
                 ) != conversation.lastMessageId
     }
+    /**
+     * Checks whether active unread conversation.
+     *
+     * @param conversation Conversation metadata including participants and ticket status.
+     * @return `true` if is active unread conversation, or `false` otherwise.
+     */
     fun isActiveUnreadConversation(conversation: ChatConversation) =
         conversation.closedAt == 0L && conversation.id !in state.archivedConversationIds &&
             isConversationUnread(conversation)
@@ -479,7 +561,11 @@ internal class SessionRuntime(
     val pendingMessageActionCount
         get() = incomingFriendRequestCount + state.conversations.count(::isActiveUnreadConversation)
 
-    // User access requires a verified app PIN or Android authentication for this enrollment and epoch.
+    /**
+     * User access requires a verified app PIN or Android authentication for this enrollment and epoch.
+     *
+     * @return `true` if can enter safe, or `false` otherwise.
+     */
     private fun canEnterSafe(): Boolean {
         val device = enrollment
         val requiresPin = device?.role == AccountRole.USER || state.accountRole == AccountRole.USER
@@ -490,7 +576,14 @@ internal class SessionRuntime(
 
 // Uses a 25-second timeout by default; Android authentication gets longer. Epoch/job checks reject canceled work.
 internal class SessionOperations(private val runtime: SessionRuntime) {
-    // Runs one session task with a timeout and a readable error message.
+    /**
+     * Runs one session task with a timeout and a readable error message.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @param timeoutMillis Duration or timestamp for timeout, in milliseconds.
+     * @param failureFor Maps an exception to a localized failure message.
+     * @param block Callback or suspending lambda executed within this scope.
+     */
     fun runOperation(
         failure: String,
         timeoutMillis: Long = 25_000,
@@ -519,7 +612,7 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                         if (operationJob === runningJob) {
                             operationJob = null
                             busy = false
-                            finalFailure?.let { message = it }
+                            finalFailure?.let { failInput(it) }
                         }
                     }
                 }

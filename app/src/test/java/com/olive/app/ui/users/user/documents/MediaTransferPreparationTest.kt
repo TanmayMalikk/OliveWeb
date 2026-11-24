@@ -81,11 +81,27 @@ class MediaTransferPreparationTest {
             f.controller.queueVoiceMessage(source,AccountIdentity("owner","fixture_owner"),voice)
             assertFalse(source.exists())
             val job=f.store.all().single()
-            assertEquals(voice,job.voiceDraft)
-            assertEquals(MediaKind.AUDIO,job.source.kind)
-            assertEquals(OcrReview.NOT_APPLICABLE,job.source.ocrReview)
-            assertTrue(File(job.source.filePath).isFile)
-            File(job.source.filePath).delete()
+            val cipherFile=File(job.source.filePath)
+            try {
+                assertEquals(voice,job.voiceDraft)
+                assertEquals(MediaKind.AUDIO,job.source.kind)
+                assertEquals(OcrReview.NOT_APPLICABLE,job.source.ocrReview)
+                assertTrue(cipherFile.isFile)
+                val key=KeyManager.unwrapKey(job.source.wrappedKeys.getValue("owner"),job.source.encryptionVersion)
+                val metadata=JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,key))
+                assertTrue(metadata.getBoolean("chatOnly"))
+                f.controller.observeUploads("owner")
+                f.session.await { f.controller.uploads.size==1 }
+                val pending=f.controller.uploads.single()
+                assertTrue(pending.chatOnly)
+                assertEquals("chat",pending.voiceConversationId)
+                f.store.write(job.copy(status=MediaTransferStatus.COMPLETE,mediaId="voice-media",voiceDraft=null))
+                f.controller.observeUploads("owner")
+                f.session.await { f.store.get(job.id)==null }
+                assertTrue(f.controller.uploads.isEmpty())
+            } finally {
+                cipherFile.delete()
+            }
         }
     }
 
@@ -147,6 +163,49 @@ class MediaTransferPreparationTest {
                             it.arguments[0] == MediaUploadWorker.workName(id) &&
                             it.arguments[1] == ExistingWorkPolicy.REPLACE
                     })
+                    val cancelled = mock(WorkInfo::class.java)
+                    `when`(cancelled.state).thenReturn(WorkInfo.State.CANCELLED)
+                    f.workerUpdates.value = listOf(cancelled)
+                    f.session.await { (f.controller.state as? MediaTransferState.Failed)?.retryable == true }
+
+                    val enqueued = mock(WorkInfo::class.java)
+                    `when`(enqueued.state).thenReturn(WorkInfo.State.ENQUEUED)
+                    f.workerUpdates.value = listOf(enqueued)
+                    f.session.await { f.controller.state == MediaTransferState.Queued(id) }
+
+                    val succeeded = mock(WorkInfo::class.java)
+                    `when`(succeeded.state).thenReturn(WorkInfo.State.SUCCEEDED)
+                    `when`(succeeded.outputData).thenReturn(workDataOf(MediaUploadWorker.MEDIA_ID to "media-9"))
+                    f.workerUpdates.value = listOf(succeeded)
+                    f.session.await { f.controller.state == MediaTransferState.Completed(id, "media-9") }
+
+                    f.store.write(
+                        initial.copy(
+                            status = MediaTransferStatus.UPLOADING,
+                            partSize = 10L,
+                            completedParts = mapOf(1 to "e1", 2 to "e2"),
+                        ),
+                    )
+                    var failedRetake = ""
+                    f.controller.queueDocument(
+                        Uri.fromFile(source),
+                        owner,
+                        OcrReview.RETAKE_RECOMMENDED,
+                        onQueued = { fail() },
+                        onFailure = { failedRetake = it },
+                    )
+                    assertTrue(failedRetake.contains("quality review"))
+
+                    var failedMissing = ""
+                    f.controller.queueDocument(
+                        Uri.parse("file:///nonexistent/missing-document.bin"),
+                        owner,
+                        OcrReview.NOT_APPLICABLE,
+                        onQueued = { fail() },
+                        onFailure = { failedMissing = it },
+                    )
+                    f.session.await { failedMissing.isNotEmpty() }
+
                     f.controller.clearState()
                     assertEquals(MediaTransferState.Idle, f.controller.state)
                     assertTrue(f.controller.uploads.isEmpty())
@@ -159,4 +218,31 @@ class MediaTransferPreparationTest {
         }
     }
 
+
+    @Test
+    fun pendingVoiceMessageSerializationAndJobConversion() {
+        val voice = PendingVoiceMessage("conv-1", "alice", "wrapped-key", "meta")
+        val json = voice.toJson()
+        val parsed = PendingVoiceMessage.fromJson(json)
+        assertEquals(voice, parsed)
+
+        val job = MediaUploadJob(
+            id = "job-1",
+            ownerUid = "alice",
+            source = PreparedEncryptedMedia(
+                filePath = "/path/to/voice.olive",
+                ciphertextSize = 100L,
+                ciphertextSha256 = "abc",
+                encryptedMetadata = "enc-meta",
+                wrappedKeys = mapOf("alice" to "wrapped"),
+                allowedUsers = listOf("alice"),
+                kind = MediaKind.AUDIO,
+                ocrReview = OcrReview.NOT_RUN,
+            ),
+            objectKey = "key-1",
+            createdAt = 1000L,
+            voiceDraft = voice,
+        )
+        assertEquals(job, MediaUploadJob.fromJson(job.toJson()))
+    }
 }

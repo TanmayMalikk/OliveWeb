@@ -21,12 +21,14 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.PrivateContactNote
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.safety.SharedPrivateEntry
 import com.olive.app.ui.users.shared.navigation.ActivityCategory
 import com.olive.app.ui.users.shared.navigation.CredentialFieldError
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 
 internal data class SessionNavigationState(
     val screen: SessionScreen = SessionScreen.Loading,
@@ -39,6 +41,7 @@ internal data class SessionNavigationState(
     val idleCountdownSeconds: Int? = null,
     val privacyBlackout: Boolean = false,
     val coverReset: Int = 0,
+    val walkthroughTourStepId: String? = null,
 )
 
 internal data class SessionAccountState(
@@ -47,13 +50,14 @@ internal data class SessionAccountState(
     val profile: UserProfile? = null,
     val pendingSync: Boolean = false,
     val deliveryAddress: DeliveryAddress = DeliveryAddress(),
-    val language: String = "English",
+    val language: String = "",
     val coverDob: String = "",
     val coverFullName: String = "",
     val coverUsername: String = "",
     val coverType: CoverType = CoverType.FITNESS,
     val accountRole: AccountRole = AccountRole.USER,
     val credentialFieldError: CredentialFieldError? = null,
+    val inputErrorVersion: Int = 0,
     val creatingAccount: Boolean = false,
     val passwordRecoveryUnlockRequest: PasswordRecoveryUnlockRequest? = null,
     val passwordRecoveryEnrolled: Boolean? = null,
@@ -65,6 +69,8 @@ internal data class SessionActivityState(
     val privacyHistory: List<SettingsEvent> = emptyList<SettingsEvent>(),
     val triggerHistory: List<TriggerEvent> = emptyList<TriggerEvent>(),
     val privateEntries: List<PrivateEntry> = emptyList<PrivateEntry>(),
+    val sharedPrivateEntries: List<SharedPrivateEntry> = emptyList<SharedPrivateEntry>(),
+    val sharedEntryRecipients: Map<String, List<String>> = emptyMap<String, List<String>>(),
     val viewedSharedEntry: PrivateEntry? = null,
 )
 
@@ -100,10 +106,30 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val navigationState = navigationFlow.asStateFlow()
     private var navigationSnapshot by mutableStateOf(navigationFlow.value)
 
+    /**
+     * Updates navigation.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateNavigation(transform: (SessionNavigationState) -> SessionNavigationState) {
-        val next = transform(navigationSnapshot)
-        navigationSnapshot = next
-        navigationFlow.value = next
+        navigationSnapshot = navigationFlow.updateAndGet(transform)
+    }
+
+    /**
+     * Enters Safe Home and advances the unlock animation version atomically so Compose never observes
+     * [SessionScreen.Safe] before the reveal overlay is armed.
+     */
+    fun enterSafeWithAnimation() = updateNavigation {
+        val nextScreen = if (canEnterSafe()) SessionScreen.Safe else SessionScreen.Cover
+        it.copy(
+            page = SafePage.Home,
+            screen = nextScreen,
+            unlockAnimationVersion = if (nextScreen == SessionScreen.Safe) {
+                it.unlockAnimationVersion + 1
+            } else {
+                it.unlockAnimationVersion
+            },
+        )
     }
 
     var screen: SessionScreen
@@ -136,14 +162,21 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var coverReset: Int
         get() = navigationSnapshot.coverReset
         set(value) = updateNavigation { it.copy(coverReset = value) }
+    var walkthroughTourStepId: String?
+        get() = navigationSnapshot.walkthroughTourStepId
+        set(value) = updateNavigation { it.copy(walkthroughTourStepId = value) }
 
     private val accountFlow = MutableStateFlow(SessionAccountState())
+    val accountState = accountFlow.asStateFlow()
     private var accountSnapshot by mutableStateOf(accountFlow.value)
 
+    /**
+     * Updates account.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateAccount(transform: (SessionAccountState) -> SessionAccountState) {
-        val next = transform(accountSnapshot)
-        accountSnapshot = next
-        accountFlow.value = next
+        accountSnapshot = accountFlow.updateAndGet(transform)
     }
 
     var busy: Boolean
@@ -182,6 +215,21 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var credentialFieldError: CredentialFieldError?
         get() = accountSnapshot.credentialFieldError
         set(value) = updateAccount { it.copy(credentialFieldError = value) }
+    val inputErrorVersion: Int
+        get() = accountSnapshot.inputErrorVersion
+
+    /**
+     * Advances the input error counter so repeated invalid submissions re-trigger field feedback.
+     */
+    fun recordInputError() = updateAccount { it.copy(inputErrorVersion = it.inputErrorVersion + 1) }
+
+    /**
+     * Sets [message] and increments [inputErrorVersion] atomically when an input attempt fails.
+     *
+     * @param text User-facing error message to announce and display.
+     */
+    fun failInput(text: String) =
+        updateAccount { it.copy(message = text, inputErrorVersion = it.inputErrorVersion + 1) }
     var creatingAccount: Boolean
         get() = accountSnapshot.creatingAccount
         set(value) = updateAccount { it.copy(creatingAccount = value) }
@@ -193,12 +241,16 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         set(value) = updateAccount { it.copy(passwordRecoveryEnrolled = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
+    val activityState = activityFlow.asStateFlow()
     private var activitySnapshot by mutableStateOf(activityFlow.value)
 
+    /**
+     * Updates activity.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateActivity(transform: (SessionActivityState) -> SessionActivityState) {
-        val next = transform(activitySnapshot)
-        activitySnapshot = next
-        activityFlow.value = next
+        activitySnapshot = activityFlow.updateAndGet(transform)
     }
 
     var attempts: List<FailedAttempt>
@@ -216,6 +268,12 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var privateEntries: List<PrivateEntry>
         get() = activitySnapshot.privateEntries
         set(value) = updateActivity { it.copy(privateEntries = value) }
+    var sharedPrivateEntries: List<SharedPrivateEntry>
+        get() = activitySnapshot.sharedPrivateEntries
+        set(value) = updateActivity { it.copy(sharedPrivateEntries = value) }
+    var sharedEntryRecipients: Map<String, List<String>>
+        get() = activitySnapshot.sharedEntryRecipients
+        set(value) = updateActivity { it.copy(sharedEntryRecipients = value) }
     var viewedSharedEntry: PrivateEntry?
         get() = activitySnapshot.viewedSharedEntry
         set(value) = updateActivity { it.copy(viewedSharedEntry = value) }
@@ -224,10 +282,13 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val messagingState = messagingFlow.asStateFlow()
     private var messagingSnapshot by mutableStateOf(messagingFlow.value)
 
+    /**
+     * Updates messaging.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateMessaging(transform: (SessionMessagingState) -> SessionMessagingState) {
-        val next = transform(messagingSnapshot)
-        messagingSnapshot = next
-        messagingFlow.value = next
+        messagingSnapshot = messagingFlow.updateAndGet(transform)
     }
 
     var userSearchResults: List<DirectoryUser>
@@ -280,16 +341,25 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     val dashboardState = dashboardFlow.asStateFlow()
     private var dashboardSnapshot by mutableStateOf(dashboardFlow.value)
 
+    /**
+     * Updates dashboard.
+     *
+     * @param transform Function used to transform or provide transform.
+     */
     private fun updateDashboard(transform: (SessionDashboardState) -> SessionDashboardState) {
-        val next = transform(dashboardSnapshot)
-        dashboardSnapshot = next
-        dashboardFlow.value = next
+        dashboardSnapshot = dashboardFlow.updateAndGet(transform)
     }
 
     var adminCounts: AccountCounts
         get() = dashboardSnapshot.adminCounts
         set(value) = updateDashboard { it.copy(adminCounts = value) }
 
+    /**
+     * Sets admin summary.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param counts Counts supplied to [setAdminSummary].
+     */
     fun setAdminSummary(ownerUid: String, counts: AccountCounts) =
         updateDashboard { it.copy(adminSummaryOwner = ownerUid, adminCounts = counts) }
     var adminAccounts: List<AdminAccountSummary>
@@ -302,6 +372,11 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         get() = dashboardSnapshot.coverDataVersion
         set(value) = updateDashboard { it.copy(coverDataVersion = value) }
 
+    /**
+     * Clears messaging.
+     *
+     * @param clearRows Whether to apply clear rows.
+     */
     fun clearMessaging(clearRows: Boolean) = updateMessaging { state ->
         val closed = state.copy(
             activeConversation = null,

@@ -1,6 +1,9 @@
 // Voice calls and private contact note dialogs for safe-app messaging.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveFloatingActionButton as FloatingActionButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -30,14 +33,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import com.olive.app.ui.shared.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Formats call duration.
+ *
+ * @param totalSeconds Total seconds supplied to [formatCallDuration].
+ * @return The resulting format call duration string.
+ */
 internal fun formatCallDuration(totalSeconds: Long): String {
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
@@ -46,6 +60,14 @@ internal fun formatCallDuration(totalSeconds: Long): String {
     else "%02d:%02d".format(minutes, seconds)
 }
 
+/**
+ * Displays the incoming call dialog overlay.
+ *
+ * @param invitation Invitation supplied to [IncomingCallDialog].
+ * @param onAccept Callback invoked when accept changes or occurs.
+ * @param onDecline Callback invoked when decline changes or occurs.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ */
 @Composable
 internal fun IncomingCallDialog(
     invitation: VoipInvitation,
@@ -81,6 +103,17 @@ internal fun IncomingCallDialog(
     }
 }
 
+/**
+ * Displays the active call dialog overlay.
+ *
+ * @param state Current state instance to read or render.
+ * @param currentUid Current user ID supplied to [ActiveCallDialog].
+ * @param onMute Callback invoked when mute changes or occurs.
+ * @param onSpeaker Callback invoked when speaker changes or occurs.
+ * @param onFinish Callback invoked when finish changes or occurs.
+ * @param onMinimize Callback invoked when minimize changes or occurs.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ */
 @Composable
 internal fun ActiveCallDialog(
     state: VoipSessionState,
@@ -214,7 +247,12 @@ internal fun ActiveCallDialog(
     }
 }
 
-// Shows a small movable call button while the user works elsewhere inside Olive Branch.
+/**
+ * Shows a small movable call button while the user works elsewhere inside Olive Branch.
+ *
+ * @param state Current state instance to read or render.
+ * @param onOpen Callback invoked when open changes or occurs.
+ */
 @Composable
 internal fun DraggableCallBubble(
     state: VoipSessionState,
@@ -278,12 +316,26 @@ internal fun DraggableCallBubble(
     }
 }
 
-// Prevents a dragged call bubble from covering the system edges or leaving the app window.
+/**
+ * Prevents a dragged call bubble from covering the system edges or leaving the app window.
+ *
+ * @receiver The Compose offset to constrain or classify.
+ * @param parent Parent supplied to [coerceInside].
+ * @param child Child supplied to [coerceInside].
+ * @return The resulting [Offset] for coerce inside.
+ */
 private fun Offset.coerceInside(parent: IntSize, child: IntSize): Offset = Offset(
     x = x.coerceIn(0f, (parent.width - child.width).coerceAtLeast(0).toFloat()),
     y = y.coerceIn(0f, (parent.height - child.height).coerceAtLeast(0).toFloat()),
 )
 
+/**
+ * Displays the full screen call dialog overlay.
+ *
+ * @param onBack Callback invoked when the user navigates back.
+ * @param onQuickExit Callback invoked when quick exit changes or occurs.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 private fun FullScreenCallDialog(
     onBack: () -> Unit,
@@ -330,6 +382,14 @@ private fun FullScreenCallDialog(
     }
 }
 
+/**
+ * Composes the call identity UI element.
+ *
+ * @param name Field, key, or display name.
+ * @param status Status supplied to [CallIdentity].
+ * @param isError Whether is error.
+ * @param isGroup Whether is group.
+ */
 @Composable
 private fun CallIdentity(
     name: String,
@@ -367,6 +427,9 @@ private fun CallIdentity(
     )
 }
 
+/**
+ * Composes the audio waveform UI element.
+ */
 @Composable
 private fun AudioWaveform() {
     Row(
@@ -382,6 +445,16 @@ private fun AudioWaveform() {
     }
 }
 
+/**
+ * Composes the call action UI element.
+ *
+ * @param label Accessible label or display caption.
+ * @param icon Action or callback executed for icon.
+ * @param onClick Callback invoked when the control is activated.
+ * @param color Color supplied to [CallAction].
+ * @param selected Whether to apply selected.
+ * @param tag Tag supplied to [CallAction].
+ */
 @Composable
 private fun CallAction(
     label: String,
@@ -394,7 +467,7 @@ private fun CallAction(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
             onClick = onClick,
-            modifier = Modifier.size(72.dp).testTag(tag),
+            modifier = Modifier.size(72.dp).testTag(tag).semantics { contentDescription = label },
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (selected) Color.White else color,
@@ -403,6 +476,67 @@ private fun CallAction(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         ) { icon() }
         Spacer(Modifier.height(8.dp))
-        Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
+        Text(label, modifier = Modifier.clearAndSetSemantics { }, color = Color.White, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * Shows one voice call status card in the conversation timeline.
+ *
+ * @param call Call supplied to [CallHistoryRow].
+ * @param canJoin Whether can join.
+ * @param onJoin Callback invoked when join changes or occurs.
+ */
+@Composable
+internal fun CallHistoryRow(
+    call: VoipCall,
+    canJoin: Boolean = false,
+    onJoin: () -> Unit = {},
+) {
+    val label = stringResource(
+        when (call.status) {
+            VoipCallStatus.MISSED -> R.string.ui_missed_call
+            VoipCallStatus.DECLINED -> R.string.ui_call_declined
+            VoipCallStatus.ENDED -> R.string.ui_call_ended
+            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
+        }
+    )
+    val activeColor = MaterialTheme.colorScheme.primaryContainer
+    Surface(
+        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
+        else MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .testTag("call_history_${call.callId}")
+            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                Modifier.clickable(onClick = onJoin)
+            } else Modifier),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LocalizedIcon(Icons.Outlined.Call, null, tint = OliveGreen)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall)
+                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
+                if (timestamp > 0) Text(
+                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.ofEpochMilli(timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
+            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                FilledTonalButton(
+                    onClick = onJoin,
+                    modifier = Modifier.testTag("join_call_${call.callId}"),
+                ) {
+                    Text(stringResource(R.string.ui_join_call))
+                }
+            }
+        }
     }
 }

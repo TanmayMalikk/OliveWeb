@@ -23,7 +23,15 @@ import com.olive.app.data.media.MediaRepository
 private const val SAFETY_SYNC_TRAILING_DELAY_MS = 250L
 private const val SAFETY_SYNC_MAXIMUM_DELAY_MS = 1_000L
 
-// Coalesces live typing while guaranteeing that continuous edits still reach the cloud once per second.
+/**
+ * Coalesces live typing while guaranteeing that continuous edits still reach the cloud once per second.
+ *
+ * @param firstEditAt First edit at supplied to [safetyPlanSyncDelayMillis].
+ * @param lastEditAt Last edit at supplied to [safetyPlanSyncDelayMillis].
+ * @param now Current epoch timestamp in milliseconds.
+ * @param immediate Whether to apply immediate.
+ * @return The computed safety plan sync delay milliseconds numeric value.
+ */
 internal fun safetyPlanSyncDelayMillis(
     firstEditAt: Long,
     lastEditAt: Long,
@@ -38,7 +46,11 @@ internal fun safetyPlanSyncDelayMillis(
 // Each upload reads the durable encrypted queue. Replacing a worker is safe because mutations are idempotent.
 class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
-    // Uploads safety-plan changes that were queued while the app was offline.
+    /**
+     * Uploads safety-plan changes that were queued while the app was offline.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result {
         if (!BuildConfig.FIREBASE_CONFIGURED) return Result.success()
         val actor = inputData.getString("actor") ?: return Result.failure()
@@ -79,6 +91,14 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
         }
     }
 
+    /**
+     * Publishes attachment.
+     *
+     * @param store Store supplied to [publishAttachment].
+     * @param repository Repository supplied to [publishAttachment].
+     * @param owner Owner supplied to [publishAttachment].
+     * @param id ID supplied to [publishAttachment].
+     */
     private suspend fun publishAttachment(store: SafetyPlanStore, repository: SafetyPlanRepository, owner: String, id: String) {
         val documents = SafetyDocumentRepository(media = MediaRepository())
         val document = documents.getFor(owner, id)
@@ -116,39 +136,76 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
     companion object {
         private const val ATTACHMENT = "attachment"
 
-        fun enqueueAttachment(context: Context, owner: String, documentId: String) {
-            val request = OneTimeWorkRequestBuilder<SafetyPlanSyncWorker>()
-                .setInputData(workDataOf("actor" to owner, "owner" to owner, ATTACHMENT to documentId))
+        /**
+         * Builds and enqueues a connected-network [SafetyPlanSyncWorker] request.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param uniqueWorkName Unique WorkManager queue name.
+         * @param policy Replacement policy for queued work.
+         * @param input Input data passed to the worker.
+         * @param initialDelaySeconds Optional initial delay and exponential backoff toggle.
+         */
+        private fun enqueueWork(
+            context: Context,
+            uniqueWorkName: String,
+            policy: ExistingWorkPolicy,
+            input: Data,
+            initialDelaySeconds: Long? = null,
+        ) {
+            val builder = OneTimeWorkRequestBuilder<SafetyPlanSyncWorker>()
+                .setInputData(input)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "olive_safety_attachment_${owner}_${documentId}", ExistingWorkPolicy.KEEP, request,
+            if (initialDelaySeconds != null) {
+                builder.setInitialDelay(initialDelaySeconds, TimeUnit.SECONDS)
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            }
+            WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName, policy, builder.build())
+        }
+
+        /**
+         * Enqueues attachment.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param owner Owner supplied to [enqueueAttachment].
+         * @param documentId Unique identifier of the safety document.
+         */
+        fun enqueueAttachment(context: Context, owner: String, documentId: String) {
+            if (!BuildConfig.FIREBASE_CONFIGURED) return
+            enqueueWork(
+                context = context,
+                uniqueWorkName = "olive_safety_attachment_${owner}_${documentId}",
+                policy = ExistingWorkPolicy.KEEP,
+                input = workDataOf("actor" to owner, "owner" to owner, ATTACHMENT to documentId),
             )
         }
-        // Queues a background safety-plan sync without creating duplicate work.
+        /**
+         * Queues a background safety-plan sync without creating duplicate work.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param actor Actor supplied to [enqueue].
+         * @param owner Owner supplied to [enqueue].
+         */
         fun enqueue(context: Context, actor: String, owner: String) {
             if (!BuildConfig.FIREBASE_CONFIGURED) return
-            val request = OneTimeWorkRequestBuilder<SafetyPlanSyncWorker>().setInputData(
-                workDataOf(
-                    "actor" to actor,
-                    "owner" to owner
-                )
-            )
-                .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-                )
-                .setInitialDelay(1, TimeUnit.SECONDS)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "olive_safety_${actor}_$owner",
-                ExistingWorkPolicy.REPLACE,
-                request
+            enqueueWork(
+                context = context,
+                uniqueWorkName = "olive_safety_${actor}_$owner",
+                policy = ExistingWorkPolicy.REPLACE,
+                input = workDataOf("actor" to actor, "owner" to owner),
+                initialDelaySeconds = 1L,
             )
         }
     }
 }
 
-// Uploads queued encrypted safety-plan edits and clears only changes confirmed by the server.
+/**
+ * Uploads queued encrypted safety-plan edits and clears only changes confirmed by the server.
+ *
+ * @param store Store supplied to [syncSafetyPlan].
+ * @param repository Repository supplied to [syncSafetyPlan].
+ * @param actor Actor supplied to [syncSafetyPlan].
+ * @param owner Owner supplied to [syncSafetyPlan].
+ */
 internal suspend fun syncSafetyPlan(
     store: SafetyPlanStore,
     repository: SafetyPlanRepository,
@@ -185,10 +242,24 @@ internal data class SafetyPlanContact(val id: String, val name: String, val deta
 private const val SAFETY_CONTACT_PREFIX = "trusted-contact:"
 private const val SAFETY_ATTACHMENT_PREFIX = "safety-plan:"
 
-/** Identifies the exact safety-plan checklist row that created an uploaded document. */
+/**
+ * Identifies the exact safety-plan checklist row that created an uploaded document.
+ *
+ * @param fieldKey Field key supplied to [safetyChecklistAttachmentTag].
+ * @param itemId Item ID supplied to [safetyChecklistAttachmentTag].
+ * @return The resulting safety checklist attachment tag string.
+ */
 internal fun safetyChecklistAttachmentTag(fieldKey: String, itemId: String): String =
     "$SAFETY_ATTACHMENT_PREFIX$fieldKey:$itemId".take(80)
 
+/**
+ * Computes safety checklist with published documents.
+ *
+ * @param fieldKey Field key supplied to [safetyChecklistWithPublishedDocuments].
+ * @param value Input value to store, parse, or format.
+ * @param documents Collection of documents values to process.
+ * @return The resulting safety checklist with published documents string.
+ */
 internal fun safetyChecklistWithPublishedDocuments(fieldKey: String, value: String, documents: List<SafetyDocument>): String {
     if (!fieldKey.endsWith("_documents")) return value
     val items = readSafetyChecklist(value)
@@ -200,6 +271,14 @@ internal fun safetyChecklistWithPublishedDocuments(fieldKey: String, value: Stri
     return if (updated == items) value else writeSafetyChecklist(updated)
 }
 
+/**
+ * Computes safety checklist attachments.
+ *
+ * @param fieldKey Field key supplied to [safetyChecklistAttachments].
+ * @param item Item supplied to [safetyChecklistAttachments].
+ * @param documents Collection of documents values to process.
+ * @return List of resulting safety checklist attachments items.
+ */
 internal fun safetyChecklistAttachments(
     fieldKey: String,
     item: SafetyChecklistItem,
@@ -211,13 +290,23 @@ internal fun safetyChecklistAttachments(
     }
 }
 
-// Creates one trusted-contact checklist item for a new safety plan.
+/**
+ * Creates one trusted-contact checklist item for a new safety plan.
+ *
+ * @param contact Trusted or emergency contact record.
+ * @return The resulting safety plan contact item.
+ */
 internal fun safetyPlanContactItem(contact: SafeContact) = SafetyChecklistItem(
     SAFETY_CONTACT_PREFIX + contact.id,
     JSONObject().put("name", contact.name).put("details", contact.details).toString()
 )
 
-// Parses one contact row stored inside the safety-plan checklist format.
+/**
+ * Parses one contact row stored inside the safety-plan checklist format.
+ *
+ * @param item Item supplied to [readSafetyPlanContact].
+ * @return The resulting [SafetyPlanContact], or `null` if unavailable.
+ */
 internal fun readSafetyPlanContact(item: SafetyChecklistItem): SafetyPlanContact? {
     if (!item.id.startsWith(SAFETY_CONTACT_PREFIX)) return null
     return runCatching {
@@ -230,7 +319,13 @@ internal fun readSafetyPlanContact(item: SafetyChecklistItem): SafetyPlanContact
     }.getOrNull()
 }
 
-// Checklist rows remain inside each existing section's revision, so offline/staff conflict handling stays compatible.
+/**
+ * Checklist rows remain inside each existing section's revision, so offline/staff conflict handling stays compatible.
+ *
+ * @param raw Raw supplied to [readSafetyChecklist].
+ * @param legacyExtras Collection of legacy extras values to process.
+ * @return List of resulting read safety checklist items.
+ */
 internal fun readSafetyChecklist(
     raw: String,
     legacyExtras: List<String> = emptyList()
@@ -270,7 +365,12 @@ internal fun readSafetyChecklist(
     }
 }
 
-// Encodes a safety checklist so it can be stored in one plan field.
+/**
+ * Encodes a safety checklist so it can be stored in one plan field.
+ *
+ * @param items Collection of items values to process.
+ * @return The resulting write safety checklist string.
+ */
 internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
     JSONObject().put("oliveSafetyChecklist", 1)
         .put("items", JSONArray().also { rows ->
@@ -290,7 +390,12 @@ internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
             }
         }).toString()
 
-// Creates the short checklist summary shown before opening a safety-plan section.
+/**
+ * Creates the short checklist summary shown before opening a safety-plan section.
+ *
+ * @param raw Raw supplied to [safetyChecklistPreview].
+ * @return The resulting safety checklist preview.
+ */
 internal fun safetyChecklistPreview(raw: String) = readSafetyChecklist(raw).joinToString("\n") {
     readSafetyPlanContact(it)?.let { contact -> "• ${contact.name}: ${contact.details}" }
         ?: ((if (it.checked) "☑ " else "☐ ") + it.text)
@@ -301,11 +406,25 @@ internal fun safetyChecklistPreview(raw: String) = readSafetyChecklist(raw).join
 // Separate encrypted vaults isolate local university accounts from Firebase accounts and each signed-in actor's cache.
 internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     private val vault = EncryptedVault(context, if (localMode) "safety-demo" else "safety-firebase")
-    // Reads one account's safety plan from encrypted local storage.
+    /**
+     * Reads one account's safety plan from encrypted local storage.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return The resulting read.
+     */
     fun read(actorUid: String, ownerUid: String) =
         vault.read().optJSONObject(actorUid)?.optJSONObject(ownerUid)?.let(SafetyPlan.Companion::fromJson)
 
-    // Creates a blank safety plan only when this account does not have one yet.
+    /**
+     * Creates a blank safety plan only when this account does not have one yet.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param ownerName Owner name supplied to [ensure].
+     * @param defaults Key-value mapping of defaults entries.
+     * @return The resulting [SafetyPlan] instance.
+     */
     fun ensure(
         actorUid: String,
         ownerUid: String,
@@ -328,7 +447,14 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(read(actorUid, ownerUid))
     }
 
-    // Replaces one saved safety plan while holding the encrypted-store lock.
+    /**
+     * Replaces one saved safety plan while holding the encrypted-store lock.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param change Function used to transform or provide change.
+     * @return The resulting [SafetyPlan] instance.
+     */
     fun update(actorUid: String, ownerUid: String, change: (SafetyPlan) -> SafetyPlan): SafetyPlan {
         var updated: SafetyPlan? = null
         vault.update { root ->
@@ -341,7 +467,13 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(updated)
     }
 
-    // Reconciles a server snapshot with the latest draft under the same encrypted-store lock.
+    /**
+     * Reconciles a server snapshot with the latest draft under the same encrypted-store lock.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param remote Remote supplied to [mergeRemote].
+     * @return The resulting [SafetyPlan] for merge remote.
+     */
     fun mergeRemote(actorUid: String, remote: SafetyPlan): SafetyPlan {
         var merged = remote
         vault.update { root ->
@@ -356,25 +488,45 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return merged
     }
 
-    // Replaces one safety plan in encrypted local storage.
+    /**
+     * Replaces one safety plan in encrypted local storage.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param value Input value to store, parse, or format.
+     */
     fun write(actorUid: String, ownerUid: String, value: SafetyPlan) {
         require(value.ownerUid == ownerUid)
         vault.update { root -> root.child(actorUid).put(ownerUid, value.toJson()) }
     }
 
-    // Loads every saved safety-plan section for the signed-in account.
+    /**
+     * Loads every saved safety-plan section for the signed-in account.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @return List of resulting all items.
+     */
     fun all(actorUid: String): List<SafetyPlan> {
         val actor = vault.read().optJSONObject(actorUid) ?: return emptyList()
         return actor.keys().asSequence()
             .mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan.Companion::fromJson) }.toList()
     }
 
-    // Removes one locally cached safety plan for this signed-in actor.
+    /**
+     * Removes one locally cached safety plan for this signed-in actor.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     fun remove(actorUid: String, ownerUid: String) {
         vault.update { it.optJSONObject(actorUid)?.remove(ownerUid) }
     }
 
-    // Removes every cached plan belonging to one signed-in actor.
+    /**
+     * Removes every cached plan belonging to one signed-in actor.
+     *
+     * @param actorUid Firebase UID of the account performing the action.
+     */
     fun purge(actorUid: String) {
         vault.update { it.remove(actorUid) }
     }
@@ -386,6 +538,12 @@ internal data class SafetyChecklistMerge(
     val conflicted: Boolean,
 )
 
+/**
+ * Computes checklist rows.
+ *
+ * @param value Input value to store, parse, or format, or null when not provided.
+ * @return Map containing the resulting checklist rows entries.
+ */
 private fun checklistRows(value: String?): Map<String, Map<String, Any?>>? = runCatching {
     val document = JSONObject(requireNotNull(value))
     require(document.optInt("oliveSafetyChecklist") == 1)
@@ -407,7 +565,14 @@ private fun checklistRows(value: String?): Map<String, Map<String, Any?>>? = run
     result
 }.getOrNull()
 
-// Merge individual checklist properties against the text visible when editing began.
+/**
+ * Merge individual checklist properties against the text visible when editing began.
+ *
+ * @param baseValue Optional base value supplied to [mergeSafetyChecklist].
+ * @param localValue Local value supplied to [mergeSafetyChecklist].
+ * @param remoteValue Remote value supplied to [mergeSafetyChecklist].
+ * @return The resulting [SafetyChecklistMerge], or `null` if unavailable.
+ */
 internal fun mergeSafetyChecklist(baseValue: String?, localValue: String, remoteValue: String): SafetyChecklistMerge? {
     val base = checklistRows(baseValue) ?: return null
     val local = checklistRows(localValue) ?: return null
@@ -438,15 +603,20 @@ internal fun mergeSafetyChecklist(baseValue: String?, localValue: String, remote
                     when {
                         a[key] == before?.get(key) -> { localProperty = b[key]; remoteProperty = b[key] }
                         b[key] == before?.get(key) || a[key] == b[key] -> { localProperty = a[key]; remoteProperty = a[key] }
-                        key in setOf("attachmentIds", "excludedAttachmentIds") &&
-                            a[key] is List<*> && b[key] is List<*> &&
-                            (before?.get(key) == null || before[key] is List<*>) -> {
-                            val first = a[key] as List<*>
-                            val second = b[key] as List<*>
-                            val original = (before?.get(key) as? List<*>).orEmpty()
-                            val removed = original.filter { it !in first || it !in second }.toSet()
-                            localProperty = (second + first).distinct().filter { it !in removed }
-                            remoteProperty = localProperty
+                        key in setOf("attachmentIds", "excludedAttachmentIds") -> {
+                            val first = a[key] as? List<*>
+                            val second = b[key] as? List<*>
+                            val beforeList = before?.get(key)
+                            if (first != null && second != null && (beforeList == null || beforeList is List<*>)) {
+                                val original = beforeList.orEmpty()
+                                val removed = original.filter { it !in first || it !in second }.toSet()
+                                localProperty = (second + first).distinct().filter { it !in removed }
+                                remoteProperty = localProperty
+                            } else {
+                                conflicted = true
+                                localProperty = a[key]
+                                remoteProperty = b[key]
+                            }
                         }
                         else -> {
                             conflicted = true
@@ -464,6 +634,12 @@ internal fun mergeSafetyChecklist(baseValue: String?, localValue: String, remote
         localRow?.let(mine::add)
         remoteRow?.let(incoming::add)
     }
+    /**
+     * Encodes the target.
+     *
+     * @param rows Collection of rows values to process.
+     * @return The resulting encode.
+     */
     fun encode(rows: List<Map<String, Any?>>) = JSONObject().put("oliveSafetyChecklist", 1)
         .put("items", JSONArray(rows.map { JSONObject(it) })).toString()
     val result = SafetyChecklistMerge(encode(mine), encode(incoming), conflicted)

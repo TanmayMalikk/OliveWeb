@@ -21,6 +21,7 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.Size
+import org.opencv.geometry.Geometry
 import org.opencv.imgproc.Imgproc
 import kotlin.math.hypot
 import kotlin.math.max
@@ -29,13 +30,20 @@ import kotlin.math.max
 object QuadTextCrop {
     private const val VERTICAL_CROP_RATIO = 1.5
 
+    /**
+     * Crops the quad text crop.
+     *
+     * @param src Src supplied to [crop].
+     * @param box Box supplied to [crop].
+     * @return The resulting [Mat] instance.
+     */
     fun crop(src: Mat, box: OCRBox): Mat {
         // Align with PaddleX CropByPolys.get_minarea_rect_crop: recompute minAreaRect
         // from the detected quad before perspective transform.
         val rectPoints = box.points.map { Point(it.x.toDouble(), it.y.toDouble()) }
         val rectInput = MatOfPoint2f()
         rectInput.fromList(rectPoints)
-        val boundingBox = Imgproc.minAreaRect(rectInput)
+        val boundingBox = Geometry.minAreaRect(rectInput)
         rectInput.release()
 
         val boxPoints = Array(4) { Point() }
@@ -61,7 +69,7 @@ object QuadTextCrop {
                 Point(0.0, dstH.toDouble()),
             )
         )
-        val m = Imgproc.getPerspectiveTransform(srcPts, dstPts)
+        val m = Geometry.getPerspectiveTransform(srcPts, dstPts)
         srcPts.release()
         dstPts.release()
 

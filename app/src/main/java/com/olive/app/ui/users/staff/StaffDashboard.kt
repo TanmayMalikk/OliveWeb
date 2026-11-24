@@ -1,6 +1,11 @@
 // Staff: shows assigned users and support tickets.
 package com.olive.app.ui.users.staff
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.organization.OrganizationSettings
@@ -8,7 +13,6 @@ import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.shared.organization.OrganizationMap
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +24,9 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -40,39 +47,53 @@ import com.olive.app.data.safety.SafetyConsultation
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
-// Shows the staff workspace with assigned users, tickets, map, and settings.
+/**
+ * Shows the staff workspace with assigned users, tickets, map, and settings.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun StaffPortal(session: SessionViewModel) {
     LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
     var page by remember { mutableStateOf(StaffPage.Dashboard) }
-    BackHandler(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
-    // Opens the selected staff dashboard section.
-    when (page) {
-        StaffPage.Dashboard -> StaffDashboard(
-            session,
-            onSettings = { page = StaffPage.Settings },
-            onSafetyPlans = { page = StaffPage.SafetyPlans },
-            onMessages = { page = StaffPage.Messages },
-            onMap = { page = StaffPage.Map },
-        )
-        StaffPage.Settings -> OrganizationSettings(
-            session,
-            onBack = { page = StaffPage.Dashboard },
-        )
-        StaffPage.SafetyPlans -> SafetyConsultations(
-            session,
-            onBack = { page = StaffPage.Dashboard },
-        )
-        StaffPage.Messages -> {
-            LaunchedEffect(Unit) { session.messages.ensureMessagingObservation() }
-            MessagesScreen(session, exit = { page = StaffPage.Dashboard })
+    val back = rememberOliveBack(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
+    OliveRouteEntrance(page, back) {
+        // Opens the selected staff dashboard section.
+        when (page) {
+            StaffPage.Dashboard -> StaffDashboard(
+                session,
+                onSettings = { page = StaffPage.Settings },
+                onSafetyPlans = { page = StaffPage.SafetyPlans },
+                onMessages = { page = StaffPage.Messages },
+                onMap = { page = StaffPage.Map },
+            )
+            StaffPage.Settings -> OrganizationSettings(
+                session,
+                onBack = { page = StaffPage.Dashboard },
+            )
+            StaffPage.SafetyPlans -> SafetyConsultations(
+                session,
+                onBack = { page = StaffPage.Dashboard },
+            )
+            StaffPage.Messages -> {
+                LaunchedEffect(Unit) { session.messages.ensureMessagingObservation() }
+                MessagesScreen(session, exit = { page = StaffPage.Dashboard })
+            }
+            StaffPage.Map -> OrganizationMap(session, onBack = { page = StaffPage.Dashboard })
         }
-        StaffPage.Map -> OrganizationMap(session, onBack = { page = StaffPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// Draws the staff workspace navigation and selected section.
+/**
+ * Draws the staff workspace navigation and selected section.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onSettings Callback invoked when settings changes or occurs.
+ * @param onSafetyPlans Callback invoked when safety plans changes or occurs.
+ * @param onMessages Callback invoked when messages changes or occurs.
+ * @param onMap Callback invoked when map changes or occurs.
+ */
 @Composable
 private fun StaffDashboard(
     session: SessionViewModel,
@@ -138,8 +159,12 @@ private fun StaffDashboard(
     }
 }
 
-// Staff: shows safety-plan consultation requests to staff.
-// Lists the plan-consult tickets assigned to this staff member.
+/**
+ * Staff: shows safety-plan consultation requests to staff. Lists the plan-consult tickets assigned to this staff member.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param onBack Callback invoked when the user navigates back.
+ */
 @Composable
 internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) {
     var selected by remember { mutableStateOf<SafetyConsultation?>(null) }
@@ -147,22 +172,26 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     var assignedExpanded by rememberSaveable { mutableStateOf(true) }
     var waitingExpanded by rememberSaveable { mutableStateOf(true) }
     val controller = session.safetyPlans
-    DisposableEffect(Unit) { onDispose { controller.close() } }
-    BackHandler { if (selected != null) selected = null else onBack() }
+    DisposableEffect(session.coverAccountId) {
+        onDispose { controller.close(preserveAdminIndex = session.accountRole == AccountRole.ADMIN) }
+    }
+    val back = rememberOliveBack(enabled = selected != null) { selected = null }
     val plan = selected
     if (plan != null) {
         val ticketLabel = if (plan.ticketNumber >= 0L) "Consult Ticket #${plan.ticketNumber}" else "Consult Ticket"
-        SafetyPlanScreen(
-            session = session,
-            ownerUid = plan.ownerUid,
-            ownerName = plan.ownerName,
-            displayOwnerName = ticketLabel,
-            onCompleteConsultation = if (
-                session.accountRole == AccountRole.STAFF &&
-                plan.conversationId.isNotBlank()
-            ) ({ completionTarget = plan }) else null,
-            onBack = { selected = null },
-        )
+        OliveRouteEntrance(plan.ownerUid, back) {
+            SafetyPlanScreen(
+                session = session,
+                ownerUid = plan.ownerUid,
+                ownerName = plan.ownerName,
+                displayOwnerName = ticketLabel,
+                onCompleteConsultation = if (
+                    session.accountRole == AccountRole.STAFF &&
+                    plan.conversationId.isNotBlank()
+                ) ({ completionTarget = plan }) else null,
+                onBack = { selected = null },
+            )
+        }
         completionTarget?.let { target ->
             AlertDialog(
                 onDismissRequest = { completionTarget = null },
@@ -192,7 +221,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     // Load once on entry; account invalidations refresh the encrypted consultation index afterward.
     LaunchedEffect(Unit) {
         controller.observeAccess()
-        controller.refreshConsultations()
+        controller.refreshConsultations(force = false)
     }
     FormColumn {
         TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
@@ -207,13 +236,20 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         }
         if (session.accountRole == AccountRole.STAFF) {
             val availabilityLabel = stringResource(R.string.safety_available)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(availabilityLabel, Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().testTag("safety_staff_available")
+                .toggleable(
+                    value = controller.available,
+                    enabled = !controller.savingAvailability,
+                    role = Role.Switch,
+                    onValueChange = controller::changeAvailability,
+                )
+                .semantics(mergeDescendants = true) { contentDescription = availabilityLabel },
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(availabilityLabel, Modifier.weight(1f).clearAndSetSemantics { })
                 Switch(
                     checked = controller.available,
-                    onCheckedChange = controller::changeAvailability,
-                    modifier = Modifier.testTag("safety_staff_available")
-                        .semantics { contentDescription = availabilityLabel },
+                    onCheckedChange = null,
+                    modifier = Modifier.clearAndSetSemantics { },
                 )
             }
         }
@@ -245,7 +281,16 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     }
 }
 
-// Staff and admins use the same collapsible consultation list so shared plan work looks consistent.
+/**
+ * Staff and admins use the same collapsible consultation list so shared plan work looks consistent.
+ *
+ * @param title Primary display title text.
+ * @param consultations Collection of consultations values to process.
+ * @param expanded Whether the expandable section is currently open.
+ * @param onExpandedChange Callback invoked when expanded change changes or occurs.
+ * @param showStaffName Whether to show staff name.
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 private fun ConsultationGroup(
     title: String,

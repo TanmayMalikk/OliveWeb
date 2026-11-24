@@ -2,24 +2,55 @@
   "Whitehorse": {
     "Hotlines": {
       "Yukon Women's Transition Home Crisis Line": {
-        "Desc": "Confidential 24/7 crisis line and safe emergency shelter for women and children fleeing domestic violence in Yukon.",
+        "Desc": "Confidential 24/7 crisis line and safe emergency shelter intake for women and children fleeing domestic violence in Yukon.",
         "Phone": "867-668-5733",
         "hours": "24/7",
         "url": "https://www.womenstransitionhome.ca/"
       },
-      "Yukon Distress and Crisis Line": {
-        "Desc": "24/7 crisis support line for individuals in distress across Yukon territory.",
+      "Yukon Reach Out Support Line": {
+        "Desc": "24/7 confidential mental health and crisis support line across Yukon territory.",
         "Phone": "1-844-533-3030",
-        "hours": "6 am to 12 am (Midnight) Daily",
+        "hours": "24/7",
         "url": "https://yukon.cmha.ca/"
       }
     },
     "Shelters": {
-      "Yukon Women's Transition Home": {
-        "Desc": "Emergency transition home offering safe shelter, basic needs, and crisis intervention.",
+      "Yukon Women's Transition Home (Kaushee's Place)": {
+        "Desc": "24/7 emergency transition home offering safe shelter, basic needs, and crisis intervention.",
         "Phone": "867-668-5733",
         "hours": "24/7",
         "url": "https://ywth.ca/"
+      }
+    },
+    "LegalAid": {
+      "Yukon Legal Services Society": {
+        "Desc": "Free family and criminal legal aid applications and Community Law Clinic in Whitehorse.",
+        "Phone": "867-667-5210",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM YST",
+        "address": "Suite 101, 2131 Second Ave, Whitehorse, YT Y1A 1C3",
+        "lat": 60.7219,
+        "lng": -135.0568,
+        "url": "https://yukonlegalaid.ca/"
+      }
+    },
+    "Counseling": {
+      "CMHA Yukon Mental Health & Counselling Hub": {
+        "Desc": "Mental health navigation, peer support, and counselling access in Whitehorse.",
+        "Phone": "867-668-6429",
+        "hours": "Monday to Friday, 9:00 AM - 4:30 PM YST (Support line 24/7)",
+        "address": "415 Baxter St, Whitehorse, YT Y1A 2T6",
+        "lat": 60.7204,
+        "lng": -135.0609,
+        "url": "https://yukon.cmha.ca/"
+      }
+    },
+    "CrisisServices": {
+      "9-8-8 Suicide Crisis Helpline (Yukon)": {
+        "Desc": "Confidential 24/7 call and text crisis intervention and suicide prevention across Yukon.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   }

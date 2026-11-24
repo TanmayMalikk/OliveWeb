@@ -58,7 +58,11 @@ import androidx.wear.compose.material3.Text
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-// Shows today's heart-rate range and explains when the watch has no usable reading.
+/**
+ * Shows today's heart-rate range and explains when the watch has no usable reading.
+ *
+ * @param state Current state instance to read or render.
+ */
 @Composable
 internal fun WatchVitalsSummary(state: WatchFitnessState) {
     val summary = state.heartRateSummary
@@ -94,7 +98,13 @@ internal fun WatchVitalsSummary(state: WatchFitnessState) {
     }
 }
 
-// Draws today's steps inside one readable circular progress indicator.
+/**
+ * Draws today's steps inside one readable circular progress indicator.
+ *
+ * @param state Current state instance to read or render.
+ * @param stepProgress Step progress supplied to [CircularStepSummary].
+ * @param totalCaloriesBurned Total calories burned supplied to [CircularStepSummary].
+ */
 @Composable
 internal fun CircularStepSummary(
     state: WatchFitnessState,
@@ -145,7 +155,12 @@ internal fun CircularStepSummary(
     }
 }
 
-// Lets watch users switch between Home, Move, Vitals, and Food summaries.
+/**
+ * Lets watch users switch between Home, Move, Vitals, and Food summaries.
+ *
+ * @param selectedPage Selected page supplied to [WatchTabs].
+ * @param onSelected Callback invoked when selected changes or occurs.
+ */
 @Composable
 internal fun WatchTabs(selectedPage: WatchPage, onSelected: (WatchPage) -> Unit) {
     val scroll = rememberScrollState()
@@ -189,7 +204,12 @@ internal fun WatchTabs(selectedPage: WatchPage, onSelected: (WatchPage) -> Unit)
     }
 }
 
-// Lets the crown scroll long pages while preventing sideways movement.
+/**
+ * Lets the crown scroll long pages while preventing sideways movement.
+ *
+ * @param pageTitle Page title supplied to [ScrollableWatchPage].
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun ScrollableWatchPage(pageTitle: String, content: @Composable ColumnScope.() -> Unit) {
     val scrollState = rememberScrollState()
@@ -216,7 +236,12 @@ internal fun ScrollableWatchPage(pageTitle: String, content: @Composable ColumnS
     )
 }
 
-// Places related watch values inside one card so they are easy to scan.
+/**
+ * Places related watch values inside one card so they are easy to scan.
+ *
+ * @param title Primary display title text, or null when not provided.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun WatchSummaryCard(
     title: String?,
@@ -242,7 +267,13 @@ internal fun WatchSummaryCard(
     }
 }
 
-// Shows one nutrition goal and how close the user is to reaching it.
+/**
+ * Shows one nutrition goal and how close the user is to reaching it.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param goal Goal supplied to [MacroProgressRow].
+ */
 @Composable
 internal fun MacroProgressRow(label: String, value: Float, goal: Int) {
     val progress = (value / goal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
@@ -262,7 +293,12 @@ internal fun MacroProgressRow(label: String, value: Float, goal: Int) {
     }
 }
 
-// Displays one small value and label without crowding the round screen.
+/**
+ * Displays one small value and label without crowding the round screen.
+ *
+ * @param value Input value to store, parse, or format.
+ * @param label Accessible label or display caption.
+ */
 @Composable
 internal fun TinyMetric(value: String, label: String) {
     Column(

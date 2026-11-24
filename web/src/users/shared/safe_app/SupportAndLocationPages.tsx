@@ -1,4 +1,5 @@
 // Safe-app users: provides staff requests, support directories, and browser location.
+import { FadedMap } from "../FadedMap";
 import { useEffect, useState } from "react";
 import {
   FileLock2,
@@ -178,9 +179,6 @@ export function LocationPage() {
     );
   };
   useEffect(locate, []);
-  const map = position
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${position.longitude - 0.01}%2C${position.latitude - 0.007}%2C${position.longitude + 0.01}%2C${position.latitude + 0.007}&layer=mapnik&marker=${position.latitude}%2C${position.longitude}`
-    : "";
   return (
     <section className="safe-feature-page">
       <div className="panel">
@@ -200,7 +198,7 @@ export function LocationPage() {
       </div>
       {position ? (
         <div className="panel safe-map">
-          <iframe title="Current location map" src={map} loading="lazy" />
+          <FadedMap className="current-location-map" label="Current location map" current={position} />
           <p>
             <MapPin size={16} /> Accuracy about {Math.round(position.accuracy)}{" "}
             m · {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
@@ -297,7 +295,7 @@ export function DocumentsPage() {
             account on phone or web.
           </p>
         </div>
-        <div className="toolbar-actions">
+        <div className="toolbar-actions" data-walkthrough-id="documents-upload">
           <Button
             variant="outline"
             onClick={() => void refresh()}

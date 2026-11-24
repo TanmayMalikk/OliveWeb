@@ -24,6 +24,7 @@ import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.Scalar
+import org.opencv.geometry.Geometry
 import org.opencv.imgproc.Imgproc
 
 // Groups the data and actions for dbpost processor.
@@ -31,6 +32,22 @@ object DBPostProcessor {
     private const val MIN_SIZE_BEFORE_UNCLIP = 3f
     private const val MIN_SIZE_AFTER_UNCLIP = 5f
 
+    /**
+     * Processes the DB post processor.
+     *
+     * @param pred Numeric array of pred values.
+     * @param predShape Numeric array of pred shape values.
+     * @param thresh Thresh supplied to [process].
+     * @param boxThresh Box thresh supplied to [process].
+     * @param unclipRatio Unclip ratio supplied to [process].
+     * @param maxCandidates Maximum candidates supplied to [process].
+     * @param useDilation Whether to use dilation.
+     * @param scoreMode Score mode supplied to [process].
+     * @param boxType Box type supplied to [process].
+     * @param originalH Original h supplied to [process].
+     * @param originalW Original w supplied to [process].
+     * @return List of resulting process items.
+     */
     fun process(
         pred: FloatArray,
         predShape: LongArray,
@@ -86,7 +103,7 @@ object DBPostProcessor {
                 val contour = contours[index]
                 val contour2f = MatOfPoint2f(*contour.toArray())
                 val rect = try {
-                    Imgproc.minAreaRect(contour2f)
+                    Geometry.minAreaRect(contour2f)
                 } finally {
                     contour2f.release()
                 }
@@ -107,7 +124,7 @@ object DBPostProcessor {
                 val expandedRect = MatOfPoint2f().let { expanded2f ->
                     try {
                         expanded2f.fromList(expandedPts)
-                        Imgproc.minAreaRect(expanded2f)
+                        Geometry.minAreaRect(expanded2f)
                     } finally {
                         expanded2f.release()
                     }
@@ -149,6 +166,16 @@ object DBPostProcessor {
         }
     }
 
+    /**
+     * Scales point.
+     *
+     * @param point Point supplied to [scalePoint].
+     * @param scaleX Scale x supplied to [scalePoint].
+     * @param scaleY Scale y supplied to [scalePoint].
+     * @param originalW Original w supplied to [scalePoint].
+     * @param originalH Original h supplied to [scalePoint].
+     * @return The resulting [PointF] for scale point.
+     */
     private fun scalePoint(
         point: Point,
         scaleX: Double,
@@ -162,6 +189,13 @@ object DBPostProcessor {
         )
     }
 
+    /**
+     * Computes box score.
+     *
+     * @param probMap Prob map supplied to [computeBoxScore].
+     * @param points Collection of points values to process.
+     * @return The computed compute box score numeric value.
+     */
     private fun computeBoxScore(probMap: Mat, points: List<Point>): Float {
         if (points.isEmpty()) return 0f
 

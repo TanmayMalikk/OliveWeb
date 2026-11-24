@@ -3,12 +3,15 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -20,6 +23,11 @@ import com.olive.app.data.messaging.MessageSendWorker
 import com.olive.app.data.messaging.OutgoingAttachment
 import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.data.network.optionalString
+import com.olive.app.data.network.requireLong
+import com.olive.app.data.network.requireString
+import com.olive.app.data.network.requireStringList
+import com.olive.app.data.network.stringMap
 import com.olive.app.data.safety.SafetyPlanSyncWorker
 import java.io.File
 import java.io.IOException
@@ -40,7 +48,6 @@ import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
 import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.KeyManager
-import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
@@ -71,7 +78,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     private val repository:MediaTicketDataSource=MediaRepository()
     private val client=mediaUploadHttpClient()
 
-    // Uploads one encrypted file in the background and saves its cloud record.
+    /**
+     * Uploads one encrypted file in the background and saves its cloud record.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork():Result {
         // WorkManager input contains only the durable job id; sensitive state is loaded from the vault.
         val jobId=inputData.getString(JOB_ID) ?: return Result.failure()
@@ -153,7 +164,13 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
-    // Media: Uploads the selected file.
+    /**
+     * Media: Uploads the selected file.
+     *
+     * @param file Local file to read, hash, process, or write.
+     * @param initial Initial supplied to [upload].
+     * @return List of resulting upload items.
+     */
     private suspend fun upload(file:File,initial:MediaUploadJob):List<MediaCompletedPart> {
         // The server chooses the strategy: a single PUT uses the whole file as part one; multipart
         // uses the server-returned part size so client and R2 boundaries cannot diverge.
@@ -177,7 +194,16 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return job.completedParts.entries.sortedBy { it.key }.map { MediaCompletedPart(it.key,it.value) }
     }
 
-    // Uploads one encrypted file section and reports its byte progress.
+    /**
+     * Uploads one encrypted file section and reports its byte progress.
+     *
+     * @param ticket Ticket supplied to [put].
+     * @param file Local file to read, hash, process, or write.
+     * @param offset Offset supplied to [put].
+     * @param length Length supplied to [put].
+     * @param onProgress Callback invoked when progress changes or occurs.
+     * @return The resulting put string.
+     */
     private suspend fun put(ticket:MediaUploadTicket,file:File,offset:Long,length:Long,onProgress:(Long)->Unit):String {
         // FileSliceRequestBody prevents loading a large encrypted object or part into memory.
         val body=FileSliceRequestBody(file,offset,length,onProgress)
@@ -190,13 +216,25 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
-    // Separates upload errors that can be retried from errors that need user action.
+    /**
+     * Separates upload errors that can be retried from errors that need user action.
+     *
+     * @param job Job supplied to [permanent].
+     * @param message Chat message or remote payload.
+     * @return The resulting [Result] instance.
+     */
     private fun permanent(job:MediaUploadJob,message:String):Result {
         // A permanent result requires explicit user/app intervention rather than automatic backoff.
         store.update(job.id) { it.copy(status=MediaTransferStatus.FAILED,error=message.take(240)) }
         return Result.failure(workDataOf(ERROR to message.take(240)))
     }
-    // Saves the upload error and asks WorkManager to retry after a delay.
+    /**
+     * Saves the upload error and asks WorkManager to retry after a delay.
+     *
+     * @param job Job supplied to [retry].
+     * @param error Throwable or error message describing a failure.
+     * @return The resulting [Result] instance.
+     */
     private fun retry(job:MediaUploadJob,error:Exception):Result {
         // WorkManager keeps the same unique work chain and applies the configured exponential delay.
         val message=when(error) {
@@ -207,13 +245,47 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return Result.retry()
     }
 
+    /**
+     * Provides the foreground notification used when WorkManager promotes an encrypted upload.
+     *
+     * @return The WorkManager foreground notification and service metadata for the upload.
+     */
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val channelId = "olive_upload_channel"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val manager = applicationContext.getSystemService(android.app.NotificationManager::class.java)
+            if (manager?.getNotificationChannel(channelId) == null) {
+                val channel = android.app.NotificationChannel(
+                    channelId,
+                    "Media Upload",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    setShowBadge(false)
+                }
+                manager?.createNotificationChannel(channel)
+            }
+        }
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setContentTitle("Uploading encrypted file")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        return ForegroundInfo(7001, notification)
+    }
+
     companion object {
         private const val JOB_ID = "jobId"
         const val MEDIA_ID = "mediaId"
         const val ERROR = "error"
         const val BYTES_SENT = "bytesSent"
         const val TOTAL_BYTES = "totalBytes"
-        /** Stable unique-work name shared with the controller's observer. */
+        /**
+         * Stable unique-work name shared with the controller's observer.
+         *
+         * @param jobId Unique identifier of the durable background job.
+         * @return The resulting work name string.
+         */
         fun workName(jobId: String): String {
             return "olive_media_$jobId"
         }
@@ -221,13 +293,18 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         /**
          * Schedules one network-constrained worker per job. KEEP prevents repeated UI taps from
          * creating concurrent writers for the same multipart session.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param jobId Unique identifier of the durable background job.
+         * @param replaceDelayedWork Whether to apply replace delayed work.
          */
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    10L,
                     TimeUnit.SECONDS,
                 ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
@@ -240,6 +317,8 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
  * Large ciphertext PUTs need a longer write window than OkHttp's short interactive-request
  * default. The total call remains below the server's ten-minute signed-ticket lifetime so a stalled
  * request fails before its capability expires and WorkManager can obtain a fresh ticket.
+ *
+ * @return The resulting [OkHttpClient] for media upload HTTP client.
  */
 internal fun mediaUploadHttpClient():OkHttpClient=OkHttpClient.Builder()
     .retryOnConnectionFailure(true)
@@ -254,11 +333,23 @@ private class FileSliceRequestBody(
     private val file:File,private val offset:Long,private val length:Long,
     private val onProgress:(Long)->Unit,
 ):RequestBody() {
-    // Reads the encrypted upload response content type.
+    /**
+     * Reads the encrypted upload response content type.
+     *
+     * @return The resulting content type.
+     */
     override fun contentType()="application/octet-stream".toMediaType()
-    // Reads the encrypted upload response size.
+    /**
+     * Reads the encrypted upload response size.
+     *
+     * @return The resulting content length.
+     */
     override fun contentLength()=length
-    // Streams encrypted upload bytes to the remote request body.
+    /**
+     * Streams encrypted upload bytes to the remote request body.
+     *
+     * @param sink Sink supplied to [writeTo].
+     */
     override fun writeTo(sink:BufferedSink) {
         file.inputStream().use { input ->
             // The file is ciphertext, so seeking/re-reading a part cannot expose plaintext.
@@ -285,13 +376,28 @@ private class FileSliceRequestBody(
     }
 }
 
-/** Bridges OkHttp's callback API to structured coroutine cancellation. */
+/**
+ * Bridges OkHttp's callback API to structured coroutine cancellation.
+ *
+ * @receiver The OkHttp call to start asynchronously.
+ * @return The resulting [Response] instance.
+ */
 private suspend fun Call.await():Response=suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object:Callback {
-        // Turns an R2 upload failure into a clear media-upload result.
+        /**
+         * Turns an R2 upload failure into a clear media-upload result.
+         *
+         * @param call Call supplied to [onFailure].
+         * @param e E supplied to [onFailure].
+         */
         override fun onFailure(call:Call,e:IOException) { if(continuation.isActive) continuation.resumeWithException(e) }
-        // Reads the R2 upload response and confirms that the encrypted file was accepted.
+        /**
+         * Reads the R2 upload response and confirms that the encrypted file was accepted.
+         *
+         * @param call Call supplied to [onResponse].
+         * @param response Response supplied to [onResponse].
+         */
         override fun onResponse(call:Call,response:Response) { if(continuation.isActive) continuation.resume(response) else response.close() }
     })
 }
@@ -306,17 +412,53 @@ private suspend fun Call.await():Response=suspendCancellableCoroutine { continua
  * `MediaTransferController` use the returned short-lived capabilities for direct R2 PUT/GET requests.
  */
 interface MediaTicketDataSource {
-    /** Creates or recovers an idempotent server upload session for [job]. */
+    /**
+     * Creates or recovers an idempotent server upload session for [job].
+     *
+     * @param job Job supplied to [createUpload].
+     * @return The resulting [MediaUploadSession] for create upload.
+     */
     suspend fun createUpload(job:MediaUploadJob):MediaUploadSession
-    /** Requests a short-lived PUT capability for exactly one single/multipart part. */
+    /**
+     * Requests a short-lived PUT capability for exactly one single/multipart part.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     * @param partNumber Part number supplied to [uploadTicket].
+     * @return The resulting [MediaUploadTicket] for upload ticket.
+     */
     suspend fun uploadTicket(jobId:String,partNumber:Int):MediaUploadTicket
-    /** Commits accepted ETags and publishes immutable media metadata after R2 size verification. */
+    /**
+     * Commits accepted ETags and publishes immutable media metadata after R2 size verification.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     * @param parts Collection of parts values to process.
+     * @return The resulting [CloudMediaRecord] for complete upload.
+     */
     suspend fun completeUpload(jobId:String,parts:List<MediaCompletedPart>):CloudMediaRecord
-    /** Aborts a pending R2 multipart session and removes its pending Firestore state. */
+    /**
+     * Aborts a pending R2 multipart session and removes its pending Firestore state.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     */
     suspend fun abortUpload(jobId:String)
-    /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
+    /**
+     * Returns a short-lived GET capability after the callable checks `allowed_users`.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @return The resulting [MediaDownloadTicket] for download ticket.
+     */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
-    /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
+    /**
+     * Atomically replaces recipients plus their account/device-wrapped AES keys.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys Key-value mapping of account keyset wrapped keys entries.
+     * @param grantIndependentRecipients Collection of grant independent recipients values to process.
+     * @param revokeIndependentRecipients Collection of revoke independent recipients values to process.
+     * @return The resulting [CloudMediaRecord] for update access.
+     */
     suspend fun updateAccess(
         mediaId:String,
         wrappedKeys:Map<String,String>,
@@ -325,12 +467,31 @@ interface MediaTicketDataSource {
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
+    /**
+     * Updates plan access.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
+     * @return The resulting [CloudMediaRecord] for update plan access.
+     */
     suspend fun updatePlanAccess(
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
         accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
+    /**
+     * Shares in chat.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param outgoing Outgoing supplied to [shareInChat].
+     * @param recipientUids Collection of recipient uids values to process.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys Key-value mapping of account keyset wrapped keys entries.
+     */
     suspend fun shareInChat(
         mediaId:String,
         outgoing:OutgoingMessage,
@@ -339,11 +500,26 @@ interface MediaTicketDataSource {
         deviceWrappedKeys:Map<String,String>,
         accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) { error("Chat attachment sharing is unavailable") }
-    /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
+    /**
+     * Adds AES-key copies encrypted for the signed-in account's other registered devices.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @return The resulting [CloudMediaRecord] for update device keys.
+     */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
-    /** Changes the owner's evidence label without changing or decrypting file contents. */
+    /**
+     * Changes the owner's evidence label without changing or decrypting file contents.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param evidence Whether to apply evidence.
+     */
     suspend fun updateEvidence(mediaId:String,evidence:Boolean)
-    /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
+    /**
+     * Deletes both the owner's R2 object and its Firestore metadata through trusted code.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     */
     suspend fun deleteMedia(mediaId:String)
 }
 
@@ -351,6 +527,12 @@ interface MediaTicketDataSource {
 class MediaDeviceVerificationException(message:String,cause:Exception):Exception(message,cause)
 class MediaDeviceVerificationRetryableException(message:String,cause:Exception):Exception(message,cause)
 
+/**
+ * Checks whether retryable app check failure.
+ *
+ * @param failure Exception or failure reason encountered during execution.
+ * @return `true` if is retryable app check failure, or `false` otherwise.
+ */
 internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
     val visited = mutableSetOf<Throwable>()
     var current: Throwable? = failure
@@ -363,7 +545,12 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
     return false
 }
 
-/** Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key. */
+/**
+ * Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key.
+ *
+ * @param job The upload job whose state or request data is being read.
+ * @return The upload request fields, including the ciphertext metadata and wrapped media keys.
+ */
 internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
     require(source.allowedUsers.toSet()==source.accountWrappedKeys.keys) {
         "Every authorized account requires an account-keyset wrapper"
@@ -395,7 +582,12 @@ class MediaRepository(
     private val auth:FirebaseAuth=FirebaseAuth.getInstance(),
     private val appCheck:FirebaseAppCheck=FirebaseAppCheck.getInstance(),
 ):MediaTicketDataSource {
-    // Requests short-lived upload URLs for one encrypted file.
+    /**
+     * Requests short-lived upload URLs for one encrypted file.
+     *
+     * @param job Job supplied to [createUpload].
+     * @return The resulting [MediaUploadSession] for create upload.
+     */
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
         val source=job.source
         val wrapped=source.wrappedKeys.getValue(job.ownerUid)
@@ -403,21 +595,35 @@ class MediaRepository(
         val metadata=org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata,key))
         val emergencyId=Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
             .matchEntire(metadata.optString("name"))?.groupValues?.get(1)
-        if(emergencyId!=null) call("emergencyAttachUpload",mapOf("id" to emergencyId,"jobId" to job.id))
+        if (emergencyId != null) call(
+            "emergencyAttachUpload", mapOf("id" to emergencyId, "jobId" to job.id)
+        )
         val result=call("mediaCreateUpload",mediaCreateUploadRequest(job))
-        return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
-            MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
+        return MediaUploadSession(job.id,result.requireString("mediaId"),result.requireString("objectKey"),
+            MediaUploadMode.valueOf(result.requireString("mode")),result.optionalString("uploadId"),result.requireLong("partSize"))
     }
 
-    // Requests a protected upload ticket for an encrypted media file.
+    /**
+     * Requests a protected upload ticket for an encrypted media file.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     * @param partNumber Part number supplied to [uploadTicket].
+     * @return The resulting [MediaUploadTicket] for upload ticket.
+     */
     override suspend fun uploadTicket(jobId:String,partNumber:Int):MediaUploadTicket {
         require(partNumber>0)
         val result=call("mediaUploadPartTicket",mapOf("jobId" to jobId,"partNumber" to partNumber))
-        return MediaUploadTicket(validateUrl(result.string("url")),result.stringMap("headers"),
-            result.long("expiresAt"),partNumber)
+        return MediaUploadTicket(validateUrl(result.requireString("url")),result.stringMap("headers"),
+            result.requireLong("expiresAt"),partNumber)
     }
 
-    // Saves a pending media upload so WorkManager can resume it later.
+    /**
+     * Saves a pending media upload so WorkManager can resume it later.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     * @param parts Collection of parts values to process.
+     * @return The resulting [CloudMediaRecord] for complete upload.
+     */
     override suspend fun completeUpload(jobId:String,parts:List<MediaCompletedPart>):CloudMediaRecord {
         val result=call("mediaCompleteUpload",mapOf("jobId" to jobId,"parts" to parts.map {
             mapOf("partNumber" to it.partNumber,"etag" to it.etag)
@@ -425,14 +631,23 @@ class MediaRepository(
         return result.record()
     }
 
-    // Deletes a completed or cancelled upload from the local queue.
+    /**
+     * Deletes a completed or cancelled upload from the local queue.
+     *
+     * @param jobId Unique identifier of the durable background job.
+     */
     override suspend fun abortUpload(jobId:String) { call("mediaAbortUpload",mapOf("jobId" to jobId)) }
 
-    // Requests a protected download ticket for an encrypted media file.
+    /**
+     * Requests a protected download ticket for an encrypted media file.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @return The resulting [MediaDownloadTicket] for download ticket.
+     */
     override suspend fun downloadTicket(mediaId:String):MediaDownloadTicket {
         try {
             val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
-            return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
+            return MediaDownloadTicket(mediaId,validateUrl(result.requireString("url")),result.stringMap("headers"),result.requireLong("expiresAt"))
         } catch (failure: FirebaseFunctionsException) {
             if (failure.code in setOf(
                     FirebaseFunctionsException.Code.PERMISSION_DENIED,
@@ -444,7 +659,17 @@ class MediaRepository(
         }
     }
 
-    // Saves the latest encrypted-media access keys for this account.
+    /**
+     * Saves the latest encrypted-media access keys for this account.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param grantIndependentRecipients Collection of grant independent recipients values to process.
+     * @param revokeIndependentRecipients Collection of revoke independent recipients values to process.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
+     * @return The resulting [CloudMediaRecord] for update access.
+     */
     override suspend fun updateAccess(
         mediaId:String,
         wrappedKeys:Map<String,String>,
@@ -455,7 +680,7 @@ class MediaRepository(
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
-        require(accountWrappedKeys.keys==wrappedKeys.keys)
+        require(wrappedKeys.keys.containsAll(accountWrappedKeys.keys))
         return call("mediaUpdateAccess",mapOf(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
@@ -466,6 +691,15 @@ class MediaRepository(
         )).record()
     }
 
+    /**
+     * Updates plan access.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
+     * @return The resulting [CloudMediaRecord] for update plan access.
+     */
     override suspend fun updatePlanAccess(
         mediaId: String,
         wrappedKeys: Map<String, String>,
@@ -479,6 +713,16 @@ class MediaRepository(
         "forPlan" to true,
     )).record()
 
+    /**
+     * Shares in chat.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param outgoing Outgoing supplied to [shareInChat].
+     * @param recipientUids Collection of recipient uids values to process.
+     * @param wrappedKeys Key-value mapping of wrapped keys entries.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
+     */
     override suspend fun shareInChat(
         mediaId:String,
         outgoing:OutgoingMessage,
@@ -500,22 +744,43 @@ class MediaRepository(
         ))
     }
 
-    // Adds the wrapped file keys needed by newly authorized devices.
+    /**
+     * Adds the wrapped file keys needed by newly authorized devices.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @return The resulting [CloudMediaRecord] for update device keys.
+     */
     override suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord {
         require(deviceWrappedKeys.isNotEmpty() && deviceWrappedKeys.size<=50)
         return call("mediaUpdateDeviceKeys",mapOf("mediaId" to mediaId,
             "deviceWrappedKeys" to deviceWrappedKeys)).record()
     }
 
-    // Updates the evidence label through the owner-only media function.
+    /**
+     * Updates the evidence label through the owner-only media function.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     * @param evidence Whether to apply evidence.
+     */
     override suspend fun updateEvidence(mediaId:String,evidence:Boolean) {
         call("mediaUpdateEvidence", mapOf("mediaId" to mediaId, "evidence" to evidence))
     }
 
-    // Removes media for media.
+    /**
+     * Removes media for media.
+     *
+     * @param mediaId Unique identifier of the encrypted media object.
+     */
     override suspend fun deleteMedia(mediaId:String) { call("mediaDelete",mapOf("mediaId" to mediaId)) }
 
-    // Calls the protected media function and checks its response.
+    /**
+     * Calls the protected media function and checks its response.
+     *
+     * @param name Field, key, or display name.
+     * @param data Key-value mapping of data entries.
+     * @return Map containing the resulting call entries.
+     */
     private suspend fun call(name:String,data:Map<String,Any>):Map<*,*> {
         // WorkManager can start before the SDK has restored its cached tokens. Waiting here makes
         // sure the callable receives both the signed-in account and the required App Check proof.
@@ -542,7 +807,12 @@ class MediaRepository(
             ?: error("Invalid $name response")
     }
 
-    // Accepts only secure signed R2 links without embedded usernames or passwords.
+    /**
+     * Accepts only secure signed R2 links without embedded usernames or passwords.
+     *
+     * @param value Input value to store, parse, or format.
+     * @return The resulting validate URL string.
+     */
     private fun validateUrl(value:String):String {
         // Signed URLs are bearer capabilities. Reject credentials, plaintext HTTP, and foreign hosts.
         val uri=URI(value)
@@ -553,44 +823,50 @@ class MediaRepository(
     }
 }
 
-// Encrypted media: Reads a required text field from a downloaded media record and rejects missing data.
-private fun Map<*,*>.string(name:String)=get(name) as? String ?: error("Missing $name")
-// Encrypted media: Reads an optional text field and uses an empty value when older records omit it.
-// Suppressing warning SameParameterValue since linter believes optional string will always equal "uploadid"
-// "uploadid" is the default value given in its one function call.
-@Suppress("SameParameterValue")
-private fun Map<*,*>.optionalString(name:String)=get(name) as? String ?: ""
-// Encrypted media: Reads a required whole number from a downloaded media record.
-private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error("Missing $name")
-// Keeps only valid text fields from downloaded encrypted metadata.
-private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? Map<*,*>)?.entries?.associate { entry ->
-    (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
-}.orEmpty()
+/**
+ * Encrypted media: Reads the account-keyset wrapped AES keys from a downloaded media record.
+ *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
+ * @param name The field name that contains the recipient key wrappers.
+ * @return The downloaded media key wrappers indexed by recipient UID.
+ */
 private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetWrappedKey> =
     (get(name) as? Map<*,*>)?.entries?.associate { entry ->
         (entry.key as? String ?: error("Invalid $name key")) to
             AccountKeysetWrappedKey.fromMap(entry.value as? Map<*,*> ?: error("Invalid $name value"))
     }.orEmpty()
-// Encrypted media: Reads the list of account IDs allowed to open a downloaded file.
-// Suppressing SameParameterValue, linter believes name is always 'allowedUsers'
-// That is the default value for stringlist function call.
-@Suppress("SameParameterValue")
-private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsInstance<String>() ?: error("Missing $name")
-// Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
-private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),
-    string("encryptedMetadata"),stringMap("wrappedKeys"),stringList("allowedUsers"),long("ciphertextSize"),
-    string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"),
+
+/**
+ * Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
+ *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
+ * @return The resulting record.
+ */
+private fun Map<*,*>.record()=CloudMediaRecord(requireString("mediaId"),requireString("ownerUid"),requireString("objectKey"),
+    requireString("encryptedMetadata"),stringMap("wrappedKeys"),requireStringList("allowedUsers"),requireLong("ciphertextSize"),
+    requireString("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,requireLong("createdAt"),
     stringMap("deviceWrappedKeys"),accountWrappedKeyMap("accountWrappedKeys"))
 
 /** Deletes expired, unpinned upload-reuse ciphertext even if no document screen is opened. */
 class OfflineMediaCleanupWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
+    /**
+     * Executes the scheduled WorkManager background task and returns the resulting work status.
+     *
+     * @return WorkManager [Result] indicating success, retry, or failure.
+     */
     override suspend fun doWork(): Result = runCatching {
         OfflineMediaCache(applicationContext).cleanupExpiredCandidates()
         Result.success()
     }.getOrElse { Result.retry() }
 
     companion object {
+        /**
+         * Enqueues the offline media cleanup worker.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param candidateId Candidate ID supplied to [enqueue].
+         */
         fun enqueue(context: Context, candidateId: String) {
             val request = OneTimeWorkRequestBuilder<OfflineMediaCleanupWorker>()
                 .setInitialDelay(OfflineMediaCache.UPLOAD_REUSE_WINDOW_MS, TimeUnit.MILLISECONDS)

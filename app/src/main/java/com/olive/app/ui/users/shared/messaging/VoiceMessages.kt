@@ -1,5 +1,7 @@
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import kotlin.time.Duration.Companion.milliseconds
 
 import android.content.Context
@@ -53,6 +55,12 @@ import java.io.File
 private const val VOICE_MESSAGE_LIMIT_MS = 5 * 60_000L
 internal const val VOICE_DRAFT_PREFIX = "voice-draft-"
 
+/**
+ * Composes the voice message upload status UI element.
+ *
+ * @param upload Optional upload supplied to [VoiceMessageUploadStatus].
+ * @param onRetry Callback invoked when retry changes or occurs.
+ */
 @Composable
 internal fun VoiceMessageUploadStatus(upload: MediaUploadPresentation? = null, onRetry: (() -> Unit)? = null) {
     val failed = upload?.status == MediaTransferStatus.FAILED
@@ -70,6 +78,14 @@ internal fun VoiceMessageUploadStatus(upload: MediaUploadPresentation? = null, o
     }
 }
 
+/**
+ * Composes the voice message composer UI element.
+ *
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param withMicrophonePermission Action or callback executed for with microphone permission.
+ * @param onSend Function used to transform or provide on send.
+ * @param content Composable content lambda rendered inside this container.
+ */
 @Composable
 internal fun VoiceMessageComposer(
     enabled: Boolean,
@@ -89,6 +105,9 @@ internal fun VoiceMessageComposer(
     val samples = remember { VoiceSamples() }
     var mounted by remember { mutableStateOf(false) }
 
+    /**
+     * Discards the target.
+     */
     fun discard() {
         recording.discard()
         draft = null
@@ -110,6 +129,9 @@ internal fun VoiceMessageComposer(
         }
     }
 
+    /**
+     * Starts active tracking and listeners.
+     */
     fun start() {
         if (!mounted || !enabled || startedAt != 0L || draft != null ||
             !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
@@ -123,6 +145,9 @@ internal fun VoiceMessageComposer(
         } else feedback = R.string.voice_failed
     }
 
+    /**
+     * Stops active listeners and releases callbacks.
+     */
     fun stop() {
         val startTime = startedAt
         if (startTime == 0L) return
@@ -259,6 +284,11 @@ private class VoiceSamples {
     private var seen = 0
     private var peak = 0
 
+    /**
+     * Adds the voice samples.
+     *
+     * @param sample Sample supplied to [add].
+     */
     fun add(sample: Int) {
         peak = maxOf(peak, sample)
         if (++seen < samplesPerPeak) return
@@ -273,6 +303,9 @@ private class VoiceSamples {
         }
     }
 
+    /**
+     * Clears the voice samples.
+     */
     fun clear() {
         peaks.clear()
         samplesPerPeak = 1
@@ -280,6 +313,11 @@ private class VoiceSamples {
         peak = 0
     }
 
+    /**
+     * Returns the waveform.
+     *
+     * @return List of resulting waveform items.
+     */
     fun waveform(): List<Int> {
         val samples = if (seen > 0) peaks + peak else peaks
         val count = minOf(samples.size, WAVEFORM_BARS)
@@ -291,6 +329,12 @@ private class VoiceSamples {
     }
 }
 
+/**
+ * Reads voice duration.
+ *
+ * @param file Local file to read, hash, process, or write.
+ * @return The computed read voice duration number, or `null` if unavailable.
+ */
 private fun readVoiceDuration(file: File): Int? = runCatching {
     val metadata = MediaMetadataRetriever()
     try {
@@ -302,9 +346,23 @@ private fun readVoiceDuration(file: File): Int? = runCatching {
     }
 }.getOrNull()
 
+/**
+ * Computes voice time.
+ *
+ * @param millis Milliseconds supplied to [voiceTime].
+ * @return The resulting voice time string.
+ */
 private fun voiceTime(millis: Int): String =
     String.format(Locale.getDefault(), "%d:%02d", millis / 60_000, millis / 1000 % 60)
 
+/**
+ * Composes the voice waveform UI element.
+ *
+ * @param samples Collection of samples values to process.
+ * @param progress Progress supplied to [VoiceWaveform].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param tint Tint supplied to [VoiceWaveform].
+ */
 @Composable
 private fun VoiceWaveform(samples: List<Int>, progress: Float, modifier: Modifier, tint: Color) {
     Canvas(modifier.height(26.dp)) {
@@ -328,6 +386,11 @@ private class VoiceRecording(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var file: File? = null
 
+    /**
+     * Starts voice recording.
+     *
+     * @return `true` if start, or `false` otherwise.
+     */
     @Suppress("DEPRECATION")
     fun start(): Boolean = runCatching {
         val output = File.createTempFile(VOICE_DRAFT_PREFIX, ".m4a", context.cacheDir)
@@ -345,6 +408,11 @@ private class VoiceRecording(private val context: Context) {
         capture.start()
     }.onFailure { discard() }.isSuccess
 
+    /**
+     * Stops voice recording.
+     *
+     * @return The resulting [File], or `null` if unavailable.
+     */
     fun stop(): File? {
         val capture = recorder ?: return null
         recorder = null
@@ -353,13 +421,24 @@ private class VoiceRecording(private val context: Context) {
         return file?.takeIf { stopped && it.length() > 0 }
     }
 
+    /**
+     * Returns the amplitude.
+     *
+     * @return The computed amplitude numeric value.
+     */
     fun amplitude(): Int = runCatching {
         val peak = recorder?.maxAmplitude ?: 0
         (sqrt(peak / 32767f) * 9).toInt().coerceIn(0, 9)
     }.getOrDefault(0)
 
+    /**
+     * Computes detach.
+     */
     fun detach() { file = null }
 
+    /**
+     * Discards the voice recording.
+     */
     fun discard() {
         recorder?.release()
         recorder = null
@@ -368,6 +447,14 @@ private class VoiceRecording(private val context: Context) {
     }
 }
 
+/**
+ * Composes the voice message bubble UI element.
+ *
+ * @param mediaId Unique identifier of the encrypted media object.
+ * @param metadata Metadata supplied to [VoiceMessageBubble].
+ * @param session Shared session view model owning application state and actions.
+ * @param mine Whether to apply mine.
+ */
 @Composable
 internal fun VoiceMessageBubble(mediaId: String, metadata: String, session: SessionViewModel, mine: Boolean) {
     val uid = session.coverAccountId ?: return
@@ -399,6 +486,17 @@ internal fun VoiceMessageBubble(mediaId: String, metadata: String, session: Sess
     }
 }
 
+/**
+ * Renders the voice audio button composable.
+ *
+ * @param modifier Compose modifier applied to the root layout.
+ * @param initialDuration Initial duration supplied to [VoiceAudioButton].
+ * @param samples Collection of samples values to process.
+ * @param tint Tint supplied to [VoiceAudioButton].
+ * @param opening Whether to apply opening.
+ * @param deleteOnClose Whether to apply delete on close.
+ * @param load Action or callback executed for load.
+ */
 @Composable
 private fun VoiceAudioButton(
     modifier: Modifier = Modifier,
@@ -419,6 +517,9 @@ private fun VoiceAudioButton(
     var failed by remember { mutableStateOf(false) }
     var generation by remember { mutableIntStateOf(0) }
 
+    /**
+     * Computes release.
+     */
     fun release() {
         generation++
         player?.release()

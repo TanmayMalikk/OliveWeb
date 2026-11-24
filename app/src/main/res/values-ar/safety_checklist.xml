@@ -57,4 +57,148 @@
         <item>خطط للسكن والطعام والأدوية في الأيام الأولى.</item>
         <item>حدد خدمات الدعم التي قد ترغب في التواصل معها.</item>
     </string-array>
+
+    <string name="onboarding_safety_questionnaire">استبيان خطة السلامة</string>
+    <string name="safety_intake_intro">تساعد هذه الأسئلة الاختيارية في تخصيص وثائق خطة السلامة الأولية وقوائم التحقق الخاصة بك. تبقى جميع الإجابات مشفّرة في ملفك الخاص ويمكنك تعديلها في أي وقت.</string>
+    <string name="safety_intake_prefer_not_to_say">أفضّل عدم الإجابة</string>
+    <string name="safety_intake_update_plan">تخصيص الخطة عبر الاستبيان</string>
+    <string name="safety_intake_dialog_apply">حفظ وتحديث الخطة</string>
+
+    <string name="safety_intake_immigration_title">وضع الهجرة أو الإقامة</string>
+    <string name="safety_intake_immigration_subtitle">يساعد في إدراج وثائق الهوية والتصاريح والدعم القانوني المناسبة لك.</string>
+    <string name="safety_intake_immigration_citizen">مواطن / جنسية</string>
+    <string name="safety_intake_immigration_pr">مقيم دائم</string>
+    <string name="safety_intake_immigration_temporary">تصريح عمل أو دراسة أو زيارة أو كفالة</string>
+    <string name="safety_intake_immigration_refugee">لاجئ أو طالب لجوء</string>
+    <string name="safety_intake_immigration_uncertain">غير موثّق أو وضع غير مؤكد</string>
+
+    <string name="safety_intake_dependants_title">المُعالون المغادرون معك</string>
+    <string name="safety_intake_dependants_subtitle">اختر كل من يحتاج للمغادرة بأمان معك.</string>
+    <string name="safety_intake_dependant_children">الأطفال</string>
+    <string name="safety_intake_dependant_adult">كبير سن أو شخص بالغ مُعال</string>
+    <string name="safety_intake_dependant_pets">حيوانات أليفة أو حيوانات مساعدة</string>
+
+    <string name="safety_intake_financial_title">الاستقلال والوصول المالي</string>
+    <string name="safety_intake_financial_subtitle">يخصّص خطوات الوصول للمال، السجلات المصرفية، والمساعدة المالية الطارئة.</string>
+    <string name="safety_intake_financial_independent">لدي أموال أو حساب خاص بي</string>
+    <string name="safety_intake_financial_shared">الحسابات مشتركة أو مراقَبة</string>
+    <string name="safety_intake_financial_none">لا يوجد وصول مستقل للمال</string>
+
+    <string name="safety_intake_transport_title">وسيلة التنقل عند المغادرة</string>
+    <string name="safety_intake_transport_subtitle">يحدد مفاتيح الطوارئ وقائمة تخطيط التنقل.</string>
+    <string name="safety_intake_transport_vehicle">سيارة خاصة أو أساسية</string>
+    <string name="safety_intake_transport_transit">مواصلات عامة أو مشي</string>
+    <string name="safety_intake_transport_ride_support">أحتاج توصيلة من شخص موثوق أو خدمة دعم</string>
+
+    <string name="safety_intake_circumstances_title">الاحتياجات القانونية والطبية والسكنية</string>
+    <string name="safety_intake_circumstances_subtitle">اختر ما ينطبق عليك لإضافة الوثائق وخطوات المتابعة المناسبة.</string>
+    <string name="safety_intake_circumstance_legal">أوامر محكمة أو حضانة أو حماية سارية</string>
+    <string name="safety_intake_circumstance_marriage">وثائق زواج أو انفصال أو رعاية أطفال مطلوبة</string>
+    <string name="safety_intake_circumstance_medical">وصفات طبية منتظمة أو رعاية صحية مستمرة</string>
+    <string name="safety_intake_circumstance_housing">عقد إيجار أو رهن عقاري مشترك</string>
+
+    <string name="safety_doc_photo_id">رخصة القيادة / هوية رسمية تحمل صورة</string>
+    <string name="safety_doc_birth_certificate">شهادة الميلاد</string>
+    <string name="safety_doc_health_card">البطاقة الصحية</string>
+    <string name="safety_doc_sin">رقم التأمين الاجتماعي (SIN) أو المعرّف الضريبي</string>
+    <string name="safety_doc_citizen_passport">جواز السفر أو شهادة الجنسية</string>
+    <string name="safety_doc_pr_card">بطاقة الإقامة الدائمة (PR) ووثيقة التأكيد وجواز السفر</string>
+    <string name="safety_doc_permit_sponsorship">جواز السفر وتصريح العمل/الدراسة/الزيارة وأي أوراق كفالة</string>
+    <string name="safety_doc_immigration_support">نسخ طلبات التأشيرة وأرقام الملفات ومراسلات الهجرة</string>
+    <string name="safety_doc_refugee_papers">هوية طالب اللجوء وإشعارات الجلسات وأوراق المساعدة القانونية ووثائق السفر</string>
+    <string name="safety_doc_any_id_copies">أي هوية رسمية أو جواز سفر أو تصاريح منتهية أو صور/نسخ للوثائق</string>
+    <string name="safety_doc_immigration_clinic">بيانات عيادة قانونية موثوقة للهجرة وملاحظات الأمان قبل مشاركة وضعك</string>
+    <string name="safety_doc_passport_generic">جواز السفر / وثائق الجنسية أو الهجرة</string>
+    <string name="safety_doc_children_records">هويات الأطفال وشهادات ميلادهم وبطاقاتهم الصحية وسجلات المدرسة والرعاية</string>
+    <string name="safety_doc_adult_dependant_records">هوية الشخص المُعال وبطاقته الصحية وقائمة أدويته ووثائق التوكيل أو الرعاية</string>
+    <string name="safety_doc_pet_records">سجلات تطعيم الحيوان ومعلومات الشريحة والتسجيل وملاحظة النقل الطارئ</string>
+    <string name="safety_doc_independent_banking">البطاقات المصرفية الشخصية وبيانات الحسابات ووثائق التأمين</string>
+    <string name="safety_doc_shared_banking">سجلات الحساب المنفصل وكشوف الحساب الحديثة والأرقام السرية بعيدًا عن الأجهزة المشتركة</string>
+    <string name="safety_doc_financial_proof">إثباتات الدخل أو الإعانات أو مصروفات الأسرة (محفوظة بأمان)</string>
+    <string name="safety_doc_banking_generic">السجلات المصرفية / التأمين / المالية عند الحاجة</string>
+    <string name="safety_doc_court_orders">أوامر المحكمة أو شروط الكفالة أو أوامر الحماية والمنع</string>
+    <string name="safety_doc_marriage_custody">عقد الزواج واتفاقيات الرعاية الأبوية أو الحضانة</string>
+    <string name="safety_doc_medical_records">الوصفات الطبية وسجلات التطعيم والملخصات الصحية</string>
+    <string name="safety_doc_housing_records">عقد الإيجار أو بيانات الرهن العقاري أو فواتير الخدمات باسمك</string>
+
+    <string name="safety_grab_house_and_car_keys">مفاتيح المنزل والمركبة (بما في ذلك نسخة احتياطية)</string>
+    <string name="safety_grab_house_keys">مفاتيح المنزل وبطاقات الدخول</string>
+    <string name="safety_grab_phone">الهاتف والشاحن وبطارية الشحن المتنقلة</string>
+    <string name="safety_grab_cash_cards">النقود والبطاقات المصرفية الشخصية</string>
+    <string name="safety_grab_separate_cash">نقود طوارئ مخبأة وأي بطاقات غير مشتركة</string>
+    <string name="safety_grab_emergency_cash">أي نقود طارئة أو بطاقة مواصلات أو قسائم يمكنك حفظها بأمان</string>
+    <string name="safety_grab_medicines">الأدوية الأساسية وقائمة مكتوبة بالوصفات الطبية</string>
+    <string name="safety_grab_clothes">ملابس أساسية وأدوات نظافة لبضعة أيام</string>
+    <string name="safety_grab_children">ملابس الأطفال والحفاضات أو الأغراض المهدئة وأدويتهم</string>
+    <string name="safety_grab_adult_dependant">أدوية الشخص المُعال وأدوات الحركة ومستلزمات الرعاية اليومية</string>
+    <string name="safety_grab_pets">طعام الحيوان والمقود أو القفص وأوعية الطعام</string>
+
+    <string name="safety_fin_indep_passwords">تأكد من أنك وحدك تعرف كلمات المرور والأرقام السرية لحساباتك الشخصية.</string>
+    <string name="safety_fin_indep_bills">راجع الفواتير المتكررة أو الاشتراكات المرتبطة بعناوين أو أجهزة مشتركة.</string>
+    <string name="safety_fin_shared_private_account">احفظ أموال الطوارئ بأمان (حساب منفصل أو مع شخص موثوق) بعيدًا عن الكشوف المراقَبة.</string>
+    <string name="safety_fin_shared_cash">احتفظ بنقود يسهل الوصول إليها وراجع البطاقات التي قد تكشف موقعك.</string>
+    <string name="safety_fin_shared_document">صوّر أو دوّن الأرصدة والديون في الحسابات المشتركة بأمان دون لفت الانتباه.</string>
+    <string name="safety_fin_emergency_aid">حدد صناديق المأوى والمساعدات المالية الطارئة ومنح الأزمات المحلية.</string>
+    <string name="safety_fin_trusted_money_help">حدد من يمكنه إقراضك أو الاحتفاظ بنقود طارئة أو تذاكر نقل لك بأمان.</string>
+    <string name="safety_fin_crisis_benefits">اسأل مركز دعم محلي عن الإعانات الطارئة أو الإعفاءات المتاحة لك بشكل مستقل.</string>
+    <string name="safety_fin_children_benefits">دوّن حسابات إعانات الأطفال ودعم رعاية الأطفال.</string>
+    <string name="safety_fin_lease_rights">اسأل مختص سكن أو عيادة قانونية عن إنهاء عقد الإيجار المشترك دون غرامة بسبب العنف الأسري.</string>
+    <string name="safety_fin_newcomer_support">اسأل جهة توطين أو مساعدة قانونية عن الدعم المالي المتاح وفق وضع إقامتك.</string>
+
+    <string name="safety_dest_choose">اختر مكانًا آمنًا للذهاب إليه.</string>
+    <string name="safety_dest_address">دوّن العنوان وكيفية العثور على المكان.</string>
+    <string name="safety_dest_when">تحقق من موعد إمكانية وصولك بأمان.</string>
+    <string name="safety_dest_children">تأكد من توفر مساحة ومستلزمات نوم للأطفال في المكان المقصود.</string>
+    <string name="safety_dest_adult_dependant">تأكد من سهولة الوصول وتوفر دعم الرعاية للشخص المُعال.</string>
+    <string name="safety_dest_pets">تأكد من السماح بالحيوانات أو رتب استضافة مؤقتة آمنة لها.</string>
+
+    <string name="safety_travel_vehicle_fuel">حافظ على خزان الوقود أو البطارية فوق النصف متى كان ذلك آمنًا.</string>
+    <string name="safety_travel_spare_key">أخفِ مفتاحًا احتياطيًا للمركبة بأمان وتحقق مما إذا كان تتبع الموقع مفعلاً.</string>
+    <string name="safety_travel_vehicle_backup">جهّز خطة بديلة بالمواصلات أو التوصيل إذا تعذّر استخدام المركبة.</string>
+    <string name="safety_travel_transit_routes">تحقق من مسارات المواصلات النهارية والليلية ونقاط التبديل الآمنة.</string>
+    <string name="safety_travel_transit_fare">أبقِ بطاقة المواصلات أو الأجرة المضبوطة في متناول يدك.</string>
+    <string name="safety_travel_pickup_spot">اختر محطة انتظار آمنة ومضاءة بعيدًا عن المنزل.</string>
+    <string name="safety_travel_confirm_driver">اتفق مع سائق موثوق أو خدمة نقل طارئة وعلى الإشارة المتفق عليها للمغادرة.</string>
+    <string name="safety_travel_meeting_spot">حدد نقطة التقاء آمنة على مسافة قصيرة من المنزل.</string>
+    <string name="safety_travel_backup_ride">احفظ رقم توصيلة بديلة أو سيارة أجرة طارئة بأمان.</string>
+    <string name="safety_travel_decide">حدد كيف ستصل إلى المكان.</string>
+    <string name="safety_travel_confirm_help">تأكد ممن يمكنه مساعدتك في النقل عند الحاجة.</string>
+    <string name="safety_travel_prepare_fare">جهّز المفاتيح أو أجرة المواصلات أو الوقود عندما يكون ذلك آمنًا.</string>
+    <string name="safety_travel_children">خطط لعربة الأطفال أو مقاعد السيارة أو مسار المشي الآمن مع الأطفال.</string>
+    <string name="safety_travel_adult_dependant">خطط لمواصلات مهيأة أو مساعدة حركة للشخص المُعال.</string>
+    <string name="safety_travel_pets">تأكد من قواعد اصطحاب الحيوانات في المواصلات أو مساحة القفص.</string>
+
+    <string name="safety_after_checkin">أخبر شخصًا موثوقًا بوصولك عندما يكون ذلك آمنًا.</string>
+    <string name="safety_after_essentials">خطط للسكن والطعام والمستلزمات الأساسية في الأيام الأولى.</string>
+    <string name="safety_after_immigration_legal">تواصل مع عيادة قانونية للهجرة لحماية وضع إقامتك.</string>
+    <string name="safety_after_children_school">أبلغ مدرسة أطفالك أو الحضانة بسرية بقواعد الاستلام الآمن.</string>
+    <string name="safety_after_adult_dependant">نسّق استمرارية الرعاية المنزلية ونقل الصيدلية للشخص المُعال.</string>
+    <string name="safety_after_legal_aid">تواصل مع المساعدة القانونية بخصوص أوامر الحماية أو الحضانة أو العنوان الآمن.</string>
+    <string name="safety_after_medical">رتّب إعادة صرف الوصفات الطبية ونقل بيانات العيادة والصيدلية بأمان.</string>
+    <string name="safety_after_housing">استكشف خيارات السكن الانتقالي وتعديل الخدمات وحقوق المستأجرين.</string>
+    <string name="safety_after_support_services">حدد خدمات الدعم التي قد ترغب في التواصل معها.</string>
+
+    <string name="safety_intake_abuse_title">نوع الإساءة التي تتعرض لها</string>
+    <string name="safety_intake_abuse_subtitle">اختر كل ما ينطبق لتخصيص خطوات الأمان الرقمي والأدلة والدعم المناسب.</string>
+    <string name="safety_intake_abuse_physical">إساءة جسدية</string>
+    <string name="safety_intake_abuse_emotional">إساءة عاطفية أو لفظية أو نفسية</string>
+    <string name="safety_intake_abuse_financial">إساءة مالية أو اقتصادية</string>
+    <string name="safety_intake_abuse_digital">إساءة رقمية أو مراقبة أو ملاحقة</string>
+    <string name="safety_intake_abuse_sexual">إساءة أو إكراه جنسي</string>
+    <string name="safety_intake_abuse_cultural">إساءة ثقافية أو روحية أو استغلال وضع الهجرة</string>
+
+    <string name="safety_doc_abuse_physical_evidence">صور مؤرخة للإصابات وتقارير المستشفى أو العيادة وأرقام محاضر الشرطة</string>
+    <string name="safety_doc_abuse_emotional_records">سجل مؤرخ أو لقطات شاشة للتهديدات أو الترهيب أو المضايقات</string>
+    <string name="safety_doc_abuse_financial_records">قسائم الراتب وتقرير الائتمان وسجلات الديون أو الحسابات المفتوحة باسمك</string>
+    <string name="safety_doc_abuse_sexual_records">سجلات الفحص الطبي المتخصص وبيانات مراكز دعم الناجين</string>
+    <string name="safety_doc_abuse_immigration_coercion">نسخ جوازات السفر أو التصاريح المحتجزة وأوراق الكفالة وأدلة التهديد</string>
+    <string name="safety_grab_abuse_digital_check">إيقاف مشاركة الموقع وفحص الحقائب والمفاتيح للتأكد من خلوها من أجهزة تتبع</string>
+    <string name="safety_fin_abuse_credit_check">وضع تنبيه ائتماني وتأمين حساباتك المستقلة للضرائب والإعانات</string>
+    <string name="safety_dest_abuse_physical_exit">تحديد مخارج آمنة من المنزل وحفظ رقم مأوى طوارئ احتياطي</string>
+    <string name="safety_travel_abuse_digital_tracking">استخدام جهاز آمن ومسار بعيد عن تطبيقات التتبع العائلية المشتركة</string>
+    <string name="safety_after_abuse_physical_care">الحصول على رعاية طبية لأي إصابات والاستفسار عن خطط المأوى الآمن</string>
+    <string name="safety_after_abuse_emotional_support">التواصل مع أخصائي دعم نفسي متمرس بالصدمات أو مجموعة مساندة</string>
+    <string name="safety_after_abuse_digital_security">تغيير كلمات المرور من جهاز آمن ومراجعة التحقق الثنائي وصلاحيات التطبيقات</string>
+    <string name="safety_after_abuse_sexual_support">التواصل مع خط دعم متخصص لحالات الاعتداء الجنسي عندما يكون ذلك آمنًا</string>
+    <string name="safety_after_abuse_cultural_support">التواصل مع جهة دعم ثقافية أو توطينية حول حقوقك دون الاعتماد على الكفيل</string>
 </resources>

@@ -34,6 +34,7 @@ import {
 } from "../../../services/MediaService";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 import { subscribeSocial, type Friend } from "../../../services/MessagingService";
+import { useWalkthroughAction } from "./WalkthroughCoachmark";
 
 // Changes a safety-plan field key into a readable section label.
 const label = (value: string) =>
@@ -48,6 +49,11 @@ export default function SafetyPlan() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
   const [activeKind, setActiveKind] = useState<"primary" | "backup">("primary");
+  const wt = useWalkthroughAction();
+  useEffect(() => {
+    if (wt.action === "plan_primary") setActiveKind("primary");
+    else if (wt.action === "plan_backup") setActiveKind("backup");
+  }, [wt.stepId, wt.action]);
   const editable = identity?.role === "USER";
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
   const [viewer, setViewer] = useState<{ document: BrowserDocument; url: string } | null>(null);
@@ -589,7 +595,7 @@ export default function SafetyPlan() {
           </Button>
       </section>}
       {editable && (friends.length > 0 || selectedContacts.length > 0) && (
-        <section className="panel">
+        <section className="panel" data-walkthrough-id="safety-share-contacts">
           <h3>Share with safe contacts</h3>
           {friends.map((friend) => (
             <label className="field" key={friend.friendUid}>

@@ -121,66 +121,12 @@
   box-shadow: inset 0 0 0 3px #284b3c;
 }
 
-.crossing-player {
-  transition: transform 95ms cubic-bezier(0.22, 1, 0.36, 1);
-}
+.crossing-player,
 .crossing-player.crossing-player-riding {
   transition: none;
 }
 .crossing-lane {
   animation: crossing-lane-in 0.22s ease-out both;
-}
-.crossing-vehicle-body {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: crossing-cart-bob 0.38s ease-in-out infinite alternate;
-}
-.crossing-wheel {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: crossing-wheel-turn 0.45s linear infinite;
-}
-.crossing-dust {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: crossing-dust 0.55s ease-out infinite;
-}
-.crossing-tree circle {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: crossing-tree-sway 2.4s ease-in-out infinite alternate;
-}
-.crossing-wave {
-  animation: crossing-water-flow 1.8s linear infinite;
-}
-.crossing-lilypad-inner {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: crossing-lily-bob 1.6s ease-in-out infinite alternate;
-}
-.crossing-rail-signal {
-  filter: drop-shadow(0 2px 2px rgb(42 45 38 / 28%));
-}
-.crossing-signal-light {
-  opacity: 0.18;
-  transition: opacity 0.15s ease;
-}
-.crossing-rail-signal-red .crossing-signal-light-red,
-.crossing-rail-signal-yellow .crossing-signal-light-yellow,
-.crossing-rail-signal-green .crossing-signal-light-green {
-  opacity: 1;
-  filter: drop-shadow(0 0 4px currentColor);
-}
-.crossing-rail-signal-red .crossing-signal-light-red {
-  animation: crossing-signal-warning 0.46s ease-in-out infinite alternate;
-}
-.crossing-train {
-  animation: crossing-train-rumble 0.12s ease-in-out infinite alternate;
-}
-.crossing-player-hop {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: crossing-hop 0.18s ease-out;
 }
 .crossing-crashed {
   animation: crossing-crash 0.28s ease-out;
@@ -194,59 +140,6 @@
 @keyframes crossing-lane-in {
   from {
     opacity: 0.65;
-  }
-}
-@keyframes crossing-cart-bob {
-  to {
-    transform: translateY(-1.5px);
-  }
-}
-@keyframes crossing-wheel-turn {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes crossing-dust {
-  from {
-    opacity: 0.7;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.35);
-  }
-}
-@keyframes crossing-tree-sway {
-  to {
-    transform: rotate(3deg);
-  }
-}
-@keyframes crossing-water-flow {
-  to {
-    stroke-dashoffset: -40;
-  }
-}
-@keyframes crossing-lily-bob {
-  to {
-    transform: translateY(1.5px) rotate(1.5deg);
-  }
-}
-@keyframes crossing-signal-warning {
-  to {
-    opacity: 0.48;
-  }
-}
-@keyframes crossing-train-rumble {
-  to {
-    transform: translateY(-1px);
-  }
-}
-@keyframes crossing-hop {
-  45% {
-    transform: translateY(-11px) scale(0.94, 1.06);
-  }
-  80% {
-    transform: translateY(1px) scale(1.06, 0.94);
   }
 }
 @keyframes crossing-crash {
@@ -721,15 +614,6 @@
 @media (prefers-reduced-motion: reduce) {
   .crossing-player,
   .crossing-lane,
-  .crossing-vehicle-body,
-  .crossing-wheel,
-  .crossing-dust,
-  .crossing-tree circle,
-  .crossing-wave,
-  .crossing-lilypad-inner,
-  .crossing-signal-light,
-  .crossing-train,
-  .crossing-player-hop,
   .crossing-crashed,
   .merge-pop,
   .merge-spawn {

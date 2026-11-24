@@ -1,18 +1,21 @@
 // Safe-app users: lists their private account activity.
 package com.olive.app.ui.users.user.dashboard
 
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
-
-
 import com.olive.app.ui.users.shared.navigation.*
-
-
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import androidx.compose.ui.res.stringResource
-import com.olive.app.R
-
+import android.Manifest
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.os.Build
+import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,22 +24,45 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
-
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.location.LocationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.olive.app.R
+import com.olive.app.notification.OliveNotificationManager
+import com.olive.app.ui.shared.LocalizedIcon as Icon
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 
-// Tap a range edge to choose its local calendar date first and clock time second.
-// UI sizing: date/time controls split the row evenly with 8dp gaps and 14x12dp button content padding.
+/**
+ * Tap a range edge to choose its local calendar date first and clock time second. UI sizing: date/time controls split the row evenly with 8dp gaps and 14x12dp button content padding.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format, or null when not provided.
+ * @param tag Tag supplied to [ActivityDateTimePicker].
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActivityDateTimePicker(
@@ -138,8 +164,11 @@ private fun ActivityDateTimePicker(
     }
 }
 
-// Activity stays grouped on the overview, then See more opens one searchable category at a time.
-// UI sizing/text: activity uses 24dp page padding, 14dp row gaps, 16dp cards, titleLarge sections, and bodySmall timestamps.
+/**
+ * Activity stays grouped on the overview, then See more opens one searchable category at a time. UI sizing/text: activity uses 24dp page padding, 14dp row gaps, 16dp cards, titleLarge sections, and bodySmall timestamps.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
 @Composable
 internal fun ActivityHistory(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -151,7 +180,12 @@ internal fun ActivityHistory(session: SessionViewModel) {
     }
     var from by remember { mutableStateOf<Long?>(null) }
     var to by remember { mutableStateOf<Long?>(null) }
-    // Keeps history rows that fall inside the dates chosen by the user.
+    /**
+     * Keeps history rows that fall inside the dates chosen by the user.
+     *
+     * @param time Time supplied to [inRange].
+     * @return The resulting in range.
+     */
     fun inRange(time: Long) =
         (from == null || time >= from!!) && (to == null || time <= to!! + 59_999)
 
@@ -160,10 +194,29 @@ internal fun ActivityHistory(session: SessionViewModel) {
     val attempts = session.attempts.filter { inRange(it.timestamp) }
     val privacy = session.privacyHistory.filter { inRange(it.timestamp) }
     val selected = session.activityCategory
+    /**
+     * Computes visible.
+     *
+     * @param category Category supplied to [visible].
+     * @param rows Collection of rows values to process.
+     * @param T The type of item being filtered for display in recent activity.
+     * @return The resulting visible.
+     */
     fun <T> visible(category: ActivityCategory, rows: List<T>) =
         if (selected == category) rows else rows.take(5)
 
     val listState = rememberLazyListState()
+    var lastCategory by remember { mutableStateOf(selected) }
+    val wt = LocalWalkthroughDirective.current
+    LaunchedEffect(wt?.stepId, wt?.action) {
+        if (wt?.action == "activity_scroll_logs") listState.animateScrollToItem(3)
+    }
+    LaunchedEffect(selected) {
+        if (selected != lastCategory) {
+            lastCategory = selected
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().oliveScrollbar(listState).testTag("activity_list"),
         state = listState,
@@ -201,7 +254,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
             return@LazyColumn
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.walkthroughTarget("activity_date_filters"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActivityDateTimePicker(uiText(R.string.from), from, "activity_from") { from = it }
                 ActivityDateTimePicker(uiText(R.string.to), to, "activity_to") { to = it }
             }
@@ -211,7 +264,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 Text(
                     stringResource(R.string.settings_history),
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() })
+                    modifier = Modifier.walkthroughTarget("activity_settings_section").semantics { heading() })
             }
             if (settings.isEmpty()) item { Text(stringResource(R.string.no_settings_activity_yet)) }
             items(visible(ActivityCategory.Settings, settings), key = { it.id }) { event ->
@@ -360,6 +413,172 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     )
                 }) { Text(stringResource(R.string.see_more)) }
             }
+        }
+    }
+}
+
+private enum class ReadinessIssue(val explanation: Int, val action: Int) {
+    Location(R.string.emergency_readiness_location, R.string.emergency_readiness_allow_location),
+    DeviceLocation(R.string.emergency_readiness_device_location, R.string.emergency_readiness_enable_location),
+    Background(R.string.emergency_readiness_background, R.string.emergency_readiness_allow_background),
+    AppNotifications(R.string.emergency_readiness_notifications, R.string.emergency_readiness_notification_settings),
+    TrackingNotifications(R.string.emergency_readiness_notifications, R.string.emergency_readiness_notification_settings),
+}
+
+/**
+ * Computes emergency readiness issues for this context.
+ *
+ * @receiver The Android context used to read permission and system settings.
+ * @param localMode Whether to apply local mode.
+ * @return List of resulting emergency readiness issues items.
+ */
+private fun Context.emergencyReadinessIssues(localMode: Boolean): List<ReadinessIssue> = buildList {
+    /**
+     * Computes granted.
+     *
+     * @param permission Permission supplied to [granted].
+     * @return The resulting granted.
+     */
+    fun granted(permission: String) =
+        ContextCompat.checkSelfPermission(this@emergencyReadinessIssues, permission) == PackageManager.PERMISSION_GRANTED
+
+    val hasLocation = granted(Manifest.permission.ACCESS_COARSE_LOCATION) || granted(Manifest.permission.ACCESS_FINE_LOCATION)
+    if (!hasLocation) add(ReadinessIssue.Location)
+    val locationManager = getSystemService(LocationManager::class.java)
+    if (locationManager != null && !LocationManagerCompat.isLocationEnabled(locationManager)) {
+        add(ReadinessIssue.DeviceLocation)
+    }
+
+    if (!localMode) {
+        if (hasLocation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            !granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        ) {
+            add(ReadinessIssue.Background)
+        }
+        val channel = getSystemService(NotificationManager::class.java)
+            ?.getNotificationChannel(OliveNotificationManager.CHANNEL_LOCATION)
+        when {
+            !NotificationManagerCompat.from(this@emergencyReadinessIssues).areNotificationsEnabled() ->
+                add(ReadinessIssue.AppNotifications)
+            channel?.importance == NotificationManager.IMPORTANCE_NONE -> add(ReadinessIssue.TrackingNotifications)
+        }
+    }
+}
+
+/**
+ * Renders the emergency readiness card composable.
+ *
+ * @param accountId Account ID supplied to [EmergencyReadinessCard].
+ * @param localMode Whether to apply local mode.
+ */
+@Composable
+internal fun EmergencyReadinessCard(accountId: String, localMode: Boolean) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val requestLocation = LocalLocationPermissionRequest.current
+    val requestBackground = LocalBackgroundLocationPermissionRequest.current
+    val openSystem = LocalSafeSystemLauncher.current
+    val scope = rememberCoroutineScope()
+    val preferences = remember(context) {
+        context.getSharedPreferences("olive_emergency_readiness", Context.MODE_PRIVATE)
+    }
+    val snoozeKey = "snoozed_until:$accountId"
+    var remindAt by remember(snoozeKey) { mutableLongStateOf(preferences.getLong(snoozeKey, 0L)) }
+    var issues by remember(accountId, localMode) { mutableStateOf(emptyList<ReadinessIssue>()) }
+    var opening by remember(accountId) { mutableStateOf(false) }
+    var settingsError by remember(accountId) { mutableStateOf(false) }
+    /**
+     * Checks the target.
+     */
+    fun check() {
+        issues = if (System.currentTimeMillis() < remindAt) emptyList()
+        else context.emergencyReadinessIssues(localMode)
+    }
+    LaunchedEffect(context, lifecycle, accountId, localMode) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                check()
+                delay(5.minutes)
+            }
+        }
+    }
+    if (issues.isEmpty()) return
+
+    /**
+     * Opens settings.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     */
+    fun openSettings(intent: Intent) {
+        settingsError = !openSystem(intent)
+    }
+    /**
+     * Requests access.
+     *
+     * @param request Function used to transform or provide request.
+     */
+    fun requestAccess(request: suspend () -> Boolean) {
+        opening = true
+        scope.launch {
+            try {
+                request()
+                check()
+            } finally {
+                opening = false
+            }
+        }
+    }
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.emergency_readiness_title), style = MaterialTheme.typography.titleMedium)
+            issues.forEach { issue ->
+                Text(stringResource(issue.explanation), style = MaterialTheme.typography.bodyMedium)
+                if (issue == ReadinessIssue.Background && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Text(
+                        stringResource(
+                            R.string.emergency_readiness_location_settings_path,
+                            context.packageManager.backgroundPermissionOptionLabel.toString(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                val colors = MaterialTheme.colorScheme
+                OutlinedButton(
+                    enabled = !opening,
+                    border = if (!opening) BorderStroke(2.dp, colors.outlineVariant)
+                        else ButtonDefaults.outlinedButtonBorder(enabled = !opening),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = colors.primaryContainer,
+                        contentColor = colors.onPrimaryContainer,
+                    ),
+                    onClick = {
+                        settingsError = false
+                        when (issue) {
+                            ReadinessIssue.Location -> requestAccess(requestLocation)
+                            ReadinessIssue.Background -> requestBackground?.let { requestAccess(it) } ?: check()
+                            ReadinessIssue.DeviceLocation -> openSettings(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            ReadinessIssue.AppNotifications -> openSettings(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                            )
+                            ReadinessIssue.TrackingNotifications -> openSettings(
+                                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    .putExtra(Settings.EXTRA_CHANNEL_ID, OliveNotificationManager.CHANNEL_LOCATION),
+                            )
+                        }
+                    },
+                ) { Text(stringResource(issue.action)) }
+            }
+            if (settingsError) Text(
+                stringResource(R.string.app_permissions_settings_unavailable),
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(enabled = !opening, onClick = {
+                remindAt = System.currentTimeMillis() + 1.days.inWholeMilliseconds
+                preferences.edit { putLong(snoozeKey, remindAt) }
+                issues = emptyList()
+            }) { Text(stringResource(R.string.emergency_readiness_remind_later)) }
         }
     }
 }

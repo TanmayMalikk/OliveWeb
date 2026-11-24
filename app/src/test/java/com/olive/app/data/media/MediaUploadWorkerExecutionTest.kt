@@ -4,11 +4,16 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import androidx.work.impl.utils.taskexecutor.TaskExecutor
+import androidx.work.impl.WorkManagerImpl
 import androidx.work.ProgressUpdater
 import com.google.common.util.concurrent.Futures
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
+import com.olive.app.support.TestAndroidKeyStore
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -105,6 +110,49 @@ class MediaUploadWorkerExecutionTest {
         }
     }
 
+    @Test
+    fun voiceRecordingIsQueuedWithItsEncryptedAttachmentOnlyAfterUploadCompletes() {
+        val ciphertext = byteArrayOf(5, 31, 76)
+        val uploads = mutableListOf<ByteArray>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { request ->
+            uploads += request.requestBody.readBytes()
+            request.sendResponseHeaders(200, -1)
+            request.close()
+        }
+        server.start()
+        val file = File(context.cacheDir, "synthetic-voice.olive").apply { writeBytes(ciphertext) }
+        WorkManagerImpl.setDelegate(mock(WorkManagerImpl::class.java))
+        try {
+            TestAndroidKeyStore.install().use {
+                val roomKey = EncryptionUtils.generateSymmetricKey()
+                val draft = PendingVoiceMessage("chat", "fixture_owner",
+                    KeyManager.wrapKey(roomKey, KeyManager.getOrCreatePublicKey()), "5000,123")
+                val initial = job(file).copy(voiceDraft = draft)
+                val outbox = MessageOutboxStore(context)
+                assertTrue(outbox.all("owner").isEmpty())
+                withWorker(initial, url = "http://127.0.0.1:${server.address.port}") { worker, current, api, states ->
+                    val result = runBlocking { worker.doWork() }
+                    assertEquals(ListenableWorker.Result.success(Data.Builder().putString("mediaId", "media").build()), result)
+                    assertArrayEquals(ciphertext, uploads.single())
+                    assertTrue(states.containsAll(listOf(MediaTransferStatus.CREATING_SESSION, MediaTransferStatus.FINALIZING)))
+                    assertNull(current().voiceDraft)
+                    assertNull(current().voiceMessage)
+                    val queued = outbox.all("owner").single()
+                    assertEquals("job", queued.id)
+                    assertEquals("chat", queued.conversationId)
+                    assertEquals("media", queued.attachment?.mediaId)
+                    assertEquals("SHARED_VOICE:media:5000,123", EncryptionUtils.decryptText(queued.ciphertext, roomKey))
+                    runBlocking { verify(api).completeUpload("job", listOf(MediaCompletedPart(1, "single"))) }
+                }
+            }
+        } finally {
+            WorkManagerImpl.setDelegate(null)
+            server.stop(0)
+            file.delete()
+        }
+    }
+
     private fun functionsFailure(message: String, code: FirebaseFunctionsException.Code) =
         FirebaseFunctionsException::class.java.getDeclaredConstructor(
             String::class.java, FirebaseFunctionsException.Code::class.java, Any::class.java,
@@ -179,5 +227,31 @@ class MediaUploadWorkerExecutionTest {
                 }
             }
         } finally { executor.shutdownNow() }
+    }
+
+    @Test
+    fun offlineMediaCleanupWorkerEnqueuesAndHandlesSuccessAndRetry() = runBlocking<Unit> {
+        val work = mock(WorkManagerImpl::class.java)
+        WorkManagerImpl.setDelegate(work)
+        try {
+            OfflineMediaCleanupWorker.enqueue(context, "cand-1")
+            assertEquals(1, mockingDetails(work).invocations.count { it.method.name == "enqueueUniqueWork" })
+        } finally {
+            WorkManagerImpl.setDelegate(null)
+        }
+
+        val workerParams = mock(WorkerParameters::class.java).apply {
+            `when`(backgroundExecutor).thenReturn(java.util.concurrent.Executor(Runnable::run))
+            `when`(taskExecutor).thenReturn(mock(TaskExecutor::class.java))
+        }
+        val worker = OfflineMediaCleanupWorker(context, workerParams)
+        mockConstruction(OfflineMediaCache::class.java).use {
+            assertEquals(ListenableWorker.Result.success(), worker.doWork())
+        }
+        mockConstruction(OfflineMediaCache::class.java) { mockCache, _ ->
+            doThrow(IllegalStateException("Cache failure")).`when`(mockCache).cleanupExpiredCandidates()
+        }.use {
+            assertEquals(ListenableWorker.Result.retry(), worker.doWork())
+        }
     }
 }

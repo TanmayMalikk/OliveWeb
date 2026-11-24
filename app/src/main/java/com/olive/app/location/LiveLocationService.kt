@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -21,6 +22,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.firestore.FirebaseFirestore
 import com.olive.app.R
 import com.olive.app.data.location.LocationDatabase
 import com.olive.app.data.location.LocationTrailPoint
@@ -51,13 +53,19 @@ class LiveLocationService : Service() {
     private var lastMotionAt = 0L
     private var lastTrailPruneAt = 0L
     private val callback = object : LocationCallback() {
-        // Publishes each fresh GPS point while live sharing is active.
+        /**
+         * Publishes each fresh GPS point while live sharing is active.
+         *
+         * @param result Result payload delivered to the callback.
+         */
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let(::handleLocation)
         }
     }
 
-    // Prepares the foreground notification and GPS client for live sharing.
+    /**
+     * Prepares the foreground notification and GPS client for live sharing.
+     */
     override fun onCreate() {
         super.onCreate()
         fused =
@@ -65,9 +73,21 @@ class LiveLocationService : Service() {
         OliveNotificationManager.createNotificationChannels(this)
     }
 
-    // This foreground location service is command-based, so screens do not bind to it.
+    /**
+     * This foreground location service is command-based, so screens do not bind to it.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @return The resulting [IBinder], or `null` if unavailable.
+     */
     override fun onBind(intent: Intent?): IBinder? = null
-    // Starts or stops GPS updates from the action sent to the foreground service.
+    /**
+     * Starts or stops GPS updates from the action sent to the foreground service.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @param flags Flags supplied to [onStartCommand].
+     * @param startId Start ID supplied to [onStartCommand].
+     * @return The computed on start command numeric value.
+     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Stop location sharing immediately when the notification action asks for it.
         if (intent?.action == STOP) {
@@ -134,7 +154,11 @@ class LiveLocationService : Service() {
         return START_REDELIVER_INTENT
     }
 
-    // Stops expired shares, tracks movement, and uploads a fresh encrypted location when needed.
+    /**
+     * Stops expired shares, tracks movement, and uploads a fresh encrypted location when needed.
+     *
+     * @param location Location supplied to [handleLocation].
+     */
     private fun handleLocation(location: Location) {
         val now = System.currentTimeMillis()
         val moved = lastUploaded?.distanceTo(location)?.let { it >= 3f } ?: true
@@ -183,7 +207,11 @@ class LiveLocationService : Service() {
         pruneExpiredTrail(now)
     }
 
-    // Removes expired trail from location sharing.
+    /**
+     * Removes expired trail from location sharing.
+     *
+     * @param now Current epoch timestamp in milliseconds.
+     */
     private fun pruneExpiredTrail(now: Long) {
         if (now - lastTrailPruneAt < TRAIL_PRUNE_INTERVAL_MILLIS) return
         lastTrailPruneAt = now
@@ -194,7 +222,9 @@ class LiveLocationService : Service() {
             }
     }
 
-    // Stops GPS uploads when live sharing ends or expires.
+    /**
+     * Stops GPS uploads when live sharing ends or expires.
+     */
     private fun stopSharing() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)
@@ -205,6 +235,7 @@ class LiveLocationService : Service() {
                 }.getOrNull()
             reference?.onDisconnect()?.cancel()
             reference?.updateChildren(mapOf("active" to false))
+            runCatching { FirebaseFirestore.getInstance().collection("liveLocationSessions").document(ownerUid).delete() }
             LiveLocationKeyStore(this).remove(ownerUid)
         }
         getSharedPreferences("olive_location_sharing", MODE_PRIVATE).edit {
@@ -216,7 +247,9 @@ class LiveLocationService : Service() {
         stopSelf()
     }
 
-    // Requests immediate location for live location service.
+    /**
+     * Requests immediate location for live location service.
+     */
     private fun requestImmediateLocation() {
         if (!hasPermission()) return
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 0L)
@@ -227,14 +260,20 @@ class LiveLocationService : Service() {
         }
     }
 
-    // Stops GPS callbacks when Android destroys the live-location service.
+    /**
+     * Stops GPS callbacks when Android destroys the live-location service.
+     */
     override fun onDestroy() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)
         super.onDestroy()
     }
 
-    // Checks whether Android still allows this service to read location.
+    /**
+     * Checks whether Android still allows this service to read location.
+     *
+     * @return `true` if has permission, or `false` otherwise.
+     */
     private fun hasPermission() = ContextCompat.checkSelfPermission(
         this,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -244,7 +283,11 @@ class LiveLocationService : Service() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
-    // Builds the notification shown while location sharing is running.
+    /**
+     * Builds the notification shown while location sharing is running.
+     *
+     * @return The resulting [Notification] instance.
+     */
     private fun notification(): Notification {
         return NotificationCompat.Builder(this, OliveNotificationManager.CHANNEL_LOCATION)
             .setSmallIcon(R.drawable.ic_notification_olive_branch)
@@ -276,26 +319,48 @@ class LiveLocationService : Service() {
 
 /** Runs the user location feed even when the cover app is not on screen. */
 class AdminLocationService : Service() {
-    private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val fusedDelegate = lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val fused by fusedDelegate
     private var ownerUid = ""
     private var displayName = ""
     private var reference: DatabaseReference? = null
     private var lastUploaded: Location? = null
     private var lastUploadAt = 0L
     private val callback = object : LocationCallback() {
+        /**
+         * Processes updated device coordinates delivered by the location provider.
+         *
+         * @param result Result payload delivered to the callback.
+         */
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let(::publish)
         }
     }
 
+    /**
+     * Initializes the component and sets up its state or UI when created by Android.
+     */
     override fun onCreate() {
         super.onCreate()
         OliveNotificationManager.createNotificationChannels(this)
     }
 
+    /**
+     * Returns the binder interface for clients connecting to this service.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @return The resulting [IBinder], or `null` if unavailable.
+     */
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // Restores the signed-in user and begins high-accuracy updates for the admin map.
+    /**
+     * Restores the signed-in user and begins high-accuracy updates for the admin map.
+     *
+     * @param intent Android intent containing the action and optional extras for this component.
+     * @param flags Flags supplied to [onStartCommand].
+     * @param startId Start ID supplied to [onStartCommand].
+     * @return The computed on start command numeric value.
+     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopTracking()
@@ -310,6 +375,7 @@ class AdminLocationService : Service() {
             stopTracking()
             return START_NOT_STICKY
         }
+        startForeground(NOTIFICATION_ID, notification())
         preferences.edit {
             putBoolean(KEY_ACTIVE, true)
             putString(KEY_UID, ownerUid)
@@ -319,7 +385,6 @@ class AdminLocationService : Service() {
             LocationDatabase.instance().reference.child(ADMIN_LOCATION_PATH).child(ownerUid)
         }.getOrNull()
         reference?.onDisconnect()?.updateChildren(mapOf("active" to false))
-        startForeground(NOTIFICATION_ID, notification())
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, SAMPLE_MILLIS)
             .setMinUpdateIntervalMillis(MIN_SAMPLE_MILLIS)
             .setMaxUpdateDelayMillis(MAX_DELAY_MILLIS)
@@ -336,7 +401,11 @@ class AdminLocationService : Service() {
         return START_STICKY
     }
 
-    // Publishes movement immediately and refreshes stationary locations once per minute.
+    /**
+     * Publishes movement immediately and refreshes stationary locations once per minute.
+     *
+     * @param location Location supplied to [publish].
+     */
     private fun publish(location: Location) {
         val now = System.currentTimeMillis()
         val moved = lastUploaded?.distanceTo(location)?.let { it >= MIN_DISTANCE_METRES } ?: true
@@ -355,9 +424,11 @@ class AdminLocationService : Service() {
         )
     }
 
-    // Marks the last point offline, removes GPS callbacks, and clears the saved session.
+    /**
+     * Marks the last point offline, removes GPS callbacks, and clears the saved session.
+     */
     private fun stopTracking() {
-        fused.removeLocationUpdates(callback)
+        if (fusedDelegate.isInitialized()) fused.removeLocationUpdates(callback)
         reference?.onDisconnect()?.cancel()
         reference?.updateChildren(mapOf("active" to false, "updatedAt" to System.currentTimeMillis()))
         getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit {
@@ -369,17 +440,30 @@ class AdminLocationService : Service() {
         stopSelf()
     }
 
+    /**
+     * Cleans up listeners and allocated resources before the component is destroyed.
+     */
     override fun onDestroy() {
-        fused.removeLocationUpdates(callback)
+        if (fusedDelegate.isInitialized()) fused.removeLocationUpdates(callback)
         super.onDestroy()
     }
 
+    /**
+     * Checks whether location permission.
+     *
+     * @return `true` if has location permission, or `false` otherwise.
+     */
     private fun hasLocationPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
+    /**
+     * Returns the notification.
+     *
+     * @return The resulting [Notification] instance.
+     */
     private fun notification(): Notification = NotificationCompat.Builder(this, OliveNotificationManager.CHANNEL_LOCATION)
         .setSmallIcon(R.drawable.ic_notification_olive_branch)
         .setContentTitle(getString(R.string.location_notification_title))
@@ -407,10 +491,18 @@ class AdminLocationService : Service() {
         private const val MIN_DISTANCE_METRES = 3f
         private const val STATIONARY_UPLOAD_MILLIS = 60_000L
 
-        // Starts or refreshes tracking for the currently signed-in user account.
+        /**
+         * Starts or refreshes tracking for the currently signed-in user account.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @param uid Firebase UID of the target user account.
+         * @param name Field, key, or display name.
+         */
         fun start(context: Context, uid: String, name: String) {
+            // Reject before requesting a foreground service. Stopping an unpromoted request can
+            // cause ForegroundServiceDidNotStartInTimeException on newer Android versions.
+            if (uid.isBlank() || !canStart(context)) return
             context.getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit {
-                putBoolean(KEY_ACTIVE, true)
                 putString(KEY_UID, uid)
                 putString(KEY_NAME, name)
             }
@@ -422,14 +514,38 @@ class AdminLocationService : Service() {
             )
         }
 
-        // Stops the admin location feed when the user signs out of this phone.
+        /**
+         * Checks whether the caller can start.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @return `true` if can start, or `false` otherwise.
+         */
+        internal fun canStart(context: Context): Boolean {
+            val foreground = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+            val background = Build.VERSION.SDK_INT < 29 || ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+            return foreground && background
+        }
+
+        /**
+         * Stops the admin location feed when the user signs out of this phone.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         */
         fun stop(context: Context) {
             context.startService(
                 Intent(context, AdminLocationService::class.java).setAction(ACTION_STOP)
             )
         }
 
-        // Returns true when this phone has a user location feed to restore.
+        /**
+         * Returns true when this phone has a user location feed to restore.
+         *
+         * @param context Android context used to access system services, resources, or storage.
+         * @return The resulting active.
+         */
         fun active(context: Context) = context.getSharedPreferences(PREFERENCES, MODE_PRIVATE)
             .getBoolean(KEY_ACTIVE, false)
     }
@@ -441,23 +557,41 @@ class AdminLocationService : Service() {
 internal class LiveLocationKeyStore(context: Context) {
     private val vault = EncryptedVault(context.applicationContext, "live-location")
 
-    // Saves the live-location encryption key in protected local storage.
+    /**
+     * Saves the live-location encryption key in protected local storage.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param key Lookup key or cryptographic key.
+     */
     fun save(ownerUid: String, key: SecretKey) =
         vault.update { it.put(ownerUid, EncryptionUtils.encodeKeyToString(key)) }
 
-    // Loads the live-location encryption key from protected local storage.
+    /**
+     * Loads the live-location encryption key from protected local storage.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @return The resulting [SecretKey], or `null` if unavailable.
+     */
     fun load(ownerUid: String): SecretKey? =
         vault.read().optString(ownerUid).takeIf(String::isNotBlank)
             ?.let(EncryptionUtils::decodeStringToKey)
 
-    // Live location key store: Removes the selected item.
+    /**
+     * Live location key store: Removes the selected item.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     */
     fun remove(ownerUid: String) = vault.update { it.remove(ownerUid) }
 }
 
 internal object LiveLocationState {
     private val mutable = MutableStateFlow<MapLocationPoint?>(null)
     val current = mutable.asStateFlow()
-    // Updates the visible live-sharing status and expiry time.
+    /**
+     * Updates the visible live-sharing status and expiry time.
+     *
+     * @param value Input value to store, parse, or format, or null when not provided.
+     */
     internal fun update(value: MapLocationPoint?) {
         if (value == null) {
             mutable.value = null
@@ -479,7 +613,12 @@ internal object LiveLocationState {
 internal object LiveLocationController {
     private const val PREFS = "olive_location_sharing"
 
-    // Returns true while the current live-location session has not expired.
+    /**
+     * Returns true while the current live-location session has not expired.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return `true` if active, or `false` otherwise.
+     */
     fun active(context: Context): Boolean {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return preferences.getBoolean(
@@ -488,15 +627,34 @@ internal object LiveLocationController {
         ) && expiresAt(context) > System.currentTimeMillis()
     }
 
-    // Reads the saved contact IDs that may receive this user's live location.
+    /**
+     * Reads the saved contact IDs that may receive this user's live location.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting selected.
+     */
     fun selected(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getStringSet("live_contacts", emptySet()).orEmpty()
 
-    // Calculates when the current live-location sharing session must stop.
+    /**
+     * Calculates when the current live-location sharing session must stop.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting expires at.
+     */
     fun expiresAt(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getLong("live_expires_at", 0L)
 
-    // Starts live location for the chosen duration and stores when it must stop.
+    /**
+     * Starts live location for the chosen duration and stores when it must stop.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @param name Field, key, or display name.
+     * @param contactUids Collection of contact uids values to process.
+     * @param expiresAt Expires at supplied to [start].
+     * @param key Lookup key or cryptographic key.
+     */
     fun start(
         context: Context,
         uid: String,
@@ -523,7 +681,11 @@ internal object LiveLocationController {
         ContextCompat.startForegroundService(context, intent)
     }
 
-    // Stops live sharing and clears its saved expiry time.
+    /**
+     * Stops live sharing and clears its saved expiry time.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     */
     fun stop(context: Context) {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val ownerUid = preferences.getString("live_owner_uid", null)

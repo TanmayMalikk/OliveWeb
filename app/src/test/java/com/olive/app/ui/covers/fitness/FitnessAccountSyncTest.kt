@@ -2,6 +2,7 @@ package com.olive.app.ui.covers.fitness
 
 import android.app.Application
 import android.content.Context
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -109,5 +110,33 @@ class FitnessAccountSyncTest {
         val repeated = store.recordWatchActivity(110, 70, 3000, today, nowMillis = 3000, heartRateUpdatedAt = 1000)
         assertEquals(110, repeated.stepsToday)
         assertEquals(1, repeated.heartRateVitals!!.sampleCount)
+    }
+
+    @Test fun foodLibraryAndOutboxDecoderHandleAllSupportedValueTypesAndRecentSearches() {
+        assertEquals(42, FitnessAccountSync.decode(JSONObject().put("type", "int").put("value", 42).toString()))
+        assertEquals(99L, FitnessAccountSync.decode(JSONObject().put("type", "long").put("value", 99L).toString()))
+        assertEquals(3.5f, FitnessAccountSync.decode(JSONObject().put("type", "float").put("value", 3.5).toString()))
+        assertEquals(true, FitnessAccountSync.decode(JSONObject().put("type", "bool").put("value", true).toString()))
+        assertEquals("abc", FitnessAccountSync.decode(JSONObject().put("type", "string").put("value", "abc").toString()))
+        assertNull(FitnessAccountSync.decode(JSONObject().put("type", "null").put("value", JSONObject.NULL).toString()))
+        assertNull(FitnessAccountSync.decode("{not-json"))
+
+        val prefs = fitnessPreferences(context, "library-account")
+        val library = FitnessFoodLibrary(prefs)
+        val observed = mutableListOf<List<SavedFood>>()
+        val subscription = library.observeSavedFoods { observed += it }
+
+        val customFood = NutritionFood("custom-1", "Quinoa", "", "1 cup", 220f, 8f, 39f, 3.5f, FoodDataSource.MANUAL)
+        library.setSaved(customFood, true)
+        library.setSaved(customFood, false)
+
+        library.recordSearch(RecentFoodSearch("   ", false))
+        for (i in 1..10) library.recordSearch(RecentFoodSearch("Food $i", i % 2 == 0))
+        val searches = library.searches()
+        assertEquals(8, searches.size)
+        assertEquals("Food 10", searches.first().query)
+
+        subscription.close()
+        assertTrue(observed.isNotEmpty())
     }
 }

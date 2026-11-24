@@ -1,11 +1,7 @@
 // User incident notes: lets the user search for an address or place a pin on a map.
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
 import { MapPin } from "lucide-react";
-import "leaflet/dist/leaflet.css";
-import markerUrl from "leaflet/dist/images/marker-icon.png?url";
-import retinaMarkerUrl from "leaflet/dist/images/marker-icon-2x.png?url";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png?url";
+import { FadedMap } from "../../shared/FadedMap";
 
 type LocationResult = {
   label: string;
@@ -20,127 +16,39 @@ type IncidentLocationPickerProps = {
   onChange: (result: LocationResult) => void;
 };
 
-const DEFAULT_CENTER: [number, number] = [53.5461, -113.4938];
-const INCIDENT_PIN = L.icon({
-  iconUrl: markerUrl,
-  iconRetinaUrl: retinaMarkerUrl,
-  shadowUrl,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  shadowSize: [41, 41],
-});
-
-function droppedPin(point: L.LatLng): LocationResult {
-  return {
-    label: "Dropped pin (" + point.lat.toFixed(5) + ", " + point.lng.toFixed(5) + ")",
-    latitude: point.lat,
-    longitude: point.lng,
-  };
-}
-
-// The map keeps the saved incident pin separate from the user's current red location dot.
+// Keeps the current GPS dot separate from the selected incident pin.
 function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPickerProps, "label">) {
-  const element = useRef<HTMLDivElement>(null);
-  const map = useRef<L.Map | null>(null);
-  const selectedMarker = useRef<L.Marker | null>(null);
-  const currentMarker = useRef<L.CircleMarker | null>(null);
-  const latestChange = useRef(onChange);
-
-  function placePin(instance: L.Map, point: L.LatLng) {
-    if (selectedMarker.current) {
-      selectedMarker.current.setLatLng(point);
-      return;
-    }
-    const pin = L.marker(point, { icon: INCIDENT_PIN, draggable: true, alt: "Incident pin" })
-      .addTo(instance);
-    pin.on("dragend", () => latestChange.current(droppedPin(pin.getLatLng())));
-    selectedMarker.current = pin;
-  }
-
-  useEffect(() => {
-    latestChange.current = onChange;
-  }, [onChange]);
-
-  // This builds the map once and reports map clicks or pin drags to the incident form.
-  useEffect(() => {
-    if (!element.current || map.current) return;
-    const initial: [number, number] =
-      Number.isFinite(latitude) && Number.isFinite(longitude)
-        ? [latitude!, longitude!]
-        : DEFAULT_CENTER;
-    const instance = L.map(element.current, {
-      center: initial,
-      zoom: Number.isFinite(latitude) ? 15 : 10,
-      scrollWheelZoom: false,
-    });
-    L.tileLayer("/api/map-tiles/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors · Tiles by Geoapify",
-      maxZoom: 19,
-    }).addTo(instance);
-
-    instance.on("click", (event: L.LeafletMouseEvent) => {
-      placePin(instance, event.latlng);
-      latestChange.current(droppedPin(event.latlng));
-    });
-    map.current = instance;
-    return () => {
-      instance.remove();
-      map.current = null;
-      selectedMarker.current = null;
-      currentMarker.current = null;
-    };
-  }, []);
-
-  // This moves the draggable pin when the user chooses an address suggestion.
-  useEffect(() => {
-    if (!map.current) return;
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      selectedMarker.current?.remove();
-      selectedMarker.current = null;
-      return;
-    }
-    const point = L.latLng(latitude!, longitude!);
-    placePin(map.current, point);
-    map.current.setView(point, 15);
-  }, [latitude, longitude]);
-
-  // The browser location is shown as a red dot and does not replace the incident pin.
-  function showCurrentLocation() {
-    navigator.geolocation?.getCurrentPosition((position) => {
-      if (!map.current) return;
-      const point = L.latLng(position.coords.latitude, position.coords.longitude);
-      if (!currentMarker.current) {
-        currentMarker.current = L.circleMarker(point, {
-          radius: 8,
-          color: "#ffffff",
-          weight: 2,
-          fillColor: "#c7352b",
-          fillOpacity: 1,
-        }).addTo(map.current).bindTooltip("Your current location");
-      } else {
-        currentMarker.current.setLatLng(point);
-      }
-      map.current.setView(point, 15);
-    });
-  }
-
+  const [current, setCurrent] = useState<{ latitude: number; longitude: number }>();
+  const selected = latitude !== undefined && longitude !== undefined &&
+    Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : undefined;
   return (
     <div className="incident-map-wrap">
-      <button type="button" className="text-link" onClick={showCurrentLocation}>
+      <button type="button" className="text-link" onClick={() =>
+        navigator.geolocation?.getCurrentPosition(({ coords }) =>
+          setCurrent({ latitude: coords.latitude, longitude: coords.longitude }),
+        )
+      }>
         Show my current location
       </button>
-      <div
-        ref={element}
+      <FadedMap
         className="incident-map"
-        role="application"
-        aria-label="Incident location map. Click the map or drag the pin to save a location."
+        label="Incident location map"
+        current={current}
+        selected={selected}
+        onSelect={(point) => onChange({
+          ...point,
+          label: "Dropped pin (" + point.latitude.toFixed(5) + ", " + point.longitude.toFixed(5) + ")",
+        })}
       />
       <small>Click the map to drop a pin. You can drag the pin to adjust it.</small>
     </div>
   );
 }
 
-// The address field waits briefly after typing so it does not send a request for every key press.
+const MAX_CACHE_ENTRIES = 64;
+const addressCache = new Map<string, LocationResult[]>();
+
+// Keep requests responsive at 50ms while cancelling stale in-flight lookups on rapid typing.
 export function IncidentLocationPicker({
   label,
   latitude,
@@ -157,25 +65,39 @@ export function IncidentLocationPicker({
 
   useEffect(() => setQuery(label), [label]);
   useEffect(() => {
-    if (query.trim().length < 2 || query === label) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || query === label) {
       setResults([]);
+      return;
+    }
+    const cacheKey = trimmed.toLowerCase().replace(/\s+/g, " ");
+    const cached = addressCache.get(cacheKey);
+    if (cached) {
+      setResults(cached);
+      setMessage("");
       return;
     }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetch(`/api/locations?q=${encodeURIComponent(query.trim())}`, {
+      fetch(`/api/locations?q=${encodeURIComponent(trimmed)}`, {
         signal: controller.signal,
       })
         .then(async (response) => {
           const body = await response.json();
           if (!response.ok) throw new Error(body.error ?? "Address search failed.");
-          setResults(body.locations ?? []);
+          const locations: LocationResult[] = body.locations ?? [];
+          if (addressCache.size >= MAX_CACHE_ENTRIES) {
+            const oldestKey = addressCache.keys().next().value;
+            if (oldestKey !== undefined) addressCache.delete(oldestKey);
+          }
+          addressCache.set(cacheKey, locations);
+          setResults(locations);
           setMessage("");
         })
         .catch((failure) => {
           if (failure.name !== "AbortError") setMessage(failure.message);
         });
-    }, 350);
+    }, 50);
     return () => {
       window.clearTimeout(timer);
       controller.abort();

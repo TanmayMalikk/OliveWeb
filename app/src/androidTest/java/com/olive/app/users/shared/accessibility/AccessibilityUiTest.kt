@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
@@ -74,22 +75,6 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithText("5").assertDoesNotExist()
     }
 
-    // Checks the game cover keeps its controls individually accessible step with the test's sample data.
-    @Test
-    fun gameCoverKeepsItsControlsIndividuallyAccessible() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            compose.activity.setContent {
-                OliveTheme { com.olive.app.ui.covers.GameCover() }
-            }
-        }
-        compose.onNodeWithTag("cover_brand_game", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithText("Olive Tap").assertExists()
-        compose.onNodeWithTag("game_score").assertTextContains("Score: 0")
-        compose.onNodeWithTag("game_entry").assertHasClickAction()
-        compose.onNodeWithTag("game_olive").assertHasClickAction().performClick()
-        compose.onNodeWithTag("game_score").assertTextContains("Score: 1")
-    }
-
     // Checks the pin errors and quick exit use live regions without stealing talk back focus step with the test's sample data.
     @Test
     fun pinErrorsAndQuickExitUseLiveRegionsWithoutStealingTalkBackFocus() {
@@ -98,10 +83,9 @@ class AccessibilityUiTest : OliveUiTestBase() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             session.account.interceptSearch("moon garden")
         }
-        repeat(6) { compose.onNodeWithTag("pin_digit_9").performClick() }
-        compose.onNodeWithTag("unlock_pin").assert(
-            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Digits entered: 6")
-        )
+        compose.onNodeWithTag("unlock_pin").performTextReplacement("999999")
+        compose.onNodeWithTag("unlock_pin").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+        hideKeyboard()
         compose.onNodeWithTag("unlock_submit").performClick()
         waitFor("session_message")
         compose.onNodeWithTag("session_message")
@@ -121,13 +105,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
                 R.string.a11y_returned_to_cover,
                 session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
             ),
-        )
-            .assert(
-                SemanticsMatcher.expectValue(
-                    SemanticsProperties.LiveRegion,
-                    LiveRegionMode.Polite
-                )
-            )
+        ).assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
     }
 
@@ -157,10 +135,10 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.runOnIdle { session.navigation.openSafePage(SafePage.Messages) }
         waitFor("messages_dms_tab")
         compose.onNodeWithTag("messages_dms_tab").assertIsSelected()
-        compose.onNodeWithTag("message_username").assertExists()
+        compose.onNodeWithTag("friend_invite").assertExists()
         click("messages_tickets_tab")
         compose.onNodeWithTag("messages_tickets_tab").assertIsSelected()
-        compose.onNodeWithTag("message_username").assertDoesNotExist()
+        compose.onNodeWithTag("friend_invite").assertDoesNotExist()
         click("messages_dms_tab")
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val uid = requireNotNull(session.coverAccountId)
@@ -229,34 +207,17 @@ class AccessibilityUiTest : OliveUiTestBase() {
 
     // Checks the pin actions and digit count are spoken without exposing the pin step with the test's sample data.
     @Test
-    fun pinActionsAndDigitCountAreSpokenWithoutExposingThePin() {
+    fun pinUsesNativePasswordInputAndKeepsAttemptFeedbackAccessible() {
         register()
         trigger()
-        compose.onNodeWithTag("pin_backspace").assertContentDescriptionEquals("Delete digit")
-        compose.onNodeWithTag("unlock_submit").assertContentDescriptionEquals("Unlock")
-            .assertIsNotEnabled()
-        compose.onNodeWithTag("unlock_pin").assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.StateDescription,
-                "Digits entered: 0"
-            )
-        )
-        compose.onNodeWithTag("pin_digit_1").performClick()
-        compose.onNodeWithTag("pin_digit_2").performClick()
-        compose.onNodeWithTag("unlock_pin").assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.StateDescription,
-                "Digits entered: 2"
-            )
-        )
-        compose.onNodeWithTag("pin_backspace").performClick()
-        compose.onNodeWithTag("unlock_pin").assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.StateDescription,
-                "Digits entered: 1"
-            )
-        )
-        compose.onNodeWithTag("pin_backspace").performClick()
+        val field = compose.onNodeWithTag("unlock_pin")
+        field.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.SetText))
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
+        compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
+        field.performTextReplacement("12")
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
+        field.performTextClearance()
         enterPin("9999")
         waitFor("session_message")
         compose.onNodeWithTag("session_message").assert(

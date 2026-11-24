@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { Pin, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
-import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { purgeEntry, TRASH_RETENTION_MS, type Entry } from "../../../domain/DomainModels";
 import { formatDateTime } from "../../shared/safe_app/ActivityHistoryPage";
+import { useWalkthroughAction } from "../../shared/safe_app/WalkthroughCoachmark";
 import { accounts } from "../../../services/AccountService";
 import {
   listBrowserDocuments,
@@ -19,6 +20,41 @@ export default function Notes() {
   const [kindFilter, setKindFilter] = useState<"all" | "Note" | "Incident">("all");
   const [trash, setTrash] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
+  const [wtPopup, setWtPopup] = useState(false);
+  const [wtTrash, setWtTrash] = useState(false);
+  const wt = useWalkthroughAction();
+  useEffect(() => {
+    if (wt.action === "notes_open_incident_editor") {
+      const timestamp = Date.now();
+      setTrash(false);
+      setWtTrash(false);
+      setEditing((cur) => cur ?? {
+        id: crypto.randomUUID(),
+        timestamp,
+        updatedAt: timestamp,
+        title: "",
+        body: "",
+        kind: "Incident",
+        pinned: false,
+        edits: [],
+      });
+      setWtPopup(true);
+    } else if (wt.action === "notes_open_trash") {
+      setEditing(null);
+      setWtPopup(false);
+      setTrash(true);
+      setWtTrash(true);
+    } else {
+      if (wtPopup) {
+        setEditing(null);
+        setWtPopup(false);
+      }
+      if (wtTrash) {
+        setTrash(false);
+        setWtTrash(false);
+      }
+    }
+  }, [wt.stepId, wt.action]);
   const [revisions, setRevisions] = useState<Entry | null>(null);
   const [now, setNow] = useState(Date.now());
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
@@ -98,7 +134,11 @@ export default function Notes() {
               ))}
             </div>
           )}
-          <Button variant="quiet" onClick={() => setTrash(!trash)}>
+          <Button
+            variant="quiet"
+            data-walkthrough-id="notes-trash-toggle"
+            onClick={() => setTrash(!trash)}
+          >
             <Trash2 size={17} />
             {trash ? "Back to notes" : "Trash"}
           </Button>
@@ -233,10 +273,14 @@ export default function Notes() {
         <Modal
           title={editing.body ? "Your entry" : "A new thought"}
           wide
-          onClose={() => setEditing(null)}
+          nonModal={wtPopup}
+          onClose={() => {
+            setEditing(null);
+            setWtPopup(false);
+          }}
         >
           <Form
-            onSubmit={async (data) => {
+            onSubmit={async (data, form) => {
               await s.perform(async () => {
                 const title = String(data.get("title")).trim();
                 const body = String(data.get("body")).trim();
@@ -249,7 +293,10 @@ export default function Notes() {
                 const incidentLatitude = latitudeText ? Number(latitudeText) : Number.NaN;
                 const incidentLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
                 const attachmentIds = data.getAll("attachments").map(String);
-                if (!body) throw new Error("Write something before saving.");
+                if (!body) {
+                  shakeNamedFields(form, ["body"]);
+                  throw new Error("Write something before saving.");
+                }
                 const changes = [
                   ["Title", editing.title, title],
                   ["Body", editing.body, body],

@@ -57,4 +57,148 @@
         <item>Planear alojamiento, comida y medicación para los primeros días.</item>
         <item>Identificar los servicios de apoyo con los que quieras contactar.</item>
     </string-array>
+
+    <string name="onboarding_safety_questionnaire">Cuestionario del plan de seguridad</string>
+    <string name="safety_intake_intro">Estas preguntas opcionales personalizan tus documentos y apartados iniciales del plan de seguridad. Todo se guarda cifrado en tu perfil privado y puedes cambiarlo en cualquier momento.</string>
+    <string name="safety_intake_prefer_not_to_say">Prefiero no decirlo</string>
+    <string name="safety_intake_update_plan">Ajustar el plan con el cuestionario</string>
+    <string name="safety_intake_dialog_apply">Guardar y actualizar plan</string>
+
+    <string name="safety_intake_immigration_title">Estatus migratorio o de residencia</string>
+    <string name="safety_intake_immigration_subtitle">Ayuda a incluir las identificaciones, permisos y apoyos legales que te correspondan.</string>
+    <string name="safety_intake_immigration_citizen">Ciudadanía</string>
+    <string name="safety_intake_immigration_pr">Residencia permanente</string>
+    <string name="safety_intake_immigration_temporary">Permiso de trabajo, estudio, visitante o patrocinio</string>
+    <string name="safety_intake_immigration_refugee">Persona refugiada o solicitante de asilo</string>
+    <string name="safety_intake_immigration_uncertain">Indocumentado o estatus incierto</string>
+
+    <string name="safety_intake_dependants_title">Personas dependientes que salen contigo</string>
+    <string name="safety_intake_dependants_subtitle">Selecciona a quienes necesiten salir a salvo contigo.</string>
+    <string name="safety_intake_dependant_children">Menores / hijos</string>
+    <string name="safety_intake_dependant_adult">Adulto mayor o persona dependiente</string>
+    <string name="safety_intake_dependant_pets">Mascotas o animales de asistencia</string>
+
+    <string name="safety_intake_financial_title">Acceso e independencia financiera</string>
+    <string name="safety_intake_financial_subtitle">Personaliza los pasos de efectivo de emergencia, cuentas y ayuda económica.</string>
+    <string name="safety_intake_financial_independent">Tengo dinero o cuenta propia</string>
+    <string name="safety_intake_financial_shared">Cuentas compartidas o vigiladas</string>
+    <string name="safety_intake_financial_none">Sin acceso independiente a dinero</string>
+
+    <string name="safety_intake_transport_title">Transporte al momento de salir</string>
+    <string name="safety_intake_transport_subtitle">Ajusta tus listas de artículos rápidos y planificación del traslado.</string>
+    <string name="safety_intake_transport_vehicle">Vehículo propio o principal</string>
+    <string name="safety_intake_transport_transit">Transporte público o a pie</string>
+    <string name="safety_intake_transport_ride_support">Necesito traslado con un contacto de confianza o servicio</string>
+
+    <string name="safety_intake_circumstances_title">Necesidades legales, médicas y de vivienda</string>
+    <string name="safety_intake_circumstances_subtitle">Marca las que apliquen para añadir esos documentos y pasos de seguimiento.</string>
+    <string name="safety_intake_circumstance_legal">Órdenes judiciales, de custodia o de protección</string>
+    <string name="safety_intake_circumstance_marriage">Registros de matrimonio, separación o crianza</string>
+    <string name="safety_intake_circumstance_medical">Recetas médicas continuas o cuidados médicos</string>
+    <string name="safety_intake_circumstance_housing">Contrato de alquiler o hipoteca compartida</string>
+
+    <string name="safety_doc_photo_id">Licencia de conducir / identificación oficial con foto</string>
+    <string name="safety_doc_birth_certificate">Certificado de nacimiento</string>
+    <string name="safety_doc_health_card">Tarjeta de salud</string>
+    <string name="safety_doc_sin">Número de seguro social (SIN) o identificación fiscal</string>
+    <string name="safety_doc_citizen_passport">Pasaporte o certificado de ciudadanía</string>
+    <string name="safety_doc_pr_card">Tarjeta de residencia permanente (PR), COPR y pasaporte</string>
+    <string name="safety_doc_permit_sponsorship">Pasaporte, permiso de trabajo/estudio/visitante y documentos de patrocinio</string>
+    <string name="safety_doc_immigration_support">Copias de solicitudes de visa, número UCI/expediente y avisos migratorios</string>
+    <string name="safety_doc_refugee_papers">Identificación de solicitante de refugio, citatorios, asistencia legal/IRB y papeles de viaje</string>
+    <string name="safety_doc_any_id_copies">Cualquier identificación oficial, pasaporte, permiso vencido o fotos/copias de identidad</string>
+    <string name="safety_doc_immigration_clinic">Contacto de clínica legal migratoria de confianza antes de compartir tu estatus</string>
+    <string name="safety_doc_passport_generic">Pasaporte / documentos de ciudadanía o inmigración</string>
+    <string name="safety_doc_children_records">Identificaciones, actas de nacimiento, tarjetas de salud y datos escolares de tus hijos</string>
+    <string name="safety_doc_adult_dependant_records">Identificación, tarjeta de salud, medicación y poder legal o cuidado del dependiente</string>
+    <string name="safety_doc_pet_records">Cartilla de vacunación, microchip/registro y nota para el traslado de mascotas</string>
+    <string name="safety_doc_independent_banking">Tarjetas bancarias personales, datos de cuenta y pólizas de seguro</string>
+    <string name="safety_doc_shared_banking">Datos de cuenta separada, estados de cuenta recientes y PIN guardados fuera de equipos compartidos</string>
+    <string name="safety_doc_financial_proof">Comprobantes de ingresos, ayudas o gastos del hogar (resguardados de forma segura)</string>
+    <string name="safety_doc_banking_generic">Documentos bancarios / de seguros / financieros, si se necesitan</string>
+    <string name="safety_doc_court_orders">Órdenes judiciales, condiciones o medidas de protección y alejamiento</string>
+    <string name="safety_doc_marriage_custody">Acta de matrimonio y acuerdos de custodia o crianza</string>
+    <string name="safety_doc_medical_records">Recetas médicas, cartillas de vacunación y resúmenes médicos</string>
+    <string name="safety_doc_housing_records">Contrato de arrendamiento, estados de hipoteca o recibos a tu nombre</string>
+
+    <string name="safety_grab_house_and_car_keys">Llaves de la casa y del vehículo (incluida una copia)</string>
+    <string name="safety_grab_house_keys">Llaves de casa y controles o tarjetas de acceso</string>
+    <string name="safety_grab_phone">Teléfono, cargador y batería portátil</string>
+    <string name="safety_grab_cash_cards">Efectivo y tarjetas bancarias personales</string>
+    <string name="safety_grab_separate_cash">Efectivo de emergencia apartado y tarjetas que no sean compartidas</string>
+    <string name="safety_grab_emergency_cash">Cualquier efectivo de emergencia, tarjeta de transporte o vales que puedas apartar sin riesgo</string>
+    <string name="safety_grab_medicines">Medicamentos esenciales y lista escrita de recetas</string>
+    <string name="safety_grab_clothes">Ropa básica y artículos de aseo para unos días</string>
+    <string name="safety_grab_children">Ropa, pañales u objetos de consuelo y medicinas de los menores</string>
+    <string name="safety_grab_adult_dependant">Medicamentos, apoyos de movilidad y artículos diarios de tu dependiente</string>
+    <string name="safety_grab_pets">Alimento para mascotas, correa o transportadora y platos</string>
+
+    <string name="safety_fin_indep_passwords">Confirma que solo tú conoces las contraseñas y PIN de tus cuentas personales.</string>
+    <string name="safety_fin_indep_bills">Revisa pagos recurrentes o suscripciones ligadas a direcciones o dispositivos compartidos.</string>
+    <string name="safety_fin_shared_private_account">Aparta fondos de emergencia en un lugar seguro (cuenta propia o persona de confianza), fuera de estados vigilados.</string>
+    <string name="safety_fin_shared_cash">Ten efectivo accesible y revisa qué tarjetas podrían revelar tu ubicación.</string>
+    <string name="safety_fin_shared_document">Fotografía o anota con discreción saldos y deudas de cuentas conjuntas.</string>
+    <string name="safety_fin_emergency_aid">Identifica fondos de refugio, asistencia financiera de emergencia y apoyos locales de crisis.</string>
+    <string name="safety_fin_trusted_money_help">Define quién podría prestarte o resguardar efectivo de emergencia o pases de transporte.</string>
+    <string name="safety_fin_crisis_benefits">Pregunta en un centro de apoyo local por subsidios de emergencia o exenciones disponibles.</string>
+    <string name="safety_fin_children_benefits">Anota cuentas de prestaciones infantiles y subsidios de cuidado para menores.</string>
+    <string name="safety_fin_lease_rights">Consulta sobre cómo rescindir un alquiler conjunto sin penalización por violencia familiar.</string>
+    <string name="safety_fin_newcomer_support">Consulta con una organización migratoria o legal qué apoyos económicos corresponden a tu estatus.</string>
+
+    <string name="safety_dest_choose">Elegir un lugar seguro al que ir.</string>
+    <string name="safety_dest_address">Anotar la dirección y cómo encontrar el lugar.</string>
+    <string name="safety_dest_when">Confirmar cuándo puedes llegar sin peligro.</string>
+    <string name="safety_dest_children">Confirmar espacio y artículos básicos para dormir con tus hijos en el destino.</string>
+    <string name="safety_dest_adult_dependant">Confirmar accesibilidad física y apoyo de cuidado para tu dependiente.</string>
+    <string name="safety_dest_pets">Verificar si aceptan mascotas o coordinar resguardo temporal seguro.</string>
+
+    <string name="safety_travel_vehicle_fuel">Mantener el tanque o batería por encima de la mitad cuando sea seguro hacerlo.</string>
+    <string name="safety_travel_spare_key">Guardar una llave de repuesto en un lugar seguro y revisar si el vehículo tiene rastreo o ubicación compartida.</string>
+    <string name="safety_travel_vehicle_backup">Planear una ruta alternativa en transporte público o con alguien si el vehículo está bloqueado.</string>
+    <string name="safety_travel_transit_routes">Revisar rutas de transporte diurnas y nocturnas y transbordos seguros.</string>
+    <string name="safety_travel_transit_fare">Tener la tarjeta de transporte o efectivo exacto a la mano.</string>
+    <string name="safety_travel_pickup_spot">Elegir una parada segura e iluminada lejos de casa.</string>
+    <string name="safety_travel_confirm_driver">Confirmar a un conductor de confianza o servicio de crisis y la señal para salir.</string>
+    <string name="safety_travel_meeting_spot">Acordar un punto de encuentro seguro a poca distancia del hogar.</string>
+    <string name="safety_travel_backup_ride">Guardar en lugar seguro un número alterno o plan de taxi de emergencia.</string>
+    <string name="safety_travel_decide">Decidir cómo llegarás.</string>
+    <string name="safety_travel_confirm_help">Confirmar quién puede ayudarte con el transporte, si hace falta.</string>
+    <string name="safety_travel_prepare_fare">Preparar las llaves, el dinero del viaje o el combustible cuando sea seguro hacerlo.</string>
+    <string name="safety_travel_children">Planear carriola, asientos infantiles o ruta segura a pie al salir con menores.</string>
+    <string name="safety_travel_adult_dependant">Planear transporte accesible o apoyo de movilidad para tu dependiente.</string>
+    <string name="safety_travel_pets">Confirmar reglas de mascotas en el transporte o espacio para la transportadora.</string>
+
+    <string name="safety_after_checkin">Avisar de tu llegada a una persona de confianza cuando sea seguro hacerlo.</string>
+    <string name="safety_after_essentials">Planear alojamiento, comida y artículos básicos para los primeros días.</string>
+    <string name="safety_after_immigration_legal">Contactar una clínica legal de inmigración para proteger tu estatus.</string>
+    <string name="safety_after_children_school">Avisar confidencialmente a la escuela o guardería sobre quién puede recoger a tus hijos.</string>
+    <string name="safety_after_adult_dependant">Organizar la continuidad de cuidados, farmacia y servicios para tu dependiente.</string>
+    <string name="safety_after_legal_aid">Consultar asistencia legal sobre órdenes de protección, custodia o dirección segura.</string>
+    <string name="safety_after_medical">Gestionar resurtido de recetas y traslado seguro de clínica o farmacia.</string>
+    <string name="safety_after_housing">Explorar vivienda de transición, cambio de servicios y derechos de arrendamiento.</string>
+    <string name="safety_after_support_services">Identificar los servicios de apoyo con los que quieras contactar.</string>
+
+    <string name="safety_intake_abuse_title">Tipo de maltrato sufrido</string>
+    <string name="safety_intake_abuse_subtitle">Marca todo lo que aplique para adaptar medidas de seguridad digital, pruebas y apoyos.</string>
+    <string name="safety_intake_abuse_physical">Violencia física</string>
+    <string name="safety_intake_abuse_emotional">Maltrato emocional, verbal o psicológico</string>
+    <string name="safety_intake_abuse_financial">Violencia financiera o económica</string>
+    <string name="safety_intake_abuse_digital">Abuso digital, vigilancia o acoso</string>
+    <string name="safety_intake_abuse_sexual">Violencia o coerción sexual</string>
+    <string name="safety_intake_abuse_cultural">Violencia cultural, espiritual o ligada al estatus migratorio</string>
+
+    <string name="safety_doc_abuse_physical_evidence">Fotos fechadas de lesiones, registros de hospital/clínica y números de reporte policial</string>
+    <string name="safety_doc_abuse_emotional_records">Registro fechado o capturas de pantalla de amenazas, intimidación o acoso</string>
+    <string name="safety_doc_abuse_financial_records">Recibos de pago, reporte de crédito y registros de deudas o cuentas a tu nombre</string>
+    <string name="safety_doc_abuse_sexual_records">Registros médicos o de atención especializada y contactos de apoyo</string>
+    <string name="safety_doc_abuse_immigration_coercion">Copias de pasaportes o permisos retenidos, cartas de patrocinio y pruebas de amenazas</string>
+    <string name="safety_grab_abuse_digital_check">Desactivar la ubicación compartida y revisar bolsos o llaves por posibles rastreadores</string>
+    <string name="safety_fin_abuse_credit_check">Activar una alerta de crédito y asegurar accesos independientes de impuestos o ayudas</string>
+    <string name="safety_dest_abuse_physical_exit">Identificar salidas seguras del hogar y tener a la mano el número de un refugio de emergencia</string>
+    <string name="safety_travel_abuse_digital_tracking">Usar un dispositivo seguro o una ruta fuera de aplicaciones familiares de rastreo</string>
+    <string name="safety_after_abuse_physical_care">Buscar atención médica para cualquier lesión y consultar planificación de refugio seguro</string>
+    <string name="safety_after_abuse_emotional_support">Contactar consejería especializada en trauma o un grupo de apoyo</string>
+    <string name="safety_after_abuse_digital_security">Cambiar contraseñas desde un dispositivo seguro y revisar correos de recuperación y permisos</string>
+    <string name="safety_after_abuse_sexual_support">Comunicar con una línea especializada en agresión sexual cuando sea seguro</string>
+    <string name="safety_after_abuse_cultural_support">Contactar servicios comunitarios o migratorios sobre derechos sin depender del patrocinio</string>
 </resources>

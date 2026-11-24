@@ -4,6 +4,7 @@ const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
 const {text, roleFromUser, protectedAccount} = require("./accountPolicy");
 const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
 const {saveSupportConversation, PLAN_CONSULT} = require("./supportGroups");
+const {stripeKey, closeFitnessBilling} = require("./fitnessAiBilling");
 
 // Deletes every document returned by an account-cleanup query.
 async function deleteQuery(query) {
@@ -24,7 +25,7 @@ async function deleteFriendListReferences(uid) {
 }
 
 // Lets an admin remove one non-protected account and all records that identify it.
-exports.adminDeleteAccount = onCall(async (request) => {
+exports.adminDeleteAccount = onCall({secrets: [stripeKey]}, async (request) => {
   const {caller} = await requireAdmin(request);
   const uid = text(request.data?.uid, 128);
   if (!uid || uid === caller.uid) throw new HttpsError("failed-precondition", "You cannot delete the account you are using.");
@@ -41,6 +42,7 @@ exports.adminDeleteAccount = onCall(async (request) => {
     for (const user of users) if (roleFromUser(user, await readProfile(user.uid)) === "ADMIN") adminCount++;
     if (adminCount <= 1) throw new HttpsError("failed-precondition", "The last Admin account cannot be deleted.");
   }
+  await closeFitnessBilling(uid);
   await db.recursiveDelete(db.collection("safetyPlans").doc(uid));
   await db.recursiveDelete(db.collection("supportRequests").doc(uid));
   await db.recursiveDelete(db.collection("accountKeysets").doc(uid));
@@ -62,6 +64,10 @@ exports.adminDeleteAccount = onCall(async (request) => {
         plan.supportSafeContactUid || "");
   }
   await db.collection("safetyStaff").doc(uid).delete();
+  await deleteQuery(db.collection("friendInvites").where("ownerUid", "==", uid));
+  await db.collection("friendInviteOwners").doc(uid).delete();
+  await db.collection("friendInviteAttempts").doc(uid).delete();
+  await db.recursiveDelete(db.collection("messagingPeerAccess").doc(uid)).catch(() => {});
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));
   await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));
   await deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid));
@@ -79,6 +85,10 @@ exports.adminDeleteAccount = onCall(async (request) => {
   await deleteFriendListReferences(uid);
   await db.recursiveDelete(db.collection("friendLists").doc(uid)).catch(() => {});
   await db.recursiveDelete(db.collection("notificationTokens").doc(uid)).catch(() => {});
+  await db.recursiveDelete(db.collection("accountLoginDevices").doc(uid)).catch(() => {});
+  await db.collection("liveLocationSessions").doc(uid).delete().catch(() => {});
+  await db.collection("emailCooldowns").doc(`safety-plan--${uid}`).delete().catch(() => {});
+  await deleteQuery(db.collection("emailNotificationLogs").where("uid", "==", uid)).catch(() => {});
   await db.collection("users").doc(uid).delete().catch(() => {});
   // Frees the global username only after its conversations and private records are cleaned up.
   if (username) {

@@ -1,0 +1,6 @@
+<resources>
+    <string name="contact_relationship">Relationship (optional)</string>
+    <string name="privacy_block_captures">Block screenshots and recordings</string>
+    <string name="privacy_block_captures_help">Protect this account’s screens on this device.</string>
+    <string name="emergency_request_sent">Emergency request sent.</string>
+</resources>

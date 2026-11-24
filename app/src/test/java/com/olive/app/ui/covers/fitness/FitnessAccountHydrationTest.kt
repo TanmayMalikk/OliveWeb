@@ -99,6 +99,39 @@ class FitnessAccountHydrationTest {
         db.emit("users/owner/fitness")
         assertFalse(fitnessPreferences(context,"different-owner").contains("step_goal"))
     }
+
+    @Test
+    fun legacyMealsFloatLongGoalsAndRemoteDrinkChangesSyncCleanly() = fixture { context, db ->
+        val prefs = fitnessPreferences(context, "owner")
+        val existingMeals = org.json.JSONArray()
+            .put(JSONObject().put("logId", "keep-1").put("name", "Keep"))
+            .put(JSONObject().put("logId", "m1").put("name", "Old meal"))
+        val existingDrinks = org.json.JSONArray()
+            .put(JSONObject().put("logId", "d1").put("ml", 100))
+        prefs.edit()
+            .putString("foods_2026-11-20", existingMeals.toString())
+            .putString("water_2026-11-20", existingDrinks.toString())
+            .commit()
+
+        db.records["users/owner/fitness/weight_kg"] = mapOf("payload" to JSONObject().put("type", "float").put("value", 64.5).toString())
+        db.records["users/owner/fitness/heart_rate_last_sample_at_2026-11-20"] = mapOf("payload" to payload("long", 2200L))
+        db.records["users/owner/fitness/meal_2026-11-20_m1"] = mapOf("payload" to payload("string", """{"logId":"m1","name":"Updated soup"}"""))
+        db.records["users/owner/fitness/drink_2026-11-20_d1"] = mapOf("payload" to payload("string", """{"logId":"d1","ml":250}"""))
+
+        FitnessAccountSync.bind(context, "owner")
+        db.emit("users/owner/fitness")
+
+        val pending = FitnessAccountSync.outbox(context, "owner")
+        assertTrue(pending.contains("meal_2026-11-20_keep-1"))
+        assertEquals(64.5f, prefs.getFloat("weight_kg", 0f), 0.01f)
+        assertEquals(2200L, prefs.getLong("heart_rate_last_sample_at_2026-11-20", 0L))
+        assertTrue(prefs.getString("foods_2026-11-20", "")!!.contains("Updated soup"))
+        assertTrue(prefs.getString("water_2026-11-20", "")!!.contains("250"))
+
+        db.records["users/owner/fitness/drink_2026-11-20_d1"] = mapOf("payload" to JSONObject().put("type", "null").put("value", JSONObject.NULL).toString())
+        db.emit("users/owner/fitness")
+        assertEquals("[]", prefs.getString("water_2026-11-20", ""))
+    }
     @Test
     fun queuedMealAndWaterChangesRemainInTheirOwnersOutboxAndGuestEntriesNeverUpload()=fixture { context,_ ->
         FitnessAccountSync.meal(context,"owner","2026-11-17","meal","{\"logId\":\"meal\"}")

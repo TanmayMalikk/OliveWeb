@@ -2,6 +2,7 @@
 package com.olive.app
 
 import androidx.compose.ui.test.*
+import androidx.activity.ComponentActivity
 import android.content.Intent
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule
 import androidx.test.ext.junit.rules.ActivityScenarioRule
@@ -32,6 +33,13 @@ internal fun createOliveComposeRule() = Intent(Intent.ACTION_MAIN).setClass(
         rule.scenario.onActivity { activity = it }
         activity
     }
+}
+
+internal fun ComponentActivity.dismissTestKeyboard() {
+    val keyboard = getSystemService(InputMethodManager::class.java)
+    val token = currentFocus?.windowToken ?: window.decorView.windowToken
+    keyboard.hideSoftInputFromWindow(token, 0)
+    currentFocus?.clearFocus()
 }
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
@@ -153,12 +161,7 @@ abstract class OliveUiTestBase {
 
     // Hides the emulator keyboard before a UI test presses controls located below a text field.
     protected fun hideKeyboard() {
-        compose.activityRule.scenario.onActivity { activity ->
-            val keyboard = activity.getSystemService(InputMethodManager::class.java)
-            val token = activity.currentFocus?.windowToken ?: activity.window.decorView.windowToken
-            keyboard.hideSoftInputFromWindow(token, 0)
-            activity.currentFocus?.clearFocus()
-        }
+        compose.activityRule.scenario.onActivity { it.dismissTestKeyboard() }
         compose.waitForIdle()
     }
 
@@ -173,6 +176,13 @@ abstract class OliveUiTestBase {
         waitFor("discreet_cover_olive")
         visibleNode("discreet_cover_olive").performTouchInput { doubleClick() }
         waitFor("new_user")
+    }
+
+    protected fun signOutAndOpenOnboarding() {
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        click("sign_out")
+        compose.waitUntil(30_000) { !session.busy && session.coverAccountId == null }
+        openOnboarding()
     }
 
     // Presses the next button used by onboarding tests.
@@ -211,9 +221,12 @@ abstract class OliveUiTestBase {
         fill("address_city", "Edmonton")
         advanceOnboarding("address_city", "trigger")
         fill("trigger", "moon garden")
-        waitFor("profile_submit")
+        advanceOnboarding("trigger", "friend_invite_code")
+        advanceOnboarding("friend_invite_code", "profile_submit")
+        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
         submitProfile()
         chooseAppPin()
+        compose.onNodeWithText("Step 7 of 7", useUnmergedTree = true).assertExists()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
         submitPinSetup()
@@ -277,10 +290,9 @@ abstract class OliveUiTestBase {
         }
     }
 
-    // Wait for one onboarding page to settle before moving to the next one. A second click handles
-    // a button event that Android can drop while the keyboard or dropdown is closing under load.
-    private fun advanceOnboarding(currentTag: String, nextTag: String) {
-        compose.waitForIdle()
+    // Wait for the keyboard and form layout to settle before advancing the onboarding page.
+    protected fun advanceOnboarding(currentTag: String, nextTag: String) {
+        hideKeyboard()
         click("onboarding_next")
         val moved = runCatching {
             compose.waitUntil(5_000) {
@@ -289,7 +301,7 @@ abstract class OliveUiTestBase {
         }.isSuccess
         if (!moved) {
             waitFor(currentTag)
-            compose.waitForIdle()
+            hideKeyboard()
             click("onboarding_next")
         }
         waitFor(nextTag)
@@ -340,7 +352,8 @@ abstract class OliveUiTestBase {
 
     // Enters the test PIN on the private-entry screen.
     protected fun enterPin(pin: String) {
-        pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
+        compose.onNodeWithTag("unlock_pin").performTextReplacement(pin)
+        hideKeyboard()
         compose.onNodeWithTag("unlock_submit").performClick()
     }
 

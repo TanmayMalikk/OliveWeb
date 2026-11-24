@@ -15,6 +15,7 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.network.hasValidatedInternetConnection
+import com.olive.app.data.network.persistentInstallationId
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
@@ -52,17 +53,28 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var waitingForConversations = false
     private var indexLoadTimeout: Job? = null
 
+    /**
+     * Updates index loading.
+     */
     private fun updateIndexLoading() {
         loadingIndex = waitingForSocial || waitingForConversations
     }
     private var cacheIndexUpdate: Job? = null
 
-    // Session messaging: Reports whether messaging screen active.
+    /**
+     * Checks whether the current screen can keep messaging listeners active.
+     *
+     * @return True when the Safe App is open or a staff or admin account is in its portal.
+     */
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
     }
-    // Starts the account's friend and conversation listeners once the current screen may show messages.
+    /**
+     * Starts the account's friend and conversation listeners once the current screen may show messages.
+     *
+     * @param showFeedback Whether to show feedback.
+     */
     fun ensureMessagingObservation(showFeedback: Boolean = false) {
         with(runtime) {
             with(state) {
@@ -72,7 +84,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts friend and chat listeners for the signed-in account.
+    /**
+     * Starts friend and chat listeners for the signed-in account.
+     *
+     * @param showFeedback Whether to show feedback.
+     */
     fun startMessaging(showFeedback: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -100,6 +116,18 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 waitingForConversations = online
                 updateIndexLoading()
                 val token = epoch
+                scope.launch {
+                    val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
+                    if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
+                        !serverConversationIndexLoaded && conversations.isEmpty()) {
+                        conversations = cached
+                    }
+                }
+                /**
+                 * Checks whether current listener.
+                 *
+                 * @return `true` if is current listener, or `false` otherwise.
+                 */
                 fun isCurrentListener() = indexGeneration == listenerGeneration && epoch == token &&
                     enrollment?.uid == device.uid && accounts.authenticatedUid() == device.uid
                 identityCheck = scope.launch {
@@ -119,13 +147,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             (role ?: device.role).localizedTitle(ResourceText(application.resources)),
                         )
                         return@launch
-                    }
-                    scope.launch {
-                        val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
-                        if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
-                            !serverConversationIndexLoaded && conversations.isEmpty()) {
-                            conversations = cached
-                        }
                     }
                     val identity = AccountIdentity(device.uid, coverUsername)
                     // Organization accounts stay in the portal, so keep their notification listener
@@ -186,7 +207,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Rebuilds messaging listeners after the account or network connection changes.
+    /**
+     * Rebuilds messaging listeners after the account or network connection changes.
+     *
+     * @param password Account password string.
+     * @param onConnected Callback invoked when connected changes or occurs.
+     */
     fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) {
         with(runtime) {
             with(state) {
@@ -223,7 +249,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Watches all conversations, including tickets for accounts without friends.
+    /**
+     * Watches all conversations, including tickets for accounts without friends.
+     *
+     * @param ownerUid Firebase UID of the resource owner.
+     * @param isCurrent Function used to transform or provide is current.
+     */
     private fun observeConversations(ownerUid: String, isCurrent: () -> Boolean) {
         with(runtime) {
             with(state) {
@@ -289,7 +320,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs one messaging change and shows a readable Firebase error if it fails.
+    /**
+     * Runs one messaging change and shows a readable Firebase error if it fails.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @param block Callback or suspending lambda executed within this scope.
+     */
     fun runMessagingAction(
         failure: String,
         block: suspend (MessagingRepository, DeviceEnrollment, Long) -> Unit
@@ -335,7 +371,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Removes friend and conversation listeners when messaging is no longer needed.
+    /**
+     * Removes friend and conversation listeners when messaging is no longer needed.
+     *
+     * @param clearRows Whether to apply clear rows.
+     */
     fun stopMessaging(clearRows: Boolean = true) {
         listenerGeneration++
         if (clearRows) rowsOwner = null
@@ -362,7 +402,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Registers messaging identity for session messaging.
+    /**
+     * Registers messaging identity for session messaging.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     */
     suspend fun registerMessagingIdentity(identity: AccountIdentity) {
         with(runtime) {
             check(accounts.authenticatedUid() == identity.uid)
@@ -379,7 +423,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reconnects device notifications to the conversations visible to the current account.
+    /**
+     * Reconnects device notifications to the conversations visible to the current account.
+     */
     fun syncLocalNotificationHandler() {
         with(runtime) {
             val device = enrollment ?: return
@@ -393,7 +439,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
 // All account roles: checks credentials, loads the account, and opens the next screen.
 
 internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
-    // Session account sign in: Authenticates the account.
+    /**
+     * Session account sign in: Authenticates the account.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     */
     fun authenticate(username: String, password: String, create: Boolean) {
         if (!canStart()) return
         if (!credentialsAreValid(username, password, create)) return
@@ -401,16 +453,27 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val failureMessage = runtime.application.getString(
             R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
         )
-        runtime.operations.runOperation(failureMessage) { sessionVersion ->
+        val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null && runtime.state.accountRole == AccountRole.USER
+        runtime.operations.runOperation(failureMessage, timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000) { sessionVersion ->
+            val creatingIdentity = create && runtime.pendingIdentity?.username != InputPolicy.username(username)
             val identity = try {
-                if (create) {
+                if (creatingIdentity) {
                     runtime.accounts.create(username, password, runtime.state.accountRole)
                 } else {
                     runtime.accounts.authenticate(username, password, runtime.state.accountRole)
                 }
             } catch (failure: Exception) {
-                if (!showCredentialFailure(failure, create, sessionVersion)) throw failure
+                if (!showCredentialFailure(failure, creatingIdentity, sessionVersion)) throw failure
                 return@runOperation
+            }
+            if (runtime.epoch != sessionVersion) return@runOperation
+            if (creatingIdentity) runtime.pendingIdentity = identity
+
+            if (!runtime.localMode) {
+                val signInDeviceId = persistentInstallationId(runtime.application, "olive_device_signin", "signin_device_id")
+                runtime.scope.launch {
+                    runCatching { runtime.accounts.recordDeviceSignIn(signInDeviceId, registerOnly = create) }
+                }
             }
 
             val profile = loadProfile(identity)
@@ -419,18 +482,46 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
 
             runtime.pendingIdentity = identity
             runtime.pendingProfile = profile
+            if (needsDeviceConfirmation) {
+                val setupRequired = create || profile == null || AccountPolicy.personalProfileNeedsSetup(profile)
+                try {
+                    runtime.passwordRecovery.enrollAfterAuthentication(identity.uid, password, sessionVersion, setupRequired)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (setupRequired) {
+                        if (runtime.epoch == sessionVersion) {
+                            runtime.state.failInput(runtime.passwordRecovery.passwordRecoveryFailure(failure))
+                        }
+                        return@runOperation
+                    }
+                    // Existing accounts can sign in even when a legacy key cannot be migrated on this device.
+                }
+                if (runtime.epoch != sessionVersion) return@runOperation
+            }
             openNextScreen(identity, profile)
         }
     }
 
-    // Stops a second sign-in request while the first request is still running.
+    /**
+     * Stops a second sign-in request while the first request is still running.
+     *
+     * @return `true` if can start, or `false` otherwise.
+     */
     private fun canStart(): Boolean {
         val state = runtime.state
         return !state.busy && runtime.enrollment == null &&
             state.screen in setOf(SessionScreen.NewCredentials, SessionScreen.ReturningCredentials)
     }
 
-    // Check the form before sending credentials to the account repository.
+    /**
+     * Check the form before sending credentials to the account repository.
+     *
+     * @param username Account username.
+     * @param password Account password string.
+     * @param create Whether to apply create.
+     * @return `true` if credentials are valid, or `false` otherwise.
+     */
     private fun credentialsAreValid(username: String, password: String, create: Boolean): Boolean {
         val state = runtime.state
         state.credentialFieldError = null
@@ -442,27 +533,34 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
         if (!organizationEmail && !validUsername) {
             state.credentialFieldError = CredentialFieldError.InvalidUsername
-            state.message = runtime.application.getString(R.string.ui_invalid_username_10e538)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_username_10e538))
             return false
         }
         if (create && !InputPolicy.passwordExcludesUsername(password, username)) {
-            state.message = runtime.application.getString(R.string.password_excludes_username)
+            state.failInput(runtime.application.getString(R.string.password_excludes_username))
             return false
         }
         if (create && !InputPolicy.validAccountPassword(password, username)) {
             state.credentialFieldError = CredentialFieldError.InvalidPassword
-            state.message = runtime.application.getString(R.string.ui_invalid_password_a2df22)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_password_a2df22))
             return false
         }
         if (password.isEmpty()) {
             state.credentialFieldError = CredentialFieldError.IncorrectPassword
-            state.message = runtime.application.getString(R.string.ui_password_required_ec4e2c)
+            state.failInput(runtime.application.getString(R.string.ui_password_required_ec4e2c))
             return false
         }
         return true
     }
 
-    // Keep the old sign-in error messages while letting unexpected failures reach the operation handler.
+    /**
+     * Keep the old sign-in error messages while letting unexpected failures reach the operation handler.
+     *
+     * @param failure Exception or failure reason encountered during execution.
+     * @param create Whether to apply create.
+     * @param sessionVersion Session version supplied to [showCredentialFailure].
+     * @return `true` if show credential failure, or `false` otherwise.
+     */
     private fun showCredentialFailure(failure: Exception, create: Boolean, sessionVersion: Long): Boolean {
         val details = failure.message.orEmpty()
         val usernameUnavailable = create && (
@@ -486,19 +584,26 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             } else {
                 CredentialFieldError.IncorrectPassword
             }
-            runtime.state.message = when {
-                usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
-                incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
-                else -> failure.message?.takeIf { it.isNotBlank() }
-                    ?: runtime.application.getString(
-                        R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
-                    )
-            }
+            runtime.state.failInput(
+                when {
+                    usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
+                    incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
+                    else -> failure.message?.takeIf { it.isNotBlank() }
+                        ?: runtime.application.getString(
+                            R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
+                        )
+                }
+            )
         }
         return true
     }
 
-    // Loads the signed-in profile before choosing the next screen.
+    /**
+     * Loads the signed-in profile before choosing the next screen.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @return The resulting [UserProfile], or `null` if unavailable.
+     */
     private suspend fun loadProfile(identity: AccountIdentity): UserProfile? {
         val remote = runtime.accounts.profile(identity)
         return withContext(Dispatchers.IO) {
@@ -506,29 +611,44 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reject organization accounts that were never provisioned and accounts opened under the wrong role.
+    /**
+     * Reject organization accounts that were never provisioned and accounts opened under the wrong role.
+     *
+     * @param profile Account profile details, or null when not provided.
+     * @param create Whether to apply create.
+     * @return `true` if validate account role, or `false` otherwise.
+     */
     private fun validateAccountRole(profile: UserProfile?, create: Boolean): Boolean {
         val chosenRole = runtime.state.accountRole
         if (profile == null && !create && chosenRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
-                chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
+                    chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }
         if (profile != null && profile.role != chosenRole) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
-                profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
+                    profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }
         return true
     }
 
-    // Opens setup, the cover, or the role portal after sign-in succeeds.
+    /**
+     * Opens setup, the cover, or the role portal after sign-in succeeds.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details, or null when not provided.
+     */
     private suspend fun openNextScreen(identity: AccountIdentity, profile: UserProfile?) {
         if (profile != null && profile.role == AccountRole.SAFE_CONTACT &&
             AccountPolicy.personalProfileNeedsSetup(profile)
@@ -554,7 +674,12 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(nextScreen)
     }
 
-    // Safe contacts enter the safe app; staff and admins enter their separate portal.
+    /**
+     * Safe contacts enter the safe app; staff and admins enter their separate portal.
+     *
+     * @param identity Authenticated account identity containing UID and username.
+     * @param profile Account profile details.
+     */
     private suspend fun openReturningNonUser(identity: AccountIdentity, profile: UserProfile) {
         val enrolled = withContext(Dispatchers.IO) { runtime.store.enrollWithoutPin(identity, profile) }
         runtime.enrollment = enrolled

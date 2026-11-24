@@ -1,7 +1,20 @@
 // Safe-app users: draws the PIN-to-safe-app olive animation in Compose.
 package com.olive.app.ui.shared
 
+import android.content.Context
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Path as AndroidPath
 import android.graphics.PathMeasure
+import android.graphics.RadialGradient as AndroidRadialGradient
+import android.graphics.RectF
+import android.graphics.Shader as AndroidShader
+import android.util.AttributeSet
+import android.view.View
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withRotation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -29,13 +42,17 @@ import androidx.compose.ui.platform.LocalResources
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.R
-import java.util.Locale
 import kotlin.math.pow
 
 
 /**
  * Keeps the next screen covered while the branch grows, then reveals it as the olive falls.
  * The drawing itself is still handled by the supplied stateless animation below.
+ *
+ * @param backgroundColor Background color supplied to [PinSafeOliveTransition].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param durationMs Duration or timestamp for duration, in milliseconds.
+ * @param onAnimationEnd Callback invoked when animation end changes or occurs.
  */
 @Composable
 internal fun PinSafeOliveTransition(
@@ -68,7 +85,12 @@ internal fun PinSafeOliveTransition(
     }
 }
 
-/** The old screen stays covered until the olive starts falling, then clears by the landing point. */
+/**
+ * The old screen stays covered until the olive starts falling, then clears by the landing point.
+ *
+ * @param progress Progress supplied to [pinSafeBackgroundAlpha].
+ * @return The computed PIN safe background alpha numeric value.
+ */
 internal fun pinSafeBackgroundAlpha(progress: Float): Float = when {
     progress <= 0.52f -> 1f
     progress >= 0.88f -> 0f
@@ -78,6 +100,10 @@ internal fun pinSafeBackgroundAlpha(progress: Float): Float = when {
 /**
  * Stateless animation canvas driven by an external progress float (0f..1f).
  * Ideal for manual scrubbing, transition coordinators, or Gesture/Scroll drivers.
+ *
+ * @param progress Progress supplied to [OliveBranchAnimationContent].
+ * @param modifier Compose modifier applied to the root layout.
+ * @param onOliveDropPosition Callback invoked when olive drop position changes or occurs.
  */
 @Composable
 internal fun OliveBranchAnimationContent(
@@ -269,6 +295,14 @@ internal fun OliveBranchAnimationContent(
 
 /**
  * Draws an olive leaf with silvery-green gradient and central vein
+ *
+ * @receiver The Compose drawing scope and its coordinate system.
+ * @param center Center supplied to [drawOliveLeaf].
+ * @param angle Angle supplied to [drawOliveLeaf].
+ * @param scale Scale supplied to [drawOliveLeaf].
+ * @param length Length supplied to [drawOliveLeaf].
+ * @param width Target or source width in pixels or layout units.
+ * @param alpha Alpha supplied to [drawOliveLeaf].
  */
 private fun DrawScope.drawOliveLeaf(
     center: Offset,
@@ -324,6 +358,12 @@ private fun DrawScope.drawOliveLeaf(
 
 /**
  * Draws a plump botanical olive with 3D radial shading and specular gloss
+ *
+ * @receiver The Compose drawing scope and its coordinate system.
+ * @param center Center supplied to [drawOliveFruit].
+ * @param radius Radius supplied to [drawOliveFruit].
+ * @param rotationDegrees Rotation degrees supplied to [drawOliveFruit].
+ * @param alpha Alpha supplied to [drawOliveFruit].
  */
 private fun DrawScope.drawOliveFruit(
     center: Offset,
@@ -368,12 +408,22 @@ internal class ResourceText(private val resolve: (Int, Array<out Any?>) -> Strin
         if (arguments.isEmpty()) resources.getString(id) else resources.getString(id, *arguments)
     })
 
-    // Lets screens request translated text by calling this object like a function.
+    /**
+     * Lets screens request translated text by calling this object like a function.
+     *
+     * @param id ID supplied to [invoke].
+     * @param arguments Variable number of arguments arguments.
+     * @return The resulting invoke string.
+     */
     operator fun invoke(@StringRes id: Int, vararg arguments: Any?): String =
         resolve(id, arguments)
 }
 
-// Returns a helper that reads translated Android text inside Compose.
+/**
+ * Returns a helper that reads translated Android text inside Compose.
+ *
+ * @return The resulting [ResourceText] for remember resource text.
+ */
 @Composable
 internal fun rememberResourceText(): ResourceText {
     val resources = LocalResources.current
@@ -384,11 +434,24 @@ internal fun rememberResourceText(): ResourceText {
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
-// Returns translated fallback text when an operation fails.
+/**
+ * Returns translated fallback text when an operation fails.
+ *
+ * @receiver The resource resolver used to produce localized error text.
+ * @param error Throwable or error message describing a failure.
+ * @param fallback Fallback supplied to [failure].
+ * @return The resulting failure string.
+ */
 internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): String =
     if (error is ResourceFailure) this(error.textId, *error.arguments) else this(fallback)
 
-// Returns the translated title for an account role.
+/**
+ * Returns the translated title for an account role.
+ *
+ * @receiver The account role to describe.
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized title.
+ */
 internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     // Chooses the translated title for the active screen or cover.
     when (this) {
@@ -399,7 +462,13 @@ internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     }
 )
 
-// Returns the translated description for an account role.
+/**
+ * Returns the translated description for an account role.
+ *
+ * @receiver The account role to describe.
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized description.
+ */
 internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     // Chooses the translated description for the active cover.
     when (this) {
@@ -410,65 +479,234 @@ internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     }
 )
 
-// Returns the translated title for a cover app.
+/**
+ * Returns the translated title for a cover app.
+ *
+ * @receiver The cover app option to describe.
+ * @param text Text string to display, parse, or send.
+ * @return The resulting localized title.
+ */
 internal fun CoverType.localizedTitle(text: ResourceText) = text(
     // Chooses the translated title for the active screen or cover.
     when (this) {
         CoverType.NEWS -> R.string.ui_daily_digest
         CoverType.FITNESS -> R.string.fitness_tracker
-        CoverType.GAME -> R.string.ui_game
     }
 )
 
-internal object AppLocaleManager {
 
-    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Chinese")
+/**
+ * Pure Android Canvas Custom View.
+ *
+ * Runs the botanical olive branch growth, olive drop, and fade away
+ * without any screen or layout coupling.
+ */
+internal class OliveAnimationView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
-    // Reads Android's current language tag for app formatting.
-    fun getLanguageTag(language: String): String {
-        return when (language.trim().lowercase()) {
-            "french", "fr", "français" -> "fr"
-            "spanish", "es", "español" -> "es"
-            "arabic", "ar", "العربية" -> "ar"
-            "chinese", "zh", "zh-cn", "zh-rcn", "中文" -> "zh-rCN"
-            else -> "en"
+    var progress: Float = 0f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            invalidate()
+        }
+
+    var onOlivePositionChanged: ((x: Float, y: Float) -> Unit)? = null
+
+    // Paints
+    private val branchPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.STROKE
+        strokeWidth = 12f
+        strokeCap = AndroidPaint.Cap.ROUND
+        strokeJoin = AndroidPaint.Join.ROUND
+        color = "#5D4037".toColorInt()
+    }
+
+    private val leafPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.FILL
+        color = "#556B2F".toColorInt()
+    }
+
+    private val olivePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.FILL
+    }
+
+    private val highlightPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.FILL
+        color = AndroidColor.argb(140, 255, 255, 255)
+    }
+
+    private val ripplePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        style = AndroidPaint.Style.STROKE
+        strokeWidth = 5f
+        color = "#6B8E23".toColorInt()
+    }
+
+    private val branchPath = AndroidPath()
+    private val subPath = AndroidPath()
+    private val pathMeasure = PathMeasure()
+    private val pos = FloatArray(2)
+    private val tan = FloatArray(2)
+    private val leafFractions = floatArrayOf(0.18f, 0.32f, 0.46f, 0.60f, 0.74f, 0.88f)
+    private val leafPath = AndroidPath()
+    private val oliveOval = RectF()
+    private val highlightOval = RectF()
+    private val gradientMatrix = AndroidMatrix()
+    private val oliveGradient = AndroidRadialGradient(
+        -11.4f,
+        -11.4f,
+        53.2f,
+        "#7A933B".toColorInt(),
+        "#2C3E14".toColorInt(),
+        AndroidShader.TileMode.CLAMP,
+    )
+
+    /**
+     * Rebuilds the branch path when the animation view changes size.
+     *
+     * @param w W supplied to [onSizeChanged].
+     * @param h H supplied to [onSizeChanged].
+     * @param oldw Oldw supplied to [onSizeChanged].
+     * @param oldh Oldh supplied to [onSizeChanged].
+     */
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        branchPath.reset()
+        branchPath.moveTo(0f, h * 0.12f)
+        branchPath.cubicTo(
+            w * 0.28f, h * 0.08f,
+            w * 0.65f, h * 0.24f,
+            w * 1.05f, h * 0.18f
+        )
+        pathMeasure.setPath(branchPath, false)
+    }
+
+    /**
+     * Draws the growing branch, leaves, falling olive, and ripple for this frame.
+     *
+     * @param canvas Canvas supplied to [onDraw].
+     */
+    override fun onDraw(canvas: AndroidCanvas) {
+        super.onDraw(canvas)
+        if (progress <= 0f || progress >= 1f) return
+
+        val h = height.toFloat()
+
+        val branchGrowth = (progress / 0.38f).coerceIn(0f, 1f)
+        val oliveGrowth = if (progress < 0.32f) 0f else ((progress - 0.32f) / 0.20f).coerceIn(0f, 1f)
+        val oliveDrop = if (progress < 0.52f) 0f else {
+            val d = ((progress - 0.52f) / 0.36f).coerceIn(0f, 1f)
+            d.toDouble().pow(1.75).toFloat()
+        }
+        val ripple = if (progress < 0.86f) 0f else ((progress - 0.86f) / 0.14f).coerceIn(0f, 1f)
+
+        // Alphas: fade away as animation progresses
+        val branchAlpha = if (progress < 0.50f) 1f else (1f - (progress - 0.50f) / 0.26f).coerceIn(0f, 1f)
+        val oliveAlpha = if (progress < 0.58f) 1f else (1f - (progress - 0.58f) / 0.28f).coerceIn(0f, 1f)
+
+        branchPaint.alpha = (branchAlpha * 255).toInt()
+        leafPaint.alpha = (branchAlpha * 255).toInt()
+        olivePaint.alpha = (oliveAlpha * 255).toInt()
+        highlightPaint.alpha = (oliveAlpha * 140).toInt()
+
+        // 1. Draw Trimmed Branch Path
+        if (branchAlpha > 0.005f && branchGrowth > 0f) {
+            subPath.reset()
+            val totalLen = pathMeasure.length
+            pathMeasure.getSegment(0f, totalLen * branchGrowth, subPath, true)
+            canvas.drawPath(subPath, branchPaint)
+
+            // 2. Draw Leaves
+            for (i in leafFractions.indices) {
+                val frac = leafFractions[i]
+                // Draw each leaf only after the growing branch reaches its attachment point.
+                if (branchGrowth >= frac * 0.82f) {
+                    val leafProgress = ((branchGrowth - frac * 0.82f) / 0.22f).coerceIn(0f, 1f)
+                    // Run this part only when path measure get pos tan total len * frac, pos, tan.
+                    if (pathMeasure.getPosTan(totalLen * frac, pos, tan)) {
+                        val baseAngle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+                        val side = if (i % 2 == 0) -1f else 1f
+                        canvas.withRotation(baseAngle + side * 42f, pos[0], pos[1]) {
+                            drawLeaf(canvas, pos[0], pos[1], leafProgress)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Draw Olive
+        if (oliveGrowth > 0f && oliveAlpha > 0.005f && pathMeasure.getPosTan(pathMeasure.length * 0.68f, pos, tan)) {
+            val anchorX = pos[0]
+            val anchorY = pos[1]
+            val baseRadius = 38f
+            val budScale = oliveGrowth.coerceIn(0f, 1f)
+
+            val oliveX: Float
+            val oliveY: Float
+            var rot = 12f
+
+            // Keep the olive attached to its stem until the falling stage begins.
+            if (oliveDrop == 0f) {
+                oliveX = anchorX + 4f
+                oliveY = anchorY + (40f * budScale)
+                if (branchAlpha > 0.01f) {
+                    canvas.drawLine(anchorX, anchorY, oliveX, oliveY - baseRadius * 0.6f * budScale, branchPaint)
+                }
+            } else {
+                val dropStart = anchorY + 40f
+                val floorY = h * 0.92f
+                oliveX = anchorX + (sin(oliveDrop * Math.PI.toFloat() * 1.5f) * 20f)
+                oliveY = dropStart + ((floorY - dropStart) * oliveDrop)
+                rot = 12f + (oliveDrop * 160f)
+            }
+
+            onOlivePositionChanged?.invoke(oliveX, oliveY)
+
+            gradientMatrix.setTranslate(oliveX, oliveY)
+            oliveGradient.setLocalMatrix(gradientMatrix)
+            olivePaint.shader = oliveGradient
+            oliveOval.set(
+                oliveX - baseRadius * 0.8f * budScale,
+                oliveY - baseRadius * 1.1f * budScale,
+                oliveX + baseRadius * 0.8f * budScale,
+                oliveY + baseRadius * 1.1f * budScale
+            )
+            highlightOval.set(
+                oliveX - baseRadius * 0.4f,
+                oliveY - baseRadius * 0.6f,
+                oliveX,
+                oliveY - baseRadius * 0.1f,
+            )
+            canvas.withRotation(rot, oliveX, oliveY) {
+                drawOval(oliveOval, olivePaint)
+                drawOval(highlightOval, highlightPaint)
+            }
+
+            // 4. Ground Ripple
+            if (ripple > 0f) {
+                ripplePaint.alpha = ((1f - ripple) * 180 * oliveAlpha).toInt()
+                canvas.drawCircle(oliveX, h * 0.92f, 120f * ripple, ripplePaint)
+            }
         }
     }
 
-    // Returns the readable name of Android's current language.
-    fun getDisplayLanguage(language: String): String {
-        return when (getLanguageTag(language)) {
-            "fr" -> "Français"
-            "es" -> "Español"
-            "ar" -> "العربية"
-            "zh-rCN" -> "中文"
-            else -> "English"
-        }
+    /**
+     * Draws one growing leaf on the animated olive branch.
+     *
+     * @param canvas Canvas supplied to [drawLeaf].
+     * @param x X supplied to [drawLeaf].
+     * @param y Y supplied to [drawLeaf].
+     * @param scale Scale supplied to [drawLeaf].
+     */
+    private fun drawLeaf(canvas: AndroidCanvas, x: Float, y: Float, scale: Float) {
+        leafPath.reset()
+        val len = 65f * scale
+        val wid = 26f * scale
+        leafPath.moveTo(x, y)
+        leafPath.cubicTo(x + len * 0.4f, y - wid, x + len * 0.85f, y - wid * 0.6f, x + len, y)
+        leafPath.cubicTo(x + len * 0.85f, y + wid * 0.6f, x + len * 0.4f, y + wid, x, y)
+        canvas.drawPath(leafPath, leafPaint)
     }
-
-    // Reads the phone's language tag, such as en-CA or fr-CA.
-    fun resolveSystemDefaultLanguageTag(): String {
-        val systemLocale = Locale.getDefault()
-        val lang = systemLocale.language.lowercase()
-        return when (lang) {
-            "fr" -> "fr"
-            "es" -> "es"
-            "ar" -> "ar"
-            "zh" -> "zh-rCN"
-            "en" -> "en"
-            else -> "en"
-        }
-    }
-
-    // Reads the phone's language name for the language picker.
-    fun resolveSystemDefaultLanguageName(): String {
-        return when (resolveSystemDefaultLanguageTag()) {
-            "fr" -> "French"
-            "es" -> "Spanish"
-            "ar" -> "Arabic"
-            "zh-rCN" -> "Chinese"
-            else -> "English"
-        }
-    }
-
 }

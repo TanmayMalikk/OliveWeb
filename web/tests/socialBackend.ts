@@ -36,3 +36,22 @@ export async function acceptRequest(_identity: typeof identity, request: Request
   state.friends.push({ friendUid: request.senderUid, friendUsername: request.senderUsername, friendshipId: request.friendshipId });
   await dismissRequest(request);
 }
+
+let inviteSequence = 0;
+let currentInvite: {code: string; link: string; expiresAt: number} | undefined;
+let claimed = false;
+export async function createFriendInvite(refresh = false) {
+  if (!currentInvite || refresh) {
+    const code = `ExampleCode${++inviteSequence}`;
+    currentInvite = {code, link: `https://yourolivebranch.ca/get/?invite=${code}`, expiresAt: Date.now() + 48 * 60 * 60 * 1000};
+  }
+  return currentInvite;
+}
+export async function claimFriendInvite(code: string) {
+  if (code !== "FreshCode1" || claimed) throw new Error("This invite has expired or been used.");
+  claimed = true;
+  state.friends.push({friendUid: candidate.uid, friendUsername: candidate.username, friendshipId: "invite-friend"});
+  broadcast();
+  return {friendshipId: "invite-friend", username: candidate.username};
+}
+export async function subscribeFriendInvite(_uid: string, _update: unknown) { return () => {}; }

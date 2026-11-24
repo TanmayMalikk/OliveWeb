@@ -92,6 +92,12 @@ class AppUpdateWorkerTest {
         assertTrue(checkNotNull(store.offer()).required)
         assertFalse(checkNotNull(store.offer()).dismissed)
         assertNull(AppUpdateStore(context, installedVersion = nextRelease.versionCode).offer())
+
+        val offers = mutableListOf<AppUpdateOffer?>()
+        val subscription = store.observe { offers += it }
+        store.publish(nextRelease.copy(releaseNotes = listOf("Live observer update")))
+        assertTrue(offers.size >= 2)
+        subscription.close()
     }
 
     @Test

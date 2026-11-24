@@ -21,6 +21,7 @@
     <string name="enter_your_pin">Saisissez votre NIP.</string>
 <string name="locking_soon">Verrouillage imminent</string>
     <string name="stay_here">Rester ici</string>
+    <string name="idle_lock_extend_prompt">Prolonger le délai d’inactivité</string>
     <string name="read_full_story">Lire l’article complet</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">Les actualités en direct sont indisponibles. Vérifiez votre connexion et réessayez.</string>
     <string name="privacy_events">Événements de confidentialité</string>
@@ -350,7 +351,7 @@
 
 
     <string name="private_contact_note">Note privée sur le contact</string>
-    <string name="private_contact_note_explanation">Vous seul pouvez lire cette note chiffrée sur cet appareil. Le nouveau texte est ajouté sur une nouvelle ligne.</string>
+    <string name="private_contact_note_explanation">Vous seul pouvez lire cette note chiffrée sur cet appareil. Modifiez-la et enregistrez-la ici.</string>
     <string name="choose_person">Choisir une personne</string>
     <string name="add_to_private_note">Ajouter à la note privée</string>
     <string name="append_note">Ajouter la note</string>
@@ -483,6 +484,35 @@
     <string name="incident_body_required">Détails de l’incident (obligatoires)</string>
     <string name="note_content_required">Note (obligatoire)</string>
     <string name="incident_clear_time">Effacer l’heure</string>
+    <string name="news_top_story">À LA UNE</string>
+    <string name="news_offline_reader">LECTURE HORS LIGNE</string>
+    <string name="news_offline">Hors ligne</string>
+    <string name="news_daily_edition" formatted="true">Édition du jour · %1$s</string>
+    <string name="news_min_read" formatted="true">%1$d min de lecture</string>
+    <string name="news_recently_read">Lus récemment</string>
+    <string name="news_no_recent_stories">Aucun article lu récemment.</string>
+    <string name="news_bookmarks">Signets</string>
+    <string name="news_history">Historique</string>
+    <string name="news_clear_history">Effacer l\'historique de lecture</string>
+    <string name="news_text_size">Modifier la taille du texte</string>
+    <string name="news_share_article">Partager l\'article</string>
+    <string name="news_category_all">Tout</string>
+    <string name="news_category_world">Monde</string>
+    <string name="news_swipe_bookmark">Enregistrer</string>
+    <string name="news_swipe_share">Partager</string>
+    <string name="notes_shared_with_you">Partagé avec vous</string>
+    <string name="notes_shared_by">Partagé par %1$s</string>
+    <string name="notes_share_title">Partager la note privée</string>
+    <string name="notes_share_help">Seuls les contacts acceptés sélectionnés peuvent ouvrir cette note ou cet incident. Décochez une personne pour révoquer son accès immédiatement.</string>
+    <string name="notes_manage_sharing">Gérer le partage de la note</string>
+    <string name="safety_sharing_saved">Accès de partage enregistré.</string>
+    <string name="email_optional">Courriel (facultatif)</string>
+    <string name="email_communication_consent">J’accepte de recevoir des notifications et communications par courriel d’Olive Branch.</string>
+    <string name="email_consent_required">Veuillez cocher la case acceptant les communications par courriel ou effacer le champ du courriel.</string>
+    <string name="email_notifications_label">Notifications par courriel</string>
+    <string name="email_notifications_enabled">Activées</string>
+    <string name="email_notifications_disabled">Désactivées</string>
+    <string name="email_invalid_message">Entrez une adresse courriel valide.</string>
     <string name="password_recovery_title">Récupération du compte</string>
     <string name="password_recovery_help">Utilisez le mot de passe de votre compte Olive Branch avec la cryptographie OPAQUE à divulgation nulle de connaissance pour restaurer vos discussions et fichiers chiffrés sur un nouvel appareil. Le serveur ne reçoit ni ne stocke jamais votre mot de passe ou clé de récupération.</string>
     <string name="password_recovery_warning">Une fois activée, la récupération par mot de passe reste activée en permanence afin de protéger votre accès aux données chiffrées entre appareils.</string>
@@ -519,4 +549,5 @@
     <string name="encrypted_access_partially_restored">Certains éléments chiffrés n’ont pas pu être restaurés. Vérifiez votre connexion et réessayez.</string>
     <string name="encrypted_access_restore_failed">L’accès chiffré n’a pas pu être restauré. Vérifiez votre connexion et votre mot de passe de récupération, puis réessayez.</string>
     <string name="ok">OK</string>
+    <string name="password_recovery_confirm_device">Confirmez votre identité pour protéger la récupération chiffrée de votre compte sur cet appareil.</string>
 </resources>

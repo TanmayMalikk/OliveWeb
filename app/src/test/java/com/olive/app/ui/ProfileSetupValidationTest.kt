@@ -13,7 +13,10 @@ class ProfileSetupValidationTest {
         safeContact: Boolean = false,
         trigger: String = "moon garden",
         name: String = "",
-        details: String = ""
+        details: String = "",
+        email: String = "",
+        emailConsent: Boolean = false,
+        relationship: String = "",
     ) =
         ProfileSetupValidation(
             safeContact,
@@ -22,7 +25,10 @@ class ProfileSetupValidationTest {
             DeliveryAddress(city = "Edmonton"),
             trigger,
             name,
-            details
+            details,
+            email,
+            emailConsent,
+            contactRelationship = relationship,
         )
 
     // Inputs: the values shown below. Expected: optional contacts must be complete before finishing user setup.
@@ -31,12 +37,14 @@ class ProfileSetupValidationTest {
         assertTrue(validation().isPageValid(2))
         assertFalse(validation(name = "Trusted friend").isPageValid(2))
         assertFalse(validation(details = "friend@example.ca").isPageValid(2))
+        assertFalse(validation(relationship = "Sibling").isPageValid(2))
         assertTrue(
             validation(
                 name = "Trusted friend",
                 details = "friend@example.ca"
             ).isPageValid(2)
         )
+        assertTrue(validation(name = "Trusted friend", details = "friend@example.ca", relationship = "Sibling").isPageValid(2))
     }
 
     // Inputs: the values shown below. Expected: safe contact progress does not require private entry credentials.
@@ -94,5 +102,26 @@ class ProfileSetupValidationTest {
             "",
         )
         assertFalse(overlongCity.isPageValid(1))
+    }
+
+    @Test
+    fun optionalEmailRequiresConsentCheckboxAndValidFormatBeforeAdvancing() {
+        // Leaving email blank keeps page 0 valid for both users and safe contacts.
+        assertTrue(validation(safeContact = false, email = "", emailConsent = false).isPageValid(0))
+        assertTrue(validation(safeContact = true, trigger = "", email = "", emailConsent = false).isPageValid(0))
+
+        // Invalid or internal alias emails are rejected even with consent checked.
+        assertFalse(validation(safeContact = false, email = "not-an-email", emailConsent = true).isPageValid(0))
+        assertFalse(validation(safeContact = true, trigger = "", email = "user@users.olive.invalid", emailConsent = true).isPageValid(0))
+
+        // Entering a valid email without checking consent blocks advancing for both roles.
+        assertFalse(validation(safeContact = false, email = "user@example.com", emailConsent = false).isPageValid(0))
+        assertFalse(validation(safeContact = true, trigger = "", email = "safe@example.com", emailConsent = false).isPageValid(0))
+
+        // Valid email with consent checked succeeds without changing required field count.
+        val validUser = validation(safeContact = false, email = "user@example.com", emailConsent = true)
+        assertTrue(validUser.isPageValid(0))
+        assertEquals(4, validUser.requiredFields.size)
+        assertTrue(validation(safeContact = true, trigger = "", email = "safe@example.com", emailConsent = true).isPageValid(0))
     }
 }

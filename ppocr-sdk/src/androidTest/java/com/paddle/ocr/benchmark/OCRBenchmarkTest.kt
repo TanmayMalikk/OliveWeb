@@ -65,7 +65,7 @@ class OCRBenchmarkTest {
                 // The SDK test APK does not package the app's large private OCR models.
                 assumeNoException("OCR benchmark requires the app model assets", missingModel)
             }
-            OpenCVUtils.init(context)
+            check(OpenCVUtils.init()) { "OpenCV initialization failed" }
 
             outputDir = File(context.getExternalFilesDir(null), "ocr_benchmark")
             outputDir.mkdirs()
