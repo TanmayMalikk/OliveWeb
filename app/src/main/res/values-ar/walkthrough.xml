@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="walkthrough_subtitle">اختر أي ميزة من جدول المحتويات لتجربة العرض التفاعلي الخاص بها أو استعراض الخطوات أو فتح الأداة مباشرة.</string>
+    <string name="walkthrough_toc_title">جدول المحتويات</string>
+    <string name="walkthrough_toc_subtitle">اختر ميزة لتعلّم كيفية استخدامها (%1$d مواضيع)</string>
+    <string name="walkthrough_progress_count">تم استكشاف %1$d من %2$d</string>
+    <string name="walkthrough_start_tour">بدء الجولة الكاملة</string>
+    <string name="walkthrough_back_to_toc">جدول المحتويات</string>
+    <string name="walkthrough_feature_counter">الميزة %1$d من %2$d</string>
+    <string name="walkthrough_how_it_works">كيف تعمل الميزة</string>
+    <string name="walkthrough_step_number">الخطوة %1$d</string>
+    <string name="walkthrough_previous_topic">الميزة السابقة</string>
+    <string name="walkthrough_next_topic">الميزة التالية</string>
+    <string name="walkthrough_open_feature">فتح %1$s</string>
+    <string name="walkthrough_demo_heading">بيئة تدريب تفاعلية</string>
+    <string name="walkthrough_demo_badge">بيئة تدريب · التغييرات هنا لا تؤثر على حسابك</string>
+    <string name="walkthrough_demo_reset">إعادة ضبط العرض</string>
+    <string name="walkthrough_demo_done">اكتمل التدريب! يمكنك إعادة الضبط أو فتح %1$s في أي وقت.</string>
+    <string name="walkthrough_explored">تمت التجربة</string>
+    <string name="walkthrough_cat_privacy">الخصوصية والدخول</string>
+    <string name="walkthrough_cat_tools">أدوات الأمان الأساسية</string>
+    <string name="walkthrough_cat_support">الدعم والطوارئ</string>
+    <string name="walkthrough_cat_account">الحساب والأمان</string>
+
+    <string name="walkthrough_topic_cover_title">تطبيقات الواجهة والدخول السري</string>
+    <string name="walkthrough_topic_cover_summary">أخفِ Olive Branch كتطبيق أخبار أو لياقة وادخل بعبارتك السرية أو أيقونة الزيتونة المخفية.</string>
+    <string name="walkthrough_topic_cover_step_1">اختر Daily Digest أو Fitness Tracker في الإعدادات ليظهر اسم التطبيق وأيقونته بشكل عادي على هاتفك.</string>
+    <string name="walkthrough_topic_cover_step_2">اكتب عبارة التفعيل السرية في شريط بحث الواجهة أو انقر مرتين على أيقونة الزيتونة في صفحة الحساب.</string>
+    <string name="walkthrough_topic_cover_step_3">أدخل رمز PIN المكوّن من 4–6 أرقام أو قفل جهاز Android لفتح مساحتك الآمنة.</string>
+
+    <string name="walkthrough_topic_exit_title">الخروج السريع والقفل التلقائي</string>
+    <string name="walkthrough_topic_exit_summary">عد فوراً إلى تطبيق الواجهة أو دع عدم النشاط يقفل جلستك الخاصة تلقائياً.</string>
+    <string name="walkthrough_topic_exit_step_1">اضغط على زر الخروج السريع العائم في أي شاشة خاصة للعودة الفورية إلى تطبيق الواجهة.</string>
+    <string name="walkthrough_topic_exit_step_2">تبديل التطبيقات أو إيقاف الشاشة يقفل مساحتك الآمنة تلقائياً.</string>
+    <string name="walkthrough_topic_exit_step_3">من الإعدادات ← الخصوصية، اضبط مؤقت القفل عند عدم النشاط بما يناسبك.</string>
+
+    <string name="walkthrough_topic_plan_title">خطة الأمان</string>
+    <string name="walkthrough_topic_plan_summary">أنشئ قوائم أمان أساسية واحتياطية، واحفظها دون اتصال، وشاركها مع جهات موثوقة أو استشر الموظفين.</string>
+    <string name="walkthrough_topic_plan_step_1">راجع وعدّل خطتك الأساسية والخطوات الاحتياطية وقائمة حقيبة الطوارئ.</string>
+    <string name="walkthrough_topic_plan_step_2">تُحفظ التعديلات محلياً فوراً وتتم مزامنتها تلقائياً عند توفر الاتصال.</string>
+    <string name="walkthrough_topic_plan_step_3">شارك خطتك مع جهات اتصال مقبولة أو اطلب استشارة من موظفي الدعم.</string>
+
+    <string name="walkthrough_topic_notes_title">الملاحظات وسجلات الوقائع</string>
+    <string name="walkthrough_topic_notes_summary">دوّن ملاحظات خاصة ووقائع مؤرخة مع موقع GPS أو خريطة ومرفقات وتثبيت وسجل تعديلات.</string>
+    <string name="walkthrough_topic_notes_step_1">أنشئ ملاحظة عامة أو واقعة تتضمن التاريخ والوقت والموقع والمرفقات المشفّرة.</string>
+    <string name="walkthrough_topic_notes_step_2">ثبّت السجلات المهمة في الأعلى، وصفِّ حسب النوع، وابحث بالكلمات المفتاحية.</string>
+    <string name="walkthrough_topic_notes_step_3">اعرض سجل التعديلات لكل عنصر، أو شاركه مع جهة موثوقة، أو استعد العناصر من المهملات.</string>
+
+    <string name="walkthrough_topic_docs_title">المستندات المشفّرة والكاميرا والتعرّف الضوئي</string>
+    <string name="walkthrough_topic_docs_summary">احفظ ملفات مشفّرة، والتقط صوراً داخل التطبيق، واستخرج النصوص محلياً وشاركها بأمان.</string>
+    <string name="walkthrough_topic_docs_step_1">ارفع ملفات PDF أو صوراً أو فيديو أو صوتاً؛ يُشفّر كل ملف على جهازك قبل الرفع.</string>
+    <string name="walkthrough_topic_docs_step_2">استخدم الكاميرا المدمجة لالتقاط المستندات مباشرة دون حفظها في معرض الهاتف العام.</string>
+    <string name="walkthrough_topic_docs_step_3">شغّل التعرّف الضوئي على النصوص (OCR) على الجهاز وشارك الملفات المحددة مع جهات الاتصال المقبولة.</string>
+
+    <string name="walkthrough_topic_chat_title">الأصدقاء والرسائل والصوت والمكالمات</string>
+    <string name="walkthrough_topic_chat_summary">تواصل عبر طلبات الصداقة أو رموز دعوة لمدة 48 ساعة، وأرسل رسائل وملاحظات صوتية مشفّرة أو أجرِ مكالمات.</string>
+    <string name="walkthrough_topic_chat_step_1">أضف أشخاصاً موثوقين بالبحث عن اسم المستخدم أو بإنشاء رمز أو رابط دعوة صالح لمدة 48 ساعة.</string>
+    <string name="walkthrough_topic_chat_step_2">تبادل نصوصاً مشفّرة ورسائل صوتية داخل المحادثة فقط ومرفقات وملاحظات وخطط أمان ومواقع مباشرة.</string>
+    <string name="walkthrough_topic_chat_step_3">ابدأ مكالمة صوتية مشفّرة، أو ابحث في الرسائل، أو تراجع عن إرسال رسالة، أو افتح معلومات المحادثة.</string>
+
+    <string name="walkthrough_topic_location_title">الموقع المباشر والملاحة</string>
+    <string name="walkthrough_topic_location_summary">شارك موقعك الفوري مع جهات مختارة، واعرض المواقع المشاركة معك، واحصل على اتجاهات خطوة بخطوة.</string>
+    <string name="walkthrough_topic_location_step_1">افتح خريطة الموقع لرؤية موقعك الحالي ودليل الأماكن المحفوظة.</string>
+    <string name="walkthrough_topic_location_step_2">ابدأ مشاركة الموقع المباشر مع جهات محددة، وعدّل المستلمين أو أوقف المشاركة في أي وقت.</string>
+    <string name="walkthrough_topic_location_step_3">اختر جهة اتصال تشارك موقعها أو ابحث عن وجهة لبدء الملاحة خطوة بخطوة.</string>
+
+    <string name="walkthrough_topic_staff_title">مساعدة الموظفين ومحادثات الدعم</string>
+    <string name="walkthrough_topic_staff_summary">تواصل مع موظفي دعم المنظمة في محادثة برقم تذكرة أو صعّد محادثة حالية.</string>
+    <string name="walkthrough_topic_staff_step_1">افتح قائمة الدعم (+) واضغط على طلب مساعدة من الموظفين، أو اطلب الدعم من داخل محادثة حالية.</string>
+    <string name="walkthrough_topic_staff_step_2">انتظر ريثما يعيّن Olive Branch موظفاً متاحاً (يمكنك إلغاء الطلب في أي وقت قبل التعيين).</string>
+    <string name="walkthrough_topic_staff_step_3">تحدث مع الموظف المعيّن، وشارك الملاحظات أو الخطط، وأضف صديقاً مقبولاً إلى التذكرة عند الحاجة.</string>
+
+    <string name="walkthrough_topic_emergency_title">تقرير الطوارئ PDF</string>
+    <string name="walkthrough_topic_emergency_summary">أنشئ ملف PDF مشفّراً للطوارئ يتضمن ملفك وملاحظاتك وإحداثيات GPS وأرسل تنبيهاً للمسؤولين.</string>
+    <string name="walkthrough_topic_emergency_step_1">فعّل الطوارئ من قائمة الدعم (+) أو اضغط مطولاً على أيقونة زيتونة الواجهة لمدة ثانيتين.</string>
+    <string name="walkthrough_topic_emergency_step_2">يجمع Olive Branch بيانات ملفك وسجلات الوقائع وإحداثياتك الحالية في ملف PDF مشفّر داخل المستندات.</string>
+    <string name="walkthrough_topic_emergency_step_3">عند الاتصال بالإنترنت، يتلقى مسؤولو المنظمة تنبيه طوارئ مع تقريرك وتتبع موقعك المباشر.</string>
+
+    <string name="walkthrough_topic_hotlines_title">الخطوط الساخنة وجهات الاتصال الموثوقة</string>
+    <string name="walkthrough_topic_hotlines_summary">تصفّح خطوط المساعدة والملاجئ الكندية حسب المنطقة وأدر قائمة جهات اتصالك الآمنة.</string>
+    <string name="walkthrough_topic_hotlines_step_1">افتح موارد الخطوط الساخنة لتصفية خطوط الأزمات 24/7 والملاجئ والمساعدة القانونية والاستشارات حسب المقاطعة والمدينة.</string>
+    <string name="walkthrough_topic_hotlines_step_2">اضغط على أيقونة القلب لحفظ الخدمات المهمة أو اتصل مباشرة أو اعرض مواقع الدليل على الخريطة.</string>
+    <string name="walkthrough_topic_hotlines_step_3">في جهات الاتصال الموثوقة، سجّل تفاصيل العلاقة وحدد من يمكن الإقامة لديه بأمان واربط الأصدقاء.</string>
+
+    <string name="walkthrough_topic_activity_title">سجل النشاط ومفاتيح Passkey والإعدادات</string>
+    <string name="walkthrough_topic_activity_summary">راجع سجل الأمان، وسجّل مفتاح استرداد Passkey، وأدر أذونات التطبيق.</string>
+    <string name="walkthrough_topic_activity_step_1">افتح نشاط الحساب لمراجعة تعديلات الإعدادات وأحداث التفعيل ومحاولات إدخال PIN.</string>
+    <string name="walkthrough_topic_activity_step_2">من الإعدادات ← الخصوصية، سجّل مفتاح استرداد Passkey لاستعادة ملفاتك ومحادثاتك المشفّرة على جهاز جديد.</string>
+    <string name="walkthrough_topic_activity_step_3">استخدم الإعدادات ← الأذونات لمراجعة ومنح أذونات الكاميرا والميكروفون والموقع والإشعارات والصحة.</string>
+
+    <!-- Sandbox demo strings -->
+    <string name="wt_cover_label">واجهة التطبيق التجريبية:</string>
+    <string name="wt_cover_news">Daily Digest</string>
+    <string name="wt_cover_fitness">Fitness Tracker</string>
+    <string name="wt_cover_trigger_label">مربع البحث في الواجهة</string>
+    <string name="wt_cover_trigger_hint">جرّب: \"moon garden\"</string>
+    <string name="wt_cover_trigger_chip">تعبئة \"moon garden\"</string>
+    <string name="wt_cover_trigger_unlock_btn">التحقق من العبارة</string>
+    <string name="wt_cover_trigger_error">أدخل \"moon garden\" أو انقر مرتين على الزيتونة المخفية</string>
+    <string name="wt_cover_olive_hint">نقر مزدوج على الزيتونة</string>
+    <string name="wt_cover_pin_label">رمز PIN التجريبي (أدخل 1234)</string>
+    <string name="wt_cover_pin_unlock">فتح المساحة الآمنة</string>
+    <string name="wt_cover_pin_error">رمز غير صحيح — جرّب 1234</string>
+    <string name="wt_cover_unlocked">تم قبول الرمز وفتح المساحة الآمنة في بيئة التدريب!</string>
+
+    <string name="wt_exit_idle_label">مؤقت القفل التلقائي:</string>
+    <string name="wt_exit_1m">1 د</string>
+    <string name="wt_exit_2m">2 د</string>
+    <string name="wt_exit_5m">5 د</string>
+    <string name="wt_exit_inside_title">مساحة آمنة تجريبية</string>
+    <string name="wt_exit_inside_body">الجلسة الخاصة مفتوحة. اضغط على الخروج السريع للقفل الفوري.</string>
+    <string name="wt_exit_button">الخروج السريع</string>
+    <string name="wt_exit_cover_title">شاشة الواجهة المخفية</string>
+    <string name="wt_exit_cover_body">تمت العودة للواجهة فوراً (المؤقت مضبوط على %1$s).</string>
+    <string name="wt_exit_reenter">إعادة الدخول للتدريب</string>
+
+    <string name="wt_plan_progress">القائمة: %1$d / %2$d جاهز</string>
+    <string name="wt_plan_item_1">نسخ الهوية وشهادة الميلاد</string>
+    <string name="wt_plan_item_2">مفاتيح احتياطية للمنزل والسيارة</string>
+    <string name="wt_plan_item_3">مبلغ طوارئ وأدوية أساسية</string>
+    <string name="wt_plan_share_toggle">مشاركة خطة الأمان مع مايا</string>
+    <string name="wt_plan_shared_badge">تمت المشاركة</string>
+    <string name="wt_plan_private_badge">خاص</string>
+
+    <string name="wt_notes_kind_note">ملاحظة</string>
+    <string name="wt_notes_kind_incident">واقعة</string>
+    <string name="wt_notes_sample_note_title">تذكير حقيبة الطوارئ</string>
+    <string name="wt_notes_sample_note_body">تم حفظ شاحن احتياطي ونسخ الوثائق في خزانة العمل.</string>
+    <string name="wt_notes_sample_incident_title">12 أكتوبر · واقعة المدخل</string>
+    <string name="wt_notes_sample_incident_body">18:30 · إدمونتون · تم حفظ الصور والملاحظات.</string>
+    <string name="wt_notes_pinned_badge">مثبّت</string>
+    <string name="wt_notes_pin_action">تثبيت / إلغاء</string>
+    <string name="wt_notes_add_edit">إضافة تعديل تجريبي</string>
+    <string name="wt_notes_history_toggle">سجل التعديلات (%1$d)</string>
+    <string name="wt_notes_edit_initial">تم إنشاء السجل الأولي</string>
+    <string name="wt_notes_edit_sample">تم تحديث الموقع والتفاصيل</string>
+    <string name="wt_notes_trash">نقل إلى المهملات</string>
+    <string name="wt_notes_trashed_notice">نُقل إلى المهملات. اضغط تراجع للاستعادة.</string>
+    <string name="wt_notes_undo">تراجع</string>
+
+    <string name="wt_docs_capture_ocr">التقاط وتشغيل OCR</string>
+    <string name="wt_docs_file_title">عقد_الإيجار.pdf</string>
+    <string name="wt_docs_file_pending">جاهز للالتقاط والتشفير</string>
+    <string name="wt_docs_file_encrypted">مشفر (AES-256)</string>
+    <string name="wt_docs_ocr_label">النص المستخرج عبر OCR (قابل للتعديل)</string>
+    <string name="wt_docs_ocr_sample">عقد إيجار · وحدة 4B · إشعار بتاريخ 18 نوفمبر</string>
+    <string name="wt_docs_share_toggle">مشاركة المستند مع مايا</string>
+    <string name="wt_docs_voice_note">الرسائل الصوتية تبقى في المحادثة ولا تُحفظ في المستندات.</string>
+
+    <string name="wt_chat_invite_btn">إنشاء رمز لمدة 48 ساعة</string>
+    <string name="wt_chat_invite_value">الرمز: %1$s · صالح 48 ساعة</string>
+    <string name="wt_chat_msg_input">اكتب رسالة مشفّرة تجريبية</string>
+    <string name="wt_chat_send">إرسال</string>
+    <string name="wt_chat_voice_btn">إضافة رسالة صوتية</string>
+    <string name="wt_chat_sample_incoming">مايا: أطمئن عليك — أخبريني إن احتجتِ مساعدة.</string>
+    <string name="wt_chat_sample_voice">رسالة صوتية · 0:08</string>
+    <string name="wt_chat_voice_badge">المحادثة فقط</string>
+    <string name="wt_chat_unsend">إلغاء الإرسال</string>
+    <string name="wt_chat_unsent">تم إلغاء إرسال الرسالة</string>
+
+    <string name="wt_loc_recipients">المستلمون:</string>
+    <string name="wt_loc_maya">مايا</string>
+    <string name="wt_loc_jordan">جوردان</string>
+    <string name="wt_loc_duration">المدة:</string>
+    <string name="wt_loc_15m">15 د</string>
+    <string name="wt_loc_1h">1 س</string>
+    <string name="wt_loc_until_stop">حتى الإيقاف</string>
+    <string name="wt_loc_start">بدء المشاركة المباشرة</string>
+    <string name="wt_loc_stop">إيقاف المشاركة</string>
+    <string name="wt_loc_status_off">مشاركة الموقع متوقفة</string>
+    <string name="wt_loc_status_on">تتم المشاركة مع %1$d جهة اتصال · %2$s</string>
+    <string name="wt_loc_preview_route">معاينة المسار</string>
+    <string name="wt_loc_route_info">المسار إلى مايا: 12 دقيقة (4.6 كم)</string>
+
+    <string name="wt_staff_request">طلب مساعدة الموظفين</string>
+    <string name="wt_staff_searching">جارٍ البحث عن موظف متاح…</string>
+    <string name="wt_staff_cancel">إلغاء الطلب</string>
+    <string name="wt_staff_simulate_assign">محاكاة التعيين</string>
+    <string name="wt_staff_ticket_header">التذكرة #104 · معيّنة لـ أليكس (موظف)</string>
+    <string name="wt_staff_sample_reply">أليكس: أهلاً، أنا هنا للمساعدة. ماذا نراجع أولاً؟</string>
+    <string name="wt_staff_user_reply">هل يمكننا مراجعة خطة المأوى البديلة؟</string>
+    <string name="wt_staff_send_reply">إرسال رد تجريبي</string>
+    <string name="wt_staff_add_friend">إضافة صديق (مايا) إلى التذكرة</string>
+
+    <string name="wt_emerg_generate">إنشاء تقرير طوارئ PDF تجريبي</string>
+    <string name="wt_emerg_note">معاينة تدريب فقط — لن يُحفظ أي ملف ولن يُرسل أي تنبيه.</string>
+    <string name="wt_emerg_doc_title">نموذج تقرير الطوارئ (PDF)</string>
+    <string name="wt_emerg_sec_1">1. ملخص الحساب وسياق الطوارئ</string>
+    <string name="wt_emerg_sec_2">2. أحدث سجلات الوقائع والأوقات</string>
+    <string name="wt_emerg_sec_3">3. إحداثيات GPS (53.5461, -113.4938)</string>
+    <string name="wt_emerg_sec_4">4. تنبيه المسؤولين ورابط الخريطة المباشرة</string>
+
+    <string name="wt_hotline_all">الكل</string>
+    <string name="wt_hotline_247">24/7 فقط</string>
+    <string name="wt_hotline_saved">المحفوظة (%1$d)</string>
+    <string name="wt_hotline_1">خط معلومات العنف الأسري ألبرتا 24/7</string>
+    <string name="wt_hotline_2">مأوى أزمات إدمونتون (24/7)</string>
+    <string name="wt_hotline_3">عيادة المساعدة القانونية ألبرتا</string>
+    <string name="wt_hotline_save_btn">حفظ في المفضلة</string>
+    <string name="wt_hotline_contact_label">مايا · أخت موثوقة</string>
+    <string name="wt_hotline_safe_stay">مكان آمن للإقامة</string>
+
+    <string name="wt_act_all">الكل</string>
+    <string name="wt_act_settings">الإعدادات</string>
+    <string name="wt_act_triggers">العبارات السرية</string>
+    <string name="wt_act_pin">PIN</string>
+    <string name="wt_act_log_1">الإعدادات · تغيير مؤقت القفل إلى دقيقتين</string>
+    <string name="wt_act_log_2">العبارات · مطابقة عبارة الدخول</string>
+    <string name="wt_act_log_3">PIN · فتح المساحة الآمنة</string>
+    <string name="wt_act_log_4">الإعدادات · تسجيل مفتاح Passkey</string>
+    <string name="wt_act_passkey_toggle">تم تسجيل مفتاح استرداد Passkey</string>
+    <string name="wt_act_passkey_note">حماية: إذا تبقى مفتاح Passkey واحد فقط، يتم منع إزالته.</string>
+</resources>

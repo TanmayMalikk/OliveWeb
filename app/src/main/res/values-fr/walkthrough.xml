@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="walkthrough_subtitle">Choisissez une fonctionnalité dans la table des matières pour tester son bac à sable interactif, lire les étapes ou ouvrir l’outil.</string>
+    <string name="walkthrough_toc_title">Table des matières</string>
+    <string name="walkthrough_toc_subtitle">Sélectionnez une fonctionnalité pour apprendre à l’utiliser (%1$d sujets)</string>
+    <string name="walkthrough_progress_count">%1$d sur %2$d exploré(s)</string>
+    <string name="walkthrough_start_tour">Démarrer la visite complète</string>
+    <string name="walkthrough_back_to_toc">Table des matières</string>
+    <string name="walkthrough_feature_counter">Fonction %1$d sur %2$d</string>
+    <string name="walkthrough_how_it_works">Comment ça fonctionne</string>
+    <string name="walkthrough_step_number">Étape %1$d</string>
+    <string name="walkthrough_previous_topic">Fonction précédente</string>
+    <string name="walkthrough_next_topic">Fonction suivante</string>
+    <string name="walkthrough_open_feature">Ouvrir %1$s</string>
+    <string name="walkthrough_demo_heading">Bac à sable interactif</string>
+    <string name="walkthrough_demo_badge">Bac à sable · Les essais ici ne modifient pas votre compte</string>
+    <string name="walkthrough_demo_reset">Réinitialiser la démo</string>
+    <string name="walkthrough_demo_done">Exercice terminé ! Réinitialisez la démo ou ouvrez %1$s quand vous voulez.</string>
+    <string name="walkthrough_explored">Exploré</string>
+    <string name="walkthrough_cat_privacy">Confidentialité et accès</string>
+    <string name="walkthrough_cat_tools">Outils de sécurité</string>
+    <string name="walkthrough_cat_support">Soutien et urgence</string>
+    <string name="walkthrough_cat_account">Compte et sécurité</string>
+
+    <string name="walkthrough_topic_cover_title">Applications de couverture et accès secret</string>
+    <string name="walkthrough_topic_cover_summary">Déguisez Olive Branch en Daily Digest ou Fitness Tracker et entrez avec votre phrase secrète ou l’olive cachée.</string>
+    <string name="walkthrough_topic_cover_step_1">Choisissez Daily Digest ou Fitness Tracker dans les paramètres pour adapter l’icône et le nom de l’application.</string>
+    <string name="walkthrough_topic_cover_step_2">Saisissez votre phrase déclencheuse dans la recherche ou touchez deux fois la petite olive dans l’onglet Compte.</string>
+    <string name="walkthrough_topic_cover_step_3">Validez votre NIP à 4–6 chiffres ou le verrouillage de l’appareil Android pour ouvrir votre espace sécurisé.</string>
+
+    <string name="walkthrough_topic_exit_title">Sortie rapide et verrouillage automatique</string>
+    <string name="walkthrough_topic_exit_summary">Revenez instantanément à la couverture ou laissez l’inactivité verrouiller votre session privée.</string>
+    <string name="walkthrough_topic_exit_step_1">Appuyez sur le bouton flottant Sortie rapide depuis n’importe quel écran privé pour revenir immédiatement à la couverture.</string>
+    <string name="walkthrough_topic_exit_step_2">Changer d’application ou éteindre l’écran verrouille automatiquement votre espace sécurisé.</string>
+    <string name="walkthrough_topic_exit_step_3">Dans Paramètres → Confidentialité, réglez le délai d’inactivité selon vos besoins.</string>
+
+    <string name="walkthrough_topic_plan_title">Plan de sécurité</string>
+    <string name="walkthrough_topic_plan_summary">Créez vos listes de sécurité principales et de secours, sauvegardez hors ligne, partagez ou consultez le personnel.</string>
+    <string name="walkthrough_topic_plan_step_1">Personnalisez votre plan principal, votre plan de secours et votre liste d’urgence.</string>
+    <string name="walkthrough_topic_plan_step_2">Les modifications sont enregistrées localement et synchronisées dès que la connexion revient.</string>
+    <string name="walkthrough_topic_plan_step_3">Partagez votre plan avec des contacts acceptés ou demandez une consultation avec le personnel.</string>
+
+    <string name="walkthrough_topic_notes_title">Notes et rapports d’incidents</string>
+    <string name="walkthrough_topic_notes_summary">Rédigez des notes privées et des incidents datés avec position GPS, pièces jointes, épinglage et historique.</string>
+    <string name="walkthrough_topic_notes_step_1">Créez une note ou un incident avec date, heure, lieu sur la carte et fichiers chiffrés joints.</string>
+    <string name="walkthrough_topic_notes_step_2">Épinglez les entrées importantes, filtrez par type et recherchez par mot-clé.</string>
+    <string name="walkthrough_topic_notes_step_3">Consultez l’historique des modifications, partagez une entrée avec un contact ou restaurez depuis la corbeille.</string>
+
+    <string name="walkthrough_topic_docs_title">Documents chiffrés, caméra et ROC</string>
+    <string name="walkthrough_topic_docs_summary">Stockez des fichiers chiffrés, prenez des photos dans l’application, extrayez le texte par ROC et partagez en sécurité.</string>
+    <string name="walkthrough_topic_docs_step_1">Importez des PDF, photos, vidéos ou audios ; chaque fichier est chiffré sur votre appareil avant l’envoi.</string>
+    <string name="walkthrough_topic_docs_step_2">Utilisez la caméra intégrée pour capturer des preuves sans les enregistrer dans la galerie publique.</string>
+    <string name="walkthrough_topic_docs_step_3">Exécutez la reconnaissance de texte (ROC) sur l’appareil et partagez les documents choisis avec vos contacts.</string>
+
+    <string name="walkthrough_topic_chat_title">Amis, messages, voix et appels</string>
+    <string name="walkthrough_topic_chat_summary">Ajoutez des contacts par demande ou code de 48 h, envoyez des messages et notes vocales chiffrés ou appelez.</string>
+    <string name="walkthrough_topic_chat_step_1">Ajoutez des personnes de confiance par nom d’utilisateur ou avec un code d’invitation unique valable 48 heures.</string>
+    <string name="walkthrough_topic_chat_step_2">Échangez des messages chiffrés, des messages vocaux uniquement dans le chat, des notes, des plans ou votre position.</string>
+    <string name="walkthrough_topic_chat_step_3">Passez un appel vocal chiffré, recherchez dans la discussion, annulez un envoi ou ouvrez Infos de discussion.</string>
+
+    <string name="walkthrough_topic_location_title">Position en direct et navigation</string>
+    <string name="walkthrough_topic_location_summary">Partagez votre position en temps réel, voyez les positions partagées avec vous et lancez un itinéraire.</string>
+    <string name="walkthrough_topic_location_step_1">Ouvrez la carte pour voir votre position actuelle et le répertoire des lieux enregistrés.</string>
+    <string name="walkthrough_topic_location_step_2">Activez le partage de position en direct avec les contacts choisis et arrêtez-le à tout moment.</string>
+    <string name="walkthrough_topic_location_step_3">Sélectionnez un contact ou une destination pour suivre l’itinéraire étape par étape.</string>
+
+    <string name="walkthrough_topic_staff_title">Aide du personnel et tickets de soutien</string>
+    <string name="walkthrough_topic_staff_summary">Contactez le personnel de soutien dans une discussion avec numéro de ticket ou transférez une conversation.</string>
+    <string name="walkthrough_topic_staff_step_1">Ouvrez le menu Soutien (+) et appuyez sur Demander l’aide du personnel, ou depuis une discussion existante.</string>
+    <string name="walkthrough_topic_staff_step_2">Patientez pendant l’attribution d’un membre disponible (vous pouvez annuler la demande à tout moment).</string>
+    <string name="walkthrough_topic_staff_step_3">Discutez avec le personnel, partagez vos éléments et ajoutez un ami accepté au ticket si nécessaire.</string>
+
+    <string name="walkthrough_topic_emergency_title">Rapport PDF d’urgence</string>
+    <string name="walkthrough_topic_emergency_summary">Créez un PDF d’urgence chiffré avec votre profil, vos notes et votre position GPS et alertez les administrateurs.</string>
+    <string name="walkthrough_topic_emergency_step_1">Déclenchez Urgence depuis le menu Soutien (+) ou maintenez l’icône olive de couverture pendant 2 secondes.</string>
+    <string name="walkthrough_topic_emergency_step_2">Olive Branch rassemble votre profil, vos incidents et vos coordonnées GPS dans un PDF chiffré dans Documents.</string>
+    <string name="walkthrough_topic_emergency_step_3">En ligne, les administrateurs reçoivent une alerte d’urgence avec votre rapport et le suivi sur la carte.</string>
+
+    <string name="walkthrough_topic_hotlines_title">Lignes d’aide et contacts de confiance</string>
+    <string name="walkthrough_topic_hotlines_summary">Parcourez les lignes d’aide et refuges canadiens par région et gérez vos contacts de confiance.</string>
+    <string name="walkthrough_topic_hotlines_step_1">Filtrez les lignes d’urgence 24/7, refuges, services juridiques et counselling par province et ville.</string>
+    <string name="walkthrough_topic_hotlines_step_2">Touchez le cœur pour enregistrer un service, appelez directement ou affichez les lieux sur la carte.</string>
+    <string name="walkthrough_topic_hotlines_step_3">Dans Contacts de confiance, notez les détails, indiquez chez qui loger en sécurité et liez un ami du chat.</string>
+
+    <string name="walkthrough_topic_activity_title">Historique d’activité, clés d’accès et paramètres</string>
+    <string name="walkthrough_topic_activity_summary">Consultez le journal d’audit, enregistrez une clé de récupération Passkey et gérez les autorisations.</string>
+    <string name="walkthrough_topic_activity_step_1">Ouvrez Activité du compte pour vérifier les changements de paramètres, déclencheurs et tentatives de NIP.</string>
+    <string name="walkthrough_topic_activity_step_2">Dans Paramètres → Confidentialité, ajoutez une clé Passkey pour récupérer vos fichiers chiffrés sur un nouvel appareil.</string>
+    <string name="walkthrough_topic_activity_step_3">Utilisez Paramètres → Autorisations pour gérer caméra, micro, localisation, notifications et santé.</string>
+
+    <!-- Sandbox demo strings -->
+    <string name="wt_cover_label">Exemple de couverture :</string>
+    <string name="wt_cover_news">Daily Digest</string>
+    <string name="wt_cover_fitness">Fitness Tracker</string>
+    <string name="wt_cover_trigger_label">Barre de recherche de couverture</string>
+    <string name="wt_cover_trigger_hint">Essayez : « moon garden »</string>
+    <string name="wt_cover_trigger_chip">Remplir « moon garden »</string>
+    <string name="wt_cover_trigger_unlock_btn">Vérifier le déclencheur</string>
+    <string name="wt_cover_trigger_error">Saisissez « moon garden » ou touchez deux fois l’olive cachée</string>
+    <string name="wt_cover_olive_hint">Double toucher olive</string>
+    <string name="wt_cover_pin_label">NIP exemple (entrez 1234)</string>
+    <string name="wt_cover_pin_unlock">Déverrouiller</string>
+    <string name="wt_cover_pin_error">Mauvais NIP — essayez 1234 (secoue en cas d’erreur)</string>
+    <string name="wt_cover_unlocked">NIP accepté — Espace sécurisé ouvert dans le bac à sable !</string>
+
+    <string name="wt_exit_idle_label">Délai d’inactivité :</string>
+    <string name="wt_exit_1m">1 min</string>
+    <string name="wt_exit_2m">2 min</string>
+    <string name="wt_exit_5m">5 min</string>
+    <string name="wt_exit_inside_title">Espace sécurisé simulé</string>
+    <string name="wt_exit_inside_body">Espace privé ouvert. Appuyez sur Sortie rapide pour verrouiller immédiatement.</string>
+    <string name="wt_exit_button">Sortie rapide</string>
+    <string name="wt_exit_cover_title">Écran de couverture</string>
+    <string name="wt_exit_cover_body">Retour immédiat à la couverture (délai réglé sur %1$s).</string>
+    <string name="wt_exit_reenter">Rouvrir l’exercice</string>
+
+    <string name="wt_plan_progress">Liste : %1$d / %2$d prêt(s)</string>
+    <string name="wt_plan_item_1">Copies de pièces d’identité</string>
+    <string name="wt_plan_item_2">Clés de maison et voiture de secours</string>
+    <string name="wt_plan_item_3">Argent d’urgence et médicaments essentiels</string>
+    <string name="wt_plan_share_toggle">Partager le plan avec Maya</string>
+    <string name="wt_plan_shared_badge">Partagé</string>
+    <string name="wt_plan_private_badge">Privé</string>
+
+    <string name="wt_notes_kind_note">Note</string>
+    <string name="wt_notes_kind_incident">Incident</string>
+    <string name="wt_notes_sample_note_title">Rappel sac d’urgence</string>
+    <string name="wt_notes_sample_note_body">Chargeur de rechange et copies au casier du travail.</string>
+    <string name="wt_notes_sample_incident_title">12 oct. · Incident entrée</string>
+    <string name="wt_notes_sample_incident_body">18:30 · 104 St NW, Edmonton · Photo et notes enregistrées.</string>
+    <string name="wt_notes_pinned_badge">Épinglé</string>
+    <string name="wt_notes_pin_action">Épingler / Détacher</string>
+    <string name="wt_notes_add_edit">Ajouter une modif exemple</string>
+    <string name="wt_notes_history_toggle">Historique (%1$d)</string>
+    <string name="wt_notes_edit_initial">Entrée initiale créée</string>
+    <string name="wt_notes_edit_sample">Lieu et détails mis à jour</string>
+    <string name="wt_notes_trash">Mettre à la corbeille</string>
+    <string name="wt_notes_trashed_notice">Entrée mise à la corbeille. Appuyez sur Annuler pour restaurer.</string>
+    <string name="wt_notes_undo">Annuler</string>
+
+    <string name="wt_docs_capture_ocr">Capturer et lancer ROC</string>
+    <string name="wt_docs_file_title">Bail_Logement.pdf</string>
+    <string name="wt_docs_file_pending">Prêt à capturer et chiffrer</string>
+    <string name="wt_docs_file_encrypted">Chiffré (AES-256)</string>
+    <string name="wt_docs_ocr_label">Texte ROC extrait (à vérifier)</string>
+    <string name="wt_docs_ocr_sample">Bail · Logement 4B · Avis daté du 18 nov.</string>
+    <string name="wt_docs_share_toggle">Partager le document avec Maya</string>
+    <string name="wt_docs_voice_note">Les messages vocaux restent dans la discussion et sont exclus de Documents.</string>
+
+    <string name="wt_chat_invite_btn">Créer un code de 48 h</string>
+    <string name="wt_chat_invite_value">Code : %1$s · Valable 48 heures</string>
+    <string name="wt_chat_msg_input">Écrire un message chiffré exemple</string>
+    <string name="wt_chat_send">Envoyer</string>
+    <string name="wt_chat_voice_btn">Ajouter note vocale</string>
+    <string name="wt_chat_sample_incoming">Maya : Je vérifie que tu vas bien ce soir.</string>
+    <string name="wt_chat_sample_voice">Message vocal · 0:08</string>
+    <string name="wt_chat_voice_badge">Chat uniquement</string>
+    <string name="wt_chat_unsend">Annuler l’envoi</string>
+    <string name="wt_chat_unsent">Message retiré</string>
+
+    <string name="wt_loc_recipients">Destinataires :</string>
+    <string name="wt_loc_maya">Maya</string>
+    <string name="wt_loc_jordan">Jordan</string>
+    <string name="wt_loc_duration">Durée :</string>
+    <string name="wt_loc_15m">15 min</string>
+    <string name="wt_loc_1h">1 h</string>
+    <string name="wt_loc_until_stop">Jusqu’à arrêt</string>
+    <string name="wt_loc_start">Partager ma position</string>
+    <string name="wt_loc_stop">Arrêter le partage</string>
+    <string name="wt_loc_status_off">Partage de position en pause</string>
+    <string name="wt_loc_status_on">Partage actif avec %1$d contact(s) · %2$s</string>
+    <string name="wt_loc_preview_route">Aperçu itinéraire</string>
+    <string name="wt_loc_route_info">Itinéraire vers Maya : 12 min (4,6 km) · Actualisation auto active</string>
+
+    <string name="wt_staff_request">Demander l’aide du personnel</string>
+    <string name="wt_staff_searching">Recherche de personnel disponible…</string>
+    <string name="wt_staff_cancel">Annuler la demande</string>
+    <string name="wt_staff_simulate_assign">Simuler attribution</string>
+    <string name="wt_staff_ticket_header">Ticket #104 · Assigné à Alex (Personnel)</string>
+    <string name="wt_staff_sample_reply">Alex : Bonjour, comment puis-je vous aider aujourd’hui ?</string>
+    <string name="wt_staff_user_reply">Pouvons-nous revoir mon plan d’hébergement ?</string>
+    <string name="wt_staff_send_reply">Envoyer réponse exemple</string>
+    <string name="wt_staff_add_friend">Ajouter une amie (Maya) au ticket</string>
+
+    <string name="wt_emerg_generate">Générer un PDF d’urgence exemple</string>
+    <string name="wt_emerg_note">Aperçu bac à sable uniquement — aucun fichier créé ni alerte envoyée.</string>
+    <string name="wt_emerg_doc_title">Exemple de rapport d’urgence (PDF)</string>
+    <string name="wt_emerg_sec_1">1. Résumé du profil et contexte d’urgence</string>
+    <string name="wt_emerg_sec_2">2. Incidents récents et horodatage</string>
+    <string name="wt_emerg_sec_3">3. Coordonnées GPS (53.5461, -113.4938)</string>
+    <string name="wt_emerg_sec_4">4. Alerte administrateur et lien carte en direct</string>
+
+    <string name="wt_hotline_all">Tout</string>
+    <string name="wt_hotline_247">24/7 uniquement</string>
+    <string name="wt_hotline_saved">Enregistrés (%1$d)</string>
+    <string name="wt_hotline_1">Ligne info violence familiale Alberta 24/7</string>
+    <string name="wt_hotline_2">Accueil refuge d’urgence Edmonton (24/7)</string>
+    <string name="wt_hotline_3">Clinique Aide juridique Alberta</string>
+    <string name="wt_hotline_save_btn">Ajouter aux favoris</string>
+    <string name="wt_hotline_contact_label">Maya · Sœur de confiance</string>
+    <string name="wt_hotline_safe_stay">Sûr pour héberger</string>
+
+    <string name="wt_act_all">Tout</string>
+    <string name="wt_act_settings">Paramètres</string>
+    <string name="wt_act_triggers">Déclencheurs</string>
+    <string name="wt_act_pin">NIP</string>
+    <string name="wt_act_log_1">Paramètres · Délai réglé sur 2 min</string>
+    <string name="wt_act_log_2">Déclencheurs · Phrase acceptée</string>
+    <string name="wt_act_log_3">NIP · Espace sécurisé déverrouillé</string>
+    <string name="wt_act_log_4">Paramètres · Clé Passkey ajoutée</string>
+    <string name="wt_act_passkey_toggle">Clé de récupération Passkey activée</string>
+    <string name="wt_act_passkey_note">Protection : s’il ne reste qu’une seule clé Passkey, sa suppression est bloquée.</string>
+</resources>

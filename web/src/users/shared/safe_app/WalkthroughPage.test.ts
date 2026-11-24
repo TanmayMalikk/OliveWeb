@@ -1,14 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
-vi.mock("../../../session/SessionProvider", () => ({
-  useSession: () => ({}),
-}));
+import { describe, expect, it } from "vitest";
 import {
   clampWalkthroughStep,
   nextWalkthroughTopicIndex,
+  walkthroughTopicGroups,
   walkthroughTopicsForRole,
-} from "./WalkthroughPage";
+} from "./WalkthroughCatalog";
 
-describe("WalkthroughPage table of contents and navigation helpers", () => {
+describe("WalkthroughCatalog table of contents and navigation helpers", () => {
   it("lists all user features in the table of contents and filters user-only topics for safe contacts", () => {
     const userTopics = walkthroughTopicsForRole("USER");
     const contactTopics = walkthroughTopicsForRole("SAFE_CONTACT");
@@ -29,6 +27,19 @@ describe("WalkthroughPage table of contents and navigation helpers", () => {
       "location",
       "activity_settings",
     ]);
+  });
+
+  it("groups topics by category in display order and omits empty categories", () => {
+    const userGroups = walkthroughTopicGroups(walkthroughTopicsForRole("USER"));
+    const contactGroups = walkthroughTopicGroups(walkthroughTopicsForRole("SAFE_CONTACT"));
+
+    expect(userGroups.map((group) => group.category.id)).toEqual([
+      "privacy",
+      "tools",
+      "support",
+      "account",
+    ]);
+    expect(contactGroups.map((group) => group.category.id)).toEqual(["tools", "account"]);
   });
 
   it("clamps step and topic navigation indices within bounds", () => {

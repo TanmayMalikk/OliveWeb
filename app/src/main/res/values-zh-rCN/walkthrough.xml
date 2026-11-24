@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="walkthrough_subtitle">从目录中选择任意功能，体验交互式沙盒演示、查看分步指引或直接打开该功能。</string>
+    <string name="walkthrough_toc_title">目录</string>
+    <string name="walkthrough_toc_subtitle">选择想要学习使用的功能（共 %1$d 项）</string>
+    <string name="walkthrough_progress_count">已探索 %1$d / %2$d 项</string>
+    <string name="walkthrough_start_tour">开始完整引导</string>
+    <string name="walkthrough_back_to_toc">返回目录</string>
+    <string name="walkthrough_feature_counter">第 %1$d 项（共 %2$d 项）</string>
+    <string name="walkthrough_how_it_works">操作步骤</string>
+    <string name="walkthrough_step_number">第 %1$d 步</string>
+    <string name="walkthrough_previous_topic">上一个功能</string>
+    <string name="walkthrough_next_topic">下一个功能</string>
+    <string name="walkthrough_open_feature">打开%1$s</string>
+    <string name="walkthrough_demo_heading">交互式沙盒演示</string>
+    <string name="walkthrough_demo_badge">练习沙盒 · 此处操作不会影响您的真实账户</string>
+    <string name="walkthrough_demo_reset">重置演示</string>
+    <string name="walkthrough_demo_done">练习完成！您可以随时重置演示或直接打开%1$s。</string>
+    <string name="walkthrough_explored">已体验</string>
+    <string name="walkthrough_cat_privacy">隐私与秘密入口</string>
+    <string name="walkthrough_cat_tools">核心安全工具</string>
+    <string name="walkthrough_cat_support">支援与紧急求助</string>
+    <string name="walkthrough_cat_account">账户与安全</string>
+
+    <string name="walkthrough_topic_cover_title">伪装应用与秘密入口</string>
+    <string name="walkthrough_topic_cover_summary">将 Olive Branch 伪装为每日摘要或健身追踪器，并通过秘密触发词或隐藏橄榄图标进入。</string>
+    <string name="walkthrough_topic_cover_step_1">在“设置”中选择“每日摘要”或“健身追踪器”，桌面图标和应用名称会随之切换。</string>
+    <string name="walkthrough_topic_cover_step_2">在伪装页搜索栏输入秘密触发短语，或在伪装页“账户”页面双击小橄榄图标。</string>
+    <string name="walkthrough_topic_cover_step_3">通过 4–6 位应用 PIN 码或 Android 设备锁验证，即可解锁您的安全空间。</string>
+
+    <string name="walkthrough_topic_exit_title">快速退出与自动锁定</string>
+    <string name="walkthrough_topic_exit_summary">随时一键返回伪装应用，或在无操作与切到后台时自动锁定私密空间。</string>
+    <string name="walkthrough_topic_exit_step_1">在任意私密页面点击角落的“快速退出”悬浮按钮，立即返回伪装应用。</string>
+    <string name="walkthrough_topic_exit_step_2">切换应用或关闭屏幕时，安全空间会自动锁定。</string>
+    <string name="walkthrough_topic_exit_step_3">在“设置 → 隐私”中调整闲置自动锁定时间及防截屏保护。</string>
+
+    <string name="walkthrough_topic_plan_title">安全计划</string>
+    <string name="walkthrough_topic_plan_summary">制定主计划与备用清单、支持离线保存、与信任联系人共享或请求工作人员咨询。</string>
+    <string name="walkthrough_topic_plan_step_1">查看并编辑根据引导问卷生成的首选计划、备用步骤和紧急随身物品清单。</string>
+    <string name="walkthrough_topic_plan_step_2">修改会立即保存在本地，并在恢复联网后自动同步。</string>
+    <string name="walkthrough_topic_plan_step_3">将安全计划共享给已接受的好友（可随时撤销），或点击请求工作人员咨询。</string>
+
+    <string name="walkthrough_topic_notes_title">笔记与事件记录</string>
+    <string name="walkthrough_topic_notes_summary">记录私密笔记及带日期、GPS/地图位置、附件、置顶和编辑历史的事件档案。</string>
+    <string name="walkthrough_topic_notes_step_1">创建普通“笔记”或记录包含日期、时间、位置及加密附件的“事件”。</string>
+    <string name="walkthrough_topic_notes_step_2">将重要记录置顶、按笔记或事件筛选，并通过关键词搜索。</string>
+    <string name="walkthrough_topic_notes_step_3">查看每条记录的修改历史、共享给信任联系人或从回收站恢复。</string>
+
+    <string name="walkthrough_topic_docs_title">加密文档、相机与 OCR 识别</string>
+    <string name="walkthrough_topic_docs_summary">存储端到端加密文件、使用应用内相机拍摄、通过本地 OCR 提取文字并安全共享。</string>
+    <string name="walkthrough_topic_docs_step_1">上传 PDF、照片、视频或音频，所有文件在上传前均在本地完成加密。</string>
+    <string name="walkthrough_topic_docs_step_2">使用应用内相机直接拍摄证据并加密保存，不会留存在系统公共相册中。</string>
+    <string name="walkthrough_topic_docs_step_3">运行本地 OCR 识别图片中的文字并校对保存，随后将所选文件共享给联系人。</string>
+
+    <string name="walkthrough_topic_chat_title">好友、消息、语音与通话</string>
+    <string name="walkthrough_topic_chat_summary">通过好友请求或 48 小时邀请码连接，发送加密消息与仅限聊天的语音，或拨打加密电话。</string>
+    <string name="walkthrough_topic_chat_step_1">通过用户名搜索添加信任的人，或生成 48 小时有效的一次性邀请码/链接。</string>
+    <string name="walkthrough_topic_chat_step_2">在单聊或群聊中发送加密文字、仅在聊天中保存的语音消息、附件、笔记、安全计划或实时位置。</string>
+    <string name="walkthrough_topic_chat_step_3">发起加密语音通话、搜索聊天记录、撤回消息，或打开“聊天信息”查看成员与共享内容。</string>
+
+    <string name="walkthrough_topic_location_title">实时位置与导航</string>
+    <string name="walkthrough_topic_location_summary">向指定联系人共享实时位置、查看他人共享给您的位置并获取路线导航。</string>
+    <string name="walkthrough_topic_location_step_1">打开位置地图查看当前定位及已保存的地点目录。</string>
+    <string name="walkthrough_topic_location_step_2">向选定联系人开启指定时长的实时位置共享，并可随时增删接收人或停止共享。</string>
+    <string name="walkthrough_topic_location_step_3">选择正在共享位置的联系人或搜索目的地，开启分段路线导航。</string>
+
+    <string name="walkthrough_topic_staff_title">工作人员协助与支持工单</string>
+    <string name="walkthrough_topic_staff_summary">在带工单编号的支持对话中联系机构工作人员，或将现有聊天升级为工作人员支持。</string>
+    <string name="walkthrough_topic_staff_step_1">打开底部支持菜单（+）并点击“请求工作人员协助”，或在现有对话中发起申请。</string>
+    <string name="walkthrough_topic_staff_step_2">等待系统分配在线工作人员（分配完成前可随时取消申请）。</string>
+    <string name="walkthrough_topic_staff_step_3">与工作人员沟通、共享相关笔记或计划，并可按需将已接受的好友加入支持工单。</string>
+
+    <string name="walkthrough_topic_emergency_title">紧急报告 PDF</string>
+    <string name="walkthrough_topic_emergency_summary">生成包含个人资料、事件记录和 GPS 坐标的加密紧急 PDF 报告，并向机构管理员发出警报。</string>
+    <string name="walkthrough_topic_emergency_step_1">在安全空间的支持菜单（+）中点击“紧急求助”，或在伪装页长按橄榄图标 2 秒。</string>
+    <string name="walkthrough_topic_emergency_step_2">Olive Branch 会将您的资料、事件记录与当前坐标打包为加密 PDF 并存入“文档”。</string>
+    <string name="walkthrough_topic_emergency_step_3">联网状态下，机构管理员会收到紧急警报，并可查看报告 PDF 与实时地图位置。</string>
+
+    <string name="walkthrough_topic_hotlines_title">援助热线与信任联系人</string>
+    <string name="walkthrough_topic_hotlines_summary">按地区浏览加拿大援助热线、庇护所和法律援助，并管理您的信任安全联系人名录。</string>
+    <string name="walkthrough_topic_hotlines_step_1">打开“热线资源”，按省份和城市筛选 24/7 危机热线、庇护所、法律援助与心理咨询。</string>
+    <string name="walkthrough_topic_hotlines_step_2">点击心形图标收藏重要服务、一键拨号，或在地图上查看目录地点并导航。</string>
+    <string name="walkthrough_topic_hotlines_step_3">在“信任联系人”中记录关系说明、标记是否可安全借宿，并关联聊天好友。</string>
+
+    <string name="walkthrough_topic_activity_title">活动历史、通行密钥与设置</string>
+    <string name="walkthrough_topic_activity_summary">查看安全审计日志、注册 Passkey 账户恢复密钥并管理应用权限。</string>
+    <string name="walkthrough_topic_activity_step_1">打开“账户活动”查看带时间戳的设置更改、触发记录、PIN 码尝试与隐私事件。</string>
+    <string name="walkthrough_topic_activity_step_2">在“设置 → 隐私”中注册 Passkey 账户恢复密钥，以便在新设备上恢复加密文档与聊天。</string>
+    <string name="walkthrough_topic_activity_step_3">在“设置 → 权限”中查看并授权相机、麦克风、位置、通知和健康数据权限。</string>
+
+    <!-- Sandbox demo strings -->
+    <string name="wt_cover_label">示例伪装应用：</string>
+    <string name="wt_cover_news">每日摘要</string>
+    <string name="wt_cover_fitness">健身追踪器</string>
+    <string name="wt_cover_trigger_label">伪装页搜索栏</string>
+    <string name="wt_cover_trigger_hint">尝试输入：\"moon garden\"</string>
+    <string name="wt_cover_trigger_chip">填入 \"moon garden\"</string>
+    <string name="wt_cover_trigger_unlock_btn">验证触发词</string>
+    <string name="wt_cover_trigger_error">请输入 \"moon garden\" 或双击隐藏橄榄图标</string>
+    <string name="wt_cover_olive_hint">双击橄榄</string>
+    <string name="wt_cover_pin_label">示例 PIN（输入 1234）</string>
+    <string name="wt_cover_pin_unlock">解锁安全空间</string>
+    <string name="wt_cover_pin_error">PIN 错误 — 请输入 1234（出错时会抖动提示）</string>
+    <string name="wt_cover_unlocked">PIN 验证通过 — 沙盒安全空间已解锁！</string>
+
+    <string name="wt_exit_idle_label">闲置自动锁定时间：</string>
+    <string name="wt_exit_1m">1 分钟</string>
+    <string name="wt_exit_2m">2 分钟</string>
+    <string name="wt_exit_5m">5 分钟</string>
+    <string name="wt_exit_inside_title">模拟安全空间</string>
+    <string name="wt_exit_inside_body">私密空间已打开。点击“快速退出”立即锁定并返回伪装页。</string>
+    <string name="wt_exit_button">快速退出</string>
+    <string name="wt_exit_cover_title">伪装应用界面</string>
+    <string name="wt_exit_cover_body">已立即返回伪装应用（自动锁定设为 %1$s）。</string>
+    <string name="wt_exit_reenter">重新进入演示</string>
+
+    <string name="wt_plan_progress">随身清单：%1$d / %2$d 项已准备</string>
+    <string name="wt_plan_item_1">身份证件与出生证明复印件</string>
+    <string name="wt_plan_item_2">备用房屋和车钥匙</string>
+    <string name="wt_plan_item_3">应急现金与常用药物</string>
+    <string name="wt_plan_share_toggle">与 Maya 共享安全计划</string>
+    <string name="wt_plan_shared_badge">已共享</string>
+    <string name="wt_plan_private_badge">私密</string>
+
+    <string name="wt_notes_kind_note">笔记</string>
+    <string name="wt_notes_kind_incident">事件</string>
+    <string name="wt_notes_sample_note_title">应急包准备提醒</string>
+    <string name="wt_notes_sample_note_body">备用充电器和证件复印件已放在办公室储物柜。</string>
+    <string name="wt_notes_sample_incident_title">10月12日 · 走廊事件记录</string>
+    <string name="wt_notes_sample_incident_body">18:30 · 埃德蒙顿 104 街 · 已保存照片和说明。</string>
+    <string name="wt_notes_pinned_badge">已置顶</string>
+    <string name="wt_notes_pin_action">置顶 / 取消</string>
+    <string name="wt_notes_add_edit">添加示例修改</string>
+    <string name="wt_notes_history_toggle">修改历史（%1$d）</string>
+    <string name="wt_notes_edit_initial">初始记录已保存</string>
+    <string name="wt_notes_edit_sample">更新了地点与详细描述</string>
+    <string name="wt_notes_trash">移至回收站</string>
+    <string name="wt_notes_trashed_notice">已移至回收站，点击撤销可恢复。</string>
+    <string name="wt_notes_undo">撤销</string>
+
+    <string name="wt_docs_capture_ocr">拍摄并执行 OCR</string>
+    <string name="wt_docs_file_title">租房合同.pdf</string>
+    <string name="wt_docs_file_pending">等待拍摄与加密</string>
+    <string name="wt_docs_file_encrypted">已加密（AES-256）</string>
+    <string name="wt_docs_ocr_label">OCR 提取文本（保存前可校对）</string>
+    <string name="wt_docs_ocr_sample">租房协议 · 4B 单元 · 11月18日通知</string>
+    <string name="wt_docs_share_toggle">将文档共享给 Maya</string>
+    <string name="wt_docs_voice_note">语音消息仅保留在聊天中，不会存入文档库。</string>
+
+    <string name="wt_chat_invite_btn">生成 48 小时邀请码</string>
+    <string name="wt_chat_invite_value">邀请码：%1$s · 48 小时内有效</string>
+    <string name="wt_chat_msg_input">输入示例加密消息</string>
+    <string name="wt_chat_send">发送</string>
+    <string name="wt_chat_voice_btn">发送示例语音</string>
+    <string name="wt_chat_sample_incoming">Maya：问候一下——今晚需要帮忙或接送请告诉我。</string>
+    <string name="wt_chat_sample_voice">语音消息 · 0:08</string>
+    <string name="wt_chat_voice_badge">仅限聊天</string>
+    <string name="wt_chat_unsend">撤回</string>
+    <string name="wt_chat_unsent">消息已撤回</string>
+
+    <string name="wt_loc_recipients">共享给：</string>
+    <string name="wt_loc_maya">Maya</string>
+    <string name="wt_loc_jordan">Jordan</string>
+    <string name="wt_loc_duration">时长：</string>
+    <string name="wt_loc_15m">15 分钟</string>
+    <string name="wt_loc_1h">1 小时</string>
+    <string name="wt_loc_until_stop">直到停止</string>
+    <string name="wt_loc_start">开启实时共享</string>
+    <string name="wt_loc_stop">停止共享</string>
+    <string name="wt_loc_status_off">实时位置共享已暂停</string>
+    <string name="wt_loc_status_on">正在与 %1$d 位联系人实时共享 · %2$s</string>
+    <string name="wt_loc_preview_route">预览路线</string>
+    <string name="wt_loc_route_info">前往 Maya 的路线：约 12 分钟（4.6 公里）</string>
+
+    <string name="wt_staff_request">请求工作人员协助</string>
+    <string name="wt_staff_searching">正在匹配在线工作人员…</string>
+    <string name="wt_staff_cancel">取消请求</string>
+    <string name="wt_staff_simulate_assign">模拟已分配</string>
+    <string name="wt_staff_ticket_header">工单 #104 · 已分配 Alex（工作人员）</string>
+    <string name="wt_staff_sample_reply">Alex：您好，我在这里协助您。您今天想先看哪部分？</string>
+    <string name="wt_staff_user_reply">可以一起看看我的备用庇护所计划吗？</string>
+    <string name="wt_staff_send_reply">发送示例回复</string>
+    <string name="wt_staff_add_friend">将信任好友（Maya）加入工单</string>
+
+    <string name="wt_emerg_generate">生成示例紧急报告 PDF</string>
+    <string name="wt_emerg_note">仅限沙盒预览——不会生成真实文件，也不会发送警报。</string>
+    <string name="wt_emerg_doc_title">示例紧急报告 (PDF)</string>
+    <string name="wt_emerg_sec_1">1. 账户资料与紧急情况摘要</string>
+    <string name="wt_emerg_sec_2">2. 近期事件记录与时间戳</string>
+    <string name="wt_emerg_sec_3">3. 当前 GPS 坐标 (53.5461, -113.4938)</string>
+    <string name="wt_emerg_sec_4">4. 机构管理员警报与实时地图链接</string>
+
+    <string name="wt_hotline_all">全部</string>
+    <string name="wt_hotline_247">仅看 24/7</string>
+    <string name="wt_hotline_saved">已收藏（%1$d）</string>
+    <string name="wt_hotline_1">阿尔伯塔省 24/7 家庭暴力信息热线</string>
+    <string name="wt_hotline_2">埃德蒙顿危机庇护所接待中心 (24/7)</string>
+    <string name="wt_hotline_3">阿尔伯塔法律援助咨询诊所</string>
+    <string name="wt_hotline_save_btn">收藏/取消收藏</string>
+    <string name="wt_hotline_contact_label">Maya · 信任的姐妹</string>
+    <string name="wt_hotline_safe_stay">可安全借宿</string>
+
+    <string name="wt_act_all">全部</string>
+    <string name="wt_act_settings">设置</string>
+    <string name="wt_act_triggers">触发词</string>
+    <string name="wt_act_pin">PIN</string>
+    <string name="wt_act_log_1">设置 · 闲置锁定改为 2 分钟</string>
+    <string name="wt_act_log_2">触发词 · 伪装入口短语验证成功</string>
+    <string name="wt_act_log_3">PIN · 安全空间已解锁</string>
+    <string name="wt_act_log_4">设置 · 已添加 Passkey 恢复密钥</string>
+    <string name="wt_act_passkey_toggle">已启用 Passkey 账户恢复密钥</string>
+    <string name="wt_act_passkey_note">安全保护：若仅剩 1 个 Passkey，将禁止移除以防丢失恢复能力。</string>
+</resources>

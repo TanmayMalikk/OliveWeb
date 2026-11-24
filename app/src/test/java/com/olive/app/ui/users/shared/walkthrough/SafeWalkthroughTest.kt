@@ -62,6 +62,24 @@ class SafeWalkthroughTest {
     }
 
     @Test
+    fun topicGroupsPreserveCategoryOrderAndFilterEmptySectionsForSafeContacts() {
+        val userGroups = walkthroughTopicGroups(walkthroughTopicsForRole(AccountRole.USER))
+        val contactGroups = walkthroughTopicGroups(walkthroughTopicsForRole(AccountRole.SAFE_CONTACT))
+
+        assertEquals(
+            listOf(
+                WalkthroughCategory.PRIVACY,
+                WalkthroughCategory.TOOLS,
+                WalkthroughCategory.SUPPORT,
+                WalkthroughCategory.ACCOUNT,
+            ),
+            userGroups.map { it.category },
+        )
+        assertEquals(listOf(WalkthroughCategory.TOOLS), contactGroups.map { it.category })
+        assertEquals(5, contactGroups.single().topics.size)
+    }
+
+    @Test
     fun stepAndTopicNavigationClampWithinValidBounds() {
         assertEquals(0, clampWalkthroughStep(-3, 3))
         assertEquals(1, clampWalkthroughStep(1, 3))
