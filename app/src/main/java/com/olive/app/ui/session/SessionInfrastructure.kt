@@ -240,7 +240,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                     }
                     if (epoch != token || screen != SessionScreen.Pin || challenge != pinChallengeVersion) return@runOperation
                     when (result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, usingAppPin = true)
+                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, verifiedPinLength = pin.length)
                         is PinResult.Rejected -> if (result.failures >= 5) navigation.quickExit() else {
                             failInput(
                                 runtime.application.resources.getQuantityString(
@@ -263,23 +263,23 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
      * @param token Authentication, push notification, or session token.
      * @param expectedScreen Expected screen supplied to [unlockVerifiedDevice].
      * @param challenge Optional challenge supplied to [unlockVerifiedDevice].
-     * @param usingAppPin Whether to apply using app PIN.
+     * @param verifiedPinLength Length recorded after successful app PIN verification, if used.
      */
     internal suspend fun unlockVerifiedDevice(
         device: DeviceEnrollment,
         token: Long,
         expectedScreen: SessionScreen,
         challenge: Int? = null,
-        usingAppPin: Boolean = false
+        verifiedPinLength: Int? = null,
     ) {
         with(runtime) {
             with(state) {
-                if (usingAppPin && !device.allowsAppPin()) return
+                if (verifiedPinLength != null && !device.allowsAppPin()) return
                 val saved = withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
                 if (epoch != token || screen != expectedScreen || enrollment != device || privacyBlackout ||
-                    (challenge != null && challenge != pinChallengeVersion) ||
-                    (usingAppPin && !device.allowsAppPin())
+                    (challenge != null && challenge != pinChallengeVersion)
                 ) return
+                if (verifiedPinLength != null) enrollment = device.copy(pinLength = verifiedPinLength)
                 pinAuthorizedUid = device.uid
                 pinAuthorizedEpoch = token
                 busy = false
@@ -323,7 +323,11 @@ internal class PasskeyCredentialRequest internal constructor(
     val assertion: Boolean,
 ) {
     internal val result = CompletableDeferred<PasskeyCredentialResult?>()
-    /** Completes the deferred passkey ceremony result with [value] or null on cancellation. */
+    /**
+     * Completes the deferred passkey ceremony result with [value] or null on cancellation.
+     *
+     * @param value The credential result, or null if the prompt did not produce one.
+     */
     fun complete(value: PasskeyCredentialResult?) {
         result.complete(value)
     }
@@ -400,12 +404,13 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Computes current.
+     * Checks that a private-entry request still belongs to the same account and screen.
      *
-     * @param token Authentication, push notification, or session token.
-     * @param expected Expected supplied to [current].
-     * @param uid Firebase UID of the target user account.
-     * @param enroll Whether to apply enroll.
+     * @param token The session epoch captured when the request started.
+     * @param expected The screen that must still be active.
+     * @param uid The UID that must match the pending or enrolled account.
+     * @param enroll Whether to check the pending enrollment instead of the enrolled device.
+     * @return True when the original user session and screen are still active and visible.
      */
     private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) = with(runtime) {
         epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&

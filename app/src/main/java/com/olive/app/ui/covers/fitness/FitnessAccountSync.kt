@@ -11,11 +11,15 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.data.network.nonNegativeFloat
 import com.olive.app.data.network.sha256Hex
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.max
@@ -75,6 +79,7 @@ internal fun fitnessPreferences(context: Context, uid: String, workout: Boolean 
 /**
  * Stores fitness value on shared preferences editor.
  *
+ * @receiver The preferences editor receiving the fitness value.
  * @param key Lookup key or cryptographic key.
  * @param value Input value to store, parse, or format, or null when not provided.
  */
@@ -298,7 +303,7 @@ internal object FitnessAccountSync {
         FitnessWatchSync.publish(context, owner, FitnessStore(context, owner).snapshot())
     }
 
-    /**
+/**
      * Schedules the fitness account sync.
      *
      * @param context Android context used to access system services, resources, or storage.
@@ -310,6 +315,98 @@ internal object FitnessAccountSync {
         WorkManager.getInstance(context).enqueueUniqueWork("fitness-upload-${fitnessAccountKey(owner)}",
             ExistingWorkPolicy.KEEP, OneTimeWorkRequestBuilder<FitnessUploadWorker>().setInputData(data)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build())
+    }
+}
+
+// Fitness cover users: syncs the signed-in account's 14-day fitness summary for the web viewer.
+
+internal object FitnessCloudSync {
+    private const val MIN_SYNC_INTERVAL_MS = 30_000L
+    private val lastUploadAtByAccount = ConcurrentHashMap<String, Long>()
+    private val lastPayloadByAccount = ConcurrentHashMap<String, String>()
+
+    /**
+     * Uploads only changed summaries and never more than once every 30 seconds.
+     *
+     * @param accountId Account ID supplied to [upload].
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @param history Collection of history values to process.
+     */
+    suspend fun upload(accountId: String, snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) {
+        // Local previews and UI tests may not have a Firebase app; there is no cloud account to sync.
+        val user = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (_: IllegalStateException) {
+            return
+        } ?: return
+        if (accountId != user.uid) return
+        val summary = summaryJson(snapshot, history)
+        val payloadSignature = summary.toString()
+        val now = System.currentTimeMillis()
+        val lastUploadAt = lastUploadAtByAccount[accountId] ?: 0L
+        if (
+            payloadSignature == lastPayloadByAccount[accountId] ||
+            now - lastUploadAt < MIN_SYNC_INTERVAL_MS
+        ) return
+        summary.put("updatedAt", now)
+        val payload = summary.toString()
+        val bytes = payload.toByteArray(Charsets.UTF_8)
+        // Use the fallback when upload is unavailable.
+        try {
+            FirebaseStorage.getInstance().reference
+                .child("accounts/${user.uid}/fitness/summary.json")
+                .putBytes(
+                    bytes,
+                    StorageMetadata.Builder().setContentType("application/json")
+                        .setCustomMetadata("schemaVersion", "1").build(),
+                ).await()
+            AccountSyncRepository().notifyChanged(accountId)
+            lastPayloadByAccount[accountId] = payloadSignature
+            lastUploadAtByAccount[accountId] = now
+        } catch (_: Exception) {
+            // Fitness sync: a temporary network or Firebase failure must not close the cover app.
+        } finally {
+            bytes.fill(0)
+        }
+    }
+
+    /**
+     * Serializes the fitness summary for the web viewer.
+     *
+     * @param snapshot Firestore or data snapshot containing the latest state.
+     * @param history Collection of history values to process.
+     * @return The resulting summary JSON.
+     */
+    private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
+        put("stepGoal", snapshot.profile.stepGoal)
+        put("calorieGoal", snapshot.profile.calorieGoal)
+        put("proteinGoal", snapshot.profile.proteinGoal)
+        put("carbohydrateGoal", snapshot.profile.carbohydrateGoal)
+        put("fatGoal", snapshot.profile.fatGoal)
+        put("watchConnected", snapshot.watchConnected)
+        put("days", JSONArray(history.map { day ->
+            JSONObject().apply {
+                put("date", day.date.toString())
+                put("steps", day.steps)
+                put("distanceKm", day.distanceKm.toDouble())
+                put("caloriesBurned", day.caloriesBurned.toDouble())
+                put("caloriesEaten", day.caloriesEaten.toDouble())
+                put("proteinGrams", day.proteinGrams.toDouble())
+                put("carbohydrateGrams", day.carbohydrateGrams.toDouble())
+                put("fatGrams", day.fatGrams.toDouble())
+            }
+        }))
+        put("vitals", JSONArray(snapshot.heartRateHistory.map { vitals ->
+            JSONObject().apply {
+                put("date", vitals.date.toString())
+                put("peakBpm", vitals.peakBpm)
+                put("lowestBpm", vitals.lowestBpm)
+                put("restingBpm", vitals.restingBpm ?: JSONObject.NULL)
+                put("averageBpm", vitals.averageBpm)
+                put("sampleCount", vitals.sampleCount)
+                put("lastUpdatedAt", vitals.lastUpdatedAt)
+            }
+        }))
     }
 }
 
@@ -695,7 +792,9 @@ internal fun coachGoals(profile: FitnessProfile) = mapOf(
 /**
  * Computes with coach goals for this fitness profile.
  *
+ * @receiver The existing fitness profile that supplies the current goals.
  * @param goals Key-value mapping of goals entries.
+ * @return A profile with valid coach goal changes applied and all other fields preserved.
  */
 internal fun FitnessProfile.withCoachGoals(goals: Map<String, Int>) = copy(
     stepGoal = goals["steps"]?.takeIf { it in 500..100_000 } ?: stepGoal,
@@ -1025,6 +1124,7 @@ private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
 /**
  * Keeps only foods that include calories and the three main macros.
  *
+ * @receiver The JSON object containing the stored fields.
  * @return `true` if has core nutrition, or `false` otherwise.
  */
 private fun JSONObject.hasCoreNutrition() =
@@ -1035,6 +1135,7 @@ private fun JSONObject.hasCoreNutrition() =
  * Cancellation belongs to the screen lifecycle, not to provider fallback.
  *
  * @param block Callback or suspending lambda executed within this scope.
+ * @param T The type of data returned by the food lookup provider.
  * @return Outcome [Result] wrapping the provider result result or failure.
  */
 private suspend fun <T> providerResult(block: suspend () -> T): Result<T> = try {

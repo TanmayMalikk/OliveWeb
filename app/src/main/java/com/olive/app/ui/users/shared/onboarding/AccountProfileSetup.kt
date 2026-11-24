@@ -208,6 +208,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var trigger by remember { mutableStateOf("") }
     var contactName by remember { mutableStateOf("") }
     var contactDetails by remember { mutableStateOf("") }
+    var contactRelationship by remember { mutableStateOf("") }
     val contacts =
         remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FITNESS) }
@@ -237,6 +238,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
         contactDetails,
         email,
         emailConsent,
+        contactRelationship = contactRelationship,
     )
     val required = validation.requiredFields
     val completed = required.count { it }
@@ -260,7 +262,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 SafeContact(
                     UUID.randomUUID().toString(),
                     contactName.trim(),
-                    contactDetails.trim()
+                    contactDetails.trim(),
+                    relationship = contactRelationship.trim(),
                 )
             ) else emptyList()).take(25)
 
@@ -440,7 +443,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                                     )
                                     Text(
-                                        contact.details,
+                                        listOf(contact.relationship, contact.details)
+                                            .filter(String::isNotBlank).joinToString(" · "),
                                         color = Muted,
                                         style = MaterialTheme.typography.bodySmall
                                     )
@@ -469,6 +473,14 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         showErrors = false
                     }
                     Field(
+                        uiText(R.string.contact_relationship),
+                        contactRelationship,
+                        "setup_contact_relationship",
+                        enabled = !session.account.busy && contacts.size < 25,
+                    ) {
+                        contactRelationship = it.take(120)
+                    }
+                    Field(
                         uiText(R.string.ui_phone_or_email_optional),
                         contactDetails,
                         "setup_contact_details",
@@ -488,10 +500,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
                                 contacts += SafeContact(
                                     UUID.randomUUID().toString(),
                                     contactName.trim(),
-                                    contactDetails.trim()
+                                    contactDetails.trim(),
+                                    relationship = contactRelationship.trim(),
                                 )
                                 contactName = ""
                                 contactDetails = ""
+                                contactRelationship = ""
                                 showErrors = false
                             }
                         },
@@ -550,11 +564,14 @@ internal class ProfileSetupValidation(
     private val contactDetails: String,
     private val email: String = "",
     private val emailConsent: Boolean = false,
+    private val contactRelationship: String = "",
 ) {
     val emailValid get() = email.isBlank() || InputPolicy.validEmail(email)
     val emailConsentValid get() = email.isBlank() || emailConsent
     val personalValid get() = fullName.isNotBlank() && InputPolicy.validDob(dob) && emailValid && emailConsentValid
-    val supportValid get() = contactName.isBlank() == contactDetails.isBlank()
+    val supportValid get() = if (contactRelationship.isBlank()) {
+        contactName.isBlank() == contactDetails.isBlank()
+    } else contactName.isNotBlank() && contactDetails.isNotBlank()
     val requiredFields
         get() = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), address.locationValid) +
                 if (safeContact) emptyList() else listOf(InputPolicy.validTrigger(trigger))

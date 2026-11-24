@@ -245,7 +245,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return Result.retry()
     }
 
-    /** Provides the foreground notification used when WorkManager promotes an encrypted upload. */
+    /**
+     * Provides the foreground notification used when WorkManager promotes an encrypted upload.
+     *
+     * @return The WorkManager foreground notification and service metadata for the upload.
+     */
     override suspend fun getForegroundInfo(): ForegroundInfo {
         val channelId = "olive_upload_channel"
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -375,6 +379,7 @@ private class FileSliceRequestBody(
 /**
  * Bridges OkHttp's callback API to structured coroutine cancellation.
  *
+ * @receiver The OkHttp call to start asynchronously.
  * @return The resulting [Response] instance.
  */
 private suspend fun Call.await():Response=suspendCancellableCoroutine { continuation ->
@@ -468,6 +473,7 @@ interface MediaTicketDataSource {
      * @param mediaId Unique identifier of the encrypted media object.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update plan access.
      */
     suspend fun updatePlanAccess(
@@ -539,7 +545,12 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
     return false
 }
 
-/** Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key. */
+/**
+ * Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key.
+ *
+ * @param job The upload job whose state or request data is being read.
+ * @return The upload request fields, including the ciphertext metadata and wrapped media keys.
+ */
 internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
     require(source.allowedUsers.toSet()==source.accountWrappedKeys.keys) {
         "Every authorized account requires an account-keyset wrapper"
@@ -656,6 +667,7 @@ class MediaRepository(
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
      * @param grantIndependentRecipients Collection of grant independent recipients values to process.
      * @param revokeIndependentRecipients Collection of revoke independent recipients values to process.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update access.
      */
     override suspend fun updateAccess(
@@ -685,6 +697,7 @@ class MediaRepository(
      * @param mediaId Unique identifier of the encrypted media object.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update plan access.
      */
     override suspend fun updatePlanAccess(
@@ -708,6 +721,7 @@ class MediaRepository(
      * @param recipientUids Collection of recipient uids values to process.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      */
     override suspend fun shareInChat(
         mediaId:String,
@@ -811,6 +825,10 @@ class MediaRepository(
 
 /**
  * Encrypted media: Reads the account-keyset wrapped AES keys from a downloaded media record.
+ *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
+ * @param name The field name that contains the recipient key wrappers.
+ * @return The downloaded media key wrappers indexed by recipient UID.
  */
 private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetWrappedKey> =
     (get(name) as? Map<*,*>)?.entries?.associate { entry ->
@@ -821,6 +839,7 @@ private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetW
 /**
  * Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
  *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
  * @return The resulting record.
  */
 private fun Map<*,*>.record()=CloudMediaRecord(requireString("mediaId"),requireString("ownerUid"),requireString("objectKey"),

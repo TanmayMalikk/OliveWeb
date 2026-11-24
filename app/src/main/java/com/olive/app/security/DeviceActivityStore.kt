@@ -429,7 +429,13 @@ object KeyManager {
         return Base64.getEncoder().encodeToString(wrappedBytes)
     }
 
-    /** Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest. */
+    /**
+     * Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest.
+     *
+     * @param secretKey The symmetric content key to wrap.
+     * @param publicKey The recipient account's public wrapping key.
+     * @return The Base64-encoded content key wrapped with RSA-OAEP using SHA-256 for MGF1.
+     */
     internal fun wrapForAccountKeyset(secretKey: SecretKey, publicKey: PublicKey): String =
         wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA256)
 
@@ -459,14 +465,28 @@ object KeyManager {
         return unwrapKey(wrappedKeyBase64, privateKeys, keyWrapVersion)
     }
 
-    /** Opens a File DEK with an unlocked account private key during the keyset migration. */
+    /**
+     * Opens a File DEK with an unlocked account private key during the keyset migration.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKey The private key used to unwrap the symmetric key.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
     fun unwrapKey(
         wrappedKeyBase64: String,
         privateKey: PrivateKey,
         keyWrapVersion: Int? = null,
     ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
 
-    /** Unwraps an RSA-OAEP encrypted symmetric key against candidate private keys and digest profiles. */
+    /**
+     * Unwraps an RSA-OAEP encrypted symmetric key against candidate private keys and digest profiles.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKeys The candidate private keys tried against the wrapper.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
     private fun unwrapKey(
         wrappedKeyBase64: String,
         privateKeys: List<PrivateKey>,
@@ -729,7 +749,11 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
     var awaitingCredential: Boolean = false
         private set
 
-    /** Launches the Android Credential Manager prompt for [value] and strips PRF results on completion. */
+    /**
+     * Launches the Android Credential Manager prompt for [value] and strips PRF results on completion.
+     *
+     * @param value The credential request to display.
+     */
     fun show(value: PasskeyCredentialRequest) {
         if (request === value) return
         cancel()
@@ -776,7 +800,12 @@ internal class AndroidPasskeyCredentials(private val activity: FragmentActivity)
         awaitingCredential = false
     }
 
-    /** Completes [value] if still active, or wipes any orphaned PRF output bytes. */
+    /**
+     * Completes [value] if still active, or wipes any orphaned PRF output bytes.
+     *
+     * @param value The credential request that this result belongs to.
+     * @param result The result returned by the credential request.
+     */
     private fun finish(value: PasskeyCredentialRequest, result: PasskeyCredentialResult?) {
         if (request !== value) {
             (result as? PasskeyCredentialResult.Assertion)?.value?.prfOutput?.fill(0)

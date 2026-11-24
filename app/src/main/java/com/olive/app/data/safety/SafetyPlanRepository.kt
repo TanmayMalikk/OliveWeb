@@ -18,6 +18,7 @@ import org.json.JSONObject
 /**
  * Invokes a protected Firebase HTTPS callable function and parses its Map response as JSON.
  *
+ * @receiver The Firebase Functions client used to execute the callable request.
  * @param name Name of the deployed Firebase HTTPS callable function.
  * @param data Request payload map forwarded to the callable function.
  * @return JSON object parsed from the callable's response map.
@@ -291,7 +292,12 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
             })) }
     }
 
-    /** Stores the server-confirmed availability without replacing the consultation list. */
+    /**
+     * Stores the server-confirmed availability without replacing the consultation list.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param available Whether this staff member can take new consultations.
+     */
     fun setAvailability(uid: String, available: Boolean) {
         requireUid(uid)
         vault.update { root -> root.child(ACCOUNTS).child(uid).put(AVAILABLE, available) }
@@ -332,7 +338,9 @@ internal class SafetyAccessIndexStore(private val vault: JsonVault) {
     /**
      * Computes rows for this JSON array.
      *
+     * @receiver The optional JSON array of consultation rows.
      * @param parse Function used to transform or provide parse.
+     * @param T The type of row produced by the JSON parser.
      * @return List of resulting rows items.
      */
     private fun <T> JSONArray?.rows(parse: (JSONObject) -> T): List<T> = this?.let { values ->

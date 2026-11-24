@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
  *
  * @param session Shared session view model owning application state and actions.
  * @param exit Action or callback executed for exit.
+ * @param guideTopicId The optional walkthrough topic selected for this screen.
  */
 @Composable
 internal fun SafeArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
@@ -407,6 +408,7 @@ internal fun SafeSupportControls(
 /**
  * Draws one support-menu button and delays its entrance so the list opens smoothly.
  *
+ * @receiver The visibility animation scope that owns this action.
  * @param labelId String resource ID for the accessible display label.
  * @param icon Icon supplied to [SupportAction].
  * @param tag Tag supplied to [SupportAction].

@@ -35,6 +35,28 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
             .close()
     }
 
+    @Test
+    fun privatePinOpensTheNumberKeyboardWithoutTapping() {
+        register(pin = "1234", username = "pin_keyboard")
+        if (compose.onAllNodesWithTag("discreet_cover_olive").fetchSemanticsNodes().isEmpty()) {
+            click("fitness_account_settings")
+        }
+        compose.onNodeWithTag("discreet_cover_olive").performScrollTo().performTouchInput { doubleClick() }
+        waitFor("unlock_pin")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("unlock_pin") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.waitUntil(10_000) {
+            val decor = compose.activity.window.decorView
+            androidx.core.view.ViewCompat.getRootWindowInsets(decor)
+                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        }
+        repeat(4) { compose.onNodeWithTag("unlock_pin_dot_$it", useUnmergedTree = true).assertIsDisplayed() }
+        compose.onNodeWithTag("unlock_pin_dot_4", useUnmergedTree = true).assertDoesNotExist()
+        enterPin("1234")
+        waitFor("safe_settings")
+    }
+
     // Checks the news navigation stays at the bottom while typing.
     @Test
     fun newsNavigationStaysAtTheBottomWhileTyping() {

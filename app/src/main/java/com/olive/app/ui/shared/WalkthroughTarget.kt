@@ -103,6 +103,7 @@ internal val LocalWalkthroughTargets = staticCompositionLocalOf<WalkthroughTarge
  * Registers this composable's root bounds in [LocalWalkthroughTargets] under [id] while composed
  * and automatically scrolls it into view whenever it becomes the active walkthrough target.
  *
+ * @receiver The modifier chain to extend.
  * @param id Unique walkthrough target identifier matching `WalkthroughTourStep.targetId` or `avoidId`.
  * @return Modified [Modifier] publishing live bounds and bring-into-view behavior for the tour.
  */

@@ -138,6 +138,7 @@ class SecureChatRepository(
      * @param conversationId Unique identifier of the conversation or support ticket.
      * @param currentUid Current user ID supplied to [roomKeyAccess].
      * @param source Source input or object to read from.
+     * @param accountKeyset The unlocked account keyset used to unwrap the content key.
      * @return The resulting [UnwrappedKeyEnvelope], or `null` if unavailable.
      */
     private suspend fun roomKeyAccess(
@@ -301,7 +302,12 @@ class SecureChatRepository(
         deviceCommitTask.await()
     }
 
-    /** Publishes optional account-recovery copies without requiring every chat role to enroll first. */
+    /**
+     * Publishes optional account-recovery copies without requiring every chat role to enroll first.
+     *
+     * @param conversation The chat and its current participants.
+     * @param roomKey The conversation's symmetric encryption key.
+     */
     private suspend fun shareWithRecoverableAccounts(
         conversation: ChatConversation,
         roomKey: SecretKey,
@@ -514,12 +520,18 @@ class SecureChatRepository(
     /**
      * Loads and unwraps the room key used to decrypt this conversation.
      *
+     * @receiver The Firestore conversation document containing wrapped keys or public keys.
      * @return The resulting room keys.
      */
     private fun DocumentSnapshot.roomKeys() =
         get("roomKeys").cloudStringMap()
 
-    /** Reads and parses account-keyset wrapped room keys from the conversation document. */
+    /**
+     * Reads and parses account-keyset wrapped room keys from the conversation document.
+     *
+     * @receiver The Firestore conversation document containing wrapped keys or public keys.
+     * @return The room key wrappers indexed by account UID.
+     */
     private fun DocumentSnapshot.accountRoomKeys(): Map<String, AccountKeysetWrappedKey> =
         (get("accountRoomKeys") as? Map<*, *>)?.mapNotNull { (uid, value) ->
             val id = uid as? String ?: return@mapNotNull null
@@ -530,6 +542,7 @@ class SecureChatRepository(
     /**
      * Loads each participant's public key before sharing a room key.
      *
+     * @receiver The Firestore conversation document containing wrapped keys or public keys.
      * @return The resulting participant public keys.
      */
     private fun DocumentSnapshot.participantPublicKeys() =

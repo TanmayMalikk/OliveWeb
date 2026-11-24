@@ -504,6 +504,13 @@ internal object MapboxDirectionsClient {
 
     /**
      * Requests a route for [profile] and converts the response into map points and directions.
+     *
+     * @param startLatitude The route origin's latitude in decimal degrees.
+     * @param startLongitude The route origin's longitude in decimal degrees.
+     * @param endLatitude The route destination's latitude in decimal degrees.
+     * @param endLongitude The route destination's longitude in decimal degrees.
+     * @param profile The account profile used by this operation.
+     * @return The parsed route and directions, or null when routing is unavailable.
      */
     suspend fun route(
         startLatitude: Double,

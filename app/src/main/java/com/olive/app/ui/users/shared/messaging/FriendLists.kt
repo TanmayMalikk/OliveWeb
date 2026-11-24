@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 /**
  * Keeps the four friend-related lists together while the parent screen handles chat lists.
  *
+ * @receiver The lazy list scope that receives the item definitions.
  * @param session Shared session view model owning application state and actions.
  * @param pendingExpanded Whether to apply pending expanded.
  * @param onPendingExpandedChange Callback invoked when pending expanded change changes or occurs.
@@ -191,6 +192,7 @@ internal fun LazyListScope.friendLists(
 /**
  * Shows one username result and the friend action currently allowed.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param request Request supplied to [IncomingRequestRow].
  */
@@ -221,6 +223,7 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
 /**
  * Shows a sent friend request and lets the user cancel it.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param request Request supplied to [OutgoingRequestRow].
  */
@@ -253,6 +256,7 @@ private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request:
 /**
  * Shared safe app friend lists shows this friend row view so the user can view its details and use its actions.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param friend Friend relationship record.
  * @param onNoteTargets Callback invoked when note targets changes or occurs.
@@ -428,6 +432,7 @@ internal fun ChatMessageBody(
  * @param mine Whether to apply mine.
  * @param onOpen Callback invoked when open changes or occurs.
  * @param sender Optional sender supplied to [SharedMediaMessage].
+ * @param onLightSurface Whether to use styling intended for a light background.
  */
 @Composable
 internal fun SharedMediaMessage(

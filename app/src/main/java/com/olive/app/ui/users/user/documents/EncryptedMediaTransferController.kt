@@ -427,7 +427,13 @@ internal class MediaTransferController(
         }
     }
 
-    /** Opens a decrypted local preview file immediately for an upload still queued or running. */
+    /**
+     * Opens a decrypted local preview file immediately for an upload still queued or running.
+     *
+     * @param jobId The queued upload job's ID.
+     * @param viewerUid The UID of the account viewing the content.
+     * @return The document metadata and temporary decrypted preview file, or null when unavailable.
+     */
     override fun openPendingUpload(jobId: String, viewerUid: String): Pair<SafetyDocument, File>? {
         val job = store.get(jobId) ?: return null
         val target = File(job.source.filePath)

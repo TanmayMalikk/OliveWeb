@@ -63,6 +63,9 @@ internal data class DestinationSuggestion(
  * - "(53.5461, -113.4938)"
  * - "53.5461°N, 113.4938°W"
  * - "N 53.5461 W 113.4938"
+ *
+ * @param input The raw input to parse or validate.
+ * @return The parsed latitude and longitude in that order, or null when the input is invalid.
  */
 internal fun parseCoordinates(input: String): Pair<Double, Double>? {
     val cleaned = input.trim().removeSurrounding("(", ")").trim()
@@ -96,6 +99,12 @@ internal fun parseCoordinates(input: String): Pair<Double, Double>? {
 
 /**
  * Computes instant local suggestions (direct coordinates + mapped directory places matching [query]).
+ *
+ * @param query The search text entered by the user.
+ * @param directoryPlaces The mapped support resources available for local search.
+ * @param coordinateTitle The display title for a direct coordinate match.
+ * @param coordinateSubtitle The supporting label for a direct coordinate match.
+ * @return The matching coordinate and local directory suggestions.
  */
 internal fun localDestinationSuggestions(
     query: String,
@@ -148,7 +157,12 @@ internal fun localDestinationSuggestions(
 internal object DestinationAutocompleteClient {
     private const val MAX_CACHE_ENTRIES = 64
     private val cache = object : LinkedHashMap<String, List<DestinationSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
-        /** Evicts the least-recently-used autocomplete cache entry past [MAX_CACHE_ENTRIES]. */
+        /**
+         * Evicts the least-recently-used autocomplete cache entry past [MAX_CACHE_ENTRIES].
+         *
+         * @param eldest The least recently used cache entry being considered for eviction.
+         * @return True when the cache entry should be evicted to enforce the size limit.
+         */
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<DestinationSuggestion>>): Boolean =
             size > MAX_CACHE_ENTRIES
     }
@@ -163,12 +177,21 @@ internal object DestinationAutocompleteClient {
 
     /**
      * Fetches address autocomplete suggestions using Mapbox Geocoding v6 with Geoapify fallback.
+     *
+     * @param query The search text entered by the user.
+     * @param proximityLatitude The latitude used to bias search results, if available.
+     * @param proximityLongitude The longitude used to bias search results, if available.
+     * @param mapboxToken The Mapbox access token used for the request.
+     * @param useGeoapifyFallback Whether to try Geoapify when Mapbox has no suggestions.
+     * @param openConnection The injected factory used to open an HTTPS connection.
+     * @return The available address suggestions for the current query and location bias.
      */
     suspend fun suggest(
         query: String,
         proximityLatitude: Double? = null,
         proximityLongitude: Double? = null,
         mapboxToken: String = BuildConfig.MAPBOX_ACCESS_TOKEN,
+        useGeoapifyFallback: Boolean = true,
         openConnection: ((URL) -> HttpsURLConnection)? = null,
     ): List<DestinationSuggestion> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
@@ -185,8 +208,9 @@ internal object DestinationAutocompleteClient {
         }
         val mapboxSucceeded = mapboxResult != null
         val mapboxItems = mapboxResult.orEmpty()
-        var geoSucceeded = !GeoapifyClient.configured
-        val resolved = if (mapboxItems.isNotEmpty() || !GeoapifyClient.configured) {
+        val geoConfigured = useGeoapifyFallback && GeoapifyClient.configured
+        var geoSucceeded = !geoConfigured
+        val resolved = if (mapboxItems.isNotEmpty() || !geoConfigured) {
             mapboxItems
         } else {
             try {
@@ -218,6 +242,13 @@ internal object DestinationAutocompleteClient {
 
     /**
      * Resolves a submitted free-text destination (coordinates, directory match, autocomplete, or Android Geocoder).
+     *
+     * @param context The Android context used for resources or system services.
+     * @param query The search text entered by the user.
+     * @param directoryPlaces The mapped support resources available for local search.
+     * @param proximityLatitude The latitude used to bias search results, if available.
+     * @param proximityLongitude The longitude used to bias search results, if available.
+     * @return The best matching destination, or null when the input cannot be resolved.
      */
     suspend fun resolveFreeText(
         context: Context,
@@ -239,7 +270,15 @@ internal object DestinationAutocompleteClient {
         }
     }
 
-    /** Constructs a Mapbox forward-geocode v6 URL for [query] with optional proximity coordinates. */
+    /**
+     * Constructs a Mapbox forward-geocode v6 URL for [query] with optional proximity coordinates.
+     *
+     * @param query The search text entered by the user.
+     * @param proximityLatitude The latitude used to bias search results, if available.
+     * @param proximityLongitude The longitude used to bias search results, if available.
+     * @param mapboxToken The Mapbox access token used for the request.
+     * @return The forward-geocoding URL with the query and any proximity bias encoded.
+     */
     private fun buildMapboxUrl(
         query: String,
         proximityLatitude: Double?,
@@ -260,7 +299,12 @@ internal object DestinationAutocompleteClient {
         return "https://api.mapbox.com/search/geocode/v6/forward?$params"
     }
 
-    /** Fetches Mapbox autocomplete suggestions asynchronously via the shared OkHttp client. */
+    /**
+     * Fetches Mapbox autocomplete suggestions asynchronously via the shared OkHttp client.
+     *
+     * @param url The request URL to open or fetch.
+     * @return The parsed Mapbox suggestions, or null when Mapbox cannot provide a response.
+     */
     private suspend fun fetchMapboxSuggestionsOkHttp(url: String): List<DestinationSuggestion>? {
         val request = Request.Builder()
             .url(url)
@@ -270,12 +314,22 @@ internal object DestinationAutocompleteClient {
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
-                /** Resumes the coroutine with null when the Mapbox request fails. */
+                /**
+                 * Resumes the coroutine with null when the Mapbox request fails.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param e The network exception reported by OkHttp.
+                 */
                 override fun onFailure(call: Call, e: IOException) {
                     if (continuation.isActive) continuation.resume(null)
                 }
 
-                /** Parses and resumes Mapbox suggestions when the HTTP response succeeds. */
+                /**
+                 * Parses and resumes Mapbox suggestions when the HTTP response succeeds.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param response The upstream response to read and validate.
+                 */
                 override fun onResponse(call: Call, response: Response) {
                     val result = runCatching {
                         response.use { res ->
@@ -289,7 +343,13 @@ internal object DestinationAutocompleteClient {
         }
     }
 
-    /** Fetches Mapbox autocomplete suggestions via an injected [HttpsURLConnection] factory. */
+    /**
+     * Fetches Mapbox autocomplete suggestions via an injected [HttpsURLConnection] factory.
+     *
+     * @param url The request URL to open or fetch.
+     * @param openConnection The injected factory used to open an HTTPS connection.
+     * @return The parsed Mapbox suggestions, or null when Mapbox cannot provide a response.
+     */
     private suspend fun fetchMapboxSuggestionsLegacy(
         url: String,
         openConnection: (URL) -> HttpsURLConnection,
@@ -314,7 +374,12 @@ internal object DestinationAutocompleteClient {
         }
     }
 
-    /** Parses Mapbox Geocoding v6 GeoJSON features into validated [DestinationSuggestion] items. */
+    /**
+     * Parses Mapbox Geocoding v6 GeoJSON features into validated [DestinationSuggestion] items.
+     *
+     * @param raw The unprocessed response or value to parse.
+     * @return The valid destinations parsed from the Mapbox features.
+     */
     internal fun parseMapboxGeocodeV6(raw: String): List<DestinationSuggestion> = runCatching {
         val features = JSONObject(raw).optJSONArray("features") ?: return@runCatching emptyList()
         (0 until features.length()).mapNotNull { index ->
@@ -345,7 +410,14 @@ internal object DestinationAutocompleteClient {
         }
     }.getOrDefault(emptyList())
 
-    /** Builds a quantized cache key combining normalized [query] text and rounded coordinates. */
+    /**
+     * Builds a quantized cache key combining normalized [query] text and rounded coordinates.
+     *
+     * @param query The search text entered by the user.
+     * @param lat The latitude in decimal degrees.
+     * @param lon The longitude in decimal degrees.
+     * @return The key combining the normalized search query with quantized coordinates.
+     */
     private fun cacheKey(query: String, lat: Double?, lon: Double?): String {
         val norm = query.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
         val latBucket = lat?.let { (it * 10.0).roundToLong() }
@@ -353,7 +425,12 @@ internal object DestinationAutocompleteClient {
         return "$norm|$latBucket|$lonBucket"
     }
 
-    /** URL-encodes [value] using UTF-8. */
+    /**
+     * URL-encodes [value] using UTF-8.
+     *
+     * @param value The query parameter value to URL-encode.
+     * @return The query parameter text encoded using UTF-8.
+     */
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 
     /** Clears all cached destination autocomplete entries. */
@@ -364,6 +441,9 @@ internal object DestinationAutocompleteClient {
 
 /**
  * Normalizes any heading angle in degrees into `[0f, 360f)`.
+ *
+ * @param degrees The input angle expressed in degrees.
+ * @return The equivalent angle in the range from 0 inclusive to 360 exclusive.
  */
 internal fun normalizeHeadingDegrees(degrees: Float): Float {
     if (!degrees.isFinite()) return 0f
@@ -373,6 +453,10 @@ internal fun normalizeHeadingDegrees(degrees: Float): Float {
 
 /**
  * Returns the shortest signed angular difference from [fromDegrees] to [toDegrees] in `(-180f, 180f]`.
+ *
+ * @param fromDegrees The starting heading in degrees.
+ * @param toDegrees The target heading in degrees.
+ * @return The shortest signed rotation in degrees from the starting heading to the target heading.
  */
 internal fun shortestAngleDelta(fromDegrees: Float, toDegrees: Float): Float {
     val diff = (normalizeHeadingDegrees(toDegrees) - normalizeHeadingDegrees(fromDegrees)) % 360f
@@ -385,6 +469,11 @@ internal fun shortestAngleDelta(fromDegrees: Float, toDegrees: Float): Float {
 
 /**
  * Applies circular exponential smoothing across the 0°/360° boundary.
+ *
+ * @param current The current position, instruction, or value used as the starting point.
+ * @param target The desired value to move or interpolate toward.
+ * @param alpha The smoothing factor applied to the new heading sample.
+ * @return The updated heading after circular interpolation between the two samples.
  */
 internal fun smoothHeading(current: Float?, target: Float, alpha: Float = 0.22f): Float {
     val normalizedTarget = normalizeHeadingDegrees(target)
@@ -396,6 +485,11 @@ internal fun smoothHeading(current: Float?, target: Float, alpha: Float = 0.22f)
 
 /**
  * Prefers GPS movement bearing once moving at walking speed (>= 0.8 m/s), falling back to compass azimuth.
+ *
+ * @param gpsBearing The latest GPS movement bearing in degrees, if available.
+ * @param gpsSpeedMetersPerSecond The latest GPS speed in meters per second, if available.
+ * @param compassAzimuth The latest compass heading, if it is available.
+ * @return The chosen movement bearing or compass heading, or null when neither is usable.
  */
 internal fun selectPreferredHeading(
     gpsBearing: Float?,
@@ -415,6 +509,10 @@ internal fun selectPreferredHeading(
 
 /**
  * Adjusts magnetic azimuth for the current Android display rotation.
+ *
+ * @param azimuthDegrees The magnetic azimuth in degrees.
+ * @param surfaceRotation The Android display rotation constant.
+ * @return The heading adjusted for the device's display orientation.
  */
 internal fun adjustAzimuthForDisplayRotation(azimuthDegrees: Float, surfaceRotation: Int): Float {
     val offset = when (surfaceRotation) {
@@ -430,6 +528,9 @@ internal fun adjustAzimuthForDisplayRotation(azimuthDegrees: Float, surfaceRotat
  * Computes a tilt-invariant compass azimuth from a screen-remapped 3x3 rotation matrix
  * (east = col/row world X, north = world Y). Smoothly blends device +Y (when held flat)
  * and back-of-phone -Z (when held upright while walking) to eliminate gimbal lock at 45°–90° tilt.
+ *
+ * @param rotationMatrix The rotation matrix used to calculate the heading.
+ * @return The computed compass azimuth, or null if the input matrix cannot be used.
  */
 internal fun computeTiltInvariantAzimuthDegrees(rotationMatrix: FloatArray): Float? {
     if (rotationMatrix.size < 9) return null
@@ -448,6 +549,10 @@ internal fun computeTiltInvariantAzimuthDegrees(rotationMatrix: FloatArray): Flo
 
 /**
  * Converts magnetic compass heading to true north heading using magnetic declination.
+ *
+ * @param magneticHeadingDegrees The magnetic north heading in degrees.
+ * @param declinationDegrees The correction from magnetic north to true north in degrees.
+ * @return The true-north heading normalized to a full rotation.
  */
 internal fun applyMagneticDeclination(magneticHeadingDegrees: Float, declinationDegrees: Float): Float {
     val normalized = normalizeHeadingDegrees(magneticHeadingDegrees)

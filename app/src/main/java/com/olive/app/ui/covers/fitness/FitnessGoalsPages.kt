@@ -410,7 +410,23 @@ internal fun FitnessGoalQuestionnairePage(
     }
 }
 
-/** Renders the age, height, weight, and metabolic basis inputs step of the fitness goal wizard. */
+/**
+ * Renders the age, height, weight, and metabolic basis inputs step of the fitness goal wizard.
+ *
+ * @param ageText The age currently entered in the form.
+ * @param onAgeChange Receives changes to the age text.
+ * @param ageError The validation error for the age field, if any.
+ * @param heightText The height currently entered in the form.
+ * @param onHeightChange Receives changes to the height text.
+ * @param heightError The validation error for the height field, if any.
+ * @param weightText The weight currently entered in the form.
+ * @param onWeightChange Receives changes to the weight text.
+ * @param weightError The validation error for the weight field, if any.
+ * @param metabolicBasis The selected equation basis for estimating energy needs.
+ * @param onBasisSelect Receives the selected basis for the calorie estimate.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shakeTrigger The counter whose change starts the field's error animation.
+ */
 @Composable
 private fun BodyDetailsStep(
     ageText: String,
@@ -491,7 +507,11 @@ private fun BodyDetailsStep(
     )
 }
 
-/** Displays the calculated fitness and nutrition goal summary before saving. */
+/**
+ * Displays the calculated fitness and nutrition goal summary before saving.
+ *
+ * @param recommendation The calorie and activity recommendation prepared for the user.
+ */
 @Composable
 private fun RecommendationReviewStep(recommendation: FitnessGoalRecommendation) {
     val profile = recommendation.profile
@@ -561,7 +581,12 @@ private fun RecommendationReviewStep(recommendation: FitnessGoalRecommendation) 
     )
 }
 
-/** Displays a single label-and-value row in the goal recommendation summary. */
+/**
+ * Displays a single label-and-value row in the goal recommendation summary.
+ *
+ * @param label The label displayed for the control.
+ * @param value The formatted result to display beside the metric label.
+ */
 @Composable
 private fun ReviewMetricRow(label: String, value: String) {
     Row(
@@ -574,7 +599,16 @@ private fun ReviewMetricRow(label: String, value: String) {
     }
 }
 
-/** Renders a selectable card option with title, description, and check indicator. */
+/**
+ * Renders a selectable card option with title, description, and check indicator.
+ *
+ * @param title The heading displayed for the section or item.
+ * @param description Supporting text displayed with the option.
+ * @param selected Whether this item is currently selected.
+ * @param enabled Whether the control or feature is enabled.
+ * @param tag The support ticket category identifier.
+ * @param onClick Runs when the user activates the control.
+ */
 @Composable
 private fun QuestionnaireOptionCard(
     title: String,
@@ -612,7 +646,12 @@ private fun QuestionnaireOptionCard(
     }
 }
 
-/** Returns the title and description string resources for a primary fitness [goal]. */
+/**
+ * Returns the title and description string resources for a primary fitness [goal].
+ *
+ * @param goal The selected primary fitness goal.
+ * @return The title and description string resource IDs, in that order.
+ */
 private fun primaryGoalStrings(goal: FitnessPrimaryGoal): Pair<Int, Int> = when (goal) {
     FitnessPrimaryGoal.LOSE_WEIGHT ->
         R.string.fitness_questionnaire_goal_lose to R.string.fitness_questionnaire_goal_lose_desc
@@ -624,7 +663,12 @@ private fun primaryGoalStrings(goal: FitnessPrimaryGoal): Pair<Int, Int> = when 
         R.string.fitness_questionnaire_goal_fitness to R.string.fitness_questionnaire_goal_fitness_desc
 }
 
-/** Returns the title and description string resources for an activity [level]. */
+/**
+ * Returns the title and description string resources for an activity [level].
+ *
+ * @param level The selected activity level.
+ * @return The title and description string resource IDs, in that order.
+ */
 private fun activityLevelStrings(level: FitnessActivityLevel): Pair<Int, Int> = when (level) {
     FitnessActivityLevel.SEDENTARY ->
         R.string.fitness_questionnaire_activity_sedentary to R.string.fitness_questionnaire_activity_sedentary_desc
@@ -636,7 +680,12 @@ private fun activityLevelStrings(level: FitnessActivityLevel): Pair<Int, Int> = 
         R.string.fitness_questionnaire_activity_very to R.string.fitness_questionnaire_activity_very_desc
 }
 
-/** Returns the title and description string resources for a nutrition [style]. */
+/**
+ * Returns the title and description string resources for a nutrition [style].
+ *
+ * @param style The selected nutrition style.
+ * @return The title and description string resource IDs, in that order.
+ */
 private fun nutritionStyleStrings(style: FitnessNutritionStyle): Pair<Int, Int> = when (style) {
     FitnessNutritionStyle.BALANCED ->
         R.string.fitness_questionnaire_nutrition_balanced to R.string.fitness_questionnaire_nutrition_balanced_desc
@@ -656,6 +705,7 @@ private fun nutritionStyleStrings(style: FitnessNutritionStyle): Pair<Int, Int> 
  * @param isError Whether validation flagged this value as invalid.
  * @param supportingText Optional helper or error caption shown beneath the field.
  * @param modifier Compose modifier applied to the field.
+ * @param shakeTrigger The counter whose change starts the field's error animation.
  */
 @Composable
 private fun GoalField(

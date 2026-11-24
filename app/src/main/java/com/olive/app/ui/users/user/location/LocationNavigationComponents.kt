@@ -111,6 +111,15 @@ import kotlin.math.ceil
  * @param onViewportCenterChanged Callback invoked when viewport center changed changes or occurs.
  * @param onLoadMoreSupport Callback invoked when load more support changes or occurs.
  * @param loadingMoreSupport Whether to apply loading more support.
+ * @param headingUp Whether the map rotates to keep the current heading at the top.
+ * @param headingDegrees The current heading in degrees.
+ * @param headingState The observable heading used to update the map.
+ * @param onToggleHeadingUp Runs when the user changes the map's heading mode.
+ * @param showSavedOnly Whether the list is filtered to saved items.
+ * @param savedCount The number of currently saved items.
+ * @param onToggleSavedOnly Runs when the user changes the saved-only filter.
+ * @param routeProfile The travel mode used to request directions.
+ * @param onUserGesture Runs when the user manually interacts with the map.
  */
 @Composable
 internal fun FullScreenLocationMap(
@@ -371,6 +380,11 @@ internal fun FullScreenLocationMap(
 /**
  * Shared trip summary metrics showing ETA duration, remaining distance, arrival clock badge,
  * travel mode, destination name, and trip progress bar.
+ *
+ * @param route The active route and its navigation directions.
+ * @param progress The current progress of the back gesture.
+ * @param destinationName The name of the selected route destination.
+ * @param routeProfile The travel mode used to request directions.
  */
 @Composable
 internal fun TripSummaryMetrics(
@@ -455,21 +469,41 @@ internal fun TripSummaryMetrics(
     }
 }
 
-/** Computes normalized [0f..1f] completion ratio along the active route. */
+/**
+ * Computes normalized [0f..1f] completion ratio along the active route.
+ *
+ * @param totalMeters The total route length in meters.
+ * @param remainingMeters The distance still to travel in meters.
+ * @return The completed fraction of the route, from 0 to 1.
+ */
 internal fun routeCompletionProgress(totalMeters: Double, remainingMeters: Double): Float {
     if (!totalMeters.isFinite() || !remainingMeters.isFinite() || totalMeters <= 0.0) return 0f
     val completed = (totalMeters - remainingMeters).coerceIn(0.0, totalMeters)
     return (completed / totalMeters).toFloat()
 }
 
-/** Returns the next navigation instruction following [current], or null at the final leg. */
+/**
+ * Returns the next navigation instruction following [current], or null at the final leg.
+ *
+ * @param route The active route and its navigation directions.
+ * @param current The current position, instruction, or value used as the starting point.
+ * @return The next maneuver, or null when there is no later instruction.
+ */
 internal fun upcomingRouteDirection(route: LocationRoute, current: RouteDirection?): RouteDirection? {
     if (current == null) return null
     val index = route.directions.indexOf(current)
     return if (index in 0 until route.directions.lastIndex) route.directions[index + 1] else null
 }
 
-/** Estimates remaining distance along [route] from ([latitude], [longitude]) to the end of [direction]. */
+/**
+ * Estimates remaining distance along [route] from ([latitude], [longitude]) to the end of [direction].
+ *
+ * @param route The active route and its navigation directions.
+ * @param latitude The latitude in decimal degrees.
+ * @param longitude The longitude in decimal degrees.
+ * @param direction The turn-by-turn instruction being evaluated.
+ * @return The estimated travel distance to the maneuver in meters, or null if it cannot be estimated.
+ */
 internal fun distanceToDirectionMeters(
     route: LocationRoute,
     latitude: Double,
@@ -495,7 +529,13 @@ internal fun distanceToDirectionMeters(
     return sum
 }
 
-/** Formats the estimated arrival clock time from [remainingSeconds] and [nowMillis]. */
+/**
+ * Formats the estimated arrival clock time from [remainingSeconds] and [nowMillis].
+ *
+ * @param remainingSeconds The estimated travel seconds remaining.
+ * @param nowMillis The current time as Unix epoch milliseconds.
+ * @return The localized estimated arrival time.
+ */
 internal fun formatArrivalTime(
     remainingSeconds: Double,
     nowMillis: Long = System.currentTimeMillis(),
@@ -505,7 +545,12 @@ internal fun formatArrivalTime(
     return java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(arrivalMillis))
 }
 
-/** Selects the directional icon matching a turn-by-turn [instruction] text string. */
+/**
+ * Selects the directional icon matching a turn-by-turn [instruction] text string.
+ *
+ * @param instruction The navigation instruction whose maneuver icon is needed.
+ * @return The icon matching the maneuver described by the instruction.
+ */
 private fun maneuverIconFor(instruction: String?): ImageVector {
     val text = instruction?.lowercase().orEmpty()
     return when {
@@ -551,6 +596,13 @@ internal fun formatRouteDuration(seconds: Double): String =
 internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) =
     ShareDurationDialog(onDismiss = onDismiss, inWindow = false, onSelected = onSelected)
 
+/**
+ * Lets the user choose a preset or custom duration for live location sharing.
+ *
+ * @param onDismiss Runs when the user dismisses the dialog.
+ * @param inWindow Whether the dialog is hosted in the current window.
+ * @param onSelected Receives the selected sharing duration in milliseconds.
+ */
 @Composable
 internal fun ShareDurationDialog(onDismiss: () -> Unit, inWindow: Boolean, onSelected: (Long) -> Unit) {
     var custom by remember { mutableStateOf("") }

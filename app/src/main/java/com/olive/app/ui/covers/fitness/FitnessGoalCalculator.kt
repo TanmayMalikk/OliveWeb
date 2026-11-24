@@ -209,11 +209,24 @@ internal object FitnessGoalCalculator {
         )
     }
 
-    /** Rounds [value] to the nearest multiple of [step]. */
+    /**
+     * Rounds [value] to the nearest multiple of [step].
+     *
+     * @param value The number to round.
+     * @param step The interval used for rounding.
+     * @return The closest integer multiple of the specified step.
+     */
     private fun roundToNearest(value: Double, step: Int): Int =
         (value / step).roundToInt() * step
 
-    /** Parses enum entry [name] safely, falling back to [default] when unrecognized. */
+    /**
+     * Parses enum entry [name] safely, falling back to [default] when unrecognized.
+     *
+     * @param T The enum type to search for a matching constant.
+     * @param name The stored enum constant name to parse.
+     * @param default The enum type to search for a matching constant.
+     * @return The matching enum constant, or the supplied default when the name is unknown.
+     */
     private inline fun <reified T : Enum<T>> enumValueOrDefault(name: String, default: T): T =
         runCatching { enumValueOf<T>(name) }.getOrDefault(default)
 }

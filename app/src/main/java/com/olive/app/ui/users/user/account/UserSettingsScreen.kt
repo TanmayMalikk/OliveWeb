@@ -637,6 +637,8 @@ internal fun SettingsHeading(modifier: Modifier = Modifier) {
  *
  * @param title Primary display title text.
  * @param content Composable content lambda rendered inside this container.
+ * @param targetId The ID of the account or item selected for tracking.
+ * @param headerTargetId The ID used to associate the header with its walkthrough target.
  */
 @Composable
 internal fun SettingsSection(

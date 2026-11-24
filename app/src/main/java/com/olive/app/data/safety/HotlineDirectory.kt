@@ -191,7 +191,12 @@ class HotlineDirectory private constructor(
     companion object {
         private const val DATASET_DATE = "2026-11-22"
 
-        /** Returns additional searchable keywords associated with a hotline resource kind. */
+        /**
+         * Returns additional searchable keywords associated with a hotline resource kind.
+         *
+         * @param kind The category of resource or record.
+         * @return The additional search terms associated with the category.
+         */
         private fun kindSearchTerms(kind: HotlineResourceKind): String = when (kind) {
             HotlineResourceKind.Hotline -> "hotline helpline phone"
             HotlineResourceKind.Shelter -> "shelter housing transition house"
@@ -421,18 +426,40 @@ internal object SavedHotlineStore {
     private val updatesMutable = MutableStateFlow(0L)
     val updates: StateFlow<Long> = updatesMutable.asStateFlow()
 
-    /** Returns the private SharedPreferences file backing saved hotline bookmarks. */
+    /**
+     * Returns the private SharedPreferences file backing saved hotline bookmarks.
+     *
+     * @param context The Android context used for resources or system services.
+     * @return The private preferences backing the hotline bookmarks.
+     */
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
-    /** Returns the hashed preference key scoped to [uid]. */
+    /**
+     * Returns the hashed preference key scoped to [uid].
+     *
+     * @param uid The account UID used to scope this operation.
+     * @return The preference key derived from the account UID.
+     */
     private fun accountKey(uid: String): String = "acct_${sha256Hex("acct:$uid")}"
 
-    /** Computes the account-scoped salted token stored for a saved hotline resource. */
+    /**
+     * Computes the account-scoped salted token stored for a saved hotline resource.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param resourceId The identifier of the hotline resource in the catalog.
+     * @return The account-scoped token used to store the bookmark.
+     */
     private fun resourceToken(uid: String, resourceId: String): String =
         sha256Hex("res:$uid:$resourceId")
 
-    /** Reads the set of stored hotline bookmark tokens for [uid]. */
+    /**
+     * Reads the set of stored hotline bookmark tokens for [uid].
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
+     * @return The bookmark tokens currently stored for the account.
+     */
     private fun readTokens(context: Context, uid: String?): Set<String> {
         if (uid.isNullOrBlank()) return emptySet()
         return prefs(context).getStringSet(accountKey(uid), emptySet()).orEmpty().toSet()
@@ -440,6 +467,11 @@ internal object SavedHotlineStore {
 
     /**
      * Resolves the set of saved resource IDs for [uid] from the current catalog.
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
+     * @param resources The current hotline catalog used to resolve saved IDs.
+     * @return The saved resource IDs that still resolve in the current catalog.
      */
     fun savedIds(context: Context, uid: String?, resources: List<HotlineResource>): Set<String> {
         if (uid.isNullOrBlank() || resources.isEmpty()) return emptySet()
@@ -452,6 +484,11 @@ internal object SavedHotlineStore {
 
     /**
      * Returns whether [resourceId] is currently saved for [uid].
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
+     * @param resourceId The identifier of the hotline resource in the catalog.
+     * @return True when the resource is bookmarked by this account.
      */
     fun isSaved(context: Context, uid: String?, resourceId: String): Boolean {
         if (uid.isNullOrBlank() || resourceId.isBlank()) return false
@@ -460,6 +497,11 @@ internal object SavedHotlineStore {
 
     /**
      * Explicitly sets whether [resourceId] is saved for [uid].
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
+     * @param resourceId The identifier of the hotline resource in the catalog.
+     * @param saved The existing saved record, if one is available.
      */
     fun setSaved(context: Context, uid: String, resourceId: String, saved: Boolean) {
         if (uid.isBlank() || resourceId.isBlank()) return
@@ -476,6 +518,11 @@ internal object SavedHotlineStore {
 
     /**
      * Toggles whether [resourceId] is saved for [uid] and returns the updated state.
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
+     * @param resourceId The identifier of the hotline resource in the catalog.
+     * @return True when the resource is bookmarked after the change.
      */
     fun toggle(context: Context, uid: String, resourceId: String): Boolean {
         val next = !isSaved(context, uid, resourceId)
@@ -485,6 +532,9 @@ internal object SavedHotlineStore {
 
     /**
      * Removes saved bookmarks for [uid], e.g. on explicit account removal.
+     *
+     * @param context The Android context used for resources or system services.
+     * @param uid The account UID used to scope this operation.
      */
     fun clearAccount(context: Context, uid: String) {
         if (uid.isBlank()) return
@@ -496,7 +546,12 @@ internal object SavedHotlineStore {
         }
     }
 
-    /** Computes a lowercase hexadecimal SHA-256 digest of [value]. */
+    /**
+     * Computes a lowercase hexadecimal SHA-256 digest of [value].
+     *
+     * @param value The text whose UTF-8 bytes are hashed.
+     * @return The lowercase hexadecimal SHA-256 digest of the UTF-8 input.
+     */
     private fun sha256Hex(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         val chars = CharArray(digest.size * 2)

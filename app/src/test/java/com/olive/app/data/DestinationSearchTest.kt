@@ -121,7 +121,7 @@ class DestinationSearchTest {
         }
 
         // Transient 500 error must not be cached so the next request retries.
-        val first = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test") {
+        val first = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test", useGeoapifyFallback = false) {
             calls++
             fakeConnection(500, "{}")
         }
@@ -129,14 +129,14 @@ class DestinationSearchTest {
         assertEquals(1, calls)
 
         // Valid 200 empty response should be cached for repeat normalized queries.
-        val second = DestinationAutocompleteClient.suggest("  jasper   ave ", 53.5, -113.5, "pk.test") {
+        val second = DestinationAutocompleteClient.suggest("  jasper   ave ", 53.5, -113.5, "pk.test", useGeoapifyFallback = false) {
             calls++
             fakeConnection(200, """{"type":"FeatureCollection","features":[]}""")
         }
         assertTrue(second.isEmpty())
         assertEquals(2, calls)
 
-        val third = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test") {
+        val third = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test", useGeoapifyFallback = false) {
             calls++
             fakeConnection(200, """{"type":"FeatureCollection","features":[]}""")
         }

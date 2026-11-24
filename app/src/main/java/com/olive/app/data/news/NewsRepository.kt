@@ -207,6 +207,7 @@ class GoogleNewsRepository(
 /**
  * Turn Google's timestamp into the phone's local time zone before showing it.
  *
+ * @receiver The news article whose publication date is displayed.
  * @param language Language supplied to [localPublishedDate].
  * @return The resulting local published date string.
  */

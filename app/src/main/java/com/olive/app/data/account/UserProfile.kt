@@ -42,13 +42,23 @@ private open class BoundedCoordinateSerializer(
 ) : KSerializer<Double?> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(name, PrimitiveKind.DOUBLE)
 
-    /** Serializes the nullable double coordinate. */
+    /**
+     * Serializes the nullable double coordinate.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The optional geographic coordinate to serialize.
+     */
     @OptIn(ExperimentalSerializationApi::class)
     override fun serialize(encoder: Encoder, value: Double?) {
         if (value == null) encoder.encodeNull() else encoder.encodeDouble(value)
     }
 
-    /** Deserializes the coordinate, ensuring it falls within bounded limits. */
+    /**
+     * Deserializes the coordinate, ensuring it falls within bounded limits.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded coordinate, or null if the stored value is absent or out of bounds.
+     */
     override fun deserialize(decoder: Decoder): Double? {
         val jsonDecoder = decoder as? JsonDecoder
         val parsed = if (jsonDecoder != null) {
@@ -67,27 +77,57 @@ private object LongitudeSerializer : BoundedCoordinateSerializer("Longitude", -1
 
 object AccountRoleSerializer : KSerializer<AccountRole> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("AccountRole", PrimitiveKind.STRING)
-    /** Serializes the account role name. */
+    /**
+     * Serializes the account role name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The account role to store by name.
+     */
     override fun serialize(encoder: Encoder, value: AccountRole) = encoder.encodeString(value.name)
-    /** Deserializes the account role from stored representation. */
+    /**
+     * Deserializes the account role from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The account role reconstructed from storage.
+     */
     override fun deserialize(decoder: Decoder): AccountRole = AccountRole.fromStored(decoder.decodeString())
 }
 
 object CoverTypeSerializer : KSerializer<CoverType> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CoverType", PrimitiveKind.STRING)
-    /** Serializes the cover type name. */
+    /**
+     * Serializes the cover type name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The cover app selection to store by name.
+     */
     override fun serialize(encoder: Encoder, value: CoverType) = encoder.encodeString(value.name)
-    /** Deserializes the cover type from stored representation. */
+    /**
+     * Deserializes the cover type from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The cover app reconstructed from storage.
+     */
     override fun deserialize(decoder: Decoder): CoverType = CoverType.fromStored(decoder.decodeString())
 }
 
 private object SafeContactListSerializer : KSerializer<List<SafeContact>> {
     override val descriptor: SerialDescriptor = ListSerializer(SafeContact.serializer()).descriptor
-    /** Serializes the list of safe contacts. */
+    /**
+     * Serializes the list of safe contacts.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The contacts to encode in the saved profile.
+     */
     override fun serialize(encoder: Encoder, value: List<SafeContact>) =
         encoder.encodeSerializableValue(ListSerializer(SafeContact.serializer()), value)
 
-    /** Deserializes the list of safe contacts, discarding invalid entries. */
+    /**
+     * Deserializes the list of safe contacts, discarding invalid entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The valid contacts decoded from the stored list.
+     */
     override fun deserialize(decoder: Decoder): List<SafeContact> {
         val jsonDecoder = decoder as? JsonDecoder
             ?: return decoder.decodeSerializableValue(ListSerializer(SafeContact.serializer()))

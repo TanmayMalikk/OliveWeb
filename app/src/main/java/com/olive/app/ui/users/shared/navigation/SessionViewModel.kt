@@ -111,7 +111,13 @@ internal class SessionViewModel @JvmOverloads constructor(
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
     /** Ensures real-time observation of incoming and outgoing shared private entries is active. */
     fun ensureSharedEntriesObservation() = runtime.secureSharing.observeSharedEntries()
-    /** Shares a private entry with selected [friends] and invokes [onComplete] afterward. */
+    /**
+     * Shares a private entry with selected [friends] and invokes [onComplete] afterward.
+     *
+     * @param entry The private entry to save, display, or share.
+     * @param friends The accepted friends available for the operation.
+     * @param onComplete Runs when the requested operation completes.
+     */
     fun sharePrivateEntryWithFriends(
         entry: PrivateEntry,
         friends: List<Friend>,
@@ -697,6 +703,8 @@ internal interface SessionAccountManagementActions {
      * @param dob Date of birth supplied to [saveSettings].
      * @param situation Situation supplied to [saveSettings].
      * @param address Address supplied to [saveSettings].
+     * @param email The contact email address entered by the user.
+     * @param emailCommunicationConsent Whether the user allows communications at the saved email address.
      */
     fun saveSettings(
         fullName: String,
@@ -764,7 +772,11 @@ internal interface SessionAccountManagementActions {
     fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
     /** Starts enrolling a new passkey recovery factor for the signed-in account. */
     fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
-    /** Removes an enrolled passkey recovery credential identified by [credentialId]. */
+    /**
+     * Removes an enrolled passkey recovery credential identified by [credentialId].
+     *
+     * @param credentialId The WebAuthn credential identifier for the passkey.
+     */
     fun removePasskeyRecovery(credentialId: String) =
         runtime.settings.removePasskeyRecovery(credentialId)
 }
@@ -817,7 +829,12 @@ internal interface SessionCoverNotesActivityActions {
     fun toggleNewsBookmark(article: NewsArticle) =
         setNewsBookmark(article, runtime.state.savedNews.none { it.link == article.link })
 
-    /** Sets a bookmark to the requested state, so a repeated Undo does not toggle it off. */
+    /**
+     * Sets a bookmark to the requested state, so a repeated Undo does not toggle it off.
+     *
+     * @param article The news article to display or bookmark.
+     * @param bookmarked Whether to store the resource as bookmarked.
+     */
     fun setNewsBookmark(article: NewsArticle, bookmarked: Boolean) =
         runtime.covers.setNewsBookmark(article, bookmarked)
 
@@ -849,6 +866,7 @@ internal interface SessionCoverNotesActivityActions {
      * @param incidentLatitude Optional incident latitude supplied to [savePrivateEntry].
      * @param incidentLongitude Optional incident longitude supplied to [savePrivateEntry].
      * @param attachmentIds Collection of attachment IDs values to process.
+     * @param newEntryId The identifier assigned to the new private entry.
      */
     fun savePrivateEntry(
         id: String?, kind: PrivateEntryKind, title: String, body: String,
@@ -872,6 +890,7 @@ internal interface SessionCoverNotesActivityActions {
      * Moves a private note into the note trash.
      *
      * @param id ID supplied to [trashPrivateEntry].
+     * @param onTrashed Runs after the entry has been moved to trash.
      */
     fun trashPrivateEntry(id: String, onTrashed: (() -> Unit)? = null) = runtime.notes.trashPrivateEntry(id, onTrashed)
     /**

@@ -296,6 +296,7 @@ internal fun OliveBranchAnimationContent(
 /**
  * Draws an olive leaf with silvery-green gradient and central vein
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param center Center supplied to [drawOliveLeaf].
  * @param angle Angle supplied to [drawOliveLeaf].
  * @param scale Scale supplied to [drawOliveLeaf].
@@ -358,6 +359,7 @@ private fun DrawScope.drawOliveLeaf(
 /**
  * Draws a plump botanical olive with 3D radial shading and specular gloss
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param center Center supplied to [drawOliveFruit].
  * @param radius Radius supplied to [drawOliveFruit].
  * @param rotationDegrees Rotation degrees supplied to [drawOliveFruit].
@@ -435,6 +437,7 @@ internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments:
 /**
  * Returns translated fallback text when an operation fails.
  *
+ * @receiver The resource resolver used to produce localized error text.
  * @param error Throwable or error message describing a failure.
  * @param fallback Fallback supplied to [failure].
  * @return The resulting failure string.
@@ -445,6 +448,7 @@ internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): S
 /**
  * Returns the translated title for an account role.
  *
+ * @receiver The account role to describe.
  * @param text Text string to display, parse, or send.
  * @return The resulting localized title.
  */
@@ -461,6 +465,7 @@ internal fun AccountRole.localizedTitle(text: ResourceText) = text(
 /**
  * Returns the translated description for an account role.
  *
+ * @receiver The account role to describe.
  * @param text Text string to display, parse, or send.
  * @return The resulting localized description.
  */
@@ -477,6 +482,7 @@ internal fun AccountRole.localizedDescription(text: ResourceText) = text(
 /**
  * Returns the translated title for a cover app.
  *
+ * @receiver The cover app option to describe.
  * @param text Text string to display, parse, or send.
  * @return The resulting localized title.
  */

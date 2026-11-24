@@ -77,6 +77,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Filter chips below the map for saved-only directory markers, compass rotation mode, and place list.
+ *
+ * @param visibleCount The number of items currently visible in the list.
+ * @param savedMappedCount The number of saved places with coordinates.
+ * @param showSavedOnly Whether the list is filtered to saved items.
+ * @param headingUp Whether the map rotates to keep the current heading at the top.
+ * @param onToggleSavedOnly Runs when the user changes the saved-only filter.
+ * @param onToggleHeadingUp Runs when the user changes the map's heading mode.
+ * @param onOpenDirectoryList Runs when the user opens the support service list.
  */
 @Composable
 internal fun DirectoryMapFilterRow(
@@ -198,6 +206,13 @@ internal fun DirectoryMapFilterRow(
 
 /**
  * Scrollable list of mapped hotline directory places with save toggles and quick inspection.
+ *
+ * @param places The directory places available to show or search.
+ * @param savedIds The IDs of bookmarked directory resources.
+ * @param onToggleSave Runs when the user changes whether the item is saved.
+ * @param onSelect Runs when the user chooses an option.
+ * @param onDismiss Runs when the user dismisses the dialog.
+ * @param inWindow Whether the dialog is hosted in the current window.
  */
 @Composable
 internal fun DirectoryPlacesListDialog(
@@ -298,6 +313,13 @@ internal fun DirectoryPlacesListDialog(
 
 /**
  * Detailed place card shown when tapping a directory marker on the map.
+ *
+ * @param resource The hotline resource to display or act on.
+ * @param saved The existing saved record, if one is available.
+ * @param onToggleSave Runs when the user changes whether the item is saved.
+ * @param onDial Runs when the user chooses to call a resource.
+ * @param onStartNavigation Runs when the user starts directions to the selected place.
+ * @param onDismiss Runs when the user dismisses the dialog.
  */
 @Composable
 internal fun DirectoryPlaceDetailDialog(

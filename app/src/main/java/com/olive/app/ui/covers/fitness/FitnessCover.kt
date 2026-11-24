@@ -231,8 +231,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     // coverReset changes whenever Quick Exit brings the already-composed cover back on screen.
     // Include it so HOME receives focus even when its page enum was already HOME and therefore
     // would not restart a page-only effect.
-    LaunchedEffect(page, session.coverReset) {
-        if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.GOAL_QUESTIONNAIRE, FitnessPage.FOOD_SEARCH)) {
+    LaunchedEffect(interactive, page, session.coverReset) {
+        if (interactive && page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.GOAL_QUESTIONNAIRE, FitnessPage.FOOD_SEARCH)) {
             withFrameNanos { }
             pageFocus.requestFocus()
         }
@@ -436,7 +436,7 @@ private fun FitnessHeader(
                 trackerLabel,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.testTag("fitness_page_title").focusRequester(pageFocus).focusable().semantics {
+                modifier = Modifier.testTag("fitness_page_title").focusRequester(pageFocus).focusable(enabled).semantics {
                     heading()
                     paneTitle = pageLabel
                     contentDescription = "$pageLabel, $trackerLabel"

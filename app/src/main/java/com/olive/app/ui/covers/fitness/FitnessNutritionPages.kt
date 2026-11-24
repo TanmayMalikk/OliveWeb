@@ -226,6 +226,7 @@ private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boo
 /**
  * Composes the localized name UI element.
  *
+ * @receiver The meal category to localize.
  * @return The resulting localized name string.
  */
 @Composable

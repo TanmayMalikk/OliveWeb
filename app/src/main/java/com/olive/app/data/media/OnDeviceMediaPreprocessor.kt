@@ -730,6 +730,7 @@ internal class VideoMediaCompressor(private val context:Context) {
     /**
      * Returns integer or null on media format.
      *
+     * @receiver The media metadata containing the requested format key.
      * @param key Lookup key or cryptographic key.
      * @return The resulting get integer or null.
      */
@@ -740,6 +741,7 @@ internal class VideoMediaCompressor(private val context:Context) {
     /**
      * Returns long or null on media format.
      *
+     * @receiver The media metadata containing the requested format key.
      * @param key Lookup key or cryptographic key.
      * @return The resulting get long or null.
      */
@@ -750,6 +752,7 @@ internal class VideoMediaCompressor(private val context:Context) {
     /**
      * Returns float or null on media format.
      *
+     * @receiver The media metadata containing the requested format key.
      * @param key Lookup key or cryptographic key.
      * @return The computed get float or null number, or `null` if unavailable.
      */

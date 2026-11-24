@@ -199,6 +199,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
      *
      * @param category Category supplied to [visible].
      * @param rows Collection of rows values to process.
+     * @param T The type of item being filtered for display in recent activity.
      * @return The resulting visible.
      */
     fun <T> visible(category: ActivityCategory, rows: List<T>) =
@@ -427,6 +428,7 @@ private enum class ReadinessIssue(val explanation: Int, val action: Int) {
 /**
  * Computes emergency readiness issues for this context.
  *
+ * @receiver The Android context used to read permission and system settings.
  * @param localMode Whether to apply local mode.
  * @return List of resulting emergency readiness issues items.
  */

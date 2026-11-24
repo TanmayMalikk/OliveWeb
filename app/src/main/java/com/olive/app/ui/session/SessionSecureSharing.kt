@@ -84,7 +84,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Recovers an authorized room key outside the short online/cache timeout. */
+    /**
+     * Recovers an authorized room key outside the short online/cache timeout.
+     *
+     * @param conversation The chat and its current participants.
+     * @return The symmetric key authorized for decrypting the conversation.
+     */
     internal suspend fun recoverRoomKey(conversation: ChatConversation): javax.crypto.SecretKey {
         with(runtime) {
             val device = enrollment ?: error("No active account")
@@ -449,6 +454,10 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
 
     /**
      * Shares or revokes a private note directly with selected accepted friends from the Notes screen.
+     *
+     * @param entry The private entry to save, display, or share.
+     * @param selectedFriends The accepted friends selected to receive the private entry.
+     * @param onComplete Runs when the requested operation completes.
      */
     fun shareWithFriends(
         entry: PrivateEntry,
@@ -528,6 +537,9 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
     /**
      * Ensures that newly added conversation participants (such as an escalated Admin or added friend) receive
      * wrapped keys for previously shared notes, incidents, and documents in the active conversation.
+     *
+     * @param conversation The chat and its current participants.
+     * @param messages The loaded messages used to reconcile shared files and notes.
      */
     fun syncSharedItemsForConversation(
         conversation: ChatConversation,

@@ -87,6 +87,7 @@ internal data class NewsFeedActions(
  * @param feed Feed supplied to [NewsFeed].
  * @param actions Actions supplied to [NewsFeed].
  * @param modifier Compose modifier applied to the root layout.
+ * @param listState The scroll state of the displayed list.
  */
 @Composable
 internal fun NewsFeed(
@@ -292,7 +293,13 @@ internal fun NewsFeed(
     }
 }
 
-/** Applies a bookmark change immediately and offers to restore a removed article. */
+/**
+ * Applies a bookmark change immediately and offers to restore a removed article.
+ *
+ * @param session The session view model supplying state and actions.
+ * @param article The news article to display or bookmark.
+ * @return A click handler that applies the bookmark change and offers undo when removing it.
+ */
 @Composable
 internal fun newsBookmarkAction(session: SessionViewModel, article: NewsArticle): () -> Unit {
     val undo = LocalOliveUndo.current

@@ -161,6 +161,7 @@ internal class AppUpdateClient(
     /**
      * Computes long version code compat for this android content pm package info.
      *
+     * @receiver The Android package metadata containing the installed version.
      * @return The computed long version code compat numeric value.
      */
     private fun android.content.pm.PackageInfo.longVersionCodeCompat(): Long =
@@ -185,6 +186,7 @@ internal class AppUpdateClient(
 /**
  * Reads n chars compat on java io reader.
  *
+ * @receiver The character stream to read.
  * @param buffer Buffer supplied to [readNCharsCompat].
  * @return The computed read n chars compat numeric value.
  */

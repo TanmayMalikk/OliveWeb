@@ -265,6 +265,7 @@ internal fun birthdayYears(today: LocalDate): List<IntRange> =
  * Composes the remember birthday input UI element.
  *
  * @param initialDate Initial date supplied to [rememberBirthdayInput].
+ * @return The saveable state containing the selected birth date.
  */
 @Composable
 internal fun rememberBirthdayInput(initialDate: String = "") = rememberSaveable(initialDate) {
@@ -469,6 +470,7 @@ private fun BirthdayPickerDialog(
 /**
  * Computes spoken year for this int.
  *
+ * @receiver The numeric year to format for spoken output.
  * @return The resulting spoken year string.
  */
 private fun Int.spokenYear(): String = toString()

@@ -62,7 +62,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var cacheIndexUpdate: Job? = null
 
     /**
-     * Session messaging: Reports whether messaging screen active.
+     * Checks whether the current screen can keep messaging listeners active.
+     *
+     * @return True when the Safe App is open or a staff or admin account is in its portal.
      */
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||

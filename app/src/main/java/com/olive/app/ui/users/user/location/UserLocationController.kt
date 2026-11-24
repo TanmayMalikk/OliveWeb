@@ -228,7 +228,14 @@ internal class LocationMapController(
         watchExpiry()
     }
 
-    /** Updates the controller's live own-position marker, trail, bearing, and speed from a GPS fix. */
+    /**
+     * Updates the controller's live own-position marker, trail, bearing, and speed from a GPS fix.
+     *
+     * @param token The session epoch captured when the operation started.
+     * @param uid The account UID used to scope this operation.
+     * @param youLabel The localized label for the current user's map marker.
+     * @param fix The latest location fix available to navigation.
+     */
     private fun applyLocationFix(token: Int, uid: String, youLabel: String, fix: DeviceCoordinates) {
         if (token != generation) return
         val previous = state.ownPoint
@@ -295,6 +302,11 @@ internal class LocationMapController(
 
     /**
      * Queues a private destination before navigating to the map screen so [open] preserves it.
+     *
+     * @param name The label to display for the queued destination.
+     * @param latitude The latitude in decimal degrees.
+     * @param longitude The longitude in decimal degrees.
+     * @param autoStart Whether to start guidance automatically when a route is ready.
      */
     fun queuePrivateDestination(
         name: String,
@@ -316,6 +328,8 @@ internal class LocationMapController(
 
     /**
      * Returns true once if a queued destination is ready for automatic route guidance.
+     *
+     * @return True once when automatic route guidance was requested.
      */
     fun consumePendingAutoStart(): Boolean {
         if (!pendingAutoStart || state.privateDestination == null || state.ownPoint == null) return false
@@ -325,6 +339,8 @@ internal class LocationMapController(
 
     /**
      * Switches between driving and walking directions.
+     *
+     * @param profile The account profile used by this operation.
      */
     fun setRouteProfile(profile: RouteProfile) {
         if (state.navigating || state.routeProfile == profile) return
@@ -719,7 +735,12 @@ internal const val MAP_ASSET_URL = "https://$MAP_ASSET_HOST/map/map.html"
 private var mapTileClient: OkHttpClient? = null
 private val mapClientLock = Any()
 
-/** Lazily creates and returns the disk-cached OkHttp client used for map tiles and styles. */
+/**
+ * Lazily creates and returns the disk-cached OkHttp client used for map tiles and styles.
+ *
+ * @param context The Android context used for resources or system services.
+ * @return The reusable HTTP client with a disk cache for map resources.
+ */
 private fun getOrCreateMapClient(context: Context): OkHttpClient {
     return mapTileClient ?: synchronized(mapClientLock) {
         mapTileClient ?: run {
@@ -733,13 +754,24 @@ private fun getOrCreateMapClient(context: Context): OkHttpClient {
     }
 }
 
-/** Returns whether [host] is an allowed remote Mapbox or OpenStreetMap tile host. */
+/**
+ * Returns whether [host] is an allowed remote Mapbox or OpenStreetMap tile host.
+ *
+ * @param host The remote hostname to check against the map asset allowlist.
+ * @return True when the hostname is in the map tile host allowlist.
+ */
 private fun isMapTileHost(host: String): Boolean =
     host == "api.mapbox.com" ||
         host == "tile.openstreetmap.org" ||
         host.endsWith(".tile.openstreetmap.org")
 
-/** Fetches a remote map style or tile asset via OkHttp, falling back to stale cache offline. */
+/**
+ * Fetches a remote map style or tile asset via OkHttp, falling back to stale cache offline.
+ *
+ * @param context The Android context used for resources or system services.
+ * @param uri The URI of the map asset requested by the WebView.
+ * @return The map resource response, or null when no permitted response is available.
+ */
 private fun fetchCachedMapResource(context: Context, uri: Uri): WebResourceResponse? {
     return try {
         val client = getOrCreateMapClient(context)

@@ -92,7 +92,11 @@ internal class DeviceLockKey(private val namespace: String) {
 internal interface DeviceAuthenticationChallenge {
     val enrolling: Boolean
     val promptCipher: Cipher?
-    /** Creates an unlocked cipher used for legacy pre-API-30 authentication prompts. */
+    /**
+     * Creates an unlocked cipher used for legacy pre-API-30 authentication prompts.
+     *
+     * @return The initialized cipher for the legacy Android authentication prompt.
+     */
     fun legacyCipher(): Cipher
 }
 
@@ -457,7 +461,11 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         private val activeInstances =
             java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<EncryptedVault>>()
 
-        /** Tracks an [EncryptedVault] instance so [purgeAll] can clear its cache later. */
+        /**
+         * Tracks an [EncryptedVault] instance so [purgeAll] can clear its cache later.
+         *
+         * @param vault The encrypted vault instance to track for cache invalidation.
+         */
         private fun registerInstance(vault: EncryptedVault) {
             activeInstances.add(java.lang.ref.WeakReference(vault))
         }
@@ -483,6 +491,7 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
 /**
  * Returns an existing JSON section or adds an empty one when it is missing.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param name Field, key, or display name.
  * @return JSON object representing child.
  */

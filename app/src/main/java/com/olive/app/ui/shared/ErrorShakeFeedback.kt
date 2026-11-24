@@ -96,6 +96,7 @@ internal fun rememberFieldErrorShakeTrigger(error: String?, shakeTrigger: Int): 
  * Applies an exaggerated finite horizontal shake and rejection haptic when [trigger] advances above zero,
  * respecting OS animator-duration reduced-motion settings.
  *
+ * @receiver The modifier chain to extend.
  * @param trigger Monotonic counter incremented on each invalid attempt (`0` skips initial mount motion).
  * @param amplitudeDp Peak horizontal excursion in dp.
  * @return Modified [Modifier] with horizontal translation applied during an active shake.

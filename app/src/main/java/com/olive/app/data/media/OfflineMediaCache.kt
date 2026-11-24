@@ -802,6 +802,7 @@ internal class DocumentDownloadGate {
      *
      * @param documentId Unique identifier of the safety document.
      * @param block Callback or suspending lambda executed within this scope.
+     * @param T The result type returned by the locked operation.
      * @return The resulting [T] for with document lock.
      */
     suspend fun <T> withDocumentLock(documentId:String,block:suspend ()->T):T =

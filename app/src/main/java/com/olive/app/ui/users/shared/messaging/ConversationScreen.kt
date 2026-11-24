@@ -3,7 +3,6 @@ package com.olive.app.ui.users.shared.messaging
 
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveFilledIconButton as FilledIconButton
-import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
@@ -14,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
@@ -202,98 +203,15 @@ internal fun ChatPane(
     }
     Box(modifier.background(ChatPageBackground)) {
         Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 78.dp)
-                    .background(Color.White)
-                    .padding(start = 12.dp, end = if (exit != null) 76.dp else 12.dp, top = 10.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (showBack) IconButton(
-                    onClick = session.messages::closeConversation,
-                    modifier = Modifier.testTag("messages_conversation_back")
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.all_conversations))
-                }
-                Box(
-                    Modifier.size(44.dp).background(OliveGreen, RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        when {
-                            active.type == "SUPPORT" -> Icons.Outlined.SupportAgent
-                            active.type == "GROUP" || active.participantIds.size > 2 -> Icons.Outlined.Group
-                            else -> Icons.Outlined.PersonOutline
-                        },
-                        null,
-                        tint = Color.White,
-                    )
-                    Box(
-                        Modifier.size(10.dp).background(OnlineIndicatorGreen, CircleShape)
-                            .align(Alignment.BottomEnd),
-                    )
-                }
-                Column(
-                    Modifier.weight(1f).focusProperties { canFocus = true }.focusRequester(chatHeaderFocus).clickable { showChatInfo = true }
-                        .testTag("open_chat_info")
-                        .semantics { contentDescription = uiText(R.string.chat_open_info) },
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        active.displayName(
-                            currentUid,
-                            session.accountRole,
-                            active.anonymousStaffDisplayName(
-                                uiText(R.string.support_chat_name),
-                                uiText(R.string.support_ticket_consultation),
-                                uiText(R.string.support_ticket_support),
-                                uiText(R.string.support_ticket_escalation),
-                            ),
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.semantics { heading() })
-                    Text(
-                        if (active.type == "SUPPORT") {
-                            stringResource(R.string.support_conversation)
-                        } else {
-                            pluralStringResource(R.plurals.chat_header_member_count, active.participantIds.size, active.participantIds.size)
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Muted,
-                    )
-                    if (active.type == "SUPPORT" && session.accountRole in setOf(
-                            AccountRole.STAFF,
-                            AccountRole.ADMIN,
-                        )
-                    ) Text(
-                        stringResource(
-                            when (active.supportTag) {
-                                SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
-                                SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
-                                else -> R.string.support_filter_support
-                            }
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = OliveGreen,
-                    )
-                }
-                if (callAllowed && callState == VoipSessionState.Idle) IconButton(
-                    onClick = {
-                        withMicrophonePermission {
-                            session.calls.start(active, currentUid, session.accountRole)
-                        }
-                    },
-                    modifier = Modifier.testTag("start_voice_call"),
-                ) {
-                    Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
-                }
-                IconButton(
-                    onClick = { if (searching) closeSearch() else searching = true },
-                    modifier = Modifier.testTag("chat_search_toggle"),
-                ) {
-                    Icon(Icons.Outlined.Search, uiText(R.string.chat_search_messages))
-                }
-            }
+            ConversationHeader(
+                session, active, currentUid, chatHeaderFocus,
+                showBack = showBack,
+                showQuickExit = exit != null,
+                showCall = callAllowed && callState == VoipSessionState.Idle,
+                onOpenInfo = { showChatInfo = true },
+                onSearch = { if (searching) closeSearch() else searching = true },
+                onStartCall = { withMicrophonePermission { session.calls.start(active, currentUid, session.accountRole) } },
+            )
             HorizontalDivider()
             if (session.accountRole == AccountRole.STAFF &&
                 active.type == "SUPPORT" && active.closedAt == 0L && active.adminUid.isBlank()) {
@@ -339,200 +257,13 @@ internal fun ChatPane(
                         },
                     )
                 }
-                LazyColumn(
-                    Modifier.weight(1f).fillMaxWidth(),
-                    state = listState,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    if (session.messages.loadingConversation) {
-                        item { LoadingSkeleton(SkeletonLayout.Conversation, modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, rows = 3) }
-                        return@LazyColumn
-                    }
-                    if (timeline.isEmpty() && session.message == null) item {
-                        Text(
-                            stringResource(if (messageSearch.isBlank()) R.string.no_messages_yet_say_hello_when_you_are_ready
-                                else R.string.chat_no_matching_messages),
-                            color = Muted,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
-                        if (timelineItem is ConversationTimelineItem.Membership) {
-                            val event = timelineItem.value
-                            val added = event.action == ChatMembershipAction.ADDED
-                            val organizationViewer = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
-                            val label = if (event.action == ChatMembershipAction.ADMIN_HELP_REQUESTED) {
-                                stringResource(R.string.chat_admin_help_requested)
-                            } else if (active.type == "SUPPORT" && organizationViewer) {
-                                stringResource(
-                                    if (added) R.string.ticket_added_friend else R.string.ticket_removed_friend,
-                                    active.ticketNumber(),
-                                )
-                            } else {
-                                val staffName = uiText(R.string.support_chat_name)
-                                val adminName = uiText(R.string.support_admin_chat_name)
-                                val accountName = uiText(R.string.account)
-                                val actor = active.senderDisplayName(
-                                    event.actorUid, event.actorName.ifBlank { accountName }, session.accountRole, staffName, adminName,
-                                )
-                                val participant = active.senderDisplayName(
-                                    event.participantUid, event.participantName.ifBlank { accountName }, session.accountRole, staffName, adminName,
-                                )
-                                stringResource(
-                                    if (added) R.string.chat_member_added else R.string.chat_member_removed,
-                                    actor, participant,
-                                )
-                            }
-                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Muted,
-                                )
-                            }
-                            return@items
-                        }
-                        if (timelineItem is ConversationTimelineItem.Call) {
-                            val call = timelineItem.value
-                            CallHistoryRow(
-                                call = call,
-                                canJoin = callState == VoipSessionState.Idle &&
-                                    call.canBeJoinedBy(currentUid),
-                                onJoin = {
-                                    withMicrophonePermission {
-                                        session.calls.joinActive(
-                                            call,
-                                            currentUid,
-                                            session.accountRole,
-                                        )
-                                    }
-                                },
-                            )
-                            return@items
-                        }
-                        val chat = (timelineItem as ConversationTimelineItem.Message).value
-                        val mine = chat.senderUid == currentUid
-                        var menuOpen by remember(chat.id) { mutableStateOf(false) }
-                        Row(
-                            Modifier.animateItem().fillMaxWidth(),
-                            horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start
-                        ) {
-                            Surface(
-                                color = if (mine) ChatSentBubble else ChatIncomingBubble,
-                                contentColor = if (mine) Paper else Ink,
-                                shape = RoundedCornerShape(
-                                    topStart = 18.dp,
-                                    topEnd = 18.dp,
-                                    bottomStart = if (mine) 18.dp else 5.dp,
-                                    bottomEnd = if (mine) 5.dp else 18.dp,
-                                ),
-                                tonalElevation = 1.dp,
-                                shadowElevation = 1.dp,
-                                border = if (mine) null else BorderStroke(1.dp, ChatBorder),
-                                modifier = Modifier.fillMaxWidth(.84f).widthIn(max = 360.dp).then(
-                                    if (mine && !chat.unsent) Modifier.combinedClickable(
-                                        onClickLabel = uiText(R.string.a11y_message_actions),
-                                        onClick = { menuOpen = true },
-                                        onLongClickLabel = uiText(R.string.a11y_message_actions),
-                                        onLongClick = { menuOpen = true },
-                                    ) else Modifier
-                                )
-                            ) {
-                                Row(
-                                    Modifier.padding(
-                                        start = 15.dp,
-                                        end = 6.dp,
-                                        top = 11.dp,
-                                        bottom = 10.dp
-                                    ), verticalAlignment = Alignment.Top
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        val sender =
-                                            if (mine && !active.isChatAdmin(chat.senderUid)) session.coverUsername else active.senderDisplayName(
-                                                chat.senderUid,
-                                                chat.senderUsername,
-                                                session.accountRole,
-                                                uiText(R.string.support_chat_name),
-                                                uiText(R.string.support_admin_chat_name),
-                                            )
-                                        Text(
-                                            sender,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (mine) Paper else Muted
-                                        )
-                                        ChatMessageBody(
-                                            chat,
-                                            session,
-                                            mine,
-                                            sender
-                                        ) { document, file -> openedMedia = document to file }
-                                        if (chat.sentAt > 0) Text(
-                                            DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm))
-                                                .withZone(ZoneId.systemDefault())
-                                                .format(Instant.ofEpochMilli(chat.sentAt)),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (mine) Paper else Muted
-                                        )
-                                        if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
-                                            val retryable = canManuallyRetryMessage(chat.deliveryStatus)
-                                            val discardable = canDiscardFailedMessage(chat.deliveryStatus)
-                                            val label = stringResource(
-                                                when (chat.deliveryStatus) {
-                                                    MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued_retry
-                                                    MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
-                                                    MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_failed_retry
-                                                    MessageDeliveryStatus.FAILED_PERMANENT ->
-                                                        if (chat.deliveryFailureCode in setOf(
-                                                                "ATTACHMENT_ACCESS_REVOKED",
-                                                                "ATTACHMENT_KEY_UNAVAILABLE",
-                                                            )
-                                                        ) R.string.message_delivery_attachment_access_revoked
-                                                        else R.string.message_delivery_failed_permanent
-                                                    MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
-                                                }
-                                            )
-                                            val statusModifier = Modifier.testTag("message_status_${chat.id}")
-                                            if (retryable || discardable) {
-                                                OutlinedButton(
-                                                    onClick = {
-                                                        if (retryable) session.messages.retryMessage(chat)
-                                                        else session.messages.discardFailedMessage(chat)
-                                                    },
-                                                    border = BorderStroke(1.dp, Paper),
-                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Paper),
-                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                                    modifier = statusModifier.semantics { liveRegion = LiveRegionMode.Polite },
-                                                ) { Text(label, style = MaterialTheme.typography.labelMedium) }
-                                            } else {
-                                                AccessibleMessage(label, modifier = statusModifier, color = Paper)
-                                            }
-                                        }
-                                    }
-                                    if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
-                                        IconButton(
-                                            onClick = { menuOpen = true },
-                                            modifier = Modifier.size(48.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Outlined.MoreVert,
-                                                uiText(R.string.a11y_message_actions)
-                                            )
-                                        }
-                                        DropdownMenu(menuOpen, { menuOpen = false }) {
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.unsend_message)) },
-                                                onClick = {
-                                                    menuOpen = false
-                                                    session.messages.unsendMessage(chat)
-                                                })
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                ConversationTimeline(
+                    session, active, currentUid, listState, timeline,
+                    hasSearch = messageSearch.isNotBlank(),
+                    callState = callState,
+                    withMicrophonePermission = withMicrophonePermission,
+                    modifier = Modifier.weight(1f),
+                ) { document, file -> openedMedia = document to file }
                 val transfers = session.media
                 val pendingVoice = transfers?.uploads?.firstOrNull {
                     it.ownerUid == currentUid && it.voiceConversationId == active.id
@@ -543,70 +274,13 @@ internal fun ChatPane(
                     VoiceMessageUploadStatus()
                 }
                 Status(session)
-                if (active.closedAt == 0L) Surface(
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    border = BorderStroke(1.dp, ChatBorder),
-                ) {
-                    val composer: @Composable (Boolean, (@Composable () -> Unit)?) -> Unit = { voiceOpen, mic ->
-                        // The outlined field reserves space above the outline for its floating label.
-                        val labelInset = 8.dp
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (canAttachMedia) {
-                                IconButton(
-                                    onClick = { showAttachmentPicker = true },
-                                    enabled = !voiceOpen && !session.messages.busy,
-                                    modifier = Modifier.padding(top = labelInset)
-                                        .testTag("attach_private_entry")
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.AttachFile,
-                                        stringResource(R.string.attach_secure_entry)
-                                    )
-                                }
-                            }
-                            Box(Modifier.weight(1f)) {
-                                OutlinedTextField(
-                                    draft,
-                                    { if (it.length <= 2_000) draft = it },
-                                    label = { Text(stringResource(R.string.message)) },
-                                    modifier = Modifier.fillMaxWidth().testTag("message_body")
-                                        .keepVisibleWhileTyping(),
-                                    readOnly = voiceOpen,
-                                    maxLines = 4,
-                                    shape = RoundedCornerShape(24.dp),
-                                    trailingIcon = if (mic != null) { { Spacer(Modifier.size(48.dp)) } } else null,
-                                )
-                                if (mic != null) Box(
-                                    Modifier.matchParentSize().padding(top = labelInset),
-                                    contentAlignment = Alignment.CenterEnd,
-                                ) { mic() }
-                            }
-                            FilledIconButton(
-                                onClick = { session.messages.sendMessage(draft) { draft = "" } },
-                                enabled = !voiceOpen && draft.isNotBlank() && !session.messages.busy &&
-                                    (active.type != "SUPPORT" || active.participantIds.size >= 2),
-                                modifier = Modifier.padding(top = labelInset)
-                                    .size(50.dp).testTag("send_message")
-                            ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
-                        }
-                    }
-                    if (!session.localMode && !session.privacyBlackout && callState == VoipSessionState.Idle) {
-                        key(currentUid, active.id) {
-                            VoiceMessageComposer(
-                                enabled = session.preparingVoiceConversationId == null && !session.messages.busy &&
-                                    active.participantIds.size >= 2,
-                                withMicrophonePermission = withMicrophonePermission,
-                                onSend = session::sendVoiceMessage,
-                                content = composer,
-                            )
-                        }
-                    } else composer(false, null)
-                }
+                if (active.closedAt == 0L) ConversationComposer(
+                    session, active, currentUid, callState, draft,
+                    canAttachMedia = canAttachMedia,
+                    withMicrophonePermission = withMicrophonePermission,
+                    onDraftChange = { draft = it },
+                    onAttach = { showAttachmentPicker = true },
+                )
             }
         }
         if (exit != null) FloatingQuickExit(
@@ -703,62 +377,416 @@ internal fun ChatPane(
 }
 
 /**
- * Shows one voice call status card in the conversation timeline.
+ * Displays the chat identity and its call, back, and search actions.
  *
- * @param call Call supplied to [CallHistoryRow].
- * @param canJoin Whether can join.
- * @param onJoin Callback invoked when join changes or occurs.
+ * @param session The active session supplying the role and chat actions.
+ * @param active The chat displayed in the header.
+ * @param currentUid The account viewing the chat.
+ * @param focus The focus requester used when the chat opens.
+ * @param showBack Whether to show the back button.
+ * @param showQuickExit Whether to reserve room for the floating Quick Exit control.
+ * @param showCall Whether to show the start call action.
+ * @param onOpenInfo Opens the chat details.
+ * @param onSearch Toggles the message search field.
+ * @param onStartCall Requests microphone access and starts the call.
  */
 @Composable
-internal fun CallHistoryRow(
-    call: VoipCall,
-    canJoin: Boolean = false,
-    onJoin: () -> Unit = {},
+private fun ConversationHeader(
+    session: SessionViewModel, active: ChatConversation, currentUid: String, focus: FocusRequester,
+    showBack: Boolean, showQuickExit: Boolean, showCall: Boolean, onOpenInfo: () -> Unit,
+    onSearch: () -> Unit, onStartCall: () -> Unit,
 ) {
-    val label = stringResource(
-        when (call.status) {
-            VoipCallStatus.MISSED -> R.string.ui_missed_call
-            VoipCallStatus.DECLINED -> R.string.ui_call_declined
-            VoipCallStatus.ENDED -> R.string.ui_call_ended
-            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
-        }
-    )
-    val activeColor = MaterialTheme.colorScheme.primaryContainer
-    Surface(
-        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
-        else MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
-            .testTag("call_history_${call.callId}")
-            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
-                Modifier.clickable(onClick = onJoin)
-            } else Modifier),
+    val uiText = rememberResourceText()
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 78.dp)
+            .background(Color.White)
+            .padding(start = 12.dp, end = if (showQuickExit) 76.dp else 12.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        if (showBack) IconButton(
+            onClick = session.messages::closeConversation,
+            modifier = Modifier.testTag("messages_conversation_back")
         ) {
-            Icon(Icons.Outlined.Call, null, tint = OliveGreen)
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall)
-                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
-                if (timestamp > 0) Text(
-                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
-                        .withZone(ZoneId.systemDefault())
-                        .format(Instant.ofEpochMilli(timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Muted,
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.all_conversations))
+        }
+        Box(
+            Modifier.size(44.dp).background(OliveGreen, RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                when {
+                    active.type == "SUPPORT" -> Icons.Outlined.SupportAgent
+                    active.type == "GROUP" || active.participantIds.size > 2 -> Icons.Outlined.Group
+                    else -> Icons.Outlined.PersonOutline
+                },
+                null,
+                tint = Color.White,
+            )
+            Box(
+                Modifier.size(10.dp).background(OnlineIndicatorGreen, CircleShape)
+                    .align(Alignment.BottomEnd),
+            )
+        }
+        Column(
+            Modifier.weight(1f).focusProperties { canFocus = true }.focusRequester(focus).clickable(onClick = onOpenInfo)
+                .testTag("open_chat_info")
+                .semantics { contentDescription = uiText(R.string.chat_open_info) },
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                active.displayName(
+                    currentUid,
+                    session.accountRole,
+                    active.anonymousStaffDisplayName(
+                        uiText(R.string.support_chat_name),
+                        uiText(R.string.support_ticket_consultation),
+                        uiText(R.string.support_ticket_support),
+                        uiText(R.string.support_ticket_escalation),
+                    ),
+                ),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() })
+            Text(
+                if (active.type == "SUPPORT") {
+                    stringResource(R.string.support_conversation)
+                } else {
+                    pluralStringResource(R.plurals.chat_header_member_count, active.participantIds.size, active.participantIds.size)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = Muted,
+            )
+            if (active.type == "SUPPORT" && session.accountRole in setOf(
+                    AccountRole.STAFF,
+                    AccountRole.ADMIN,
                 )
+            ) Text(
+                stringResource(
+                    when (active.supportTag) {
+                        SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+                        SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
+                        else -> R.string.support_filter_support
+                    }
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = OliveGreen,
+            )
+        }
+        if (showCall) IconButton(
+            onClick = onStartCall,
+            modifier = Modifier.testTag("start_voice_call"),
+        ) {
+            Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
+        }
+        IconButton(
+            onClick = onSearch,
+            modifier = Modifier.testTag("chat_search_toggle"),
+        ) {
+            Icon(Icons.Outlined.Search, uiText(R.string.chat_search_messages))
+        }
+    }
+}
+
+/**
+ * Shows messages, membership changes and calls in timeline order.
+ *
+ * @param session The active session supplying loading state and message actions.
+ * @param active The chat displayed in the timeline.
+ * @param currentUid The account viewing the messages.
+ * @param listState The scroll state shared with the screen.
+ * @param timeline The entries to display, including any search filter.
+ * @param hasSearch Whether a message search query is active.
+ * @param callState The current voice call state.
+ * @param withMicrophonePermission Runs an action after microphone access is available.
+ * @param modifier The layout modifier for the timeline.
+ * @param onOpenMedia Opens a document preview in the conversation.
+ */
+@Composable
+private fun ConversationTimeline(
+    session: SessionViewModel, active: ChatConversation, currentUid: String, listState: LazyListState,
+    timeline: List<ConversationTimelineItem>, hasSearch: Boolean, callState: VoipSessionState,
+    withMicrophonePermission: (() -> Unit) -> Unit, modifier: Modifier,
+    onOpenMedia: (SafetyDocument, File) -> Unit,
+) {
+    val uiText = rememberResourceText()
+    LazyColumn(
+        modifier.fillMaxWidth(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (session.messages.loadingConversation) {
+            item { LoadingSkeleton(SkeletonLayout.Conversation, modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, rows = 3) }
+            return@LazyColumn
+        }
+        if (timeline.isEmpty() && session.message == null) item {
+            Text(
+                stringResource(if (!hasSearch) R.string.no_messages_yet_say_hello_when_you_are_ready
+                    else R.string.chat_no_matching_messages),
+                color = Muted,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
+        items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
+            if (timelineItem is ConversationTimelineItem.Membership) {
+                val event = timelineItem.value
+                val added = event.action == ChatMembershipAction.ADDED
+                val organizationViewer = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+                val label = if (event.action == ChatMembershipAction.ADMIN_HELP_REQUESTED) {
+                    stringResource(R.string.chat_admin_help_requested)
+                } else if (active.type == "SUPPORT" && organizationViewer) {
+                    stringResource(
+                        if (added) R.string.ticket_added_friend else R.string.ticket_removed_friend,
+                        active.ticketNumber(),
+                    )
+                } else {
+                    val staffName = uiText(R.string.support_chat_name)
+                    val adminName = uiText(R.string.support_admin_chat_name)
+                    val accountName = uiText(R.string.account)
+                    val actor = active.senderDisplayName(
+                        event.actorUid, event.actorName.ifBlank { accountName }, session.accountRole, staffName, adminName,
+                    )
+                    val participant = active.senderDisplayName(
+                        event.participantUid, event.participantName.ifBlank { accountName }, session.accountRole, staffName, adminName,
+                    )
+                    stringResource(
+                        if (added) R.string.chat_member_added else R.string.chat_member_removed,
+                        actor, participant,
+                    )
+                }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
+                return@items
             }
-            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
-                FilledTonalButton(
-                    onClick = onJoin,
-                    modifier = Modifier.testTag("join_call_${call.callId}"),
+            if (timelineItem is ConversationTimelineItem.Call) {
+                val call = timelineItem.value
+                CallHistoryRow(
+                    call = call,
+                    canJoin = callState == VoipSessionState.Idle &&
+                        call.canBeJoinedBy(currentUid),
+                    onJoin = {
+                        withMicrophonePermission {
+                            session.calls.joinActive(
+                                call,
+                                currentUid,
+                                session.accountRole,
+                            )
+                        }
+                    },
+                )
+                return@items
+            }
+            val chat = (timelineItem as ConversationTimelineItem.Message).value
+            val mine = chat.senderUid == currentUid
+            var menuOpen by remember(chat.id) { mutableStateOf(false) }
+            Row(
+                Modifier.animateItem().fillMaxWidth(),
+                horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start
+            ) {
+                Surface(
+                    color = if (mine) ChatSentBubble else ChatIncomingBubble,
+                    contentColor = if (mine) Paper else Ink,
+                    shape = RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (mine) 18.dp else 5.dp,
+                        bottomEnd = if (mine) 5.dp else 18.dp,
+                    ),
+                    tonalElevation = 1.dp,
+                    shadowElevation = 1.dp,
+                    border = if (mine) null else BorderStroke(1.dp, ChatBorder),
+                    modifier = Modifier.fillMaxWidth(.84f).widthIn(max = 360.dp).then(
+                        if (mine && !chat.unsent) Modifier.combinedClickable(
+                            onClickLabel = uiText(R.string.a11y_message_actions),
+                            onClick = { menuOpen = true },
+                            onLongClickLabel = uiText(R.string.a11y_message_actions),
+                            onLongClick = { menuOpen = true },
+                        ) else Modifier
+                    )
                 ) {
-                    Text(stringResource(R.string.ui_join_call))
+                    Row(
+                        Modifier.padding(
+                            start = 15.dp,
+                            end = 6.dp,
+                            top = 11.dp,
+                            bottom = 10.dp
+                        ), verticalAlignment = Alignment.Top
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            val sender =
+                                if (mine && !active.isChatAdmin(chat.senderUid)) session.coverUsername else active.senderDisplayName(
+                                    chat.senderUid,
+                                    chat.senderUsername,
+                                    session.accountRole,
+                                    uiText(R.string.support_chat_name),
+                                    uiText(R.string.support_admin_chat_name),
+                                )
+                            Text(
+                                sender,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (mine) Paper else Muted
+                            )
+                            ChatMessageBody(
+                                chat,
+                                session,
+                                mine,
+                                sender,
+                                onOpenMedia,
+                            )
+                            if (chat.sentAt > 0) Text(
+                                DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm))
+                                    .withZone(ZoneId.systemDefault())
+                                    .format(Instant.ofEpochMilli(chat.sentAt)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (mine) Paper else Muted
+                            )
+                            if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
+                                val retryable = canManuallyRetryMessage(chat.deliveryStatus)
+                                val discardable = canDiscardFailedMessage(chat.deliveryStatus)
+                                val label = stringResource(
+                                    when (chat.deliveryStatus) {
+                                        MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued_retry
+                                        MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
+                                        MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_failed_retry
+                                        MessageDeliveryStatus.FAILED_PERMANENT ->
+                                            if (chat.deliveryFailureCode in setOf(
+                                                    "ATTACHMENT_ACCESS_REVOKED",
+                                                    "ATTACHMENT_KEY_UNAVAILABLE",
+                                                )
+                                            ) R.string.message_delivery_attachment_access_revoked
+                                            else R.string.message_delivery_failed_permanent
+                                        MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
+                                    }
+                                )
+                                val statusModifier = Modifier.testTag("message_status_${chat.id}")
+                                if (retryable || discardable) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (retryable) session.messages.retryMessage(chat)
+                                            else session.messages.discardFailedMessage(chat)
+                                        },
+                                        border = BorderStroke(1.dp, Paper),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Paper),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = statusModifier.semantics { liveRegion = LiveRegionMode.Polite },
+                                    ) { Text(label, style = MaterialTheme.typography.labelMedium) }
+                                } else {
+                                    AccessibleMessage(label, modifier = statusModifier, color = Paper)
+                                }
+                            }
+                        }
+                        if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
+                            IconButton(
+                                onClick = { menuOpen = true },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.MoreVert,
+                                    uiText(R.string.a11y_message_actions)
+                                )
+                            }
+                            DropdownMenu(menuOpen, { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.unsend_message)) },
+                                    onClick = {
+                                        menuOpen = false
+                                        session.messages.unsendMessage(chat)
+                                    })
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * Shows the text composer and its attachment and voice controls.
+ *
+ * @param session The active session supplying message actions and privacy state.
+ * @param active The open chat.
+ * @param currentUid The account authoring the message.
+ * @param callState The current voice call state.
+ * @param draft The unsent text owned by the conversation screen.
+ * @param canAttachMedia Whether the current account can attach files.
+ * @param withMicrophonePermission Runs recording actions after microphone access is available.
+ * @param onDraftChange Updates the draft in the conversation screen.
+ * @param onAttach Opens the attachment picker.
+ */
+@Composable
+private fun ConversationComposer(
+    session: SessionViewModel, active: ChatConversation, currentUid: String, callState: VoipSessionState,
+    draft: String, canAttachMedia: Boolean, withMicrophonePermission: (() -> Unit) -> Unit,
+    onDraftChange: (String) -> Unit, onAttach: () -> Unit,
+) {
+    Surface(
+        color = Color.White,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, ChatBorder),
+    ) {
+        val composer: @Composable (Boolean, (@Composable () -> Unit)?) -> Unit = { voiceOpen, mic ->
+            // The outlined field reserves space above the outline for its floating label.
+            val labelInset = 8.dp
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (canAttachMedia) {
+                    IconButton(
+                        onClick = onAttach,
+                        enabled = !voiceOpen && !session.messages.busy,
+                        modifier = Modifier.padding(top = labelInset)
+                            .testTag("attach_private_entry")
+                    ) {
+                        Icon(
+                            Icons.Outlined.AttachFile,
+                            stringResource(R.string.attach_secure_entry)
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        draft,
+                        { if (it.length <= 2_000) onDraftChange(it) },
+                        label = { Text(stringResource(R.string.message)) },
+                        modifier = Modifier.fillMaxWidth().testTag("message_body")
+                            .keepVisibleWhileTyping(),
+                        readOnly = voiceOpen,
+                        maxLines = 4,
+                        shape = RoundedCornerShape(24.dp),
+                        trailingIcon = if (mic != null) { { Spacer(Modifier.size(48.dp)) } } else null,
+                    )
+                    if (mic != null) Box(
+                        Modifier.matchParentSize().padding(top = labelInset),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) { mic() }
+                }
+                FilledIconButton(
+                    onClick = { session.messages.sendMessage(draft) { onDraftChange("") } },
+                    enabled = !voiceOpen && draft.isNotBlank() && !session.messages.busy &&
+                        (active.type != "SUPPORT" || active.participantIds.size >= 2),
+                    modifier = Modifier.padding(top = labelInset)
+                        .size(50.dp).testTag("send_message")
+                ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
+            }
+        }
+        if (!session.localMode && !session.privacyBlackout && callState == VoipSessionState.Idle) {
+            key(currentUid, active.id) {
+                VoiceMessageComposer(
+                    enabled = session.preparingVoiceConversationId == null && !session.messages.busy &&
+                        active.participantIds.size >= 2,
+                    withMicrophonePermission = withMicrophonePermission,
+                    onSend = session::sendVoiceMessage,
+                    content = composer,
+                )
+            }
+        } else composer(false, null)
     }
 }

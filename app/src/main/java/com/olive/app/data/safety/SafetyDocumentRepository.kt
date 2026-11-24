@@ -141,6 +141,7 @@ internal fun isChatOnlyMediaMetadata(
 /**
  * Returns whether this record represents chat-only media excluded from document storage.
  *
+ * @receiver The document whose index metadata or sharing scope is read.
  * @return `true` if this document is a chat voice message or other chat-only item.
  */
 internal fun SafetyDocument.isChatOnlyMedia(): Boolean =
@@ -528,7 +529,13 @@ class SafetyDocumentRepository(
         }
     }
 
-    /** Ensures every target chat recipient has decryption access and wrapped keys for [documentId]. */
+    /**
+     * Ensures every target chat recipient has decryption access and wrapped keys for [documentId].
+     *
+     * @param documentId The ID of the document.
+     * @param callerUid The UID of the signed-in account making the request.
+     * @param recipients The accounts receiving access to the shared content.
+     */
     override suspend fun ensureChatMediaAccess(
         documentId: String,
         callerUid: String,
@@ -768,7 +775,13 @@ class SafetyDocumentRepository(
         )
     }
 
-    /** Wraps a document key with the recipient's public account key when enrolled; returns null otherwise. */
+    /**
+     * Wraps a document key with the recipient's public account key when enrolled; returns null otherwise.
+     *
+     * @param documentKey The document's symmetric encryption key.
+     * @param uid The account UID used to scope this operation.
+     * @return The wrapped document key, or null if the recipient has no account keyset.
+     */
     private suspend fun accountKeysetAccess(documentKey: SecretKey, uid: String): AccountKeysetWrappedKey? {
         val row = try {
             firestore.collection("accountKeyDirectories").document(uid).get(Source.SERVER).await()
@@ -1063,7 +1076,13 @@ class IndexedSafetyDocumentRepository(
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) =
         remote.revokeAccess(documentId, ownerUid, recipientUid)
 
-    /** Ensures every target chat recipient has decryption access to [documentId]. */
+    /**
+     * Ensures every target chat recipient has decryption access to [documentId].
+     *
+     * @param documentId The ID of the document.
+     * @param callerUid The UID of the signed-in account making the request.
+     * @param recipients The accounts receiving access to the shared content.
+     */
     override suspend fun ensureChatMediaAccess(
         documentId: String,
         callerUid: String,
@@ -1117,6 +1136,7 @@ class IndexedSafetyDocumentRepository(
 /**
  * Computes snapshot for this indexed documents.
  *
+ * @receiver The local document index to snapshot.
  * @return The resulting snapshot.
  */
 private fun IndexedDocuments.snapshot() =

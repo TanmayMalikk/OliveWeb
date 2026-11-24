@@ -85,7 +85,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
 
-/** Rounds card corners with a smooth join between the curve and each straight edge. */
+/**
+ * Rounds card corners with a smooth join between the curve and each straight edge.
+ *
+ * @param radius The corner radius in density-independent pixels.
+ * @return A shape that uses the supplied corner radius with smooth joins.
+ */
 internal fun oliveCorners(radius: Dp): CornerBasedShape {
     val corner = CornerSize(radius)
     return OliveCorners(corner, corner, corner, corner)
@@ -101,6 +106,12 @@ private class OliveCorners(
 ) : CornerBasedShape(topStart, topEnd, bottomEnd, bottomStart) {
     /**
      * Creates a copy of this shape with the specified corner sizes.
+     *
+     * @param topStart The corner size at the logical start of the top edge.
+     * @param topEnd The corner size at the logical end of the top edge.
+     * @param bottomEnd The corner size at the logical end of the bottom edge.
+     * @param bottomStart The corner size at the logical start of the bottom edge.
+     * @return A new shape with the specified corner sizes.
      */
     override fun copy(
         topStart: CornerSize,
@@ -111,6 +122,14 @@ private class OliveCorners(
 
     /**
      * Creates an [Outline] of this shape for the given size and corner radii.
+     *
+     * @param size The size of the available drawing area in pixels.
+     * @param topStart The corner size at the logical start of the top edge.
+     * @param topEnd The corner size at the logical end of the top edge.
+     * @param bottomEnd The corner size at the logical end of the bottom edge.
+     * @param bottomStart The corner size at the logical start of the bottom edge.
+     * @param layoutDirection The direction used to resolve logical start and end corners.
+     * @return The outline for the resolved size and layout direction.
      */
     override fun createOutline(
         size: Size,
@@ -305,6 +324,13 @@ private val OliveOutlinedElevation: CardElevation
 
 /**
  * Renders a static elevated card.
+ *
+ * @param modifier The Compose modifier applied to the component.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveCard(
@@ -320,6 +346,16 @@ internal fun OliveCard(
 
 /**
  * Renders a clickable elevated card with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveCard(
@@ -342,6 +378,13 @@ internal fun OliveCard(
 
 /**
  * Renders a static outlined card.
+ *
+ * @param modifier The Compose modifier applied to the component.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveOutlinedCard(
@@ -357,6 +400,16 @@ internal fun OliveOutlinedCard(
 
 /**
  * Renders a clickable outlined card with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveOutlinedCard(
@@ -377,7 +430,19 @@ internal fun OliveOutlinedCard(
     )
 }
 
-/** Adds the same press feedback to custom dashboard tiles. */
+/**
+ * Adds the same press feedback to custom dashboard tiles.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param color The base color to draw.
+ * @param contentColor The color inherited by text and icons in the content.
+ * @param border The optional stroke drawn around the component.
+ * @param tonalElevation The tonal elevation applied to the Material surface.
+ * @param content The composable content to render inside the component.
+ */
 @Composable
 internal fun OliveActionSurface(
     onClick: () -> Unit,
@@ -411,7 +476,15 @@ internal fun OliveActionSurface(
     )
 }
 
-/** Moves the artwork on press while leaving the layout and touch bounds in place. */
+/**
+ * Moves the artwork on press while leaving the layout and touch bounds in place.
+ *
+ * @receiver The modifier chain to extend.
+ * @param source The interaction source whose press events are observed.
+ * @param enabled Whether to show press feedback.
+ * @param depth The distance the component moves while pressed.
+ * @return The modifier chain with press feedback added when enabled.
+ */
 @Composable
 internal fun Modifier.olivePress(
     source: MutableInteractionSource,
@@ -456,7 +529,12 @@ internal fun Modifier.olivePress(
     }
 }
 
-/** Keeps a quick tap visible for a few frames, even when down and up arrive together. */
+/**
+ * Keeps a quick tap visible for a few frames, even when down and up arrive together.
+ *
+ * @param source The interaction source whose press events are observed.
+ * @return Observable state indicating whether the pressed visual should be shown.
+ */
 @Composable
 private fun rememberOlivePressFeedback(source: MutableInteractionSource): State<Boolean> {
     val pressed = remember(source) { mutableStateOf(false) }
@@ -485,7 +563,14 @@ private fun rememberOlivePressFeedback(source: MutableInteractionSource): State<
 internal fun rememberOliveInteraction(source: MutableInteractionSource? = null): MutableInteractionSource =
     source ?: remember { MutableInteractionSource() }
 
-/** Tracks the current destination only. Canceling the gesture leaves its navigation state intact. */
+/**
+ * Tracks the current destination only. Canceling the gesture leaves its navigation state intact.
+ *
+ * @param enabled Whether this destination handles the system back gesture.
+ * @param preview Whether to update the visual preview during the back gesture.
+ * @param onBack Runs after the back gesture completes.
+ * @return Observable progress of the predictive-back gesture.
+ */
 @Composable
 internal fun rememberOliveBack(
     enabled: Boolean = true,
@@ -504,14 +589,26 @@ internal fun rememberOliveBack(
     return progress
 }
 
-/** Provides movement without exposing the content behind this destination. */
+/**
+ * Provides movement without exposing the content behind this destination.
+ *
+ * @receiver The modifier chain to extend.
+ * @param progress The current progress of the back gesture.
+ * @return The modifier chain with the back-gesture visual effect applied.
+ */
 internal fun Modifier.oliveBackPreview(progress: State<Float>): Modifier = graphicsLayer {
     val scale = 1f - progress.value * 0.045f
     scaleX = scale
     scaleY = scale
 }
 
-/** Animates the arriving destination without retaining a second copy of outgoing content. */
+/**
+ * Animates the arriving destination without retaining a second copy of outgoing content.
+ *
+ * @param route The route identity used to restart the entrance animation.
+ * @param back The predictive-back progress used to draw the route preview.
+ * @param content The composable content to render inside the component.
+ */
 @Composable
 internal fun OliveRouteEntrance(route: Any, back: State<Float>, content: @Composable () -> Unit) {
     val opacity = remember(route) { Animatable(0f) }
@@ -523,7 +620,14 @@ internal fun OliveRouteEntrance(route: Any, back: State<Float>, content: @Compos
 
 internal val LocalOliveUndo = staticCompositionLocalOf<(String, () -> Unit) -> Unit> { { _, _ -> } }
 
-/** Offers one undo action for the current account and destination. */
+/**
+ * Offers one undo action for the current account and destination.
+ *
+ * @param scopeKey The value used to reset state when the scope changes.
+ * @param enabled Whether the undo affordance can be shown.
+ * @param bottomClearance The space reserved below the content for inset or overlay controls.
+ * @param content The composable content to render inside the component.
+ */
 @Composable
 internal fun OliveUndoOverlay(
     scopeKey: Any?,

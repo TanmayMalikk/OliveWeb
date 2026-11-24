@@ -445,6 +445,7 @@ private fun CameraModeSelector(
 /**
  * Shows one camera mode as a full-width text button with a clear selected state.
  *
+ * @receiver The row layout scope that contains the control.
  * @param label Accessible label or display caption.
  * @param selected Whether to apply selected.
  * @param enabled Whether this feature or control is currently enabled.

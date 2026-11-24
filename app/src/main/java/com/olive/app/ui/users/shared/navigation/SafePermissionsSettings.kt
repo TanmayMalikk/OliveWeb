@@ -534,6 +534,7 @@ private fun UpdateOfferCard(state: SafeAppUpdateUi) {
 /**
  * Composes the swipe away UI element.
  *
+ * @receiver The modifier chain to extend.
  * @param onDismiss Callback invoked when the dialog or sheet is dismissed, or null when not provided.
  * @return The resulting [Modifier] for swipe away.
  */
@@ -565,6 +566,7 @@ private fun Modifier.swipeAway(onDismiss: (() -> Unit)?): Modifier {
 /**
  * Checks whether horizontal swipe for offset.
  *
+ * @receiver The Compose offset to constrain or classify.
  * @return `true` if is horizontal swipe, or `false` otherwise.
  */
 private fun Offset.isHorizontalSwipe() = abs(x) > abs(y)

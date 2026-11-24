@@ -373,6 +373,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * Removes private entry from the signed-in session.
      *
      * @param id ID supplied to [trashPrivateEntry].
+     * @param onTrashed Runs after the entry has been moved to trash.
      */
     fun trashPrivateEntry(id: String, onTrashed: (() -> Unit)? = null) {
         with(runtime) {
@@ -434,6 +435,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * @param entry Entry supplied to [updatePrivateEntry].
      * @param failure Exception or failure reason encountered during execution.
      * @param success Success supplied to [updatePrivateEntry].
+     * @param onSaved Runs after the requested changes are saved.
      */
     private fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String?, onSaved: (() -> Unit)? = null) {
         with(runtime) {
@@ -471,6 +473,8 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
 
     /**
      * Allows entry settings only for a user who has an active device enrollment.
+     *
+     * @return True when the active user can change private entry settings.
      */
     private fun editable() = with(runtime) {
         !state.busy && state.screen == SessionScreen.Safe &&

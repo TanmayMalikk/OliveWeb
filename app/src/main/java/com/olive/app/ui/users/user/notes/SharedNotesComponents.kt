@@ -32,6 +32,12 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Displays a read-only private note or incident report that another account shared with this user or safe contact.
+ *
+ * @param item The resource or record being processed.
+ * @param ownerDisplayName The display name associated with the item's owner.
+ * @param formatter The formatter used to display dates or values.
+ * @param onOpen Runs when the user opens the item.
+ * @param modifier The Compose modifier applied to the component.
  */
 @Composable
 internal fun SharedPrivateNoteCard(
@@ -101,6 +107,13 @@ internal fun SharedPrivateNoteCard(
 
 /**
  * Lets a note owner grant or revoke access to a private note or incident for accepted friends and safe contacts.
+ *
+ * @param entry The private entry to save, display, or share.
+ * @param currentRecipientUids The accounts that currently hold access.
+ * @param friends The accepted friends available for the operation.
+ * @param contacts The contact details available for this operation.
+ * @param onDismiss Runs when the user dismisses the dialog.
+ * @param onSave Runs when the user saves the edited information.
  */
 @Composable
 internal fun NoteSharingDialog(

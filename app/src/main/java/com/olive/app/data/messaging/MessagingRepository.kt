@@ -514,6 +514,7 @@ class MessagingRepository(
     /**
      * Wraps a Firebase listener so the screen can close it safely.
      *
+     * @receiver The Firestore listener registration to wrap as a chat subscription.
      * @return The resulting as subscription.
      */
     private fun ListenerRegistration.asSubscription() = ChatSubscription { remove() }

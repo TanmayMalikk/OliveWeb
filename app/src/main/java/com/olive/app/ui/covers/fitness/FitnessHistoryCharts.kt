@@ -447,6 +447,7 @@ private fun calculateChartAxisScale(highestValue: Float): ChartAxisScale {
 /**
  * Draws separate bars for each daily measure in the fitness history chart.
  *
+ * @receiver The drawing scope for the history chart.
  * @param series Collection of series values to process.
  * @param highestValue Highest value supplied to [drawHistoryBars].
  * @param horizontalPadding Horizontal padding supplied to [drawHistoryBars].

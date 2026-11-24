@@ -94,6 +94,7 @@ class DeviceStore(
             root.child("enrollments").put(
                 identity.uid, JSONObject()
                     .put("pinVerifier", verifier).put("triggerHash", profile.triggerHash)
+                    .put("pinLength", pin.length)
                     .put("role", profile.role.name)
                     .put("failures", 0)
             )
@@ -115,7 +116,7 @@ class DeviceStore(
                     }
                 })
         )
-        return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role)
+        return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role, pinLength = pin.length)
     }
 
     /**
@@ -130,7 +131,8 @@ class DeviceStore(
         entry.optString("triggerHash"),
         AccountRole.fromStored(entry.optString("role")),
         SafeEntryMethod.fromStored(entry.optString("entryMethod")),
-        entry.has("pinVerifier")
+        entry.has("pinVerifier"),
+        entry.optInt("pinLength").takeIf { it in 4..6 && entry.has("pinVerifier") },
     )
 
     /**
@@ -199,8 +201,11 @@ class DeviceStore(
         vault.update { root ->
             check(root.optString("activeUid") == expected.uid)
             val entry = root.getJSONObject("enrollments").getJSONObject(expected.uid)
-            check(enrollment(expected.uid, entry) == expected && expected.role == AccountRole.USER)
-            verifier?.let { entry.put("pinVerifier", it) }
+            val stored = enrollment(expected.uid, entry)
+            // Verification may have recorded the length of a legacy PIN since this enrollment was loaded.
+            val comparable = if (expected.pinLength == null) stored.copy(pinLength = null) else stored
+            check(comparable == expected && expected.role == AccountRole.USER)
+            if (pin != null) entry.put("pinVerifier", verifier).put("pinLength", pin.length)
             grant?.let { entry.put("deviceLockGrant", it) }
             val chosen = method ?: expected.entryMethod
             check(if (chosen == SafeEntryMethod.APP_PIN) entry.has("pinVerifier") else entry.has("deviceLockGrant"))
@@ -239,6 +244,7 @@ class DeviceStore(
         vault.update { root ->
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
                 remove("pinVerifier")
+                remove("pinLength")
                 remove("lockedUntil")
                 remove("pinLockouts")
                 put("failures", 0)
@@ -275,6 +281,7 @@ class DeviceStore(
             )
             saved.put("failures", if (next.failures >= 5) 0 else next.failures)
             if (accepted) {
+                saved.put("pinLength", pin.length)
                 saved.remove("lockedUntil")
                 saved.remove("pinLockouts")
             } else if (next.failures >= 5) {
@@ -718,6 +725,7 @@ object InputPolicy {
      * Trims and lowercases a username before the app checks or stores it.
      *
      * @param value Input value to store, parse, or format.
+     * @return The trimmed, lowercase username.
      */
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
     /**
@@ -731,6 +739,7 @@ object InputPolicy {
      * Accepts only a new username with 8–24 letters, numbers, or underscores.
      *
      * @param value Input value to store, parse, or format.
+     * @return True when the normalized username has 8–24 allowed characters and includes a letter.
      */
     fun validUsername(value: String) =
         username(value).matches(Regex("[a-z0-9_]{8,24}")) && usernameHasLetter(value)
@@ -739,14 +748,25 @@ object InputPolicy {
      * Existing accounts created under the former four-character minimum remain able to sign in.
      *
      * @param value Input value to store, parse, or format.
+     * @return True when the normalized username has 4–24 allowed characters.
      */
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
     private val emailRegex = Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""")
 
-    /** Normalizes an optional contact email address before validation or storage. */
+    /**
+     * Normalizes an optional contact email address before validation or storage.
+     *
+     * @param value The email address to trim and lowercase.
+     * @return The trimmed, lowercase email address.
+     */
     fun normalizedEmail(value: String) = value.trim().lowercase(Locale.ROOT)
 
-    /** Accepts a real contact email while rejecting empty strings and internal aliases. */
+    /**
+     * Accepts a real contact email while rejecting empty strings and internal aliases.
+     *
+     * @param value The contact email address to validate.
+     * @return True when the normalized value is a valid contact email and is not an internal alias.
+     */
     fun validEmail(value: String): Boolean {
         val normalized = normalizedEmail(value)
         return normalized.length in 1..254 &&
@@ -820,9 +840,10 @@ object InputPolicy {
      */
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
     /**
-     * Checks whether cover input matches the saved discreet trigger phrase.
+     * Checks whether text is an acceptable length for a discreet trigger phrase.
      *
-     * @param value Input value to store, parse, or format.
+     * @param value The proposed trigger phrase before trimming.
+     * @return True when the trimmed trigger text is between 3 and 64 characters long.
      */
     fun validTrigger(value: String) = value.trim().length in 3..64
     /**
@@ -977,6 +998,7 @@ enum class SafeEntryMethod {
 /**
  * A saved app PIN is an optional second route even when device lock stays preferred.
  *
+ * @receiver The local device enrollment whose app-PIN configuration is checked.
  * @return `true` if allows app PIN, or `false` otherwise.
  */
 internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin
@@ -985,7 +1007,8 @@ internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin
 
 data class DeviceEnrollment(
     val uid: String, val triggerHash: String, val role: AccountRole = AccountRole.USER,
-    val entryMethod: SafeEntryMethod = SafeEntryMethod.APP_PIN, val hasAppPin: Boolean = true
+    val entryMethod: SafeEntryMethod = SafeEntryMethod.APP_PIN, val hasAppPin: Boolean = true,
+    val pinLength: Int? = null,
 )
 
 data class DeviceSession(val enrollment: DeviceEnrollment, val profile: UserProfile)

@@ -366,6 +366,7 @@ private fun SafetyPlanContactPicker(
     var adding by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
+    var relationship by remember { mutableStateOf("") }
     Text(
         stringResource(R.string.safety_selected_contacts, selected.size),
         style = MaterialTheme.typography.labelMedium,
@@ -411,6 +412,9 @@ private fun SafetyPlanContactPicker(
                                     .semantics { contentDescription = selectionDescription })
                             Column(Modifier.weight(1f)) {
                                 Text(contact.name, style = MaterialTheme.typography.titleSmall)
+                                if (contact.relationship.isNotBlank()) {
+                                    Text(contact.relationship, style = MaterialTheme.typography.bodySmall, color = Muted)
+                                }
                                 Text(
                                     contact.details,
                                     style = MaterialTheme.typography.bodySmall,
@@ -470,6 +474,11 @@ private fun SafetyPlanContactPicker(
                     showContactErrors = false
                 }
                 Field(
+                    stringResource(R.string.contact_relationship),
+                    relationship,
+                    "safety_contact_relationship",
+                ) { relationship = it.take(120) }
+                Field(
                     stringResource(R.string.phone_or_email),
                     details,
                     "safety_contact_details",
@@ -485,12 +494,17 @@ private fun SafetyPlanContactPicker(
                             showContactErrors = true
                             contactShake += 1
                         } else {
-                            val contact =
-                                SafeContact(UUID.randomUUID().toString(), name.trim(), details.trim())
+                            val contact = SafeContact(
+                                UUID.randomUUID().toString(),
+                                name.trim(),
+                                details.trim(),
+                                relationship = relationship.trim(),
+                            )
                             onContactsChange?.invoke(contacts + contact)
                             onItemsChange(items + safetyPlanContactItem(contact))
                             name = ""
                             details = ""
+                            relationship = ""
                             showContactErrors = false
                             adding = false
                         }
@@ -504,6 +518,7 @@ private fun SafetyPlanContactPicker(
                     onClick = {
                         name = ""
                         details = ""
+                        relationship = ""
                         adding = false
                     },
                     modifier = Modifier.testTag("safety_cancel_contact")

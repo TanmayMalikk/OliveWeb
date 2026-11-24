@@ -275,6 +275,7 @@ internal fun OnboardingProgress(
 /**
  * Offshoots and leaf tips lean right, giving the branch a clear direction of growth.
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param base Base supplied to [drawOnboardingSprig].
  * @param spacing Spacing supplied to [drawOnboardingSprig].
  * @param sprig Sprig supplied to [drawOnboardingSprig].
@@ -318,6 +319,7 @@ private fun DrawScope.drawOnboardingSprig(
 /**
  * Two curved edges form a narrow olive leaf; its vein points back to the stem.
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param base Base supplied to [drawOnboardingLeaf].
  * @param tip Tip supplied to [drawOnboardingLeaf].
  * @param color Color supplied to [drawOnboardingLeaf].

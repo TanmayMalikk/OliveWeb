@@ -259,6 +259,13 @@ internal fun EmergencyResponseScreen(
 
 /**
  * Renders one segmented filter tab for active or resolved emergency requests.
+ *
+ * @receiver The row layout scope that contains the control.
+ * @param label The label displayed for the control.
+ * @param count The number of items represented by the badge.
+ * @param selected Whether this item is currently selected.
+ * @param urgentCount The number of requests flagged as urgent.
+ * @param onClick Runs when the user activates the control.
  */
 @Composable
 private fun RowScope.EmergencyFilterTab(
@@ -308,6 +315,15 @@ private fun RowScope.EmergencyFilterTab(
 
 /**
  * Displays one emergency alert card with status header, timestamp, PDF action, live tracking, and resolution control.
+ *
+ * @param alert The emergency alert displayed by the card.
+ * @param completed Whether the emergency request has been resolved.
+ * @param openingPdf Whether the report PDF is currently opening.
+ * @param attachmentError The error message shown when the report attachment cannot be opened.
+ * @param resolveEnabled Whether the status action can currently be used.
+ * @param onTrack Runs when the admin opens live tracking for the alert.
+ * @param onOpenPdf Runs when the admin opens the emergency report PDF.
+ * @param onToggleResolved Runs when the admin resolves or reopens the request.
  */
 @Composable
 private fun EmergencyAlertCard(

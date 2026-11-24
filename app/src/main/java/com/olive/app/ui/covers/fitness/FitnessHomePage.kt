@@ -164,7 +164,13 @@ internal fun FitnessHomePage(
     }
 }
 
-/** Renders the dismissible onboarding card inviting the user to configure fitness goals. */
+/**
+ * Renders the dismissible onboarding card inviting the user to configure fitness goals.
+ *
+ * @param onStartQuestionnaire Runs when the user begins the guided fitness goal setup.
+ * @param onManualGoals Runs when the user chooses to enter fitness goals manually.
+ * @param onDismiss Runs when the user dismisses the dialog.
+ */
 @Composable
 private fun FitnessGoalSetupCard(
     onStartQuestionnaire: () -> Unit,

@@ -274,6 +274,7 @@ internal class SyncCheckpointStore(
     /**
      * Computes non negative for this JSON object.
      *
+     * @receiver The JSON object containing the stored fields.
      * @param name Field, key, or display name.
      * @return The computed non negative numeric value.
      */

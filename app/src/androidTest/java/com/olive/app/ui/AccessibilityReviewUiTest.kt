@@ -81,11 +81,16 @@ class AccessibilityReviewUiTest {
         compose.runOnUiThread { session = ViewModelProvider(compose.activity)[SessionViewModel::class.java] }
         check(session.localMode)
         compose.waitUntil(15_000) { !session.busy }
-        compose.runOnIdle { session.runtime.state.screen = SessionScreen.Pin }
+        compose.runOnIdle {
+            session.runtime.enrollment = com.olive.app.security.DeviceEnrollment("pin-fixture", "", pinLength = 4)
+            session.runtime.state.screen = SessionScreen.Pin
+        }
         compose.setContent { OliveTheme { SystemPinPrompt(session, session.pinChallengeVersion) } }
         val field = compose.onNodeWithTag("unlock_pin")
         field.assert(SemanticsMatcher.keyIsDefined(SemanticsActions.SetText))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+        repeat(4) { compose.onNodeWithTag("unlock_pin_dot_$it", useUnmergedTree = true).assertIsDisplayed() }
+        compose.onNodeWithTag("unlock_pin_dot_4", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         field.performTextReplacement("0012")
         compose.onNodeWithTag("unlock_submit").assertIsEnabled()

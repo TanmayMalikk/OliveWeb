@@ -294,7 +294,15 @@ private class LiveLocationSharingDataSource(
         return key
     }
 
-    /** Records active live-location metadata so backend notification triggers know session timing and recipients. */
+    /**
+     * Records active live-location metadata so backend notification triggers know session timing and recipients.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
     suspend fun setSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) {
         val doc = firestore.collection("liveLocationSessions").document(ownerUid)
         val cleanRecipients = recipientUids.filter { it.isNotBlank() && it != ownerUid }.distinct().take(25)
@@ -561,7 +569,15 @@ internal interface LocationSharingDataSource {
      * @return The resulting [SecretKey], or `null` if unavailable.
      */
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
-    /** Records or clears active live-location session metadata for notification scheduling. */
+    /**
+     * Records or clears active live-location session metadata for notification scheduling.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
     suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) = Unit
     /**
      * Watches static contacts for changes.
@@ -636,11 +652,20 @@ internal class LocationSharingRepository private constructor(
      *
      * @param ownerUid Firebase UID of the resource owner.
      * @param friends List of friend records.
+     * @return The encryption key for the updated recipients, or null when no key is available.
      */
     override suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>) =
         liveLocations.setRecipients(ownerUid, friends)
 
-    /** Records or clears live-location session timing and recipient metadata. */
+    /**
+     * Records or clears live-location session timing and recipient metadata.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
     override suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long) =
         liveLocations.setSessionState(ownerUid, recipientUids, expiresAt, active, startedAt)
 
@@ -704,7 +729,12 @@ data class AddressSuggestion(
 internal object GeoapifyClient {
     private const val MAX_CACHE_ENTRIES = 64
     private val cache = object : LinkedHashMap<String, List<AddressSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
-        /** Evicts the least-recently-used Geoapify cache entry past [MAX_CACHE_ENTRIES]. */
+        /**
+         * Evicts the least-recently-used Geoapify cache entry past [MAX_CACHE_ENTRIES].
+         *
+         * @param eldest The least recently used cache entry being considered for eviction.
+         * @return True when the cache entry should be evicted to enforce the size limit.
+         */
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<AddressSuggestion>>): Boolean =
             size > MAX_CACHE_ENTRIES
     }
@@ -724,6 +754,9 @@ internal object GeoapifyClient {
      *
      * @param query Search query string entered by the user.
      * @param cityOnly Whether to apply city only.
+     * @param minLength The minimum required number of characters.
+     * @param apiKey The credential used to make the API request.
+     * @param openConnection The injected factory used to open an HTTPS connection.
      * @return List of resulting autocomplete items.
      */
     suspend fun autocomplete(
@@ -758,7 +791,12 @@ internal object GeoapifyClient {
         results
     }
 
-    /** Executes a Geoapify autocomplete HTTP request asynchronously via the shared OkHttp client. */
+    /**
+     * Executes a Geoapify autocomplete HTTP request asynchronously via the shared OkHttp client.
+     *
+     * @param url The request URL to open or fetch.
+     * @return The request success flag and list of Geoapify suggestions.
+     */
     private suspend fun fetchWithOkHttp(url: String): Pair<Boolean, List<AddressSuggestion>> {
         val request = Request.Builder()
             .url(url)
@@ -768,12 +806,22 @@ internal object GeoapifyClient {
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
-                /** Propagates the HTTP failure exception to the suspended caller. */
+                /**
+                 * Propagates the HTTP failure exception to the suspended caller.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param e The network exception reported by OkHttp.
+                 */
                 override fun onFailure(call: Call, e: IOException) {
                     if (continuation.isActive) continuation.resumeWithException(e)
                 }
 
-                /** Parses the HTTP response body into address suggestions and resumes the caller. */
+                /**
+                 * Parses the HTTP response body into address suggestions and resumes the caller.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param response The upstream response to read and validate.
+                 */
                 override fun onResponse(call: Call, response: Response) {
                     try {
                         val outcome = response.use { res ->
@@ -789,7 +837,13 @@ internal object GeoapifyClient {
         }
     }
 
-    /** Executes a Geoapify autocomplete request using an injected [HttpsURLConnection] factory. */
+    /**
+     * Executes a Geoapify autocomplete request using an injected [HttpsURLConnection] factory.
+     *
+     * @param url The request URL to open or fetch.
+     * @param openConnection The injected factory used to open an HTTPS connection.
+     * @return The request success flag and list of Geoapify suggestions.
+     */
     private suspend fun fetchWithConnection(
         url: String,
         openConnection: (URL) -> HttpsURLConnection,

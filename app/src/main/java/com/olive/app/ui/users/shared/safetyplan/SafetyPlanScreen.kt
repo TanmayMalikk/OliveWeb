@@ -748,6 +748,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
  * Composes the safety conflict property label UI element.
  *
  * @param property Property supplied to [safetyConflictPropertyLabel].
+ * @return The localized label for the conflicting safety-plan property.
  */
 @Composable
 private fun safetyConflictPropertyLabel(property: String) = stringResource(

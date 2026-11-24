@@ -47,6 +47,17 @@ private val OliveTonalElevation: ButtonElevation
 
 /**
  * Renders an elevated Olive button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param contentPadding The spacing between the component's edges and its content.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveButton(
@@ -70,6 +81,17 @@ internal fun OliveButton(
 
 /**
  * Renders a filled tonal Olive button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param contentPadding The spacing between the component's edges and its content.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveFilledTonalButton(
@@ -93,6 +115,17 @@ internal fun OliveFilledTonalButton(
 
 /**
  * Renders an outlined Olive button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param contentPadding The spacing between the component's edges and its content.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveOutlinedButton(
@@ -116,6 +149,17 @@ internal fun OliveOutlinedButton(
 
 /**
  * Renders a text-only Olive button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param border The optional stroke drawn around the component.
+ * @param contentPadding The spacing between the component's edges and its content.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveTextButton(
@@ -139,6 +183,14 @@ internal fun OliveTextButton(
 
 /**
  * Renders a standard icon button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveIconButton(
@@ -159,6 +211,14 @@ internal fun OliveIconButton(
 
 /**
  * Renders a filled icon button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveFilledIconButton(
@@ -179,6 +239,14 @@ internal fun OliveFilledIconButton(
 
 /**
  * Renders a filled tonal icon button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveFilledTonalIconButton(
@@ -199,6 +267,15 @@ internal fun OliveFilledTonalIconButton(
 
 /**
  * Renders an outlined icon button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param enabled Whether the control or feature is enabled.
+ * @param shape The shape used to draw the component.
+ * @param colors The colors for the control's visual states.
+ * @param border The optional stroke drawn around the component.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveOutlinedIconButton(
@@ -220,6 +297,15 @@ internal fun OliveOutlinedIconButton(
 
 /**
  * Renders a floating action button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param shape The shape used to draw the component.
+ * @param containerColor The background color of the component.
+ * @param contentColor The color inherited by text and icons in the content.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveFloatingActionButton(
@@ -242,6 +328,15 @@ internal fun OliveFloatingActionButton(
 
 /**
  * Renders a small floating action button with themed press animations.
+ *
+ * @param onClick Runs when the user activates the control.
+ * @param modifier The Compose modifier applied to the component.
+ * @param shape The shape used to draw the component.
+ * @param containerColor The background color of the component.
+ * @param contentColor The color inherited by text and icons in the content.
+ * @param elevation The elevation used for the component's shadow or surface treatment.
+ * @param interactionSource The source that reports press and focus interactions.
+ * @param content The composable content to render inside the component.
  */
 @Composable
 internal fun OliveSmallFloatingActionButton(

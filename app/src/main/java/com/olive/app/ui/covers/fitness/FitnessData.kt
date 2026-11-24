@@ -756,6 +756,7 @@ internal class FitnessStore(private val context: Context, private val accountId:
 /**
  * Fitness cover: Converts this record into JSON.
  *
+ * @receiver The logged food entry to serialize.
  * @return JSON representation of this object.
  */
 private fun FoodLogEntry.toJson() = JSONObject().apply {
@@ -769,6 +770,7 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
 /**
  * Serializes this instance into a JSON object.
  *
+ * @receiver The nutrition record to serialize.
  * @param includeServingOptions Whether to include serving options.
  * @return JSON object representing to JSON.
  */
@@ -816,6 +818,7 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
 /**
  * Converts JSON object into nutrition food.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param includeServingOptions Whether to include serving options.
  * @return The resulting [NutritionFood], or `null` if unavailable.
  */
@@ -858,6 +861,7 @@ internal fun readNutritionFoods(array: JSONArray?, includeServingOptions: Boolea
 /**
  * Formats the food serving amount shown in the diary.
  *
+ * @receiver The serving amount to format for display.
  * @return The resulting display amount string.
  */
 internal fun Float.displayAmount(): String = when {
@@ -1017,6 +1021,7 @@ internal data class FitnessSnapshot(
 /**
  * Calculates aggregated nutrition totals across a list of food log entries.
  *
+ * @receiver The logged food entries contributing to the totals.
  * @return The sum of calories and macros for all entries.
  */
 private fun List<FoodLogEntry>.nutritionTotals() = fold(NutritionTotals()) { total, entry ->

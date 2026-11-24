@@ -17,6 +17,8 @@ internal class WalkthroughVisits(context: Context, accountId: String) {
 
     /**
      * Returns `true` if this account has already opened the automatic first-login walkthrough.
+     *
+     * @return True when the account has already opened the automatic first-login walkthrough.
      */
     fun hasSeenInitialTour(): Boolean = preferences.getBoolean(initialTourKey, false)
 

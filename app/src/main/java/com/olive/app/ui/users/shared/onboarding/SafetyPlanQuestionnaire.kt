@@ -200,6 +200,7 @@ internal fun SafetyPlanQuestionnaireForm(
  * @param enabled Whether the controls are currently enabled.
  * @param onDismiss Callback invoked when the user closes without saving.
  * @param onSave Callback invoked with the updated completed [SafetyPlanIntake].
+ * @param inWindow Whether the dialog is hosted in the current window.
  */
 @Composable
 internal fun SafetyPlanQuestionnaireDialog(
@@ -257,7 +258,13 @@ internal fun SafetyPlanQuestionnaireDialog(
     }
 }
 
-/** Renders a titled safety-plan onboarding question block with subtitle and option content. */
+/**
+ * Renders a titled safety-plan onboarding question block with subtitle and option content.
+ *
+ * @param title The heading displayed for the section or item.
+ * @param subtitle The supporting text displayed below the title.
+ * @param content The composable content to render inside the component.
+ */
 @Composable
 private fun QuestionnaireQuestionSection(
     title: String,
@@ -275,7 +282,15 @@ private fun QuestionnaireQuestionSection(
     }
 }
 
-/** Renders a single radio selection row inside an outlined card. */
+/**
+ * Renders a single radio selection row inside an outlined card.
+ *
+ * @param label The label displayed for the control.
+ * @param selected Whether this item is currently selected.
+ * @param enabled Whether the control or feature is enabled.
+ * @param tag The support ticket category identifier.
+ * @param onSelect Runs when the user chooses an option.
+ */
 @Composable
 private fun QuestionnaireRadioRow(
     label: String,
@@ -310,7 +325,15 @@ private fun QuestionnaireRadioRow(
     }
 }
 
-/** Renders a toggleable checkbox option row inside an outlined card. */
+/**
+ * Renders a toggleable checkbox option row inside an outlined card.
+ *
+ * @param label The label displayed for the control.
+ * @param checked Whether the switch is currently on.
+ * @param enabled Whether the control or feature is enabled.
+ * @param tag The support ticket category identifier.
+ * @param onToggle Runs when the user changes the switch state.
+ */
 @Composable
 private fun QuestionnaireCheckboxRow(
     label: String,
@@ -345,7 +368,12 @@ private fun QuestionnaireCheckboxRow(
     }
 }
 
-/** Maps an [AbuseType] option to its localized label resource ID. */
+/**
+ * Maps an [AbuseType] option to its localized label resource ID.
+ *
+ * @param type The selected option or category.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun abuseTypeLabel(type: AbuseType): Int = when (type) {
     AbuseType.PHYSICAL -> R.string.safety_intake_abuse_physical
     AbuseType.EMOTIONAL_OR_PSYCHOLOGICAL -> R.string.safety_intake_abuse_emotional
@@ -355,7 +383,12 @@ private fun abuseTypeLabel(type: AbuseType): Int = when (type) {
     AbuseType.CULTURAL_OR_IMMIGRATION -> R.string.safety_intake_abuse_cultural
 }
 
-/** Maps an [ImmigrationStatus] option to its localized label resource ID. */
+/**
+ * Maps an [ImmigrationStatus] option to its localized label resource ID.
+ *
+ * @param status The option representing the user's immigration status.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun immigrationLabel(status: ImmigrationStatus): Int = when (status) {
     ImmigrationStatus.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     ImmigrationStatus.CITIZEN -> R.string.safety_intake_immigration_citizen
@@ -365,14 +398,24 @@ private fun immigrationLabel(status: ImmigrationStatus): Int = when (status) {
     ImmigrationStatus.UNDOCUMENTED_OR_UNCERTAIN -> R.string.safety_intake_immigration_uncertain
 }
 
-/** Maps a [DependantNeed] option to its localized label resource ID. */
+/**
+ * Maps a [DependantNeed] option to its localized label resource ID.
+ *
+ * @param need The selected dependant-care need.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun dependantLabel(need: DependantNeed): Int = when (need) {
     DependantNeed.CHILDREN -> R.string.safety_intake_dependant_children
     DependantNeed.ELDER_OR_ADULT_DEPENDANT -> R.string.safety_intake_dependant_adult
     DependantNeed.PETS -> R.string.safety_intake_dependant_pets
 }
 
-/** Maps a [FinancialSituation] option to its localized label resource ID. */
+/**
+ * Maps a [FinancialSituation] option to its localized label resource ID.
+ *
+ * @param situation The recorded situation described by the user.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun financialLabel(situation: FinancialSituation): Int = when (situation) {
     FinancialSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     FinancialSituation.INDEPENDENT -> R.string.safety_intake_financial_independent
@@ -380,7 +423,12 @@ private fun financialLabel(situation: FinancialSituation): Int = when (situation
     FinancialSituation.NO_INDEPENDENT_ACCESS -> R.string.safety_intake_financial_none
 }
 
-/** Maps a [TransportSituation] option to its localized label resource ID. */
+/**
+ * Maps a [TransportSituation] option to its localized label resource ID.
+ *
+ * @param situation The recorded situation described by the user.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun transportLabel(situation: TransportSituation): Int = when (situation) {
     TransportSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
     TransportSituation.OWN_VEHICLE -> R.string.safety_intake_transport_vehicle
@@ -388,7 +436,12 @@ private fun transportLabel(situation: TransportSituation): Int = when (situation
     TransportSituation.NEEDS_RIDE_SUPPORT -> R.string.safety_intake_transport_ride_support
 }
 
-/** Maps a [SafetyCircumstance] option to its localized label resource ID. */
+/**
+ * Maps a [SafetyCircumstance] option to its localized label resource ID.
+ *
+ * @param circumstance The selected safety circumstance.
+ * @return The localized string resource ID for the selected option.
+ */
 private fun circumstanceLabel(circumstance: SafetyCircumstance): Int = when (circumstance) {
     SafetyCircumstance.LEGAL_OR_COURT_ORDERS -> R.string.safety_intake_circumstance_legal
     SafetyCircumstance.MARRIAGE_OR_PARENTING -> R.string.safety_intake_circumstance_marriage

@@ -67,10 +67,20 @@ private open class SafeEnumSerializer<T : Enum<T>>(
 ) : KSerializer<T> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
 
-    /** Serializes the enum entry by its name. */
+    /**
+     * Serializes the enum entry by its name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The enum option to store by name.
+     */
     override fun serialize(encoder: Encoder, value: T) = encoder.encodeString(value.name)
 
-    /** Deserializes the enum entry, falling back to [defaultValue] when unrecognized. */
+    /**
+     * Deserializes the enum entry, falling back to [defaultValue] when unrecognized.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded enum constant, or the configured fallback when the stored name is unknown.
+     */
     override fun deserialize(decoder: Decoder): T {
         val raw = (decoder as? JsonDecoder)?.let { json ->
             (json.decodeJsonElement() as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -85,11 +95,21 @@ private open class SafeEnumSetSerializer<T : Enum<T>>(
 ) : KSerializer<Set<T>> {
     override val descriptor: SerialDescriptor = SetSerializer(String.serializer()).descriptor
 
-    /** Serializes the enum set as a sorted list of enum names. */
+    /**
+     * Serializes the enum set as a sorted list of enum names.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The selected enum options to store as names.
+     */
     override fun serialize(encoder: Encoder, value: Set<T>) =
         encoder.encodeSerializableValue(ListSerializer(String.serializer()), value.map { it.name }.sorted())
 
-    /** Deserializes a JSON array of enum names into a set, ignoring unknown entries. */
+    /**
+     * Deserializes a JSON array of enum names into a set, ignoring unknown entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The set of recognized options from the stored enum names.
+     */
     override fun deserialize(decoder: Decoder): Set<T> {
         val json = decoder as? JsonDecoder
             ?: return decoder.decodeSerializableValue(ListSerializer(String.serializer())).mapNotNull(parse).toSet()
@@ -101,7 +121,13 @@ private open class SafeEnumSetSerializer<T : Enum<T>>(
     }
 }
 
-/** Returns the enum constant matching [name], or null when unrecognized. */
+/**
+ * Returns the enum constant matching [name], or null when unrecognized.
+ *
+ * @param T The enum type to search for a matching constant.
+ * @param name The stored enum constant name to look up.
+ * @return The matching enum constant, or null when the name is unknown.
+ */
 private inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
     enumValues<T>().firstOrNull { it.name == name }
 

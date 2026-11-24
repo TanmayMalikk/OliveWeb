@@ -58,6 +58,7 @@ internal enum class AccessibilityTraversalOrder(val index: Float) {
 /**
  * Marks a layout as the boundary where TalkBack applies the shared traversal order.
  *
+ * @receiver The modifier chain to extend.
  * @return The resulting [Modifier] for accessibility traversal group.
  */
 internal fun Modifier.accessibilityTraversalGroup(): Modifier = semantics {
@@ -67,6 +68,7 @@ internal fun Modifier.accessibilityTraversalGroup(): Modifier = semantics {
 /**
  * Assigns one part of an overlapping layout to its place in the shared TalkBack order.
  *
+ * @receiver The modifier chain to extend.
  * @param order Order supplied to [accessibilityTraversal].
  * @return The resulting [Modifier] for accessibility traversal.
  */
@@ -268,6 +270,7 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
 /**
  * Recheck after focus changes and throughout keyboard resizing. Scrolling reveals the field without requesting focus, so it cannot steal input or TalkBack focus from another control.
  *
+ * @receiver The modifier chain to extend.
  * @return The resulting [Modifier] for keep visible while typing.
  */
 internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
@@ -287,6 +290,7 @@ internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
 /**
  * UI sizing: every scrollbar is 4dp wide, sits 3dp from the edge, and keeps at least a 28dp thumb. Shared Olive scrollbar for forms and other regular vertically scrolling content.
  *
+ * @receiver The modifier chain to extend.
  * @param state Current state instance to read or render.
  * @return The resulting [Modifier] for olive scrollbar.
  */
@@ -310,6 +314,7 @@ internal fun Modifier.oliveScrollbar(state: ScrollState): Modifier = drawWithCon
 /**
  * Include partial rows so the thumb follows each scroll pixel instead of jumping between item indices.
  *
+ * @receiver The modifier chain to extend.
  * @param state Current state instance to read or render.
  * @return The resulting [Modifier] for olive scrollbar.
  */
@@ -334,6 +339,7 @@ internal fun Modifier.oliveScrollbar(state: LazyListState): Modifier = drawWithC
 /**
  * Measure partial grid rows together; full-width headings and incomplete rows retain their actual item counts.
  *
+ * @receiver The modifier chain to extend.
  * @param state Current state instance to read or render.
  * @return The resulting [Modifier] for olive scrollbar.
  */
@@ -363,6 +369,7 @@ internal fun Modifier.oliveScrollbar(state: LazyGridState): Modifier = drawWithC
 /**
  * Draws lazy scrollbar.
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param start Start supplied to [drawLazyScrollbar].
  * @param end End supplied to [drawLazyScrollbar].
  * @param total Total supplied to [drawLazyScrollbar].

@@ -319,6 +319,8 @@ internal object CoverLauncher {
 
 /**
  * Send an explicitly requested report without unlocking or exposing the Safe App on the cover.
+ *
+ * @receiver The active session that supplies the emergency action.
  */
 internal fun SessionViewModel.sendCoverEmergency() {
     val uid = coverAccountId ?: return

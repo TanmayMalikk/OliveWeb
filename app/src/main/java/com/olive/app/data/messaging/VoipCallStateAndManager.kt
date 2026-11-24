@@ -77,6 +77,7 @@ data class VoipCall(
 /**
  * Computes connected participant count for this VoIP call.
  *
+ * @receiver The voice call whose participants or join state are inspected.
  * @return The computed connected participant count numeric value.
  */
 fun VoipCall.connectedParticipantCount(): Int =
@@ -85,6 +86,7 @@ fun VoipCall.connectedParticipantCount(): Int =
 /**
  * Checks whether the caller can be rejoined by.
  *
+ * @receiver The voice call whose participants or join state are inspected.
  * @param userId User ID supplied to [canBeRejoinedBy].
  * @return `true` if can be rejoined by, or `false` otherwise.
  */
@@ -96,6 +98,7 @@ fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
 /**
  * Lets an invited chat member enter an active call from its chat log. Pending members accept the invitation, while disconnected members rejoin an established room.
  *
+ * @receiver The voice call whose participants or join state are inspected.
  * @param userId User ID supplied to [canBeJoinedBy].
  * @return `true` if can be joined by, or `false` otherwise.
  */
@@ -110,6 +113,7 @@ fun VoipCall.canBeJoinedBy(userId: String): Boolean {
 /**
  * Computes other party name for this VoIP call.
  *
+ * @receiver The voice call whose participants or join state are inspected.
  * @param currentUid Current user ID supplied to [otherPartyName].
  * @return The resulting other party name string.
  */
@@ -517,6 +521,7 @@ class VoipManager(
     /**
      * Converts a server array into call models.
      *
+     * @receiver The JSON array containing the call or participant records.
      * @return List of resulting to call list items.
      */
     private fun JSONArray.toCallList(): List<VoipCall> =
@@ -525,6 +530,7 @@ class VoipManager(
     /**
      * Converts a server array into invitation models for the ringing screen.
      *
+     * @receiver The JSON array containing the call or participant records.
      * @return List of resulting to invitation list items.
      */
     private fun JSONArray.toInvitationList(): List<VoipInvitation> =
@@ -543,6 +549,7 @@ class VoipManager(
     /**
      * Converts a server array into the participants and their current responses.
      *
+     * @receiver The JSON array containing the call or participant records.
      * @return List of resulting to participant list items.
      */
     private fun JSONArray.toParticipantList(): List<VoipParticipant> =

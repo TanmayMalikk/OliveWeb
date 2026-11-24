@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
  * @param createInvite Loads or creates an invite. A refresh requests a replacement code.
  * @param observeUnavailable Subscribes to changes that invalidate the displayed code.
  * @param onDismiss Closes the dialog.
+ * @param inWindow Whether the dialog is hosted in the current window.
  */
 @Composable
 internal fun FriendInviteDialog(

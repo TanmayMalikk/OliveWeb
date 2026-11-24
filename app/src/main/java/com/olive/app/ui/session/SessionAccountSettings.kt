@@ -39,6 +39,8 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param dob Date of birth supplied to [saveSettings].
      * @param situation Situation supplied to [saveSettings].
      * @param address Address supplied to [saveSettings].
+     * @param email The contact email address entered by the user.
+     * @param emailCommunicationConsent Whether the user allows communications at the saved email address.
      */
     fun saveSettings(
         fullName: String, affected: String, abuserName: String,
@@ -494,7 +496,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Removes an enrolled passkey recovery credential and refreshes the stored list. */
+    /**
+     * Removes an enrolled passkey recovery credential and refreshes the stored list.
+     *
+     * @param credentialId The WebAuthn credential identifier for the passkey.
+     */
     fun removePasskeyRecovery(credentialId: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -511,13 +517,24 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Publishes the user's encrypted account keyset envelope to Firestore once per session epoch. */
+    /**
+     * Publishes the user's encrypted account keyset envelope to Firestore once per session epoch.
+     *
+     * @param e The encrypted account keyset envelope to publish.
+     */
     private suspend fun publishKeyset(e: AccountKeysetEnvelope) {
         val m = "${e.accountId}:${e.keyId}:${e.epoch}"
         if (m !in publishedKeysets) { runtime.accountKeysetRepository?.publish(e); publishedKeysets.add(m) }
     }
 
-    /** Obtains the unlocked [AccountRecoveryKey], recovering from passkey or provisioning if missing. */
+    /**
+     * Obtains the unlocked [AccountRecoveryKey], recovering from passkey or provisioning if missing.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @param ensureRemotePublished Whether to publish the local account keyset if the server needs it.
+     * @return The unlocked account recovery key for the active account.
+     */
     private suspend fun accountRecoveryKey(
         uid: String, token: Long, ensureRemotePublished: Boolean = false,
     ): AccountRecoveryKey {
@@ -532,7 +549,13 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         return recoverAccountRecoveryKey(uid, remote, token)
     }
 
-    /** Generates a new Account Recovery Key and envelope, protects it locally, and publishes it. */
+    /**
+     * Generates a new Account Recovery Key and envelope, protects it locally, and publishes it.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The newly generated recovery key after local protection and publication.
+     */
     private suspend fun createAccountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val repository = checkNotNull(runtime.accountKeysetRepository)
         val recoveryKey = withContext(Dispatchers.IO) { AccountRecoveryKey.generate() }
@@ -552,7 +575,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         return recoveryKey
     }
 
-    /** Unlocks [keyset] via a passkey PRF assertion and re-wraps the ARK under device authentication. */
+    /**
+     * Unlocks [keyset] via a passkey PRF assertion and re-wraps the ARK under device authentication.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param keyset The account keyset used for encryption or recovery.
+     * @param token The session epoch captured when the operation started.
+     * @return The recovery key unwrapped from the passkey-protected envelope.
+     */
     private suspend fun recoverAccountRecoveryKey(
         uid: String,
         keyset: AccountKeysetEnvelope,
@@ -581,7 +611,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Unlocks a local [AccountRecoveryKey] using biometric or device credential authentication. */
+    /**
+     * Unlocks a local [AccountRecoveryKey] using biometric or device credential authentication.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param record The stored record used for the operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The recovery key decrypted from the device-protected record.
+     */
     private suspend fun unlockDeviceRecoveryKey(
         uid: String,
         record: AccountRecoveryKeyDeviceRecord,
@@ -598,7 +635,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Wraps and saves a local copy of [recoveryKey] protected by the Android device lock. */
+    /**
+     * Wraps and saves a local copy of [recoveryKey] protected by the Android device lock.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param recoveryKey The account recovery key used to protect or open the private keyset.
+     * @param envelope The encrypted envelope carrying the account keyset.
+     * @param token The session epoch captured when the operation started.
+     */
     private suspend fun protectDeviceRecoveryKey(
         uid: String,
         recoveryKey: AccountRecoveryKey,
@@ -620,7 +664,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Requests UI-layer biometric/device lock authentication for [challenge]. */
+    /**
+     * Requests UI-layer biometric/device lock authentication for [challenge].
+     *
+     * @param challenge The device authentication challenge prepared for this operation.
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The cipher authorized by the system authentication prompt.
+     */
     private suspend fun requestDeviceAuthentication(
         challenge: DeviceAuthenticationChallenge,
         uid: String,
@@ -636,7 +687,15 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Requests an Activity-hosted Credential Manager ceremony for passkey recovery. */
+    /**
+     * Requests an Activity-hosted Credential Manager ceremony for passkey recovery.
+     *
+     * @param requestJson The serialized WebAuthn request passed to Credential Manager.
+     * @param assertion Whether the request is an assertion rather than registration.
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The credential result returned by Android Credential Manager.
+     */
     private suspend fun requestPasskey(
         requestJson: String,
         assertion: Boolean,
@@ -655,13 +714,24 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Verifies that the active Safe session, epoch, and user UID still match the started flow. */
+    /**
+     * Verifies that the active Safe session, epoch, and user UID still match the started flow.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return True when the account UID and epoch still identify the same unlocked user session.
+     */
     private fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
         epoch == token && state.screen == SessionScreen.Safe && enrollment?.uid == uid &&
             state.accountRole == AccountRole.USER
     }
 
-    /** Ensures media encryption has a stable account public key without unlocking private material. */
+    /**
+     * Ensures media encryption has a stable account public key without unlocking private material.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @return The account keyset envelope containing the stable public wrapping key.
+     */
     internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope = with(runtime) {
         withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
             scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local) } }
@@ -677,7 +747,12 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope } ?: error("Account recovery keyset was not stored")
     }
 
-    /** Unlocks account private material only in client memory for one media-key operation. */
+    /**
+     * Unlocks account private material only in client memory for one media-key operation.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @return The unlocked account keyset, including the private key needed to unwrap media keys.
+     */
     internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset = with(runtime) {
         val token = epoch
         check(currentRecoverySession(uid, token)) { "Account session changed" }

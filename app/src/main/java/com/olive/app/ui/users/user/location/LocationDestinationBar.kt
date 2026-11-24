@@ -94,6 +94,13 @@ import kotlinx.coroutines.launch
 /**
  * Free-use GPS destination bar accepting arbitrary addresses or latitude/longitude coordinates
  * with immediate local suggestions + 50ms debounced remote autocomplete.
+ *
+ * @param controller The controller that owns the screen's state and actions.
+ * @param state The current state used to render the component.
+ * @param directoryPlaces The mapped support resources available for local search.
+ * @param routeNotConfigured The message shown when routing credentials are missing.
+ * @param routeUnavailable The message shown when no route is available.
+ * @param routeFailed The message shown when the route request fails.
  */
 @Composable
 internal fun FreeUseGpsDestinationCard(
@@ -117,7 +124,13 @@ internal fun FreeUseGpsDestinationCard(
     val coordSubtitle = stringResource(R.string.location_gps_coordinates_hint)
     val noMatchMessage = stringResource(R.string.location_gps_no_match)
 
-    /** Clears transient autocomplete suggestions and begins or queues navigation to ([lat], [lon]). */
+    /**
+     * Clears transient autocomplete suggestions and begins or queues navigation to ([lat], [lon]).
+     *
+     * @param title The heading displayed for the section or item.
+     * @param lat The latitude in decimal degrees.
+     * @param lon The longitude in decimal degrees.
+     */
     fun startRouteTo(title: String, lat: Double, lon: Double) {
         suppressNextAutocomplete = true
         suggestions = emptyList()
@@ -402,6 +415,13 @@ internal fun FreeUseGpsDestinationCard(
 /**
  * Observes tilt-invariant true-north compass orientation and GPS movement bearing while [enabled] is true,
  * returning a [State] holding a circularly smoothed heading in `[0f, 360f)` without forcing caller recomposition.
+ *
+ * @param enabled Whether to subscribe to heading updates.
+ * @param latitude The latitude in decimal degrees.
+ * @param longitude The longitude in decimal degrees.
+ * @param gpsBearing The GPS movement bearing in degrees, if a recent fix provides it.
+ * @param gpsSpeedMetersPerSecond The latest GPS speed in meters per second, if available.
+ * @return Observable heading in degrees clockwise from true north, or null before a reading is available.
  */
 @Composable
 internal fun rememberDeviceHeadingState(
@@ -447,7 +467,11 @@ internal fun rememberDeviceHeadingState(
     }
     val latestDeclination by rememberUpdatedState(declinationDegrees)
 
-    /** Smooths incoming GPS or compass azimuth readings and updates heading state above 1.5 degrees. */
+    /**
+     * Smooths incoming GPS or compass azimuth readings and updates heading state above 1.5 degrees.
+     *
+     * @param rawCompass The latest compass heading before smoothing or fallback.
+     */
     fun publishIfChanged(rawCompass: Float?) {
         val candidate = selectPreferredHeading(latestGpsBearing, latestGpsSpeed, rawCompass) ?: return
         val current = headingState.value
@@ -486,7 +510,12 @@ internal fun rememberDeviceHeadingState(
                 val remappedMatrix = FloatArray(9)
                 var lastEmitElapsedMs = 0L
 
-                /** Remaps sensor rotation matrices to match the current screen orientation. */
+                /**
+                 * Remaps sensor rotation matrices to match the current screen orientation.
+                 *
+                 * @param input The raw input to parse or validate.
+                 * @return A rotation matrix aligned to the current display orientation.
+                 */
                 fun remapForDisplay(input: FloatArray): FloatArray = when (latestDisplayRotation) {
                     AndroidSurface.ROTATION_90 -> {
                         SensorManager.remapCoordinateSystem(input, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix)
@@ -504,7 +533,11 @@ internal fun rememberDeviceHeadingState(
                 }
 
                 val listener = object : SensorEventListener {
-                    /** Throttles orientation sensor updates and computes tilt-invariant true-north heading. */
+                    /**
+                     * Throttles orientation sensor updates and computes tilt-invariant true-north heading.
+                     *
+                     * @param event The latest sensor sample reported by Android.
+                     */
                     override fun onSensorChanged(event: SensorEvent) {
                         val now = SystemClock.elapsedRealtime()
                         when (event.sensor.type) {
@@ -537,7 +570,12 @@ internal fun rememberDeviceHeadingState(
                         publishIfChanged(trueAzimuth)
                     }
 
-                    /** Ignores sensor accuracy changes for the compass azimuth listener. */
+                    /**
+                     * Ignores sensor accuracy changes for the compass azimuth listener.
+                     *
+                     * @param sensor The source sensor supplied by Android.
+                     * @param accuracy The sensor accuracy level reported by Android.
+                     */
                     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
                 }
 
@@ -563,6 +601,13 @@ internal fun rememberDeviceHeadingState(
 /**
  * Observes tilt-invariant true-north compass orientation and GPS movement bearing while [enabled] is true,
  * returning a circularly smoothed heading in `[0f, 360f)`.
+ *
+ * @param enabled Whether to subscribe to heading updates.
+ * @param latitude The latitude in decimal degrees.
+ * @param longitude The longitude in decimal degrees.
+ * @param gpsBearing The latest GPS movement bearing in degrees, if available.
+ * @param gpsSpeedMetersPerSecond The latest GPS speed in meters per second, if available.
+ * @return The current smoothed heading in degrees from true north, or null when unavailable.
  */
 @Composable
 internal fun rememberDeviceHeading(

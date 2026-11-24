@@ -652,6 +652,7 @@ internal fun FoodBookmark(saved: Boolean, enabled: Boolean = true, onToggle: () 
 /**
  * Computes recent food items for this lazy list scope.
  *
+ * @receiver The lazy list scope that receives the item definitions.
  * @param foods Collection of foods values to process.
  * @param searches Collection of searches values to process.
  * @param enabled Whether this feature or control is currently enabled.
@@ -682,6 +683,7 @@ internal fun LazyListScope.recentFoodItems(
 /**
  * Computes saved food items for this lazy list scope.
  *
+ * @receiver The lazy list scope that receives the item definitions.
  * @param foods Collection of foods values to process.
  * @param repository Repository supplied to [savedFoodItems].
  * @param enabled Whether this feature or control is currently enabled.

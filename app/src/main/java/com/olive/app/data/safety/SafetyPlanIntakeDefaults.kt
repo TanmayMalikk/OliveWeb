@@ -208,7 +208,13 @@ internal fun safetyPlanManagedSectionPrompts(
     )
 }
 
-/** Builds tailored document checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored document checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @param hasAffectedPeople Whether the intake identifies other people affected by the situation.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun documentPromptIds(intake: SafetyPlanIntake, hasAffectedPeople: Boolean): List<Int> = buildList {
     add(R.string.safety_doc_photo_id)
     add(R.string.safety_doc_birth_certificate)
@@ -264,7 +270,12 @@ private fun documentPromptIds(intake: SafetyPlanIntake, hasAffectedPeople: Boole
     if (AbuseType.CULTURAL_OR_IMMIGRATION in intake.abuseTypes) add(R.string.safety_doc_abuse_immigration_coercion)
 }
 
-/** Builds tailored quick-grab checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored quick-grab checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun grabPromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     add(
         if (intake.transportSituation == TransportSituation.OWN_VEHICLE) {
@@ -291,7 +302,12 @@ private fun grabPromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     if (AbuseType.DIGITAL_OR_STALKING in intake.abuseTypes) add(R.string.safety_grab_abuse_digital_check)
 }
 
-/** Builds tailored financial checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored financial checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun financePromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     when (intake.financialSituation) {
         FinancialSituation.INDEPENDENT -> {
@@ -322,7 +338,12 @@ private fun financePromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     if (AbuseType.FINANCIAL in intake.abuseTypes) add(R.string.safety_fin_abuse_credit_check)
 }
 
-/** Builds tailored destination checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored destination checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun destinationPromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     add(R.string.safety_dest_choose)
     add(R.string.safety_dest_address)
@@ -333,7 +354,12 @@ private fun destinationPromptIds(intake: SafetyPlanIntake): List<Int> = buildLis
     if (AbuseType.PHYSICAL in intake.abuseTypes) add(R.string.safety_dest_abuse_physical_exit)
 }
 
-/** Builds tailored travel checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored travel checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun travelPromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     when (intake.transportSituation) {
         TransportSituation.OWN_VEHICLE -> {
@@ -363,7 +389,12 @@ private fun travelPromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     if (AbuseType.DIGITAL_OR_STALKING in intake.abuseTypes) add(R.string.safety_travel_abuse_digital_tracking)
 }
 
-/** Builds tailored aftercare checklist string resource IDs from [intake]. */
+/**
+ * Builds tailored aftercare checklist string resource IDs from [intake].
+ *
+ * @param intake The recorded questionnaire answers used to tailor the plan.
+ * @return The localized prompt resource IDs chosen for this checklist section.
+ */
 private fun aftercarePromptIds(intake: SafetyPlanIntake): List<Int> = buildList {
     add(R.string.safety_after_checkin)
     add(R.string.safety_after_essentials)
@@ -423,7 +454,12 @@ private val newcomerStatuses = setOf(
     ImmigrationStatus.UNDOCUMENTED_OR_UNCERTAIN,
 )
 
-/** Truncates checklist items so the encoded JSON string fits within section limits. */
+/**
+ * Truncates checklist items so the encoded JSON string fits within section limits.
+ *
+ * @param items The checklist items considered for encoding.
+ * @return The checklist prefix that fits within the storage size limit.
+ */
 private fun fitEncodedChecklist(items: List<SafetyChecklistItem>): List<SafetyChecklistItem> {
     val fitted = mutableListOf<SafetyChecklistItem>()
     for (item in items.take(MAX_SECTION_ITEMS)) {
@@ -433,5 +469,10 @@ private fun fitEncodedChecklist(items: List<SafetyChecklistItem>): List<SafetyCh
     return fitted
 }
 
-/** Normalizes a checklist prompt string for case-insensitive duplicate matching. */
+/**
+ * Normalizes a checklist prompt string for case-insensitive duplicate matching.
+ *
+ * @receiver The checklist prompt text to normalize.
+ * @return The normalized prompt text used for case-insensitive matching.
+ */
 private fun String.normalizedPrompt(): String = trim().lowercase(Locale.ROOT)

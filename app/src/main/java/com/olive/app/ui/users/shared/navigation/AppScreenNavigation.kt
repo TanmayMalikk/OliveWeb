@@ -152,8 +152,8 @@ internal fun OliveRoot(
     val isCover = navigation.screen == SessionScreen.Cover
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var imeWasVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(isCover, imeVisible) {
-        if (!isCover && imeWasVisible && !imeVisible) focus.clearFocus()
+    LaunchedEffect(navigation.screen, imeVisible) {
+        if (!isCover && navigation.screen != SessionScreen.Pin && imeWasVisible && !imeVisible) focus.clearFocus()
         imeWasVisible = !isCover && imeVisible
     }
     val view = LocalView.current
@@ -263,13 +263,6 @@ internal fun OliveRoot(
             }
         }
         if (!isCover) {
-            // Hide the keyboard whenever the private PIN screen opens.
-            LaunchedEffect(navigation.screen) {
-                if (navigation.screen == SessionScreen.Pin) {
-                    keyboard?.hide()
-                    focus.clearFocus(force = true)
-                }
-            }
             val backProgress = rememberOliveBack(
                 preview = privateArea && !privacyHidden && !showPinAnimation && !supportExpanded &&
                     navigation.page != SafePage.Camera,
@@ -562,7 +555,14 @@ internal fun OliveRoot(
     }
 }
 
-/** Returns whether the PIN-to-Safe unlock reveal animation still needs to play for the current screen state. */
+/**
+ * Returns whether the PIN-to-Safe unlock reveal animation still needs to play for the current screen state.
+ *
+ * @param screen The current app screen.
+ * @param unlockAnimationVersion The sequence number of the latest successful unlock animation.
+ * @param completedUnlockAnimation The most recent unlock animation sequence already completed.
+ * @return True when the unlock animation for the current PIN challenge still needs to play.
+ */
 internal fun shouldShowPinSafeAnimation(
     screen: SessionScreen,
     unlockAnimationVersion: Int,
@@ -616,6 +616,7 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     val configured get() = runtime.configured
     val preferredEntryMethod get() = runtime.enrollment?.entryMethod ?: SafeEntryMethod.APP_PIN
     val hasAppPin get() = runtime.enrollment?.hasAppPin == true
+    val appPinLength get() = runtime.enrollment?.pinLength
     val phoneHasLock get() = runtime.deviceSecure
     val usesDeviceLock get() = preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK && phoneHasLock
     val canUseAppPin get() = runtime.enrollment?.allowsAppPin() == true

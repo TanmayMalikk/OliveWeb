@@ -222,6 +222,7 @@ private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
  * @param onChatTabChange Callback invoked when chat tab change changes or occurs.
  * @param onSupportFilterChange Callback invoked when support filter change changes or occurs.
  * @param modifier Compose modifier applied to the root layout.
+ * @param listState The scroll state of the displayed list.
  */
 @Composable
 private fun MessagingSidebar(
@@ -596,6 +597,7 @@ private fun ConversationRow(
  * Formats the support tag label shown by secure messaging.
  *
  * @param tag Tag supplied to [supportTagLabel].
+ * @return The localized label for the support ticket category.
  */
 @Composable
 private fun supportTagLabel(tag: String) = stringResource(
@@ -611,6 +613,7 @@ private fun supportTagLabel(tag: String) = stringResource(
 /**
  * Lists the friends or supported users who may have a private contact note.
  *
+ * @receiver The conversation from which to derive the stored or displayed data.
  * @param currentUid Current user ID supplied to [privateNoteTargets].
  * @param role Account role determining workspace permissions.
  * @param friendUids Collection of friend uids values to process.

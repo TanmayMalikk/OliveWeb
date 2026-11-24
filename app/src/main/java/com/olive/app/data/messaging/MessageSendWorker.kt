@@ -426,6 +426,7 @@ data class CachedChatAccess(
 /**
  * Converts chat conversation into cache JSON.
  *
+ * @receiver The conversation from which to derive the stored or displayed data.
  * @return The resulting to cache JSON.
  */
 internal fun ChatConversation.toCacheJson() = JSONObject().apply {
@@ -483,6 +484,7 @@ internal fun conversationFromCacheJson(value: JSONObject): ChatConversation {
 /**
  * Converts encrypted chat message into cache JSON.
  *
+ * @receiver The encrypted message to serialize for the cache.
  * @return The resulting to cache JSON.
  */
 internal fun EncryptedChatMessage.toCacheJson() = JSONObject().apply {

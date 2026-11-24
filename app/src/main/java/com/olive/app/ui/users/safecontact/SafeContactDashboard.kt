@@ -60,6 +60,7 @@ import com.olive.app.data.account.PrivateEntryKind
  *
  * @param session Shared session view model owning application state and actions.
  * @param exit Action or callback executed for exit.
+ * @param guideTopicId The optional walkthrough topic selected for this screen.
  */
 @Composable
 internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {

@@ -144,6 +144,10 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     /**
      * Replaces the non-owner recipient list for a shared private entry, or deletes the cloud copy when
      * all recipients are revoked so revoked contacts immediately lose access.
+     *
+     * @param entry The private entry to save, display, or share.
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
      */
     suspend fun updateMultiRecipientEntry(
         entry: PrivateEntry,
@@ -187,6 +191,9 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
     /**
      * Deletes the shared cloud record for an owned entry when the entry is trashed or all recipients are revoked.
+     *
+     * @param entryId The ID of the private entry.
+     * @param ownerUid The UID of the account that owns the data.
      */
     suspend fun revokeAllRecipients(entryId: String, ownerUid: String) {
         val documentRef = firestore.collection("privateEntries").document(entryId)
@@ -206,6 +213,10 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     /**
      * Grants access to any current conversation participants (such as an escalated Admin or newly added friend)
      * who were not yet wrapped on a previously shared private entry.
+     *
+     * @param entryId The ID of the private entry.
+     * @param callerUid The UID of the signed-in account making the request.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
      */
     suspend fun ensureRecipientsHaveAccess(
         entryId: String,
@@ -247,6 +258,11 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
     /**
      * Streams private entries shared with [currentUid] alongside the recipient map for entries owned by [currentUid].
+     *
+     * @param currentUid The UID of the currently signed-in account.
+     * @param onUpdate Receives the latest decoded entries or snapshot.
+     * @param onError Receives any error raised while observing or decoding entries.
+     * @return The Firestore listener registration that can stop the observation.
      */
     internal fun observeUserSharedEntries(
         currentUid: String,
@@ -277,7 +293,13 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         }
     }
 
-    /** Unwraps and decrypts shared private entries visible to [currentUid]. */
+    /**
+     * Unwraps and decrypts shared private entries visible to [currentUid].
+     *
+     * @param documents The document repository used to access shared attachments.
+     * @param currentUid The UID of the currently signed-in account.
+     * @return The decrypted shared entries and the recipient metadata visible to the active account.
+     */
     private fun decodeSharedEntriesSnapshot(
         documents: List<DocumentSnapshot>,
         currentUid: String,
@@ -528,6 +550,7 @@ internal fun mergeVisibleSafetyPlan(
 /**
  * Gives the safety plan the safety fields with defaults it needs.
  *
+ * @receiver The safety-plan field to update.
  * @param value Input value to store, parse, or format.
  * @param activeWriterId Active writer ID supplied to [edit].
  * @param activeWriterUid Active writer user ID supplied to [edit].
@@ -719,6 +742,7 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
 /**
  * Converts safety document into index JSON.
  *
+ * @receiver The document whose index metadata or sharing scope is read.
  * @param viewerUid Firebase UID of the viewing account.
  * @return JSON object representing to index JSON.
  */
@@ -761,6 +785,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
 /**
  * Converts JSON object into document.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param viewerUid Firebase UID of the viewing account.
  * @param id ID supplied to [toDocument].
  * @return The resulting [SafetyDocument] for to document.

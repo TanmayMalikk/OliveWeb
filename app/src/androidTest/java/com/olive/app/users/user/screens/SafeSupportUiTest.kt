@@ -356,9 +356,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     @Test
     fun hotlinesMatchTheSavedCityAndCanBrowseAnotherProvince() {
         val session = setup()
-        toggle()
-        compose.onNodeWithTag("support_hotlines")
-            .performClick()
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Hotlines) }
         waitFor("hotline_page")
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("hotline_use_device_location").fetchSemanticsNodes()

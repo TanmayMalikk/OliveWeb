@@ -5,21 +5,7 @@ import com.olive.app.ui.shared.OliveSmallFloatingActionButton as SmallFloatingAc
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.walkthroughTarget
-import android.annotation.SuppressLint
-import android.graphics.Color
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewConfiguration
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -79,7 +65,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
@@ -99,13 +84,35 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * Interactive 60fps Mapbox GL location map with native vector rotation, pins, and route rendering.
+ *
+ * @param points The location points to display on the map.
+ * @param modifier The Compose modifier applied to the component.
+ * @param ownPointUid The UID identifying the current user's marker.
+ * @param showOwnPointInBlue Whether to render the user's own marker in blue.
+ * @param route The active route and its navigation directions.
+ * @param navigationActive Whether route guidance is currently running.
+ * @param detailsOnlyForSelectedPoint Whether marker details are limited to the selected point.
+ * @param userSearchEnabled Whether the map offers account search.
+ * @param initialFollowUid The account UID the map should follow initially, if any.
+ * @param selectedLocation The currently selected map location, if any.
+ * @param onSelectedLocationChange Receives the new location when the user moves or selects a pin.
+ * @param supportServices The mapped support services to display.
+ * @param onSupportSelected Receives the support service selected on the map.
+ * @param onViewportCenterChanged Receives the new center coordinates as the map moves.
+ * @param headingUp Whether the map rotates to keep the current heading at the top.
+ * @param headingDegrees The current heading in degrees.
+ * @param headingState The observable heading used to update the map.
+ * @param onToggleHeadingUp Runs when the user changes the map's heading mode.
+ * @param compassEnabled Whether to show compass or heading controls.
+ * @param fitSupportServices Whether to fit the support markers within the viewport.
+ * @param bottomControlsPadding The extra spacing reserved beneath the map controls.
+ * @param onUserGesture Runs when the user manually interacts with the map.
+ * @param showControls Whether to render the map controls.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun InteractiveLocationMap(
     points: List<MapLocationPoint>,
@@ -194,68 +201,42 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Loading) loadState = MapLoadState.Error
     }
 
-    /** Encodes current user and contact points into JSON and pushes them to the WebView map. */
+    /**
+     * Encodes current user and contact points into JSON and pushes them to the WebView map.
+     *
+     * @param view The Android view associated with this callback.
+     * @param moveCamera Whether to move the viewport to the selected point.
+     */
     fun updatePoints(view: WebView, moveCamera: Boolean) {
-        val encoded = JSONArray().apply {
-            points.forEach { point ->
-                put(JSONObject().apply {
-                    put("uid", point.uid)
-                    put("name", point.name)
-                    put("latitude", point.latitude)
-                    put("longitude", point.longitude)
-                    put("label", if (point.lastKnown) "${point.name} · $lastKnownLabel" else point.name)
-                    put("live", point.live)
-                    put("lastKnown", point.lastKnown)
-                    put("own", point.uid == ownPointUid)
-                    put("blue", showOwnPointInBlue && point.uid == ownPointUid && point.live)
-                    point.accuracy?.let { put("accuracy", it.toDouble()) }
-                    put("trail", JSONArray().apply {
-                        point.trail.forEach { trailPoint ->
-                            put(JSONObject().apply {
-                                put("latitude", trailPoint.latitude)
-                                put("longitude", trailPoint.longitude)
-                                put("updatedAt", trailPoint.updatedAt)
-                            })
-                        }
-                    })
-                })
-            }
-        }
-        view.evaluateJavascript(
-            "window.oliveSetPoints($encoded,$moveCamera,$detailsOnlyForSelectedPoint);",
-            null,
-        )
+        view.updateMapPoints(points, ownPointUid, showOwnPointInBlue, lastKnownLabel, moveCamera, detailsOnlyForSelectedPoint)
     }
 
-    /** Encodes directory support locations and pushes them to the WebView map. */
+    /**
+     * Encodes directory support locations and pushes them to the WebView map.
+     *
+     * @param view The Android view associated with this callback.
+     */
     fun updateSupportServices(view: WebView) {
-        val encoded = JSONArray().apply {
-            supportServices.forEach { service ->
-                put(JSONObject().apply {
-                    put("id", service.id)
-                    put("name", service.name)
-                    put("latitude", service.latitude)
-                    put("longitude", service.longitude)
-                    put("saved", service.saved)
-                })
-            }
-        }
         val fit = fitSupportServices && !supportWereFitted && supportServices.isNotEmpty() && !navigationActive
-        view.evaluateJavascript("window.oliveSetServices($encoded,$fit);", null)
+        view.updateMapServices(supportServices, fit)
         if (fit) supportWereFitted = true
     }
 
-    /** Serializes active turn-by-turn route coordinates and sends them to the WebView map. */
+    /**
+     * Serializes active turn-by-turn route coordinates and sends them to the WebView map.
+     *
+     * @param view The Android view associated with this callback.
+     * @param fitRoute Whether to fit the route in the visible map area.
+     */
     fun updateRoute(view: WebView, fitRoute: Boolean) {
-        val encoded = JSONArray().apply {
-            route?.coordinates?.forEach { coordinate ->
-                put(JSONArray().put(coordinate.latitude).put(coordinate.longitude))
-            }
-        }
-        view.evaluateJavascript("window.oliveSetRoute($encoded,$fitRoute);", null)
+        view.updateMapRoute(route, fitRoute)
     }
 
-    /** Notifies the WebView map when its CSS pixel dimensions change so the canvas resizes cleanly. */
+    /**
+     * Notifies the WebView map when its CSS pixel dimensions change so the canvas resizes cleanly.
+     *
+     * @param view The Android view associated with this callback.
+     */
     fun resizeMapIfChanged(view: WebView) {
         if (view.height <= 0 || view.width <= 0) return
         val density = view.resources.displayMetrics.density
@@ -267,7 +248,11 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);", null)
     }
 
-    /** Pushes the picked incident coordinates or clears selection in the WebView map. */
+    /**
+     * Pushes the picked incident coordinates or clears selection in the WebView map.
+     *
+     * @param view The Android view associated with this callback.
+     */
     fun updateSelection(view: WebView) {
         val latitude = selectedLocation?.first ?: 0.0
         val longitude = selectedLocation?.second ?: 0.0
@@ -385,141 +370,48 @@ internal fun InteractiveLocationMap(
         key(attempt) {
             AndroidView(
                 factory = { context ->
-                    object : WebView(context) {
-                        private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-                        private var touchDownX = 0f
-                        private var touchDownY = 0f
-
-                        /** Claims parent touch interception during map drags and dispatches clicks on tap. */
-                        override fun onTouchEvent(event: MotionEvent): Boolean {
-                            when (event.actionMasked) {
-                                MotionEvent.ACTION_DOWN -> {
-                                    touchDownX = event.x
-                                    touchDownY = event.y
-                                    parent?.requestDisallowInterceptTouchEvent(true)
-                                }
-                                MotionEvent.ACTION_POINTER_DOWN ->
-                                    parent?.requestDisallowInterceptTouchEvent(true)
-                                MotionEvent.ACTION_UP -> {
-                                    parent?.requestDisallowInterceptTouchEvent(false)
-                                    if (abs(event.x - touchDownX) <= touchSlop &&
-                                        abs(event.y - touchDownY) <= touchSlop
-                                    ) {
-                                        performClick()
-                                    }
-                                }
-                                MotionEvent.ACTION_CANCEL ->
-                                    parent?.requestDisallowInterceptTouchEvent(false)
+                    createLocationMapWebView(
+                        context = context,
+                        onViewportCenter = if (onViewportCenterChanged == null) null else { latitude, longitude ->
+                            currentViewportCallback?.invoke(latitude, longitude)
+                        },
+                        onSelectSupport = if (onSupportSelected == null) null else { id ->
+                            currentSupportServices.firstOrNull { it.id == id }?.let { currentSupportSelection?.invoke(it) }
+                        },
+                        onSelectLocation = onSelectedLocationChange,
+                        onGesture = {
+                            following = false
+                            if (currentUsesInternalCompass) internalHeadingUp = false
+                            currentUserGestureCallback?.invoke()
+                        },
+                        onBearing = { mapBearingState.floatValue = it },
+                        onResize = ::resizeMapIfChanged,
+                        onError = { view -> if (webView[0] === view) loadState = MapLoadState.Error },
+                        onReady = ready@{ view ->
+                            if (webView[0] !== view) return@ready
+                            loadState = MapLoadState.Ready
+                            if (following && followTargetUid != null) {
+                                view.evaluateJavascript(
+                                    "window.oliveSetFollow(true,${JSONObject.quote(followTargetUid)},${selectedFollowUid != null && (userSearchEnabled || initialFollowUid != null)});",
+                                    null,
+                                )
                             }
-                            return super.onTouchEvent(event)
-                        }
-
-                        /** Completes accessibility click handling for the map WebView. */
-                        override fun performClick(): Boolean {
-                            super.performClick()
-                            return true
-                        }
-                    }.apply {
+                            updatePoints(view, moveCamera = !following || followTargetUid == null)
+                            updateSupportServices(view)
+                            updateRoute(view, route != null)
+                            updateSelection(view)
+                            val degArg = currentHeadingState.value?.takeIf { it.isFinite() }?.toString() ?: "null"
+                            view.evaluateJavascript(
+                                "window.oliveSetHeading($degArg,$currentHeadingUp,$currentNavigationActive);",
+                                null,
+                            )
+                            if (onViewportCenterChanged != null) {
+                                view.evaluateJavascript("window.oliveReportMapCenter();", null)
+                            }
+                        },
+                    ).apply {
                         webView[0] = this
-                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                        setBackgroundColor(Color.rgb(241, 237, 228))
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = false
-                        settings.allowContentAccess = false
-                        settings.allowFileAccess = false
-                        settings.setSupportZoom(false)
-                        if (onViewportCenterChanged != null) addJavascriptInterface(
-                            LocationSelectionBridge { latitude, longitude ->
-                                currentViewportCallback?.invoke(latitude, longitude)
-                            },
-                            "OliveMapViewport",
-                        )
-                        if (onSupportSelected != null) addJavascriptInterface(
-                            SupportSelectionBridge { id ->
-                                currentSupportServices.firstOrNull { it.id == id }?.let { currentSupportSelection?.invoke(it) }
-                            },
-                            "OliveSupportSelection",
-                        )
-                        if (onSelectedLocationChange != null) addJavascriptInterface(
-                            LocationSelectionBridge(onSelectedLocationChange),
-                            "OliveLocationSelection",
-                        )
-                        addJavascriptInterface(
-                            MapCameraBridge(
-                                onGesture = {
-                                    following = false
-                                    if (currentUsesInternalCompass) internalHeadingUp = false
-                                    currentUserGestureCallback?.invoke()
-                                },
-                                onBearing = { bearing ->
-                                    mapBearingState.floatValue = bearing
-                                },
-                            ),
-                            "OliveMapCamera",
-                        )
-                        webChromeClient = object : WebChromeClient() {
-                            /** Watches the WebView page title signal to initialize map layers once ready. */
-                            override fun onReceivedTitle(view: WebView, title: String?) {
-                                if (webView[0] !== view) return
-                                if (title == "olive-map-error") loadState = MapLoadState.Error
-                                if (title == MAP_READY_TITLE) {
-                                    loadState = MapLoadState.Ready
-                                    if (following && followTargetUid != null) {
-                                        view.evaluateJavascript(
-                                            "window.oliveSetFollow(true,${JSONObject.quote(followTargetUid)},${selectedFollowUid != null && (userSearchEnabled || initialFollowUid != null)});",
-                                            null,
-                                        )
-                                    }
-                                    updatePoints(view, moveCamera = !following || followTargetUid == null)
-                                    updateSupportServices(view)
-                                    updateRoute(view, route != null)
-                                    updateSelection(view)
-                                    val degArg = currentHeadingState.value?.takeIf { it.isFinite() }?.toString() ?: "null"
-                                    view.evaluateJavascript(
-                                        "window.oliveSetHeading($degArg,$currentHeadingUp,$currentNavigationActive);",
-                                        null,
-                                    )
-                                    if (onViewportCenterChanged != null) {
-                                        view.evaluateJavascript("window.oliveReportMapCenter();", null)
-                                    }
-                                }
-                            }
-                        }
-                        webViewClient = object : WebViewClient() {
-                            /** Serves bundled offline map assets and cached map tiles over HTTPS. */
-                            override fun shouldInterceptRequest(
-                                view: WebView,
-                                request: WebResourceRequest,
-                            ): WebResourceResponse? = bundledMapAsset(context, request.url, request.method)
-
-                            /** Triggers a container resize check once the map page finishes loading. */
-                            override fun onPageFinished(view: WebView, url: String) {
-                                view.post { resizeMapIfChanged(view) }
-                            }
-
-                            /** Prevents the embedded map WebView from navigating away from local map HTML. */
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView,
-                                request: WebResourceRequest,
-                            ) = true
-
-                            /** Marks the map as failed when loading the main frame reports an error. */
-                            override fun onReceivedError(
-                                view: WebView,
-                                request: WebResourceRequest,
-                                error: WebResourceError,
-                            ) {
-                                if (webView[0] === view && request.isForMainFrame) loadState = MapLoadState.Error
-                            }
-                        }
-                        addOnLayoutChangeListener { changed, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
-                                resizeMapIfChanged(changed as WebView)
-                            }
-                        }
-                        val publicToken = BuildConfig.MAPBOX_ACCESS_TOKEN.trim().takeIf { it.startsWith("pk.") }
-                        val url = if (publicToken == null) MAP_ASSET_URL else "$MAP_ASSET_URL#mapbox=${Uri.encode(publicToken)}"
-                        loadUrl(url)
+                        loadOliveMap()
                     }
                 },
                 update = { },
@@ -754,35 +646,14 @@ internal fun InteractiveLocationMap(
     }
 }
 
-private class LocationSelectionBridge(private val onChange: (Double, Double) -> Unit) {
-    private val mainHandler = Handler(Looper.getMainLooper())
-    /** Receives map coordinate selection callbacks from JavaScript after bounds validation. */
-    @JavascriptInterface
-    fun selected(latitude: Double, longitude: Double) {
-        if (latitude in -90.0..90.0 && longitude in -180.0..180.0) mainHandler.post { onChange(latitude, longitude) }
-    }
-}
-
-private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
-    private val handler = Handler(Looper.getMainLooper())
-    /** Dispatches a selected support directory resource ID from JavaScript to the main thread. */
-    @JavascriptInterface
-    fun selected(id: String) { if (id.length in 1..512) handler.post { onSelected(id) } }
-}
-
-private class MapCameraBridge(private val onGesture: () -> Unit, private val onBearing: (Float) -> Unit) {
-    private val handler = Handler(Looper.getMainLooper())
-    /** Notifies the Compose host when the user pans or rotates the map manually. */
-    @JavascriptInterface fun onUserGesture() { handler.post(onGesture) }
-    /** Forwards map bearing updates in degrees from JavaScript to update the compass needle. */
-    @JavascriptInterface fun onBearingChanged(bearing: Double) { if (bearing.isFinite()) handler.post { onBearing(bearing.toFloat()) } }
-}
-
 private enum class MapLoadState { Loading, Ready, Error }
 
-private const val MAP_READY_TITLE = "olive-map-ready"
-
-/** Draws a rotating compass dial with a red north-pointing needle at [bearingDegrees]. */
+/**
+ * Draws a rotating compass dial with a red north-pointing needle at [bearingDegrees].
+ *
+ * @param bearingDegrees The direction of travel expressed in degrees.
+ * @param contentDescription The accessibility label for the icon or control.
+ */
 @Composable
 private fun CompassNeedleIcon(bearingDegrees: Float, contentDescription: String) {
     Box(

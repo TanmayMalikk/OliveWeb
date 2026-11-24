@@ -334,6 +334,9 @@ private fun CoachComposer(
 
 /**
  * Formats coach replies with clean paragraph breaks and bullet points for workouts and meals.
+ *
+ * @param rawText The unformatted reply received from the coach.
+ * @return The formatted coach response with readable paragraphs and list items.
  */
 internal fun formatCoachReply(rawText: String): String {
     var text = rawText.trim()

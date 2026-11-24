@@ -105,7 +105,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Renders the active route progress card with full-screen and stop-navigation controls. */
+/**
+ * Renders the active route progress card with full-screen and stop-navigation controls.
+ *
+ * @param controller The controller that owns the screen's state and actions.
+ * @param state The current state used to render the component.
+ * @param displayedOwn The current user's location point shown on the map, if available.
+ * @param onOpenFullScreen Runs when the user requests the full-screen map.
+ */
 @Composable
 private fun PrivateRouteControls(
     controller: LocationMapController,
@@ -175,13 +182,20 @@ private fun PrivateRouteControls(
 
 /**
  * Shows the user and trusted-contact map, sharing controls, directory places, and route tools.
+ *
+ * @param session The session view model supplying state and actions.
  */
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
     LocationMapScreen(session, session.locationMap)
 }
 
-/** Renders the location workspace bound to a specific [LocationMapController] instance. */
+/**
+ * Renders the location workspace bound to a specific [LocationMapController] instance.
+ *
+ * @param session The session view model supplying state and actions.
+ * @param controller The controller that owns the screen's state and actions.
+ */
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMapController) {
     val context = LocalContext.current
@@ -202,7 +216,12 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     var offeredBackground by remember(uid) { mutableStateOf(false) }
     val permissionScope = rememberCoroutineScope()
 
-    /** Prompts for location permission when needed and tracks foreground/background prompts. */
+    /**
+     * Prompts for location permission when needed and tracks foreground/background prompts.
+     *
+     * @param retry Whether to request foreground permission again even if a previous result exists.
+     * @return True when the current location permission is sufficient to open the map.
+     */
     suspend fun requestMapAccess(retry: Boolean = false): Boolean {
         val granted = if (retry || permissionResult == null) requestPermission() else permissionResult == true
         permissionResult = granted
@@ -676,7 +695,16 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     }
 }
 
-/** Renders the searchable friend picker used to choose live-location recipients. */
+/**
+ * Renders the searchable friend picker used to choose live-location recipients.
+ *
+ * @param accountId The account ID that owns the key or record.
+ * @param friends The accepted friends available for the operation.
+ * @param contactNames The display names associated with sharing recipients.
+ * @param selected Whether this item is currently selected.
+ * @param enabled Whether the control or feature is enabled.
+ * @param onSelectionChange Runs when the selected contacts change.
+ */
 @Composable
 internal fun LocationShareFriendPicker(
     accountId: String,

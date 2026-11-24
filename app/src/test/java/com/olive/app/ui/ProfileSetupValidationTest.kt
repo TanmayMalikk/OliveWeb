@@ -16,6 +16,7 @@ class ProfileSetupValidationTest {
         details: String = "",
         email: String = "",
         emailConsent: Boolean = false,
+        relationship: String = "",
     ) =
         ProfileSetupValidation(
             safeContact,
@@ -27,6 +28,7 @@ class ProfileSetupValidationTest {
             details,
             email,
             emailConsent,
+            contactRelationship = relationship,
         )
 
     // Inputs: the values shown below. Expected: optional contacts must be complete before finishing user setup.
@@ -35,12 +37,14 @@ class ProfileSetupValidationTest {
         assertTrue(validation().isPageValid(2))
         assertFalse(validation(name = "Trusted friend").isPageValid(2))
         assertFalse(validation(details = "friend@example.ca").isPageValid(2))
+        assertFalse(validation(relationship = "Sibling").isPageValid(2))
         assertTrue(
             validation(
                 name = "Trusted friend",
                 details = "friend@example.ca"
             ).isPageValid(2)
         )
+        assertTrue(validation(name = "Trusted friend", details = "friend@example.ca", relationship = "Sibling").isPageValid(2))
     }
 
     // Inputs: the values shown below. Expected: safe contact progress does not require private entry credentials.
