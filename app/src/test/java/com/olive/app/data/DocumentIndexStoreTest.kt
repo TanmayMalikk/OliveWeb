@@ -135,7 +135,8 @@ class DocumentIndexStoreTest {
         index.replace(ALICE, listOf(document("cached", ALICE)), 100)
         val repository = IndexedSafetyDocumentRepository(
             FakeRemote(getFailure = SecurityException("revoked")),
-            index
+            index,
+            deviceId = { "phone" },
         )
 
         assertEquals("cached", repository.cachedFor(ALICE, "cached")?.id)
@@ -148,7 +149,7 @@ class DocumentIndexStoreTest {
         val index = DocumentIndexStore(FakeJsonVault())
         val remote = FakeRemote()
         val original = document("cached", ALICE)
-        val repository = IndexedSafetyDocumentRepository(remote, index)
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" })
         remote.documents = listOf(original)
         repository.listFor(ALICE)
         val observed = mutableListOf<DocumentListSnapshot>()

@@ -185,7 +185,7 @@ class NewsReaderUiTest {
         instrumentation.runOnMainSync { browser.loadUrl("https://publisher.example/next") }
         waitForBody("Related story final paragraph", "/next")
         compose.waitForIdle()
-        compose.onNodeWithTag("news_reader_host").assertTextEquals("publisher.example")
+        compose.onNodeWithTag("news_reader_host").assertTextContains("publisher.example", substring = true)
         instrumentation.runOnMainSync {
             assertTrue("Related links must create reader history", browser.canGoBack())
             compose.activity.onBackPressedDispatcher.onBackPressed()

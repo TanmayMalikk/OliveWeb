@@ -65,7 +65,7 @@ class SafeWalkthroughTest {
         val userSteps = walkthroughTourStepsForRole(AccountRole.USER)
         val contactSteps = walkthroughTourStepsForRole(AccountRole.SAFE_CONTACT)
 
-        assertEquals(47, userSteps.size)
+        assertEquals(46, userSteps.size)
         assertEquals(20, contactSteps.size)
 
         val supportMenuSteps = userSteps.filter { it.openSupportMenu }
@@ -144,7 +144,8 @@ class SafeWalkthroughTest {
         assertEquals("hotlines_region_location", firstWalkthroughStepForTopic(AccountRole.USER, "hotlines_contacts")?.id)
 
         val userSettingsSteps = userSteps.filter { it.settingsTabTag != null }
-        assertEquals(12, userSettingsSteps.size)
+        assertEquals(11, userSettingsSteps.size)
+        assertFalse(userSettingsSteps.any { it.id == "settings_privacy_passkey" })
         assertEquals(
             listOf(
                 "settings_tab_profile",

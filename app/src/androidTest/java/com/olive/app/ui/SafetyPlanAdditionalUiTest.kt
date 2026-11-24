@@ -14,6 +14,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.data.account.*
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.*
@@ -208,7 +209,7 @@ class SafetyPlanAdditionalUiTest {
         compose.onNodeWithTag("safety_add_contact").performClick()
         compose.onNodeWithTag("safety_contact_name").performTextInput("Another fixture contact")
         compose.onNodeWithTag("safety_contact_details").performTextInput("New synthetic number")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithTag("safety_save_contact").performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(listOf("Fixture contact", "Another fixture contact"), contacts.value.map { it.name })

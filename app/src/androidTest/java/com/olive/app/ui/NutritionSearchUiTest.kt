@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.ui.covers.fitness.*
 import com.olive.app.ui.shared.OliveTheme
 import org.junit.Assert.*
@@ -37,7 +38,7 @@ class NutritionSearchUiTest {
             FoodSearchPage(true, PaddingValues(0.dp), { choice, _, _, _ -> selected = choice }, source)
         } }
         compose.onNodeWithTag("fitness_food_search").performTextInput("oat")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         compose.waitUntil(10000) { compose.onAllNodesWithText("Oats autocomplete").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Oats autocomplete").performClick()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text(R.string.nutrition_more)))

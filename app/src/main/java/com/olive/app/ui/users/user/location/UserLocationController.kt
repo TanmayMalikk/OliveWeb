@@ -177,7 +177,7 @@ internal class LocationMapController(
                         applyLocationFix(token, uid, configuration.youLabel, fix)
                     }
                     if (token == generation && state.locating) state = state.copy(locating = false)
-                    val updates = runCatching {
+                    val updates = try {
                         DeviceLocation.startUpdates(
                             applicationContext,
                             intervalMillis = 1_500L,
@@ -185,7 +185,15 @@ internal class LocationMapController(
                         ) { fix ->
                             applyLocationFix(token, uid, configuration.youLabel, fix)
                         }
-                    }.getOrNull()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: SecurityException) {
+                        // Location permission may have been revoked since the prompt.
+                        null
+                    } catch (failure: Exception) {
+                        Log.w("UserLocationController", "Continuous location updates unavailable", failure)
+                        null
+                    }
                     if (updates != null) {
                         liveLocationUpdates = updates
                         awaitCancellation()

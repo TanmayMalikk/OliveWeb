@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughVisits
 import com.olive.app.dismissTestKeyboard
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
@@ -138,6 +139,7 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
 
         compose.runOnIdle {
+            WalkthroughVisits(compose.activity, "contact").markInitialTourSeen()
             session.runtime.enrollment = DeviceEnrollment("contact", "", AccountRole.SAFE_CONTACT)
             session.runtime.state.accountRole = AccountRole.SAFE_CONTACT
             session.runtime.state.profile = UserProfile(
@@ -147,7 +149,12 @@ class OrganizationAndChatUiTest {
             session.runtime.state.page = SafePage.Home
             session.runtime.state.screen = SessionScreen.Safe
         }
-        compose.onNodeWithTag("safe_contact_profile").assertIsDisplayed()
+        val contactProfile = compose.onNodeWithTag("safe_contact_profile")
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("safe_contact_profile").fetchSemanticsNodes().size == 1
+        }
+        if (!contactProfile.isDisplayed()) contactProfile.performScrollTo()
+        contactProfile.assertIsDisplayed()
         compose.onNodeWithTag("cover_root").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
     }
@@ -299,11 +306,19 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { Box(Modifier.fillMaxSize()) { ChatInfoDialog(session, "staff", {}, { _, _ -> }) } } }
         compose.onNodeWithText("Support Ticket #520").assertExists()
+        val expandSheet = compose.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsActions.Expand),
+            useUnmergedTree = true,
+        )
+        if (expandSheet.fetchSemanticsNodes().isNotEmpty()) {
+            expandSheet.onFirst().performSemanticsAction(SemanticsActions.Expand)
+        }
         compose.onNodeWithText("Ticket #520").assertIsDisplayed()
         scrollDialogTo(hasTestTag("chat_member_member"))
         compose.onNodeWithText("Friend", ignoreCase = false).assertIsDisplayed()
-        scrollDialogTo(hasTestTag("chat_member_admin"))
-        compose.onNodeWithText(text(R.string.support_admin_chat_name)).assertIsDisplayed()
+        val adminLabel = text(R.string.support_admin_chat_name)
+        scrollDialogTo(hasText(adminLabel))
+        compose.onNodeWithText(adminLabel).assertIsDisplayed()
         compose.onNodeWithText("Private owner").assertDoesNotExist()
         compose.onNodeWithText("Private friend").assertDoesNotExist()
         scrollDialogTo(hasText(text(R.string.chat_no_shared_items)))
