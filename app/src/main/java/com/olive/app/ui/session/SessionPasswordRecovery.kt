@@ -123,6 +123,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
      * @return Human-readable string suitable for display in the UI.
      */
     private fun passwordRecoveryFailure(failure: Throwable): String {
+        android.util.Log.w("SessionPasswordRecovery", "Password recovery failure: ${failure.javaClass.simpleName}: ${failure.message}", failure)
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
         val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()
         val firestore = causes.filterIsInstance<FirebaseFirestoreException>().firstOrNull()
@@ -145,6 +146,12 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 R.string.password_recovery_error_account_mismatch
             causes.any { it.message?.contains("active passkey", ignoreCase = true) == true } ->
                 R.string.password_recovery_remove_blocked_last
+            causes.any { it is IllegalStateException && it.message?.contains("cancelled", ignoreCase = true) == true } ->
+                R.string.passkey_recovery_setup_cancelled
+            causes.any { it.message?.contains("Secure lock screen", ignoreCase = true) == true || it.message?.contains("device lock", ignoreCase = true) == true } ->
+                R.string.passkey_recovery_provider_unavailable
+            causes.any { it.message?.contains("No recovery passkeys", ignoreCase = true) == true } ->
+                R.string.password_recovery_remove_blocked_last
             causes.any { it is IllegalStateException && it.message?.contains("OPAQUE WebAssembly", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_runtime_unavailable
             causes.any { it.message?.contains("Account recovery key", ignoreCase = true) == true } ->
@@ -153,9 +160,15 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 FirebaseFunctionsException.Code.PERMISSION_DENIED ->
                     if (functions.message?.contains("revoked", ignoreCase = true) == true) R.string.password_recovery_error_revoked
                     else R.string.password_recovery_error_incorrect
-                FirebaseFunctionsException.Code.FAILED_PRECONDITION ->
-                    if (functions.message?.contains("passkey", ignoreCase = true) == true) R.string.password_recovery_remove_blocked_last
-                    else R.string.password_recovery_error_unsupported
+                FirebaseFunctionsException.Code.FAILED_PRECONDITION -> when {
+                    functions.message?.contains("passkey", ignoreCase = true) == true ->
+                        R.string.password_recovery_remove_blocked_last
+                    functions.message?.contains("OPAQUE", ignoreCase = true) == true ->
+                        R.string.password_recovery_error_runtime_unavailable
+                    functions.message?.contains("Sign in again", ignoreCase = true) == true ->
+                        R.string.passkey_recovery_sign_in_again
+                    else -> R.string.password_recovery_error_unsupported
+                }
                 FirebaseFunctionsException.Code.UNAVAILABLE,
                 FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ->
                     R.string.password_recovery_error_connection

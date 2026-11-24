@@ -188,6 +188,7 @@ internal class SessionPasskeyRecovery(private val runtime: SessionRuntime) {
     }
 
     private fun passkeyRecoveryFailureMessage(failure: Exception): String {
+        android.util.Log.w("SessionPasskeyRecovery", "Passkey recovery failure: ${failure.javaClass.simpleName}: ${failure.message}", failure)
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
         val stage = causes.filterIsInstance<PasskeyRecoveryStageException>().firstOrNull()
         val credential = causes.filterIsInstance<PasskeyCredentialFailureException>().firstOrNull()
