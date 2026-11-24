@@ -121,7 +121,6 @@ internal class SessionViewModel @JvmOverloads constructor(
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
     val passwordRecoveryUnlockRequest get() = runtime.state.passwordRecoveryUnlockRequest
-    val passwordRecoveryEnrolled: Boolean? get() = runtime.state.passwordRecoveryEnrolled
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
     val inputErrorVersion get() = runtime.state.inputErrorVersion
@@ -820,12 +819,6 @@ internal interface SessionAccountManagementActions {
      * Refreshes whether OPAQUE password recovery is enrolled for the signed-in account.
      */
     fun refreshPasswordRecovery() = runtime.passwordRecovery.refreshPasswordRecovery()
-    /**
-     * Enrolls OPAQUE password recovery protecting the user's Account Recovery Key.
-     *
-     * @param password User-chosen recovery password protecting the enrolled OPAQUE record.
-     */
-    fun enablePasswordRecovery(password: String) = runtime.passwordRecovery.enablePasswordRecovery(password)
     /**
      * Rotates the user's OPAQUE password recovery secret after verifying [oldPassword].
      *

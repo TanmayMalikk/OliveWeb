@@ -30,7 +30,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         scope.launch {
             val enrolled = runCatching {
                 dataSources.accountKeysets?.isPasswordRecoveryEnrolled(uid) ?: false
-            }.getOrNull() ?: false
+            }.getOrNull() ?: return@launch
             if (enrollment?.uid == uid) {
                 state.passwordRecoveryEnrolled = enrolled
             }
@@ -38,27 +38,38 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Enrolls OPAQUE password recovery using [password] for the signed-in safe user.
+     * Enrolls OPAQUE after authentication, preserving any existing recovery enrollment.
      *
-     * @param password User-chosen recovery password protecting the Account Recovery Key.
+     * @param uid The account authenticated by the credentials flow.
+     * @param password The account password already entered for sign-in or creation.
+     * @param token The session epoch captured by that credentials request.
+     * @param setupRequired Whether recovery must be configured before entering onboarding.
      */
-    fun enablePasswordRecovery(password: String) = with(runtime) {
-        with(state) {
-            val uid = enrollment?.uid ?: return@with
-            val recovery = opaqueRecoveryRepository ?: return@with
-            if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
-            operations.runOperation(
-                application.getString(R.string.password_recovery_error_unsupported),
-                failureFor = ::passwordRecoveryFailure,
-            ) { token ->
-                val ark = settings.accountRecoveryKey(uid, token)
-                recovery.enroll(uid, password, ark)
-                if (currentRecoverySession(uid, token)) {
-                    passwordRecoveryEnrolled = true
-                    message = application.getString(R.string.password_recovery_added)
+    internal suspend fun enrollAfterAuthentication(uid: String, password: String, token: Long, setupRequired: Boolean) = with(runtime) {
+        check(settings.currentRecoverySession(uid, token)) { "Recovery session changed" }
+        val keysets = checkNotNull(accountKeysetRepository)
+        val recovery = checkNotNull(opaqueRecoveryRepository)
+        val enrolled = keysets.isPasswordRecoveryEnrolled(uid)
+        check(settings.currentRecoverySession(uid, token)) { "Recovery session changed" }
+        state.passwordRecoveryEnrolled = enrolled
+        if (enrolled) return@with
+
+        val local = withContext(Dispatchers.IO) { accountKeysets.read(uid) }
+        val remote = keysets.fetch(uid)
+        check(settings.currentRecoverySession(uid, token)) { "Recovery session changed" }
+        val ark = when {
+            local != null && (remote == null || remote.keyId == local.envelope.keyId && remote.epoch == local.envelope.epoch) -> {
+                settings.unlockDeviceRecoveryKey(uid, local.deviceRecord, token).also {
+                    if (remote == null) settings.publishKeyset(local.envelope)
                 }
             }
+            remote == null && local == null -> settings.createAccountRecoveryKey(uid, token)
+            setupRequired -> error("Account recovery key unavailable on this device")
+            else -> return@with
         }
+        check(settings.currentRecoverySession(uid, token)) { "Recovery session changed" }
+        recovery.enroll(uid, password, ark)
+        if (settings.currentRecoverySession(uid, token)) state.passwordRecoveryEnrolled = true
     }
 
     /**
@@ -157,7 +168,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
      * @param failure Throwable thrown during a password recovery operation.
      * @return Human-readable string suitable for display in the UI.
      */
-    private fun passwordRecoveryFailure(failure: Throwable): String {
+    internal fun passwordRecoveryFailure(failure: Throwable): String {
         android.util.Log.w("SessionPasswordRecovery", "Password recovery failure: ${failure.javaClass.simpleName}: ${failure.message}", failure)
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
         val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()

@@ -434,7 +434,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                     if (state.passwordRecoveryEnrolled == true) {
                         try {
                             val ark = accountRecoveryKey(device.uid, token)
-                            opaqueRecoveryRepository?.rotate(device.uid, currentPassword, newPassword, ark)
+                            opaqueRecoveryRepository?.rotate(
+                                device.uid, currentPassword, newPassword, ark, firebasePassword = newPassword,
+                            )
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (e: Exception) {
                             android.util.Log.e("SessionAccountSettings", "Failed to rotate password recovery", e)
                         }
@@ -464,7 +468,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      *
      * @param e The encrypted account keyset envelope to publish.
      */
-    private suspend fun publishKeyset(e: AccountKeysetEnvelope) {
+    internal suspend fun publishKeyset(e: AccountKeysetEnvelope) {
         val m = "${e.accountId}:${e.keyId}:${e.epoch}"
         if (m !in publishedKeysets) { runtime.accountKeysetRepository?.publish(e); publishedKeysets.add(m) }
     }
@@ -494,7 +498,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param token The session epoch captured when the operation started.
      * @return The newly generated recovery key after local protection and publication.
      */
-    private suspend fun createAccountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
+    internal suspend fun createAccountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val repository = checkNotNull(runtime.accountKeysetRepository)
         val recoveryKey = withContext(Dispatchers.IO) { AccountRecoveryKey.generate() }
         val envelope = withContext(Dispatchers.IO) { AccountKeysetEnvelope.create(uid, recoveryKey) }
@@ -535,7 +539,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param token The session epoch captured when the operation started.
      * @return The recovery key decrypted from the device-protected record.
      */
-    private suspend fun unlockDeviceRecoveryKey(
+    internal suspend fun unlockDeviceRecoveryKey(
         uid: String,
         record: AccountRecoveryKeyDeviceRecord,
         token: Long,
@@ -594,25 +598,32 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         token: Long,
     ): javax.crypto.Cipher {
         check(currentRecoverySession(uid, token)) { "Recovery session changed" }
-        val request = DeviceLockRequest(challenge, settingsChange = true)
+        val request = DeviceLockRequest(challenge, subtitleRes = R.string.password_recovery_confirm_device)
         runtime.state.deviceLockRequest = request
         return try {
-            request.result.await() ?: error("Device authentication was cancelled")
+            val cipher = request.result.await() ?: error("Device authentication was cancelled")
+            check(currentRecoverySession(uid, token)) { "Recovery session changed" }
+            cipher
         } finally {
             if (runtime.state.deviceLockRequest === request) runtime.state.deviceLockRequest = null
         }
     }
 
     /**
-     * Verifies that the active Safe session, epoch, and user UID still match the started flow.
+     * Verifies that the setup or unlocked Safe session still belongs to the same user.
      *
      * @param uid The account UID used to scope this operation.
      * @param token The session epoch captured when the operation started.
-     * @return True when the account UID and epoch still identify the same unlocked user session.
+     * @return True while the same user and session may complete recovery setup or unlock.
      */
-    private fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
-        epoch == token && state.screen == SessionScreen.Safe && enrollment?.uid == uid &&
-            state.accountRole == AccountRole.USER
+    internal fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
+        if (epoch != token || state.accountRole != AccountRole.USER || state.privacyBlackout) return@with false
+        when (state.screen) {
+            SessionScreen.Safe -> enrollment?.uid == uid
+            SessionScreen.NewCredentials, SessionScreen.ReturningCredentials ->
+                enrollment == null && pendingIdentity?.uid == uid && accounts.authenticatedUid() == uid
+            else -> false
+        }
     }
 
     /**

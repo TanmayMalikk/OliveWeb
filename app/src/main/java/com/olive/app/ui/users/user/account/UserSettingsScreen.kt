@@ -495,12 +495,6 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             }
                             HorizontalDivider()
                             Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_idle_group")) { IdleTimeoutSetting(session) }
-                            if (userRole) {
-                                HorizontalDivider()
-                                Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_passkey_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PasswordRecoverySection(session)
-                                }
-                            }
                             HorizontalDivider()
                             Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_cache_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(

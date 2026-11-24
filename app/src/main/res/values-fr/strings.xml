@@ -549,4 +549,5 @@
     <string name="encrypted_access_partially_restored">Certains éléments chiffrés n’ont pas pu être restaurés. Vérifiez votre connexion et réessayez.</string>
     <string name="encrypted_access_restore_failed">L’accès chiffré n’a pas pu être restauré. Vérifiez votre connexion et votre mot de passe de récupération, puis réessayez.</string>
     <string name="ok">OK</string>
+    <string name="password_recovery_confirm_device">Confirmez votre identité pour protéger la récupération chiffrée de votre compte sur cet appareil.</string>
 </resources>

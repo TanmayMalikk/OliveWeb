@@ -453,17 +453,21 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val failureMessage = runtime.application.getString(
             R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
         )
-        runtime.operations.runOperation(failureMessage) { sessionVersion ->
+        val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null && runtime.state.accountRole == AccountRole.USER
+        runtime.operations.runOperation(failureMessage, timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000) { sessionVersion ->
+            val creatingIdentity = create && runtime.pendingIdentity?.username != InputPolicy.username(username)
             val identity = try {
-                if (create) {
+                if (creatingIdentity) {
                     runtime.accounts.create(username, password, runtime.state.accountRole)
                 } else {
                     runtime.accounts.authenticate(username, password, runtime.state.accountRole)
                 }
             } catch (failure: Exception) {
-                if (!showCredentialFailure(failure, create, sessionVersion)) throw failure
+                if (!showCredentialFailure(failure, creatingIdentity, sessionVersion)) throw failure
                 return@runOperation
             }
+            if (runtime.epoch != sessionVersion) return@runOperation
+            if (creatingIdentity) runtime.pendingIdentity = identity
 
             if (!runtime.localMode) {
                 val signInDeviceId = persistentInstallationId(runtime.application, "olive_device_signin", "signin_device_id")
@@ -478,6 +482,23 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
 
             runtime.pendingIdentity = identity
             runtime.pendingProfile = profile
+            if (needsDeviceConfirmation) {
+                val setupRequired = create || profile == null || AccountPolicy.personalProfileNeedsSetup(profile)
+                try {
+                    runtime.passwordRecovery.enrollAfterAuthentication(identity.uid, password, sessionVersion, setupRequired)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (setupRequired) {
+                        if (runtime.epoch == sessionVersion) {
+                            runtime.state.failInput(runtime.passwordRecovery.passwordRecoveryFailure(failure))
+                        }
+                        return@runOperation
+                    }
+                    // Existing accounts can sign in even when a legacy key cannot be migrated on this device.
+                }
+                if (runtime.epoch != sessionVersion) return@runOperation
+            }
             openNextScreen(identity, profile)
         }
     }

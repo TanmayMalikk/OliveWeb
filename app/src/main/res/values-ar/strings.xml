@@ -558,4 +558,5 @@
     <string name="encrypted_access_partially_restored">تعذرت استعادة بعض العناصر المشفّرة. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="encrypted_access_restore_failed">تعذرت استعادة الوصول المشفّر. تحقق من الاتصال وكلمة مرور الاسترداد ثم حاول مرة أخرى.</string>
     <string name="ok">حسنًا</string>
+    <string name="password_recovery_confirm_device">أكّد هويتك لحماية استرداد الحساب المشفّر على هذا الجهاز.</string>
 </resources>

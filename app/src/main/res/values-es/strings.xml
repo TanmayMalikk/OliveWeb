@@ -549,4 +549,5 @@
     <string name="encrypted_access_partially_restored">No se pudieron restaurar algunos elementos cifrados. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="encrypted_access_restore_failed">No se pudo restaurar el acceso cifrado. Comprueba tu conexión y tu contraseña de recuperación, e inténtalo de nuevo.</string>
     <string name="ok">Aceptar</string>
+    <string name="password_recovery_confirm_device">Confirma tu identidad para proteger la recuperación cifrada de tu cuenta en este dispositivo.</string>
 </resources>

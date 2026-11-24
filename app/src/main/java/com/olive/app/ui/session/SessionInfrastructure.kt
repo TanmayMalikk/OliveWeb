@@ -300,7 +300,8 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
 // Holds an active biometric/device-credential unlock request.
 internal class DeviceLockRequest internal constructor(
     val challenge: DeviceAuthenticationChallenge,
-    val settingsChange: Boolean = false
+    val settingsChange: Boolean = false,
+    @androidx.annotation.StringRes val subtitleRes: Int? = null,
 ) {
     internal val result = CompletableDeferred<Cipher?>()
     /**

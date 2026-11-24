@@ -600,4 +600,5 @@
     <string name="encrypted_access_partially_restored">Some encrypted items could not be restored. Check your connection and try again.</string>
     <string name="encrypted_access_restore_failed">Encrypted access could not be restored. Check your connection and recovery password, then try again.</string>
     <string name="ok">OK</string>
+    <string name="password_recovery_confirm_device">Confirm your identity to protect encrypted account recovery on this device.</string>
 </resources>

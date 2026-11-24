@@ -764,16 +764,6 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         userOnly = true,
     ),
     WalkthroughTourStep(
-        id = "settings_privacy_passkey",
-        topicId = "cover_entry",
-        titleRes = R.string.wt_step_settings_privacy_passkey_title,
-        bodyRes = R.string.wt_step_settings_privacy_passkey_body,
-        tourPage = SafePage.Settings,
-        targetId = "settings_privacy_passkey_group",
-        settingsTabTag = "settings_tab_privacy",
-        userOnly = true,
-    ),
-    WalkthroughTourStep(
         id = "settings_privacy_cache",
         topicId = "cover_entry",
         titleRes = R.string.wt_step_settings_privacy_cache_title,

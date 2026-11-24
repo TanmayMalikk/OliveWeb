@@ -202,6 +202,7 @@ internal class OpaqueRecoveryRepository(
      * @param oldPassword Current recovery password to reauthenticate and unlock with if needed.
      * @param newPassword New recovery password to enroll.
      * @param currentRecoveryKey Already unlocked recovery key, or `null` to unlock via [oldPassword].
+     * @param firebasePassword Current Firebase credential, which may already have changed.
      * @return The newly enrolled [OpaquePasswordRecoveryEnvelope].
      */
     suspend fun rotate(
@@ -209,9 +210,10 @@ internal class OpaqueRecoveryRepository(
         oldPassword: String,
         newPassword: String,
         currentRecoveryKey: AccountRecoveryKey? = null,
+        firebasePassword: String = oldPassword,
     ): OpaquePasswordRecoveryEnvelope {
         require(newPassword.isNotBlank()) { "New password cannot be blank" }
-        authenticator.reauthenticate(accountId, oldPassword)
+        authenticator.reauthenticate(accountId, firebasePassword)
 
         val activeKey = currentRecoveryKey ?: unlock(accountId, oldPassword)
 

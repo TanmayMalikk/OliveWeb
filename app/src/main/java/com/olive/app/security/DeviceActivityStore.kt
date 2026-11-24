@@ -674,7 +674,7 @@ internal class AndroidDeviceLock(
      * @return The resulting subtitle.
      */
     private fun subtitle(value: DeviceLockRequest) = activity.getString(
-        when {
+        value.subtitleRes ?: when {
             value.settingsChange -> R.string.entry_confirm_settings
             value.challenge.enrolling -> R.string.entry_confirm_setup
             else -> R.string.entry_unlock_description
