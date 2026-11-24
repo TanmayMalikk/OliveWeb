@@ -51,10 +51,10 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 /**
- * Composes the observe emergency alerts UI element.
+ * Keeps the displayed emergency alerts scoped to the current session.
  *
  * @param session Shared session view model owning application state and actions.
- * @return The resulting [Pair] for observe emergency alerts.
+ * @return The loaded alerts and any error message. The alerts are null until the first load completes.
  */
 @Composable
 internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<EmergencyAlert>?, String?> {
@@ -656,7 +656,7 @@ internal fun EmergencyAlertDialog(
 }
 
 /**
- * Composes the emergency location preview UI element.
+ * Displays the current map positions available for the emergency alert's owner.
  *
  * @param session Shared session view model owning application state and actions.
  * @param ownerUid Firebase UID of the resource owner.

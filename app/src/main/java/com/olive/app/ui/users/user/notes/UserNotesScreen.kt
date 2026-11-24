@@ -729,7 +729,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
 }
 
 /**
- * Computes note board kind label.
+ * Selects the label resource for the note or incident filter.
  *
  * @param kind Optional kind supplied to [noteBoardKindLabel].
  * @return The computed note board kind label numeric value.

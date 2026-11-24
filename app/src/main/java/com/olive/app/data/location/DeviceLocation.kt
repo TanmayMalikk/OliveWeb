@@ -784,7 +784,7 @@ internal data class SupportMapCenter(val latitude: Double, val longitude: Double
 
 internal data class LoadedSupportArea(val center: SupportMapCenter, val result: NearbySupportResult) {
     /**
-     * Computes covers.
+     * Checks whether a point lies within the radius of a loaded support search.
      *
      * @param point Point supplied to [covers].
      * @return `true` if covers, or `false` otherwise.
@@ -794,7 +794,7 @@ internal data class LoadedSupportArea(val center: SupportMapCenter, val result: 
 }
 
 /**
- * Computes support distance meters.
+ * Calculates the great-circle distance between two coordinates in meters.
  *
  * @param lat Latitude supplied to [supportDistanceMeters].
  * @param lon Longitude supplied to [supportDistanceMeters].

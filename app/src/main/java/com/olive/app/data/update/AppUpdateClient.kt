@@ -174,7 +174,7 @@ internal class AppUpdateClient(
         private const val READ_TIMEOUT_MS = 30_000
 
         /**
-         * Computes file name.
+         * Builds the local APK filename from the release version code.
          *
          * @param versionCode Version code supplied to [fileName].
          * @return The resulting file name string.
@@ -215,7 +215,7 @@ internal data class AppReleaseManifest(
     val releaseNotes: List<String> = emptyList(),
 ) {
     /**
-     * Computes requires update.
+     * Checks whether a newer release is mandatory for the installed app version.
      *
      * @param installedVersion Installed version supplied to [requiresUpdate].
      * @return The resulting requires update.
@@ -467,7 +467,7 @@ internal object AppUpdateScheduler {
     }
 
     /**
-     * Computes announce release.
+     * Posts the release notification when Android allows Olive to send notifications.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @param versionName Version name supplied to [announceRelease].

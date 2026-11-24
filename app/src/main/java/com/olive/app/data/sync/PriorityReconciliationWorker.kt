@@ -272,7 +272,7 @@ internal class SyncCheckpointStore(
     }
 
     /**
-     * Computes non negative for this JSON object.
+     * Reads a required JSON long and rejects negative values.
      *
      * @receiver The JSON object containing the stored fields.
      * @param name Field, key, or display name.
@@ -635,7 +635,7 @@ internal data class SyncRevisions(
     }
 
     /**
-     * Computes value.
+     * Reads the applied revision for the requested sync domain.
      *
      * @param domain Domain supplied to [value].
      * @return The computed value numeric value.
@@ -648,7 +648,7 @@ internal data class SyncRevisions(
     }
 
     /**
-     * Computes with applied.
+     * Copies the revision state with an updated value for the requested sync domain.
      *
      * @param domain Domain supplied to [withApplied].
      * @param value Input value to store, parse, or format.
@@ -673,7 +673,7 @@ internal fun syncRevisionsFrom(uid: String, data: Map<String, Any?>?): SyncRevis
     data ?: return null
     if (data["ownerUid"] != uid || data["allowedUsers"] != listOf(uid)) return null
     /**
-     * Computes revision.
+     * Reads a nonnegative revision from a numeric field in the remote record.
      *
      * @param name Field, key, or display name.
      * @return The resulting revision.

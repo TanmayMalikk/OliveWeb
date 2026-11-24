@@ -43,7 +43,7 @@ import org.json.JSONObject
 internal fun fitnessAuthenticatedUid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
 
 /**
- * Computes fitness account key.
+ * Hashes the account ID for use in fitness storage names.
  *
  * @param uid Firebase UID of the target user account.
  * @return The resulting fitness account key string.
@@ -201,7 +201,7 @@ internal object FitnessAccountSync {
     }
 
     /**
-     * Computes meal.
+     * Queues a signed-in account's meal change for sync.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @param owner Owner supplied to [meal].
@@ -215,7 +215,7 @@ internal object FitnessAccountSync {
     }
 
     /**
-     * Computes water.
+     * Queues a signed-in account's water entry change for sync.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @param owner Owner supplied to [water].
@@ -252,7 +252,7 @@ internal object FitnessAccountSync {
     }
 
     /**
-     * Computes outbox.
+     * Opens the local queue for the specified account's pending fitness updates.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @param owner Owner supplied to [outbox].
@@ -779,7 +779,7 @@ internal class FitnessCoachClient(
 }
 
 /**
- * Computes coach goals.
+ * Builds the named goal values supplied to the fitness coach.
  *
  * @param profile Account profile details.
  * @return The resulting coach goals.
@@ -790,7 +790,7 @@ internal fun coachGoals(profile: FitnessProfile) = mapOf(
 )
 
 /**
- * Computes with coach goals for this fitness profile.
+ * Copies the fitness profile with valid goals supplied by the coach.
  *
  * @receiver The existing fitness profile that supplies the current goals.
  * @param goals Key-value mapping of goals entries.

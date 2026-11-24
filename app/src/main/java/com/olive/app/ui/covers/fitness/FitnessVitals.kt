@@ -588,7 +588,7 @@ internal object FitnessHealthConnect {
         HealthPermission.getReadPermission(HeartRateRecord::class))
 
     /**
-     * Computes available.
+     * Checks whether Health Connect is available on the device.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @return The resulting available.

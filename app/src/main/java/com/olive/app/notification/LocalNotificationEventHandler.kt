@@ -284,7 +284,7 @@ object LocalNotificationEventHandler {
     }
 
     /**
-     * Computes device ID.
+     * Reads or creates the stable installation ID used by local notification handling.
      *
      * @param context Android context used to access system services, resources, or storage.
      * @return The resulting device ID string.

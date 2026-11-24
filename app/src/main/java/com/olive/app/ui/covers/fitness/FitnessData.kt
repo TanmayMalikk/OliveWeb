@@ -392,10 +392,10 @@ internal class FitnessStore(private val context: Context, private val accountId:
     }
 
     /**
-     * Computes water total.
+     * Adds up the saved water entries for the requested day.
      *
-     * @param today Today supplied to [waterTotal].
-     * @return The computed water total numeric value.
+     * @param today The date whose stored water entries are read.
+     * @return The nonnegative total in milliliters, or zero if the saved entries cannot be read.
      */
     private fun waterTotal(today: LocalDate): Int = runCatching {
         val entries = JSONArray(preferences.getString("water_$today", "[]"))

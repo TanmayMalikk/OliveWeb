@@ -304,7 +304,7 @@ private val oliveLightColors = lightColorScheme(
 )
 
 /**
- * Composes the olive theme UI element.
+ * Applies the Olive Material theme and minimum touch target size to the supplied content.
  *
  * @param content Composable content lambda rendered inside this container.
  */
@@ -711,7 +711,7 @@ internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
 }
 
 /**
- * Composes the floating quick exit UI element.
+ * Displays the floating control that lets the user leave the private area.
  *
  * @param onClick Callback invoked when the control is activated.
  * @param modifier Compose modifier applied to the root layout.

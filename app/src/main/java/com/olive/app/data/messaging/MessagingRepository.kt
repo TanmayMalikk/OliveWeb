@@ -1011,6 +1011,7 @@ internal class ChatAccountAccessRecovery(
     /**
      * Extracts the set of participant UIDs stored on this conversation snapshot.
      *
+     * @receiver The Firestore conversation snapshot.
      * @return The participant UIDs, or an empty set when missing.
      */
     private fun DocumentSnapshot.participantIds(): Set<String> =
@@ -1019,6 +1020,7 @@ internal class ChatAccountAccessRecovery(
     /**
      * Extracts valid account recovery key wrappers mapped by owner UID from this conversation snapshot.
      *
+     * @receiver The Firestore conversation snapshot.
      * @return Map from owner UID to parsed [AccountKeysetWrappedKey] entries.
      */
     private fun DocumentSnapshot.accountRecoveryKeys(): Map<String, AccountKeysetWrappedKey> =

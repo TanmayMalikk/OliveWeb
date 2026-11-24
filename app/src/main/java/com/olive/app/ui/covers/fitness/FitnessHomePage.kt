@@ -362,12 +362,12 @@ internal val FitnessContinuousCorners = GenericShape { size, _ ->
 }
 
 /**
- * Composes the water tracker UI element.
+ * Shows daily water intake and opens the water logging controls.
  *
- * @param totalMl Total ml supplied to [WaterTracker].
- * @param goalMl Goal ml supplied to [WaterTracker].
+ * @param totalMl Water logged today in milliliters.
+ * @param goalMl Daily water goal in milliliters.
  * @param enabled Whether this feature or control is currently enabled.
- * @param onAdd Callback invoked when add changes or occurs.
+ * @param onAdd Receives the saved intake adjustment and daily goal in milliliters.
  */
 @Composable
 internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (Int, Int) -> Unit) {
@@ -420,7 +420,7 @@ private fun WaterLogDialog(
     val updatedGoal = goal.toIntOrNull()
     val total = (totalMl.toLong() + adjustment).coerceAtLeast(0)
     /**
-     * Computes adjust.
+     * Changes the pending water adjustment within the allowed range and prevents a negative daily total.
      *
      * @param amount Amount supplied to [adjust].
      */
@@ -519,7 +519,7 @@ private fun WaterLogDialog(
 }
 
 /**
- * Composes the water glass UI element.
+ * Draws an animated glass that fills as the user approaches the water goal.
  *
  * @param fraction Fraction supplied to [WaterGlass].
  * @param modifier Compose modifier applied to the root layout.

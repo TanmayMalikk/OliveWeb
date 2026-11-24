@@ -238,7 +238,7 @@ class OfflineMediaCache internal constructor(
     }
 
     /**
-     * Computes recent caching enabled.
+     * Reads whether the account has enabled caching of recently opened media.
      *
      * @param uid Firebase UID of the target user account.
      * @return `true` if recent caching enabled, or `false` otherwise.
@@ -536,7 +536,7 @@ class OfflineMediaCache internal constructor(
         rootJson.child(ACCOUNTS).child(uid).child(CANDIDATES)
 
     /**
-     * Computes account directory.
+     * Finds the account's cache directory using its hashed identifier.
      *
      * @param uid Firebase UID of the target user account.
      * @return The resulting account directory.
@@ -553,7 +553,7 @@ class OfflineMediaCache internal constructor(
         File(accountDirectory(uid), fileName.takeIf { it.matches(CACHE_FILE) } ?: "invalid")
 
     /**
-     * Computes matches.
+     * Checks that a cache file exists and matches the expected size and SHA-256 digest.
      *
      * @param file Local file to read, hash, process, or write.
      * @param size Size or count limit for the operation.
@@ -581,7 +581,7 @@ class OfflineMediaCache internal constructor(
     }
 
     /**
-     * Computes opaque name.
+     * Hashes an identifier before using it as a cache name.
      *
      * @param value Input value to store, parse, or format.
      * @return The resulting opaque name string.
@@ -801,7 +801,7 @@ internal class DocumentDownloadGate {
     private val locks=ConcurrentHashMap<String,Mutex>()
 
     /**
-     * Computes with document lock.
+     * Serializes cache operations that target the same document.
      *
      * @param documentId Unique identifier of the safety document.
      * @param block Callback or suspending lambda executed within this scope.

@@ -855,7 +855,7 @@ object InputPolicy {
     fun triggerHash(value: String): String = SecretVerifier.createTrigger(normalizeTrigger(value))
 
     /**
-     * Computes matches trigger.
+     * Checks the entered trigger against the stored verifier, including the legacy digest format.
      *
      * @param value Input value to store, parse, or format.
      * @param stored Stored supplied to [matchesTrigger].
@@ -876,7 +876,7 @@ object InputPolicy {
     private fun normalizeTrigger(value: String) = value.lowercase(Locale.ROOT).filterNot(Char::isWhitespace)
 
     /**
-     * Computes unsalted trigger hash.
+     * Hashes the normalized trigger using the legacy SHA-256 format.
      *
      * @param value Input value to store, parse, or format.
      * @return The resulting unsalted trigger hash string.

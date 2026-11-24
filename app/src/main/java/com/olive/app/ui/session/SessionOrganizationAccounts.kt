@@ -814,7 +814,7 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Computes preload.
+     * Starts loading the organization summary, accounts, and staff roster.
      */
     fun preload() {
         summary()
@@ -822,21 +822,21 @@ internal class AdminDataPreloader(private val runtime: SessionRuntime) {
         staff()
     }
     /**
-     * Computes summary.
+     * Loads the counts and summary displayed in the admin dashboard.
      *
      * @param force Whether to apply force.
      * @return The resulting summary.
      */
     fun summary(force: Boolean = false) = load(Dataset.Summary, force)
     /**
-     * Computes accounts.
+     * Loads the organization account list.
      *
      * @param force Whether to apply force.
      * @param showLoading Whether to show loading.
      */
     fun accounts(force: Boolean = false, showLoading: Boolean = false) = load(Dataset.Accounts, force, showLoading)
     /**
-     * Computes staff.
+     * Loads the staff roster for the admin workspace.
      *
      * @param force Whether to apply force.
      * @param showLoading Whether to show loading.

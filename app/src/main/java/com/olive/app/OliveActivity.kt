@@ -235,7 +235,7 @@ class OliveActivity : FragmentActivity() {
     }
 
     /**
-     * Handles the new intent event.
+     * Updates the activity's intent and forwards incoming call details to the session.
      *
      * @param intent Android intent containing the action and optional extras for this component.
      */

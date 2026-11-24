@@ -123,7 +123,7 @@ internal fun unattachedEmergencyEvidence(
 }
 
 /**
- * Computes emergency coordinates.
+ * Formats latitude and longitude to six decimal places for the emergency report.
  *
  * @param latitude Latitude supplied to [emergencyCoordinates].
  * @param longitude Longitude supplied to [emergencyCoordinates].
@@ -327,7 +327,7 @@ internal object EmergencyReportPdf {
         }
 
         /**
-         * Computes paragraph.
+         * Draws wrapped report text and leaves space before the next item.
          *
          * @param value Input value to store, parse, or format.
          * @param muted Whether to apply muted.
@@ -462,7 +462,7 @@ internal object EmergencyReportPdf {
         }
 
         /**
-         * Computes line.
+         * Draws a horizontal rule in the report and advances the layout position.
          */
         private fun line() {
             ensure(16f)

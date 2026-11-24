@@ -197,7 +197,7 @@ internal data class ManualNutritionDraft(
     val nutrients: Map<LabelNutrient, String> = emptyMap(),
 ) {
     /**
-     * Computes amount.
+     * Parses the entered nutrient amount, treating a blank optional field as zero.
      *
      * @param field Field supplied to [amount].
      * @return The computed amount number, or `null` if unavailable.
@@ -305,7 +305,7 @@ internal fun parseNutritionLabel(text: String): NutritionLabelReading {
 }
 
 /**
- * Computes manual draft from food.
+ * Copies a food's serving description and nutrient values into an editable manual draft.
  *
  * @param food Food supplied to [manualDraftFromFood].
  * @return The resulting manual draft from food.
@@ -478,7 +478,7 @@ internal fun servingBasis(description: String): ServingBasis? {
     return ServingBasis(amount, when(unit) { "kg" -> "g"; "l" -> "ml"; else -> unit }).takeIf { amount.isFinite() && amount > 0 }
 }
 /**
- * Computes serving units.
+ * Collects the distinct measurement units available across a food's serving options.
  *
  * @param food Food supplied to [servingUnits].
  * @return The resulting serving units.
@@ -617,7 +617,7 @@ internal enum class FoodLibrarySection(val label: Int) {
 }
 
 /**
- * Composes the remember saved foods UI element.
+ * Keeps saved foods in Compose state and observes changes from the food library.
  *
  * @param library Optional library supplied to [rememberSavedFoods].
  * @return List of resulting remember saved foods items.
@@ -633,7 +633,7 @@ internal fun rememberSavedFoods(library: FitnessFoodLibrary?): List<SavedFood> {
 }
 
 /**
- * Composes the food bookmark UI element.
+ * Shows whether a food is saved and lets the user toggle its saved state.
  *
  * @param saved Whether to apply saved.
  * @param enabled Whether this feature or control is currently enabled.
@@ -650,7 +650,7 @@ internal fun FoodBookmark(saved: Boolean, enabled: Boolean = true, onToggle: () 
 }
 
 /**
- * Computes recent food items for this lazy list scope.
+ * Adds recent search shortcuts and previously logged foods to the list.
  *
  * @receiver The lazy list scope that receives the item definitions.
  * @param foods Collection of foods values to process.
@@ -681,7 +681,7 @@ internal fun LazyListScope.recentFoodItems(
 }
 
 /**
- * Computes saved food items for this lazy list scope.
+ * Adds saved foods or an empty-state message to the list.
  *
  * @receiver The lazy list scope that receives the item definitions.
  * @param foods Collection of foods values to process.

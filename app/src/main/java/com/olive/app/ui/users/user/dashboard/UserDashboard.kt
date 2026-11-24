@@ -607,7 +607,7 @@ private enum class SafeHomeFeature(val page: SafePage, val label: Int, val icon:
 }
 
 /**
- * Composes the safe feature grid UI element.
+ * Arranges the private feature cards in a layout that adapts to the current font scale.
  *
  * @param session Shared session view model owning application state and actions.
  */
@@ -703,7 +703,7 @@ private fun SafeFeatureCard(
 }
 
 /**
- * Composes the safe home shortcuts UI element.
+ * Arranges the profile and account activity shortcuts for the available width and font scale.
  *
  * @param session Shared session view model owning application state and actions.
  */
@@ -735,7 +735,7 @@ private fun SafeHomeShortcuts(session: SessionViewModel) {
 }
 
 /**
- * Composes the safe home shortcut UI element.
+ * Displays an outlined shortcut button and runs its action when selected.
  *
  * @param label Accessible label or display caption.
  * @param icon Icon supplied to [SafeHomeShortcut].

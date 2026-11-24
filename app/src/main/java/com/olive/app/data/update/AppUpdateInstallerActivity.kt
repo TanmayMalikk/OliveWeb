@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Computes install updates permission intent.
+ * Builds the Android settings intent for allowing Olive to install updates.
  *
  * @param context Android context used to access system services, resources, or storage.
  * @return The resulting install updates permission intent.
@@ -68,7 +68,7 @@ class AppUpdateInstallerActivity : ComponentActivity() {
     }
 
     /**
-     * Handles the save instance state event.
+     * Records whether package installation has started so the activity can restore its state.
      *
      * @param outState Out state supplied to [onSaveInstanceState].
      */
@@ -106,7 +106,7 @@ class AppUpdateInstallerActivity : ComponentActivity() {
     }
 
     /**
-     * Computes continue install.
+     * Continues with the prepared APK or opens Android settings to request install permission.
      */
     private fun continueInstall() {
         val file = preparedFile ?: return
@@ -133,7 +133,7 @@ class AppUpdateInstallerActivity : ComponentActivity() {
 }
 
 /**
- * Composes the app update installer content UI element.
+ * Displays the update installer's current stage and corresponding actions.
  *
  * @param version Version supplied to [AppUpdateInstallerContent].
  * @param stage Stage supplied to [AppUpdateInstallerContent].

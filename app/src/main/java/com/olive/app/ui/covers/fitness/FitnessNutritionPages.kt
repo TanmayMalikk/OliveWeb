@@ -224,7 +224,7 @@ private fun MealHeader(meal: MealType, entries: List<FoodLogEntry>, enabled: Boo
 }
 
 /**
- * Composes the localized name UI element.
+ * Looks up the localized display name for a meal type.
  *
  * @receiver The meal category to localize.
  * @return The resulting localized name string.
@@ -251,7 +251,7 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
 }
 
 /**
- * Composes the calories overview UI element.
+ * Shows calories logged and progress toward the daily calorie goal.
  *
  * @param snapshot Firestore or data snapshot containing the latest state.
  */
@@ -306,7 +306,7 @@ private fun CaloriesOverview(snapshot: FitnessSnapshot) {
 }
 
 /**
- * Composes the macro overview UI element.
+ * Shows carbohydrates, fat, and protein against their daily goals.
  *
  * @param snapshot Firestore or data snapshot containing the latest state.
  */
@@ -334,7 +334,7 @@ private fun MacroOverview(snapshot: FitnessSnapshot) {
 }
 
 /**
- * Composes the other nutrients UI element.
+ * Shows the expandable breakdown of additional nutrients.
  *
  * @param totals Totals supplied to [OtherNutrients].
  */

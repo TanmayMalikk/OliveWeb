@@ -144,7 +144,7 @@ internal class OnDeviceMediaPreprocessor(
     }
 
     /**
-     * Computes normalized pass through mime.
+     * Normalizes a MIME type for an unmodified file and uses the binary default when it is blank.
      *
      * @param mimeType MIME content type of the payload.
      * @return The resulting normalized pass through mime.
@@ -328,7 +328,7 @@ internal class ImageMediaCompressor {
     }
 
     /**
-     * Computes replace.
+     * Recycles the previous bitmap when the next processing step produces a replacement.
      *
      * @param previous Previous supplied to [replace].
      * @param next Next supplied to [replace].
@@ -371,7 +371,7 @@ internal object ImageCompressionPolicy {
     fun isSupportedStillMime(mimeType:String)=normalizedMimeType(mimeType) in eligibleMimeTypes
 
     /**
-     * Computes detect mime type.
+     * Reads file header bytes to recognize a supported image format.
      *
      * @param file Local file to read, hash, process, or write.
      * @return The resulting detect mime type string, or `null` when unavailable.
@@ -445,7 +445,7 @@ internal object ImageCompressionPolicy {
     }
 
     /**
-     * Computes sample size.
+     * Calculates the bitmap decoder's sample size for the requested dimension limit.
      *
      * @param width Target or source width in pixels or layout units.
      * @param height Target or source height in pixels or layout units.
@@ -658,7 +658,7 @@ internal class VideoMediaCompressor(private val context:Context) {
                 lateinit var transformer:Transformer
                 val listener=object:Transformer.Listener {
                     /**
-                     * Handles the completed event.
+                     * Resumes the suspended export after the video transformer finishes.
                      *
                      * @param composition Composition supplied to [onCompleted].
                      * @param exportResult Export result supplied to [onCompleted].
@@ -668,7 +668,7 @@ internal class VideoMediaCompressor(private val context:Context) {
                     }
 
                     /**
-                     * Handles the error event.
+                     * Resumes the suspended export with the video transformer's exception.
                      *
                      * @param composition Composition supplied to [onError].
                      * @param exportResult Export result supplied to [onError].
@@ -905,7 +905,7 @@ internal object VideoCompressionPolicy {
     }
 
     /**
-     * Computes even.
+     * Rounds a dimension down to an even value with a minimum of two pixels.
      *
      * @param value Input value to store, parse, or format.
      * @return The resulting even.

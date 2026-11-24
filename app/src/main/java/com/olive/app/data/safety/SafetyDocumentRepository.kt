@@ -150,6 +150,7 @@ internal fun SafetyDocument.isChatOnlyMedia(): Boolean =
 /**
  * Applies authenticated private metadata after the document key is recovered on-device.
  *
+ * @receiver The document whose private metadata is being applied.
  * @param metadata Decrypted JSON authenticated by the document's AES-GCM key.
  * @return A viewer-ready copy without persisting plaintext metadata.
  */
@@ -1047,7 +1048,7 @@ class IndexedSafetyDocumentRepository(
     override suspend fun getFor(uid: String, id: String): SafetyDocument = remote.getFor(uid, id)
 
     /**
-     * Computes cached for.
+     * Finds a document in the local index if the account is still listed as a recipient.
      *
      * @param uid Firebase UID of the target user account.
      * @param id ID supplied to [cachedFor].

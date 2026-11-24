@@ -195,7 +195,7 @@ private fun AddressTextField(
 }
 
 /**
- * Composes the address autocomplete UI element.
+ * Displays an address field with suggestions that the user can select.
  *
  * @param current Current supplied to [AddressAutocomplete].
  * @param label Accessible label or display caption.
@@ -296,19 +296,19 @@ private const val FIRST_BIRTH_YEAR = 1927
 private const val YEARS_PER_GROUP = 10
 
 /**
- * Computes birthday years.
+ * Groups supported birth years into ranges for the date picker.
  *
- * @param today Today supplied to [birthdayYears].
- * @return List of resulting birthday years items.
+ * @param today The date used to bound the supported years.
+ * @return The year ranges ordered from newest to oldest.
  */
 internal fun birthdayYears(today: LocalDate): List<IntRange> =
     (maxOf(FIRST_BIRTH_YEAR, today.minusYears(130).year)..today.year)
         .chunked(YEARS_PER_GROUP).asReversed().map { it.first()..it.last() }
 
 /**
- * Composes the remember birthday input UI element.
+ * Keeps the selected birthday across recompositions and saved-state restoration.
  *
- * @param initialDate Initial date supplied to [rememberBirthdayInput].
+ * @param initialDate The saved birth date to show when the picker first opens.
  * @return The saveable state containing the selected birth date.
  */
 @Composable
@@ -512,7 +512,7 @@ private fun BirthdayPickerDialog(
 }
 
 /**
- * Computes spoken year for this int.
+ * Formats the year as a whole number for the date picker's spoken label.
  *
  * @receiver The numeric year to format for spoken output.
  * @return The resulting spoken year string.

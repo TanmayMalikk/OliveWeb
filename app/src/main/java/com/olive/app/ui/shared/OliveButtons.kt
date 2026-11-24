@@ -596,7 +596,7 @@ private fun SkeletonCard(
 }
 
 /**
- * Composes the skeleton lines UI element.
+ * Draws stacked loading placeholders with the requested relative widths.
  *
  * @param widths Variable number of widths arguments.
  * @param modifier Compose modifier applied to the root layout.
@@ -640,7 +640,7 @@ private fun MetricRow(columns: Int, compact: Boolean = false) {
 }
 
 /**
- * Composes the skeleton actions UI element.
+ * Draws a row of placeholders for actions while their content loads.
  *
  * @param count Count supplied to [SkeletonActions].
  */
@@ -652,7 +652,7 @@ private fun SkeletonActions(count: Int) {
 }
 
 /**
- * Composes the food result placeholder UI element.
+ * Reserves space for a food search result while it loads.
  */
 @Composable
 private fun FoodResultPlaceholder() {
@@ -664,7 +664,7 @@ private fun FoodResultPlaceholder() {
 }
 
 /**
- * Composes the fitness chart placeholder UI element.
+ * Reserves space for a chart and its labels while fitness data loads.
  */
 @Composable
 private fun FitnessChartPlaceholder() {
@@ -681,7 +681,7 @@ private fun FitnessChartPlaceholder() {
 }
 
 /**
- * Composes the skeleton block UI element.
+ * Draws a loading placeholder with the supplied size, shape, and color.
  *
  * @param modifier Compose modifier applied to the root layout.
  * @param shape Shape supplied to [SkeletonBlock].
