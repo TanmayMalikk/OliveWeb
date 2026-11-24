@@ -46,15 +46,17 @@ import com.olive.app.ui.shared.OlivePrivateLayout
 import com.olive.app.ui.shared.OliveTextButton
 
 internal val LocalWalkthroughTour = staticCompositionLocalOf<((String) -> Unit)?> { null }
+internal val LocalWalkthroughSettingsTab = staticCompositionLocalOf<String?> { null }
 
 /**
  * Renders the floating OliveGreen walkthrough coachmark popup above live application screens
+ * (including above the open `+` Support menu when showcasing staff help and emergency features)
  * without covering Quick Exit or blocking real screen interactions.
  *
- * @param role Account role used to filter walkthrough topics.
- * @param activeTopicId Active coachmark topic ID, or `null` when no tour is running.
+ * @param role Account role used to resolve role-allowed tour steps.
+ * @param activeStepId Active coachmark step ID, or `null` when no tour is running.
  * @param showBottomControls Whether floating corner controls (`Quick exit` / `+`) occupy the bottom edge.
- * @param onAdvance Callback invoked with the next topic ID or `null` when finishing the tour.
+ * @param onAdvance Callback invoked with the next step ID or `null` when finishing the tour.
  * @param onOpenContents Callback returning the user to the Walkthrough Table of Contents.
  * @param onSkip Callback dismissing the coachmark popup in place.
  * @param modifier Modifier applied to the overlay container.
@@ -63,41 +65,42 @@ internal val LocalWalkthroughTour = staticCompositionLocalOf<((String) -> Unit)?
 @Composable
 internal fun WalkthroughCoachmarkOverlay(
     role: AccountRole,
-    activeTopicId: String?,
+    activeStepId: String?,
     showBottomControls: Boolean,
     onAdvance: (String?) -> Unit,
     onOpenContents: () -> Unit,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (activeTopicId == null) return
-    val topics = remember(role) { walkthroughTopicsForRole(role) }
-    val activeIndex = topics.indexOfFirst { it.id == activeTopicId }
+    if (activeStepId == null) return
+    val steps = remember(role) { walkthroughTourStepsForRole(role) }
+    val activeIndex = steps.indexOfFirst { it.id == activeStepId }
     if (activeIndex < 0) return
-    val topic = topics[activeIndex]
-    val prevId = nextWalkthroughTourTopicId(topics, topic.id, -1)
-    val nextId = nextWalkthroughTourTopicId(topics, topic.id, 1)
-    val arrowIcon = when (topic.arrow) {
+    val step = steps[activeIndex]
+    val prevId = nextWalkthroughTourStepId(steps, step.id, -1)
+    val nextId = nextWalkthroughTourStepId(steps, step.id, 1)
+    val arrowIcon = when (step.arrow) {
         WalkthroughArrow.SouthEast -> Icons.Outlined.SouthEast
         WalkthroughArrow.SouthWest -> Icons.Outlined.SouthWest
         WalkthroughArrow.NorthEast -> Icons.Outlined.NorthEast
         WalkthroughArrow.North -> Icons.Outlined.North
         WalkthroughArrow.South -> Icons.Outlined.South
     }
-    val alignment = when (topic.anchor) {
+    val alignment = when (step.anchor) {
         WalkthroughAnchor.BottomEnd -> Alignment.BottomEnd
         WalkthroughAnchor.BottomStart -> Alignment.BottomStart
         WalkthroughAnchor.TopEnd -> Alignment.TopEnd
         WalkthroughAnchor.TopCenter -> Alignment.TopCenter
         WalkthroughAnchor.BottomCenter -> Alignment.BottomCenter
     }
+    val topPadding = if (step.openSupportMenu) 16.dp else 64.dp
     val bottomPadding = if (showBottomControls) OlivePrivateLayout.FloatingActionClearance + 8.dp else 16.dp
-    val titleText = stringResource(topic.titleRes)
+    val titleText = stringResource(step.titleRes)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = bottomPadding),
+            .padding(start = 16.dp, end = 16.dp, top = topPadding, bottom = bottomPadding),
     ) {
         Surface(
             shape = MaterialTheme.shapes.large,
@@ -121,7 +124,7 @@ internal fun WalkthroughCoachmarkOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        stringResource(R.string.walkthrough_tour_step_counter, activeIndex + 1, topics.size),
+                        stringResource(R.string.walkthrough_tour_step_counter, activeIndex + 1, steps.size),
                         style = MaterialTheme.typography.labelLarge,
                         color = Color.White.copy(alpha = 0.9f),
                     )
@@ -154,7 +157,7 @@ internal fun WalkthroughCoachmarkOverlay(
                     )
                 }
                 Text(
-                    stringResource(topic.stepResIds.first()),
+                    stringResource(step.bodyRes),
                     fontSize = 15.sp,
                     lineHeight = 21.sp,
                     color = Color.White,

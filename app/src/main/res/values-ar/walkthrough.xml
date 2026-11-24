@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="walkthrough_subtitle">اختر أي ميزة من جدول المحتويات لبدء جولة إرشادية تفاعلية مباشرة داخل شاشة Olive Branch الحقيقية.</string>
+    <string name="walkthrough_subtitle">اختر أي ميزة من جدول المحتويات لبدء جولة إرشادية تفاعلية مباشرة داخل شاشات Olive Branch الحقيقية.</string>
     <string name="walkthrough_toc_title">جدول المحتويات</string>
-    <string name="walkthrough_toc_subtitle">اختر ميزة لبدء الجولة الإرشادية داخل التطبيق (%1$d مواضيع)</string>
+    <string name="walkthrough_toc_subtitle">اختر ميزة لاستكشاف جميع أدواتها مباشرة (%1$d فئات)</string>
+    <string name="walkthrough_toc_step_count">%1$d خطوات</string>
     <string name="walkthrough_start_tour">بدء الجولة الكاملة</string>
     <string name="walkthrough_tour_step_counter">الخطوة %1$d من %2$d</string>
     <string name="walkthrough_tour_next">التالي</string>
@@ -15,14 +16,14 @@
     <string name="walkthrough_cat_support">الدعم والطوارئ</string>
     <string name="walkthrough_cat_account">الحساب والأمان</string>
 
-    <string name="walkthrough_topic_cover_title">تطبيقات الواجهة والدخول السري</string>
-    <string name="walkthrough_topic_cover_summary">أخفِ Olive Branch كتطبيق أخبار أو لياقة وادخل بعبارتك السرية أو أيقونة الزيتونة المخفية.</string>
+    <string name="walkthrough_topic_cover_title">تبويبات الإعدادات والدخول السري</string>
+    <string name="walkthrough_topic_cover_summary">استعرض جميع تبويبات الإعدادات: الملف والواجهة، كلمة المرور والعبارة السرية، الخصوصية وPasskey، والأذونات.</string>
     <string name="walkthrough_topic_cover_step_1">اختر Daily Digest أو Fitness Tracker في الإعدادات ليظهر اسم التطبيق وأيقونته بشكل عادي على هاتفك.</string>
     <string name="walkthrough_topic_cover_step_2">اكتب عبارة التفعيل السرية في شريط بحث الواجهة أو انقر مرتين على أيقونة الزيتونة في صفحة الحساب.</string>
     <string name="walkthrough_topic_cover_step_3">أدخل رمز PIN المكوّن من 4–6 أرقام أو قفل جهاز Android لفتح مساحتك الآمنة.</string>
 
-    <string name="walkthrough_topic_exit_title">الخروج السريع والقفل التلقائي</string>
-    <string name="walkthrough_topic_exit_summary">عد فوراً إلى تطبيق الواجهة أو دع عدم النشاط يقفل جلستك الخاصة تلقائياً.</string>
+    <string name="walkthrough_topic_exit_title">اختصارات الرئيسية والخروج السريع</string>
+    <string name="walkthrough_topic_exit_summary">تعرّف على الخروج السريع والكاميرا الخاصة وملفي الشخصي وسجل النشاط وتنبيهات التحديث.</string>
     <string name="walkthrough_topic_exit_step_1">اضغط على زر الخروج السريع العائم في أي شاشة خاصة للعودة الفورية إلى تطبيق الواجهة.</string>
     <string name="walkthrough_topic_exit_step_2">تبديل التطبيقات أو إيقاف الشاشة يقفل مساحتك الآمنة تلقائياً.</string>
     <string name="walkthrough_topic_exit_step_3">من الإعدادات ← الخصوصية، اضبط مؤقت القفل عند عدم النشاط بما يناسبك.</string>
@@ -34,50 +35,118 @@
     <string name="walkthrough_topic_plan_step_3">شارك خطتك مع جهات اتصال مقبولة أو اطلب استشارة من موظفي الدعم.</string>
 
     <string name="walkthrough_topic_notes_title">الملاحظات وسجلات الوقائع</string>
-    <string name="walkthrough_topic_notes_summary">دوّن ملاحظات خاصة ووقائع مؤرخة مع موقع GPS أو خريطة ومرفقات وتثبيت وسجل تعديلات.</string>
+    <string name="walkthrough_topic_notes_summary">دوّن ملاحظات خاصة ووقائع مؤرخة مع خريطة GPS ومرفقات وتثبيت وبحث وسجل تعديلات ومهملات.</string>
     <string name="walkthrough_topic_notes_step_1">أنشئ ملاحظة عامة أو واقعة تتضمن التاريخ والوقت والموقع والمرفقات المشفّرة.</string>
     <string name="walkthrough_topic_notes_step_2">ثبّت السجلات المهمة في الأعلى، وصفِّ حسب النوع، وابحث بالكلمات المفتاحية.</string>
     <string name="walkthrough_topic_notes_step_3">اعرض سجل التعديلات لكل عنصر، أو شاركه مع جهة موثوقة، أو استعد العناصر من المهملات.</string>
 
     <string name="walkthrough_topic_docs_title">المستندات المشفّرة والكاميرا والتعرّف الضوئي</string>
-    <string name="walkthrough_topic_docs_summary">احفظ ملفات مشفّرة، والتقط صوراً داخل التطبيق، واستخرج النصوص محلياً وشاركها بأمان.</string>
+    <string name="walkthrough_topic_docs_summary">احفظ ملفات مشفّرة بـ AES، والتقط صوراً داخل التطبيق، واستخرج النص بـ OCR محلياً وشارك بأمان.</string>
     <string name="walkthrough_topic_docs_step_1">ارفع ملفات PDF أو صوراً أو فيديو أو صوتاً؛ يُشفّر كل ملف على جهازك قبل الرفع.</string>
     <string name="walkthrough_topic_docs_step_2">استخدم الكاميرا المدمجة لالتقاط المستندات مباشرة دون حفظها في معرض الهاتف العام.</string>
     <string name="walkthrough_topic_docs_step_3">شغّل التعرّف الضوئي على النصوص (OCR) على الجهاز وشارك الملفات المحددة مع جهات الاتصال المقبولة.</string>
 
-    <string name="walkthrough_topic_chat_title">الأصدقاء والرسائل والصوت والمكالمات</string>
-    <string name="walkthrough_topic_chat_summary">تواصل عبر طلبات الصداقة أو رموز دعوة لمدة 48 ساعة، وأرسل رسائل وملاحظات صوتية مشفّرة أو أجرِ مكالمات.</string>
+    <string name="walkthrough_topic_chat_title">الأصدقاء والرسائل والصوت والوسائط والمكالمات</string>
+    <string name="walkthrough_topic_chat_summary">أضف أصدقاء أو رموز دعوة 48 ساعة، وأرسل صوتيات محادثة، وشارك وسائط وملاحظات وخططاً وموقعاً، واتصل وابحث.</string>
     <string name="walkthrough_topic_chat_step_1">أضف أشخاصاً موثوقين بالبحث عن اسم المستخدم أو بإنشاء رمز أو رابط دعوة صالح لمدة 48 ساعة.</string>
     <string name="walkthrough_topic_chat_step_2">تبادل نصوصاً مشفّرة ورسائل صوتية داخل المحادثة فقط ومرفقات وملاحظات وخطط أمان ومواقع مباشرة.</string>
     <string name="walkthrough_topic_chat_step_3">ابدأ مكالمة صوتية مشفّرة، أو ابحث في الرسائل، أو تراجع عن إرسال رسالة، أو افتح معلومات المحادثة.</string>
 
     <string name="walkthrough_topic_location_title">الموقع المباشر والملاحة</string>
-    <string name="walkthrough_topic_location_summary">شارك موقعك الفوري مع جهات مختارة، واعرض المواقع المشاركة معك، واحصل على اتجاهات خطوة بخطوة.</string>
+    <string name="walkthrough_topic_location_summary">شارك موقعك الفوري، وتصفّح الأماكن المحفوظة، واعرض المواقع المشاركة، وابدأ الملاحة خطوة بخطوة.</string>
     <string name="walkthrough_topic_location_step_1">افتح خريطة الموقع لرؤية موقعك الحالي ودليل الأماكن المحفوظة.</string>
     <string name="walkthrough_topic_location_step_2">ابدأ مشاركة الموقع المباشر مع جهات محددة، وعدّل المستلمين أو أوقف المشاركة في أي وقت.</string>
     <string name="walkthrough_topic_location_step_3">اختر جهة اتصال تشارك موقعها أو ابحث عن وجهة لبدء الملاحة خطوة بخطوة.</string>
 
     <string name="walkthrough_topic_staff_title">مساعدة الموظفين ومحادثات الدعم</string>
-    <string name="walkthrough_topic_staff_summary">تواصل مع موظفي دعم المنظمة في محادثة برقم تذكرة أو صعّد محادثة حالية.</string>
+    <string name="walkthrough_topic_staff_summary">افتح قائمة الدعم (+) لطلب مساعدة موظف دعم المنظمة أو تصعيد محادثة حالية.</string>
     <string name="walkthrough_topic_staff_step_1">افتح قائمة الدعم (+) واضغط على طلب مساعدة من الموظفين، أو اطلب الدعم من داخل محادثة حالية.</string>
     <string name="walkthrough_topic_staff_step_2">انتظر ريثما يعيّن Olive Branch موظفاً متاحاً (يمكنك إلغاء الطلب في أي وقت قبل التعيين).</string>
     <string name="walkthrough_topic_staff_step_3">تحدث مع الموظف المعيّن، وشارك الملاحظات أو الخطط، وأضف صديقاً مقبولاً إلى التذكرة عند الحاجة.</string>
 
-    <string name="walkthrough_topic_emergency_title">تقرير الطوارئ PDF</string>
-    <string name="walkthrough_topic_emergency_summary">أنشئ ملف PDF مشفّراً للطوارئ يتضمن ملفك وملاحظاتك وإحداثيات GPS وأرسل تنبيهاً للمسؤولين.</string>
+    <string name="walkthrough_topic_emergency_title">تنبيه وتقرير الطوارئ PDF</string>
+    <string name="walkthrough_topic_emergency_summary">افتح قائمة الدعم (+) لإنشاء ملف PDF مشفّر للطوارئ مع GPS وإرسال تنبيه للمسؤولين.</string>
     <string name="walkthrough_topic_emergency_step_1">فعّل الطوارئ من قائمة الدعم (+) أو اضغط مطولاً على أيقونة زيتونة الواجهة لمدة ثانيتين.</string>
     <string name="walkthrough_topic_emergency_step_2">يجمع Olive Branch بيانات ملفك وسجلات الوقائع وإحداثياتك الحالية في ملف PDF مشفّر داخل المستندات.</string>
     <string name="walkthrough_topic_emergency_step_3">عند الاتصال بالإنترنت، يتلقى مسؤولو المنظمة تنبيه طوارئ مع تقريرك وتتبع موقعك المباشر.</string>
 
     <string name="walkthrough_topic_hotlines_title">الخطوط الساخنة وجهات الاتصال الموثوقة</string>
-    <string name="walkthrough_topic_hotlines_summary">تصفّح خطوط المساعدة والملاجئ الكندية حسب المنطقة وأدر قائمة جهات اتصالك الآمنة.</string>
+    <string name="walkthrough_topic_hotlines_summary">تصفّح خطوط المساعدة والملاجئ الكندية، واحفظ المفضلة، وأدر قائمة جهات اتصالك الآمنة.</string>
     <string name="walkthrough_topic_hotlines_step_1">افتح موارد الخطوط الساخنة لتصفية خطوط الأزمات 24/7 والملاجئ والمساعدة القانونية والاستشارات حسب المقاطعة والمدينة.</string>
     <string name="walkthrough_topic_hotlines_step_2">اضغط على أيقونة القلب لحفظ الخدمات المهمة أو اتصل مباشرة أو اعرض مواقع الدليل على الخريطة.</string>
     <string name="walkthrough_topic_hotlines_step_3">في جهات الاتصال الموثوقة، سجّل تفاصيل العلاقة وحدد من يمكن الإقامة لديه بأمان واربط الأصدقاء.</string>
 
-    <string name="walkthrough_topic_activity_title">سجل النشاط ومفاتيح Passkey والإعدادات</string>
-    <string name="walkthrough_topic_activity_summary">راجع سجل الأمان، وسجّل مفتاح استرداد Passkey، وأدر أذونات التطبيق.</string>
+    <string name="walkthrough_topic_activity_title">سجل النشاط والأمان</string>
+    <string name="walkthrough_topic_activity_summary">راجع تعديلات الإعدادات المؤرخة، واستخدام العبارة السرية، ومحاولات PIN، وأحداث التقاط الشاشة.</string>
     <string name="walkthrough_topic_activity_step_1">افتح نشاط الحساب لمراجعة تعديلات الإعدادات وأحداث التفعيل ومحاولات إدخال PIN.</string>
     <string name="walkthrough_topic_activity_step_2">من الإعدادات ← الخصوصية، سجّل مفتاح استرداد Passkey لاستعادة ملفاتك ومحادثاتك المشفّرة على جهاز جديد.</string>
     <string name="walkthrough_topic_activity_step_3">استخدم الإعدادات ← الأذونات لمراجعة ومنح أذونات الكاميرا والميكروفون والموقع والإشعارات والصحة.</string>
+
+    <string name="wt_step_quick_exit_fab_title">الخروج السريع والقفل التلقائي</string>
+    <string name="wt_step_quick_exit_fab_body">اضغط على الخروج السريع في الزاوية السفلية في أي وقت لقفل مساحتك الآمنة والعودة إلى الواجهة.</string>
+    <string name="wt_step_home_header_shortcuts_title">الكاميرا الخاصة والاختصارات</string>
+    <string name="wt_step_home_header_shortcuts_body">استخدم أيقونة الكاميرا أعلى الشاشة للالتقاط المشفّر فوراً أو أيقونة الترس لفتح الإعدادات.</string>
+    <string name="wt_step_home_profile_activity_title">ملفي الشخصي وسجل النشاط</string>
+    <string name="wt_step_home_profile_activity_body">اعرض ملفك الشخصي أو راجع سجل النشاط أو ابدأ بأي أداة أمان رئيسية بالأسفل.</string>
+
+    <string name="wt_step_support_menu_staff_title">قائمة الدعم (+) · مساعدة الموظفين</string>
+    <string name="wt_step_support_menu_staff_body">فتحنا قائمة + لك: اضغط على طلب مساعدة من الموظفين للتواصل مع مختص عبر تذكرة دعم.</string>
+    <string name="wt_step_support_menu_staff_escalate_title">إلغاء الطلب وإضافة صديق</string>
+    <string name="wt_step_support_menu_staff_escalate_body">يمكنك الإلغاء قبل التعيين، وبعدها مشاركة الملاحظات والخطط أو إضافة صديق مقبول إلى التذكرة.</string>
+    <string name="wt_step_support_menu_emergency_title">قائمة الدعم (+) · تقرير الطوارئ</string>
+    <string name="wt_step_support_menu_emergency_body">اضغط الطوارئ هنا (أو اضغط الزيتونة ثانيتين في الواجهة) لإنشاء ملف PDF مشفّر يتضمن GPS.</string>
+    <string name="wt_step_support_menu_emergency_alert_title">تنبيهات المسؤولين المباشرة</string>
+    <string name="wt_step_support_menu_emergency_alert_body">عند الاتصال بالإنترنت، يُحفظ التقرير في المستندات ويُرسل تنبيه طوارئ مع التتبع المباشر للمسؤولين.</string>
+
+    <string name="wt_step_plan_checklists_title">الخطة الأساسية والاحتياطية والقائمة</string>
+    <string name="wt_step_plan_checklists_body">عدّل خطتك الأساسية والاحتياطية وحقيبة الطوارئ هنا؛ تُحفظ محلياً وتُزامن عند الاتصال.</string>
+    <string name="wt_step_plan_share_consult_title">مشاركة الخطة واستشارة الموظفين</string>
+    <string name="wt_step_plan_share_consult_body">شارك خطتك مع جهات مقبولة (ويمكنك الإلغاء أي وقت) أو اطلب استشارة خاصة مع الموظفين.</string>
+
+    <string name="wt_step_notes_create_title">إنشاء الملاحظات والوقائع المؤرخة</string>
+    <string name="wt_step_notes_create_body">سجّل ملاحظات خاصة أو وقائع بالتاريخ والوقت والموقع على الخريطة ومرفقات مشفّرة.</string>
+    <string name="wt_step_notes_pin_search_title">التثبيت والتصفية والبحث</string>
+    <string name="wt_step_notes_pin_search_body">ثبّت السجلات المهمة بالأعلى، وصفِّ حسب النوع، ورتّب بالتاريخ أو ابحث بالكلمات المفتاحية.</string>
+    <string name="wt_step_notes_history_trash_title">سجل التعديلات والمشاركة والمهملات</string>
+    <string name="wt_step_notes_history_trash_body">اعرض سجل تعديل كل عنصر أو شاركه مع صديق موثوق أو استعد المحذوفات خلال 30 يوماً.</string>
+
+    <string name="wt_step_docs_encrypted_vault_title">خزنة المستندات المشفّرة</string>
+    <string name="wt_step_docs_encrypted_vault_body">ارفع ملفات PDF أو صوراً أو فيديو أو صوتاً مشفّرة بـ AES؛ تبقى التسجيلات الصوتية داخل المحادثات فقط.</string>
+    <string name="wt_step_docs_private_camera_title">كاميرا داخل التطبيق (دون المعرض)</string>
+    <string name="wt_step_docs_private_camera_body">التقط صوراً أو فيديو داخل التطبيق لتحفظ مشفّرة مباشرة دون ظهورها في معرض الهاتف العام.</string>
+    <string name="wt_step_docs_ocr_share_title">التعرّف الضوئي OCR والمشاركة</string>
+    <string name="wt_step_docs_ocr_share_body">استخرج النصوص من صور المستندات محلياً وراجعها، ثم شارك الملفات المختارة مع جهات مقبولة.</string>
+
+    <string name="wt_step_chat_add_friends_title">الأصدقاء ورموز دعوة 48 ساعة</string>
+    <string name="wt_step_chat_add_friends_body">ابحث باسم المستخدم لإرسال طلب صداقة، أو أنشئ رمز دعوة أو رابطاً صالحاً لـ 48 ساعة.</string>
+    <string name="wt_step_chat_voice_messages_title">المحادثات والصوتيات الخاصة</string>
+    <string name="wt_step_chat_voice_messages_body">أنشئ محادثات فردية أو جماعية مشفّرة وأرسل رسائل صوتية تبقى محفوظة داخل المحادثة فقط.</string>
+    <string name="wt_step_chat_share_media_title">مشاركة الوسائط والملاحظات والخطط</string>
+    <string name="wt_step_chat_share_media_body">من مرفقات المحادثة، شارك صور الكاميرا أو المستندات أو الملاحظات أو خطط الأمان أو موقعك المباشر.</string>
+    <string name="wt_step_chat_calls_search_info_title">المكالمات والبحث والإلغاء والمعلومات</string>
+    <string name="wt_step_chat_calls_search_info_body">أجرِ مكالمات صوتية مشفّرة، وابحث في الرسائل، وألغِ الإرسال، أو افتح معلومات المحادثة.</string>
+
+    <string name="wt_step_loc_map_places_title">الخريطة التفاعلية ودليل الأماكن</string>
+    <string name="wt_step_loc_map_places_body">اعرض موقعك بالأعلى وتصفّح الملاجئ والعيادات والمساعدة القانونية مصنفة حسب المقاطعة.</string>
+    <string name="wt_step_loc_live_sharing_title">مشاركة الموقع المباشر</string>
+    <string name="wt_step_loc_live_sharing_body">شارك إحداثياتك الفورية لمدة محددة مع جهات اتصال مختارة، وعدّل المستلمين أو أوقف المشاركة أي وقت.</string>
+    <string name="wt_step_loc_navigation_title">الملاحة خطوة بخطوة</string>
+    <string name="wt_step_loc_navigation_body">اضغط على جهة تشارك موقعها معك أو اختر وجهة على الخريطة لبدء التوجيه خطوة بخطوة.</string>
+
+    <string name="wt_step_hotlines_directory_title">الخطوط الساخنة والملاجئ والمفضلة</string>
+    <string name="wt_step_hotlines_directory_body">صفِّ خطوط 24/7 والملاجئ والمساعدة القانونية؛ واحفظها بالقلب أو اتصل مباشرة أو اعرضها على الخريطة.</string>
+    <string name="wt_step_contacts_directory_title">دليل جهات الاتصال الموثوقة</string>
+    <string name="wt_step_contacts_directory_body">دوّن بيانات الأشخاص الموثوقين وحدد من يمكن الإقامة لديه بأمان واربطهم بأصدقاء المحادثة.</string>
+
+    <string name="wt_step_activity_audit_title">سجل النشاط والأمان</string>
+    <string name="wt_step_activity_audit_body">راجع تعديلات الإعدادات المؤرخة، وفتح العبارة السرية، ومحاولات PIN، وتنبيهات التقاط الشاشة.</string>
+
+    <string name="wt_step_settings_profile_cover_title">الإعدادات (الملف) · الواجهة والهوية</string>
+    <string name="wt_step_settings_profile_cover_body">غيّر تطبيق الواجهة واختر PIN أو قفل الجهاز وعدّل بيانات ملفك الشخصي وعنوانك.</string>
+    <string name="wt_step_settings_password_trigger_title">الإعدادات (كلمة المرور) · العبارة السرية</string>
+    <string name="wt_step_settings_password_trigger_body">حدّث كلمة المرور أو رمز PIN أو عبارة الدخول السرية بعد التحقق من بياناتك الحالية.</string>
+    <string name="wt_step_settings_privacy_passkey_title">الإعدادات (الخصوصية) · المهلة وPasskey</string>
+    <string name="wt_step_settings_privacy_passkey_body">اضبط مهلة القفل وحماية التقاط الشاشة وسجّل مفتاح استرداد Passkey لحفظ مفاتيحك المشفّرة.</string>
+    <string name="wt_step_settings_permissions_title">الإعدادات (الأذونات) · صلاحيات الجهاز</string>
+    <string name="wt_step_settings_permissions_body">راجع وأدر هنا أذونات الكاميرا والميكروفون والموقع بالخلفية والإشعارات وHealth Connect.</string>
 </resources>

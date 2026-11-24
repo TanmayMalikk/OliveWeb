@@ -35,7 +35,10 @@ import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
 import WalkthroughPage from "./WalkthroughPage";
 import { WalkthroughCoachmark } from "./WalkthroughCoachmark";
-import { walkthroughTopicsForRole } from "./WalkthroughCatalog";
+import {
+  firstWalkthroughStepForTopic,
+  walkthroughTourStepsForRole,
+} from "./WalkthroughCatalog";
 import {
   DocumentsPage,
   LocationPage,
@@ -96,7 +99,7 @@ export default function SafeApp() {
   const heading = useRef<HTMLHeadingElement>(null);
   const previousPage = useRef(s.page);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeTourTopicId, setActiveTourTopicId] = useState<string | null>(null);
+  const [activeTourStepId, setActiveTourStepId] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState(0);
   const [dismissedAt, setDismissedAt] = useState(0);
   useEffect(() => {
@@ -125,20 +128,40 @@ export default function SafeApp() {
   const title = s.page === "Home"
     ? isSafeContact ? "Safe contact space" : "Your Safe Space"
     : groups.flatMap(({ items }) => items).find(({ page }) => page === s.page)?.label;
-  const navigate = (page: Page) => {
+  const navigate = (page: Page, clearTour = true) => {
     setMenuOpen(false);
     s.clearMessage();
+    if (clearTour) setActiveTourStepId(null);
     if (s.page === page) heading.current?.focus();
     s.setPage(page);
   };
-  const startTour = (topicId: string) => {
-    const topic = walkthroughTopicsForRole(p.role).find((item) => item.id === topicId);
-    if (!topic) return;
-    setActiveTourTopicId(topic.id);
-    if (s.page !== topic.tourPage) navigate(topic.tourPage);
+  const startTour = (targetId: string) => {
+    const steps = walkthroughTourStepsForRole(p.role);
+    const step = steps.find((item) => item.id === targetId) ?? firstWalkthroughStepForTopic(p.role, targetId);
+    if (!step) return;
+    setActiveTourStepId(step.id);
+    if (s.page !== step.tourPage) navigate(step.tourPage, false);
   };
+  useEffect(() => {
+    if (!uid) return;
+    const key = `olive-walkthrough-seen:${uid}`;
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(key) === "1";
+      if (!seen) window.localStorage.setItem(key, "1");
+    } catch {
+      seen = true;
+    }
+    if (!seen) {
+      const firstStep = walkthroughTourStepsForRole(p.role)[0];
+      if (firstStep) {
+        setActiveTourStepId(firstStep.id);
+        if (s.page !== firstStep.tourPage) navigate(firstStep.tourPage, false);
+      }
+    }
+  }, [uid]);
   const triggerQuickExit = () => {
-    setActiveTourTopicId(null);
+    setActiveTourStepId(null);
     s.quickExit();
   };
 
@@ -207,7 +230,7 @@ export default function SafeApp() {
           </Suspense>
         </main>
         <footer className="safe-footer">
-          <button className="text-link" onClick={() => { setActiveTourTopicId(null); void s.perform(s.signOut); }}>Sign out</button>
+          <button className="text-link" onClick={() => { setActiveTourStepId(null); void s.perform(s.signOut); }}>Sign out</button>
         </footer>
       </div>
       {p.role === "USER" && (
@@ -216,16 +239,16 @@ export default function SafeApp() {
       {s.idleSeconds === null && (
         <WalkthroughCoachmark
           role={p.role}
-          activeTopicId={activeTourTopicId}
+          activeStepId={activeTourStepId}
           onAdvance={(nextId) => {
-            if (!nextId) setActiveTourTopicId(null);
+            if (!nextId) setActiveTourStepId(null);
             else startTour(nextId);
           }}
           onOpenContents={() => {
-            setActiveTourTopicId(null);
+            setActiveTourStepId(null);
             navigate("Walkthrough");
           }}
-          onSkip={() => setActiveTourTopicId(null)}
+          onSkip={() => setActiveTourStepId(null)}
         />
       )}
       {s.idleSeconds !== null && (

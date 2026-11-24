@@ -42,7 +42,7 @@ internal data class SessionNavigationState(
     val idleCountdownSeconds: Int? = null,
     val privacyBlackout: Boolean = false,
     val coverReset: Int = 0,
-    val walkthroughTourTopicId: String? = null,
+    val walkthroughTourStepId: String? = null,
 )
 
 internal data class SessionAccountState(
@@ -163,9 +163,9 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var coverReset: Int
         get() = navigationSnapshot.coverReset
         set(value) = updateNavigation { it.copy(coverReset = value) }
-    var walkthroughTourTopicId: String?
-        get() = navigationSnapshot.walkthroughTourTopicId
-        set(value) = updateNavigation { it.copy(walkthroughTourTopicId = value) }
+    var walkthroughTourStepId: String?
+        get() = navigationSnapshot.walkthroughTourStepId
+        set(value) = updateNavigation { it.copy(walkthroughTourStepId = value) }
 
     private val accountFlow = MutableStateFlow(SessionAccountState())
     val accountState = accountFlow.asStateFlow()

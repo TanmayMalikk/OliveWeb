@@ -1,4 +1,4 @@
-// All safe-app roles: Walkthrough Table of Contents launching live guided coachmark tours.
+// All safe-app roles: Walkthrough Table of Contents launching live multi-step coachmark tours.
 import {
   ArrowRight,
   BookOpen,
@@ -19,15 +19,19 @@ import { Button } from "../../../components/SharedComponents";
 import {
   clampWalkthroughStep,
   nextWalkthroughTopicIndex,
+  nextWalkthroughTourStepId,
   nextWalkthroughTourTopicId,
+  walkthroughStepCountForTopic,
   walkthroughTopicGroups,
   walkthroughTopicsForRole,
+  walkthroughTourStepsForRole,
   type WebWalkthroughTopic,
 } from "./WalkthroughCatalog";
 
 export {
   clampWalkthroughStep,
   nextWalkthroughTopicIndex,
+  nextWalkthroughTourStepId,
   nextWalkthroughTourTopicId,
   walkthroughTopicGroups,
   walkthroughTopicsForRole,
@@ -50,17 +54,19 @@ const TOPIC_ICONS: Record<string, typeof ShieldCheck> = {
 export default function WalkthroughPage({
   onStartTour,
 }: {
-  onStartTour?: (topicId: string) => void;
+  onStartTour?: (targetId: string) => void;
 }) {
   const session = useSession();
-  const topics = walkthroughTopicsForRole(session.profile?.role);
+  const role = session.profile?.role;
+  const topics = walkthroughTopicsForRole(role);
+  const steps = walkthroughTourStepsForRole(role);
   const groups = walkthroughTopicGroups(topics);
 
-  const launchTopic = (topic: WebWalkthroughTopic) => {
+  const launchTarget = (targetId: string, fallbackPage: WebWalkthroughTopic["tourPage"]) => {
     if (onStartTour) {
-      onStartTour(topic.id);
+      onStartTour(targetId);
     } else {
-      session.setPage(topic.tourPage);
+      session.setPage(fallbackPage);
     }
   };
 
@@ -71,8 +77,8 @@ export default function WalkthroughPage({
       <section className="panel" aria-labelledby="walkthrough-toc-heading">
         <h2 id="walkthrough-toc-heading">Table of contents</h2>
         <p>
-          Pick any feature below to open the live Olive Branch screen with an interactive popup guide
-          pointing right at the controls you use.
+          Pick any feature below to open the live Olive Branch screens and step through every tool
+          with floating guided popups.
         </p>
         <div
           style={{
@@ -84,10 +90,10 @@ export default function WalkthroughPage({
             marginTop: "0.75rem",
           }}
         >
-          <span className="tag">{topics.length} features</span>
+          <span className="tag">{steps.length} guided steps</span>
           <Button
             data-testid="walkthrough-start-tour"
-            onClick={() => topics[0] && launchTopic(topics[0])}
+            onClick={() => steps[0] && launchTarget(steps[0].id, steps[0].tourPage)}
           >
             <Play size={16} aria-hidden="true" /> Start full walkthrough
           </Button>
@@ -106,20 +112,22 @@ export default function WalkthroughPage({
               {group.topics.map((topic) => {
                 displayIndex += 1;
                 const TopicIcon = TOPIC_ICONS[topic.id] ?? BookOpen;
+                const stepCount = walkthroughStepCountForTopic(role, topic.id);
                 return (
                   <button
                     key={topic.id}
                     type="button"
                     className="safe-task"
                     data-testid={`walkthrough-toc-${topic.id}`}
-                    onClick={() => launchTopic(topic)}
+                    onClick={() => launchTarget(topic.id, topic.tourPage)}
                   >
                     <span className="safe-task-icon" aria-hidden="true">
                       <TopicIcon size={21} />
                     </span>
                     <span className="safe-task-copy">
                       <strong>
-                        {displayIndex}. {topic.title}
+                        {displayIndex}. {topic.title}{" "}
+                        <span className="tag">{stepCount} steps</span>
                       </strong>
                       <span>{topic.summary}</span>
                     </span>

@@ -42,10 +42,12 @@ import com.olive.app.ui.users.safecontact.SafeContactArea
 import com.olive.app.ui.users.shared.auth.*
 import com.olive.app.ui.users.shared.onboarding.ProfileSetup
 import com.olive.app.ui.users.shared.organization.OrganizationProfileSetup
-import com.olive.app.ui.users.shared.walkthrough.FirstVisitWalkthrough
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughSettingsTab
 import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughTour
 import com.olive.app.ui.users.shared.walkthrough.WalkthroughCoachmarkOverlay
-import com.olive.app.ui.users.shared.walkthrough.walkthroughTopicsForRole
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughVisits
+import com.olive.app.ui.users.shared.walkthrough.firstWalkthroughStepForTopic
+import com.olive.app.ui.users.shared.walkthrough.walkthroughTourStepsForRole
 import com.olive.app.ui.users.staff.StaffPortal
 import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
@@ -203,10 +205,30 @@ internal fun OliveRoot(
         navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    val activeTourTopicId = navigation.walkthroughTourTopicId
-    val startTour: (String) -> Unit = { topicId ->
-        val topic = walkthroughTopicsForRole(session.accountRole).firstOrNull { it.id == topicId }
-        if (topic != null) session.runtime.navigation.startWalkthroughTour(topic.id, topic.tourPage)
+    val activeTourStep = remember(session.accountRole, navigation.walkthroughTourStepId) {
+        walkthroughTourStepsForRole(session.accountRole).firstOrNull { it.id == navigation.walkthroughTourStepId }
+    }
+    val startTour: (String) -> Unit = { targetId ->
+        val steps = walkthroughTourStepsForRole(session.accountRole)
+        val step = steps.firstOrNull { it.id == targetId }
+            ?: firstWalkthroughStepForTopic(session.accountRole, targetId)
+        if (step != null) session.runtime.navigation.startWalkthroughTour(step.id, step.tourPage)
+    }
+    LaunchedEffect(callAccountId, navigation.screen, showPinAnimation) {
+        if (navigation.screen == SessionScreen.Safe && !showPinAnimation && callAccountId.isNotBlank()) {
+            val visits = WalkthroughVisits(context, callAccountId)
+            if (!visits.hasSeenInitialTour()) {
+                visits.markInitialTourSeen()
+                walkthroughTourStepsForRole(session.accountRole).firstOrNull()?.let { firstStep ->
+                    session.runtime.navigation.startWalkthroughTour(firstStep.id, firstStep.tourPage)
+                }
+            }
+        }
+    }
+    LaunchedEffect(activeTourStep?.id, activeTourStep?.openSupportMenu, navigation.screen, navigation.page) {
+        if (navigation.screen == SessionScreen.Safe) {
+            supportExpanded = activeTourStep?.openSupportMenu == true
+        }
     }
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
@@ -345,6 +367,7 @@ internal fun OliveRoot(
                                         LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
                                         LocalQuickExit provides if (userQuickExit) exit else null,
                                         LocalWalkthroughTour provides startTour,
+                                        LocalWalkthroughSettingsTab provides activeTourStep?.settingsTabTag,
                                         LocalSafeSystemLauncher provides systemLaunchers.open,
                                         LocalSafePermissionActions provides systemLaunchers.permissions,
                                         LocalSafeUpdateReminder provides update.onDownload,
@@ -406,39 +429,6 @@ internal fun OliveRoot(
                                         }
                                     }
                                 }
-                                val tourEligible = navigation.screen == SessionScreen.Safe && session.profile != null &&
-                                    !privacyHidden && !showPinAnimation && !supportExpanded &&
-                                    !callOverlayVisible && navigation.idleCountdownSeconds == null
-                                if (tourEligible && activeTourTopicId == null) {
-                                    FirstVisitWalkthrough(
-                                        accountId = callAccountId,
-                                        role = session.accountRole,
-                                        page = navigation.page,
-                                        onOpenGuide = startTour,
-                                        modifier = Modifier.align(Alignment.BottomCenter)
-                                            .padding(horizontal = 16.dp)
-                                            .padding(bottom = if (showQuickExit || showSupport)
-                                                OlivePrivateLayout.FloatingActionClearance else 12.dp)
-                                            .widthIn(max = 440.dp)
-                                            .heightIn(max = 240.dp),
-                                    )
-                                }
-                                if (tourEligible && activeTourTopicId != null) {
-                                    WalkthroughCoachmarkOverlay(
-                                        role = session.accountRole,
-                                        activeTopicId = activeTourTopicId,
-                                        showBottomControls = showQuickExit || showSupport,
-                                        onAdvance = { nextId ->
-                                            if (nextId == null) session.runtime.navigation.dismissWalkthroughTour()
-                                            else startTour(nextId)
-                                        },
-                                        onOpenContents = {
-                                            session.runtime.navigation.dismissWalkthroughTour()
-                                            session.navigation.openSafePage(SafePage.Walkthrough)
-                                        },
-                                        onSkip = { session.runtime.navigation.dismissWalkthroughTour() },
-                                    )
-                                }
                             }
                         }
                         if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
@@ -462,7 +452,35 @@ internal fun OliveRoot(
                             showQuickExit,
                             showSupport,
                             supportExpanded
-                        ) { supportExpanded = it }
+                        ) { nextExpanded ->
+                            supportExpanded = nextExpanded
+                            if ((nextExpanded && activeTourStep?.openSupportMenu != true) ||
+                                (!nextExpanded && activeTourStep?.openSupportMenu == true)
+                            ) {
+                                session.runtime.navigation.dismissWalkthroughTour()
+                            }
+                        }
+                        if (navigation.screen == SessionScreen.Safe && session.profile != null &&
+                            activeTourStep != null && !privacyHidden && !showPinAnimation &&
+                            !callOverlayVisible && navigation.idleCountdownSeconds == null &&
+                            (!supportExpanded || activeTourStep.openSupportMenu)
+                        ) {
+                            WalkthroughCoachmarkOverlay(
+                                role = session.accountRole,
+                                activeStepId = activeTourStep.id,
+                                showBottomControls = showQuickExit || showSupport,
+                                onAdvance = { nextId ->
+                                    if (nextId == null) session.runtime.navigation.dismissWalkthroughTour()
+                                    else startTour(nextId)
+                                },
+                                onOpenContents = {
+                                    session.runtime.navigation.dismissWalkthroughTour()
+                                    session.navigation.openSafePage(SafePage.Walkthrough)
+                                },
+                                onSkip = { session.runtime.navigation.dismissWalkthroughTour() },
+                                modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+                            )
+                        }
                     }
                 }
             }

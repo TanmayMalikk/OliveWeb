@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="walkthrough_subtitle">Choisissez une fonctionnalité dans la table des matières pour démarrer une visite guidée directement dans l’écran réel d’Olive Branch.</string>
+    <string name="walkthrough_subtitle">Choisissez une fonctionnalité dans la table des matières pour démarrer une visite guidée interactive dans les écrans réels d’Olive Branch.</string>
     <string name="walkthrough_toc_title">Table des matières</string>
-    <string name="walkthrough_toc_subtitle">Sélectionnez une fonctionnalité pour démarrer la visite guidée (%1$d sujets)</string>
+    <string name="walkthrough_toc_subtitle">Sélectionnez un sujet pour explorer tous ses outils (%1$d catégories)</string>
+    <string name="walkthrough_toc_step_count">%1$d étapes</string>
     <string name="walkthrough_start_tour">Démarrer la visite complète</string>
     <string name="walkthrough_tour_step_counter">Étape %1$d sur %2$d</string>
     <string name="walkthrough_tour_next">Suivant</string>
@@ -15,14 +16,14 @@
     <string name="walkthrough_cat_support">Soutien et urgence</string>
     <string name="walkthrough_cat_account">Compte et sécurité</string>
 
-    <string name="walkthrough_topic_cover_title">Applications de couverture et accès secret</string>
-    <string name="walkthrough_topic_cover_summary">Déguisez Olive Branch en Daily Digest ou Fitness Tracker et entrez avec votre phrase secrète ou l’olive cachée.</string>
+    <string name="walkthrough_topic_cover_title">Onglets des paramètres et accès secret</string>
+    <string name="walkthrough_topic_cover_summary">Parcourez tous les onglets de Paramètres : Profil et couverture, Mot de passe et phrase secrète, Confidentialité et Passkey, Autorisations.</string>
     <string name="walkthrough_topic_cover_step_1">Choisissez Daily Digest ou Fitness Tracker dans les paramètres pour adapter l’icône et le nom de l’application.</string>
     <string name="walkthrough_topic_cover_step_2">Saisissez votre phrase déclencheuse dans la recherche ou touchez deux fois la petite olive dans l’onglet Compte.</string>
     <string name="walkthrough_topic_cover_step_3">Validez votre NIP à 4–6 chiffres ou le verrouillage de l’appareil Android pour ouvrir votre espace sécurisé.</string>
 
-    <string name="walkthrough_topic_exit_title">Sortie rapide et verrouillage automatique</string>
-    <string name="walkthrough_topic_exit_summary">Revenez instantanément à la couverture ou laissez l’inactivité verrouiller votre session privée.</string>
+    <string name="walkthrough_topic_exit_title">Raccourcis Accueil et Sortie rapide</string>
+    <string name="walkthrough_topic_exit_summary">Explorez la Sortie rapide, la caméra privée, Mon profil, l’activité du compte et les rappels de mise à jour.</string>
     <string name="walkthrough_topic_exit_step_1">Appuyez sur le bouton flottant Sortie rapide depuis n’importe quel écran privé pour revenir immédiatement à la couverture.</string>
     <string name="walkthrough_topic_exit_step_2">Changer d’application ou éteindre l’écran verrouille automatiquement votre espace sécurisé.</string>
     <string name="walkthrough_topic_exit_step_3">Dans Paramètres → Confidentialité, réglez le délai d’inactivité selon vos besoins.</string>
@@ -34,50 +35,118 @@
     <string name="walkthrough_topic_plan_step_3">Partagez votre plan avec des contacts acceptés ou demandez une consultation avec le personnel.</string>
 
     <string name="walkthrough_topic_notes_title">Notes et rapports d’incidents</string>
-    <string name="walkthrough_topic_notes_summary">Rédigez des notes privées et des incidents datés avec position GPS, pièces jointes, épinglage et historique.</string>
+    <string name="walkthrough_topic_notes_summary">Rédigez des notes privées et des incidents datés avec lieu GPS, pièces jointes, épinglage, recherche, historique et corbeille.</string>
     <string name="walkthrough_topic_notes_step_1">Créez une note ou un incident avec date, heure, lieu sur la carte et fichiers chiffrés joints.</string>
     <string name="walkthrough_topic_notes_step_2">Épinglez les entrées importantes, filtrez par type et recherchez par mot-clé.</string>
     <string name="walkthrough_topic_notes_step_3">Consultez l’historique des modifications, partagez une entrée avec un contact ou restaurez depuis la corbeille.</string>
 
     <string name="walkthrough_topic_docs_title">Documents chiffrés, caméra et ROC</string>
-    <string name="walkthrough_topic_docs_summary">Stockez des fichiers chiffrés, prenez des photos dans l’application, extrayez le texte par ROC et partagez en sécurité.</string>
+    <string name="walkthrough_topic_docs_summary">Stockez des fichiers chiffrés AES, prenez des photos dans l’application, extrayez le texte par ROC et partagez en sécurité.</string>
     <string name="walkthrough_topic_docs_step_1">Importez des PDF, photos, vidéos ou audios ; chaque fichier est chiffré sur votre appareil avant l’envoi.</string>
     <string name="walkthrough_topic_docs_step_2">Utilisez la caméra intégrée pour capturer des preuves sans les enregistrer dans la galerie publique.</string>
     <string name="walkthrough_topic_docs_step_3">Exécutez la reconnaissance de texte (ROC) sur l’appareil et partagez les documents choisis avec vos contacts.</string>
 
-    <string name="walkthrough_topic_chat_title">Amis, messages, voix et appels</string>
-    <string name="walkthrough_topic_chat_summary">Ajoutez des contacts par demande ou code de 48 h, envoyez des messages et notes vocales chiffrés ou appelez.</string>
+    <string name="walkthrough_topic_chat_title">Amis, messages, voix, médias et appels</string>
+    <string name="walkthrough_topic_chat_summary">Ajoutez des amis ou codes de 48 h, envoyez des notes vocales dans le chat, partagez médias/notes/plans/position, appelez et cherchez.</string>
     <string name="walkthrough_topic_chat_step_1">Ajoutez des personnes de confiance par nom d’utilisateur ou avec un code d’invitation unique valable 48 heures.</string>
     <string name="walkthrough_topic_chat_step_2">Échangez des messages chiffrés, des messages vocaux uniquement dans le chat, des notes, des plans ou votre position.</string>
     <string name="walkthrough_topic_chat_step_3">Passez un appel vocal chiffré, recherchez dans la discussion, annulez un envoi ou ouvrez Infos de discussion.</string>
 
     <string name="walkthrough_topic_location_title">Position en direct et navigation</string>
-    <string name="walkthrough_topic_location_summary">Partagez votre position en temps réel, voyez les positions partagées avec vous et lancez un itinéraire.</string>
+    <string name="walkthrough_topic_location_summary">Partagez votre position en temps réel, explorez les lieux enregistrés, voyez les positions partagées et lancez un itinéraire.</string>
     <string name="walkthrough_topic_location_step_1">Ouvrez la carte pour voir votre position actuelle et le répertoire des lieux enregistrés.</string>
     <string name="walkthrough_topic_location_step_2">Activez le partage de position en direct avec les contacts choisis et arrêtez-le à tout moment.</string>
     <string name="walkthrough_topic_location_step_3">Sélectionnez un contact ou une destination pour suivre l’itinéraire étape par étape.</string>
 
     <string name="walkthrough_topic_staff_title">Aide du personnel et tickets de soutien</string>
-    <string name="walkthrough_topic_staff_summary">Contactez le personnel de soutien dans une discussion avec numéro de ticket ou transférez une conversation.</string>
+    <string name="walkthrough_topic_staff_summary">Ouvrez le menu Soutien (+) pour demander l’aide du personnel ou transférer une conversation.</string>
     <string name="walkthrough_topic_staff_step_1">Ouvrez le menu Soutien (+) et appuyez sur Demander l’aide du personnel, ou depuis une discussion existante.</string>
     <string name="walkthrough_topic_staff_step_2">Patientez pendant l’attribution d’un membre disponible (vous pouvez annuler la demande à tout moment).</string>
     <string name="walkthrough_topic_staff_step_3">Discutez avec le personnel, partagez vos éléments et ajoutez un ami accepté au ticket si nécessaire.</string>
 
-    <string name="walkthrough_topic_emergency_title">Rapport PDF d’urgence</string>
-    <string name="walkthrough_topic_emergency_summary">Créez un PDF d’urgence chiffré avec votre profil, vos notes et votre position GPS et alertez les administrateurs.</string>
+    <string name="walkthrough_topic_emergency_title">Alerte et rapport PDF d’urgence</string>
+    <string name="walkthrough_topic_emergency_summary">Ouvrez le menu Soutien (+) pour générer un PDF d’urgence chiffré avec GPS et alerter les administrateurs.</string>
     <string name="walkthrough_topic_emergency_step_1">Déclenchez Urgence depuis le menu Soutien (+) ou maintenez l’icône olive de couverture pendant 2 secondes.</string>
     <string name="walkthrough_topic_emergency_step_2">Olive Branch rassemble votre profil, vos incidents et vos coordonnées GPS dans un PDF chiffré dans Documents.</string>
     <string name="walkthrough_topic_emergency_step_3">En ligne, les administrateurs reçoivent une alerte d’urgence avec votre rapport et le suivi sur la carte.</string>
 
     <string name="walkthrough_topic_hotlines_title">Lignes d’aide et contacts de confiance</string>
-    <string name="walkthrough_topic_hotlines_summary">Parcourez les lignes d’aide et refuges canadiens par région et gérez vos contacts de confiance.</string>
+    <string name="walkthrough_topic_hotlines_summary">Parcourez les lignes d’aide et refuges canadiens, enregistrez vos favoris et gérez vos contacts de confiance.</string>
     <string name="walkthrough_topic_hotlines_step_1">Filtrez les lignes d’urgence 24/7, refuges, services juridiques et counselling par province et ville.</string>
     <string name="walkthrough_topic_hotlines_step_2">Touchez le cœur pour enregistrer un service, appelez directement ou affichez les lieux sur la carte.</string>
     <string name="walkthrough_topic_hotlines_step_3">Dans Contacts de confiance, notez les détails, indiquez chez qui loger en sécurité et liez un ami du chat.</string>
 
-    <string name="walkthrough_topic_activity_title">Historique d’activité, clés d’accès et paramètres</string>
-    <string name="walkthrough_topic_activity_summary">Consultez le journal d’audit, enregistrez une clé de récupération Passkey et gérez les autorisations.</string>
+    <string name="walkthrough_topic_activity_title">Activité du compte et journal de sécurité</string>
+    <string name="walkthrough_topic_activity_summary">Consultez les changements de paramètres, déclencheurs de couverture, tentatives de NIP et alertes de capture.</string>
     <string name="walkthrough_topic_activity_step_1">Ouvrez Activité du compte pour vérifier les changements de paramètres, déclencheurs et tentatives de NIP.</string>
     <string name="walkthrough_topic_activity_step_2">Dans Paramètres → Confidentialité, ajoutez une clé Passkey pour récupérer vos fichiers chiffrés sur un nouvel appareil.</string>
     <string name="walkthrough_topic_activity_step_3">Utilisez Paramètres → Autorisations pour gérer caméra, micro, localisation, notifications et santé.</string>
+
+    <string name="wt_step_quick_exit_fab_title">Sortie rapide et verrouillage</string>
+    <string name="wt_step_quick_exit_fab_body">Appuyez sur Sortie rapide en bas à droite à tout moment pour verrouiller l’espace et revenir à la couverture.</string>
+    <string name="wt_step_home_header_shortcuts_title">Caméra privée et raccourcis</string>
+    <string name="wt_step_home_header_shortcuts_body">Utilisez l’icône caméra pour capturer des preuves chiffrées ou la roue dentée pour ouvrir Paramètres.</string>
+    <string name="wt_step_home_profile_activity_title">Mon profil et Activité du compte</string>
+    <string name="wt_step_home_profile_activity_body">Consultez Mon profil, vérifiez le journal Activité du compte ou lancez un outil ci-dessous.</string>
+
+    <string name="wt_step_support_menu_staff_title">Menu Soutien (+) · Personnel</string>
+    <string name="wt_step_support_menu_staff_body">Nous avons ouvert le menu + : appuyez sur Demander l’aide du personnel pour joindre un intervenant par ticket.</string>
+    <string name="wt_step_support_menu_staff_escalate_title">Annulation et ajout d’un ami</string>
+    <string name="wt_step_support_menu_staff_escalate_body">Vous pouvez annuler avant l’attribution, puis partager des notes ou ajouter un ami accepté à la discussion.</string>
+    <string name="wt_step_support_menu_emergency_title">Menu Soutien (+) · PDF d’urgence</string>
+    <string name="wt_step_support_menu_emergency_body">Appuyez sur Urgence ici (ou maintenez l’olive 2 s sur la couverture) pour créer un PDF chiffré avec GPS.</string>
+    <string name="wt_step_support_menu_emergency_alert_title">Alertes d’urgence aux admins</string>
+    <string name="wt_step_support_menu_emergency_alert_body">En ligne, Urgence enregistre le PDF dans Documents et envoie une alerte avec suivi carte aux administrateurs.</string>
+
+    <string name="wt_step_plan_checklists_title">Plan principal, secours et listes</string>
+    <string name="wt_step_plan_checklists_body">Modifiez votre plan principal, votre plan de secours et la liste d’urgence. Enregistré hors ligne et synchronisé ensuite.</string>
+    <string name="wt_step_plan_share_consult_title">Partage et consultation du personnel</string>
+    <string name="wt_step_plan_share_consult_body">Partagez le plan avec des contacts acceptés (révocable à tout moment) ou demandez une consultation privée.</string>
+
+    <string name="wt_step_notes_create_title">Notes et incidents datés</string>
+    <string name="wt_step_notes_create_body">Enregistrez des notes ou des incidents avec date, heure, position GPS/carte et pièces jointes chiffrées.</string>
+    <string name="wt_step_notes_pin_search_title">Épingler, filtrer et trier</string>
+    <string name="wt_step_notes_pin_search_body">Épinglez les dossiers essentiels en haut, filtrez par type, triez par date ou recherchez par mot-clé.</string>
+    <string name="wt_step_notes_history_trash_title">Historique, partage et corbeille</string>
+    <string name="wt_step_notes_history_trash_body">Consultez l’historique des modifications, partagez avec un ami ou restaurez depuis la corbeille sous 30 jours.</string>
+
+    <string name="wt_step_docs_encrypted_vault_title">Coffre de documents chiffrés</string>
+    <string name="wt_step_docs_encrypted_vault_body">Importez des PDF, photos, vidéos ou audios chiffrés AES sur l’appareil. Les vocaux restent uniquement dans le chat.</string>
+    <string name="wt_step_docs_private_camera_title">Caméra privée intégrée</string>
+    <string name="wt_step_docs_private_camera_body">Prenez des photos ou vidéos directement dans Olive Branch sans jamais les enregistrer dans la galerie publique.</string>
+    <string name="wt_step_docs_ocr_share_title">ROC locale et partage sécurisé</string>
+    <string name="wt_step_docs_ocr_share_body">Extrayez et vérifiez le texte des photos sur l’appareil par ROC, puis partagez les fichiers choisis avec vos amis.</string>
+
+    <string name="wt_step_chat_add_friends_title">Amis et codes d’invitation 48 h</string>
+    <string name="wt_step_chat_add_friends_body">Ajoutez des contacts par nom d’utilisateur ou générez un code ou lien d’invitation unique valable 48 heures.</string>
+    <string name="wt_step_chat_voice_messages_title">Chats, groupes et vocaux privés</string>
+    <string name="wt_step_chat_voice_messages_body">Discutez en privé ou en groupe et envoyez des messages vocaux chiffrés conservés uniquement dans le chat.</string>
+    <string name="wt_step_chat_share_media_title">Partager médias, notes et plans</string>
+    <string name="wt_step_chat_share_media_body">Depuis les pièces jointes d’un chat, envoyez photos caméra, Documents, Notes/Incidents, Plans ou position.</string>
+    <string name="wt_step_chat_calls_search_info_title">Appels, recherche, retrait et Infos</string>
+    <string name="wt_step_chat_calls_search_info_body">Passez un appel vocal chiffré, cherchez dans la discussion, annulez un envoi ou ouvrez Infos de discussion.</string>
+
+    <string name="wt_step_loc_map_places_title">Carte et répertoire des lieux</string>
+    <string name="wt_step_loc_map_places_body">Voyez votre position ci-dessus et parcourez refuges, cliniques et services juridiques filtrés par province.</string>
+    <string name="wt_step_loc_live_sharing_title">Partage de position en direct</string>
+    <string name="wt_step_loc_live_sharing_body">Partagez votre position en direct pour une durée choisie avec des contacts et modifiez ou arrêtez à tout moment.</string>
+    <string name="wt_step_loc_navigation_title">Navigation étape par étape</string>
+    <string name="wt_step_loc_navigation_body">Sélectionnez un contact qui partage sa position ou une destination pour lancer l’itinéraire guidé.</string>
+
+    <string name="wt_step_hotlines_directory_title">Lignes d’aide, refuges et favoris</string>
+    <string name="wt_step_hotlines_directory_body">Filtrez lignes 24/7, refuges et aide juridique au Canada ; ajoutez en favoris, appelez ou affichez sur la carte.</string>
+    <string name="wt_step_contacts_directory_title">Répertoire des contacts de confiance</string>
+    <string name="wt_step_contacts_directory_body">Notez les contacts sûrs, indiquez chez qui héberger en sécurité et associez-les à vos amis du chat.</string>
+
+    <string name="wt_step_activity_audit_title">Journal d’activité et de sécurité</string>
+    <string name="wt_step_activity_audit_body">Vérifiez les modifications horodatées, accès secrets, tentatives de NIP et alertes de capture d’écran.</string>
+
+    <string name="wt_step_settings_profile_cover_title">Paramètres (Profil) · Couverture et profil</string>
+    <string name="wt_step_settings_profile_cover_body">Changez d’app de couverture, choisissez NIP ou verrouillage appareil et modifiez votre profil ou adresse.</string>
+    <string name="wt_step_settings_password_trigger_title">Paramètres (Mot de passe) · Phrase secrète</string>
+    <string name="wt_step_settings_password_trigger_body">Modifiez mot de passe, NIP ou phrase déclencheuse secrète après vérification de vos identifiants.</string>
+    <string name="wt_step_settings_privacy_passkey_title">Paramètres (Confidentialité) · Délai et Passkey</string>
+    <string name="wt_step_settings_privacy_passkey_body">Réglez le délai d’inactivité, la protection anti-capture et enregistrez une clé de récupération Passkey.</string>
+    <string name="wt_step_settings_permissions_title">Paramètres (Autorisations) · Appareil</string>
+    <string name="wt_step_settings_permissions_body">Vérifiez et gérez ici les accès caméra, micro, position en arrière-plan, notifications et Santé.</string>
 </resources>

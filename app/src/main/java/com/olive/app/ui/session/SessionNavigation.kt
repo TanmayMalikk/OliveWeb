@@ -85,7 +85,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 activityCategory = null
                 screenHistory.clear()
                 safePageHistory.clear()
-                walkthroughTourTopicId = null
+                walkthroughTourStepId = null
                 if (accountRole == AccountRole.USER) profile = null
                 attempts = emptyList()
                 message = null
@@ -147,8 +147,8 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun back() {
         with(runtime) {
             with(state) {
-                if (screen == SessionScreen.Safe && walkthroughTourTopicId != null) {
-                    walkthroughTourTopicId = null
+                if (screen == SessionScreen.Safe && walkthroughTourStepId != null) {
+                    walkthroughTourStepId = null
                 } else if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
                 else if (screen == SessionScreen.Safe && page == SafePage.Activity && activityCategory != null) {
                     activityCategory = null
@@ -184,6 +184,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
             with(state) {
                 // Safe App pages use their own back stack before leaving the private area.
                 if (screen == SessionScreen.Safe) {
+                    walkthroughTourStepId = null
                     if (value != page) safePageHistory += page
                     page = value
                     message = null
@@ -208,17 +209,17 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Activates the live in-app walkthrough coachmark at [topicId] and navigates to [tourPage].
+     * Activates the live in-app walkthrough coachmark at [stepId] and opens [tourPage].
      *
-     * @param topicId Walkthrough topic identifier to display.
+     * @param stepId Walkthrough step identifier to display.
      * @param tourPage Destination safe page containing the live target controls.
      */
-    fun startWalkthroughTour(topicId: String, tourPage: SafePage) {
+    fun startWalkthroughTour(stepId: String, tourPage: SafePage) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe) return
-                walkthroughTourTopicId = topicId
                 if (page != tourPage) navigate(tourPage)
+                walkthroughTourStepId = stepId
             }
         }
     }
@@ -227,7 +228,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
      * Dismisses the active in-app walkthrough coachmark without leaving the current safe page.
      */
     fun dismissWalkthroughTour() {
-        runtime.state.walkthroughTourTopicId = null
+        runtime.state.walkthroughTourStepId = null
     }
 }
 

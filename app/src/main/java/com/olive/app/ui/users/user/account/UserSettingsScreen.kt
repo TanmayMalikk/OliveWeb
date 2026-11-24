@@ -71,6 +71,7 @@ import com.olive.app.ui.users.shared.navigation.FormColumn
 import com.olive.app.ui.users.shared.navigation.SafePermissionsSettings
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughSettingsTab
 import com.olive.app.ui.users.shared.onboarding.EmailConsentSection
 import com.olive.app.ui.shared.BirthdayPicker
 import com.olive.app.ui.shared.rememberBirthdayInput
@@ -90,6 +91,8 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val userRole = profile.role == AccountRole.USER
     val tabs = if (userRole) SettingsCategory.entries else accountSettingsTabs
     var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
+    val requestedTourTab = LocalWalkthroughSettingsTab.current
+    LaunchedEffect(requestedTourTab) { tabs.firstOrNull { it.tag == requestedTourTab }?.let { selectedTab = it } }
     val activeTab = selectedTab.takeIf { it in tabs } ?: SettingsCategory.Profile
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current

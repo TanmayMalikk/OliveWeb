@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="walkthrough_subtitle">从目录中选择任意功能，在 Olive Branch 真实界面中直接开启交互式引导提示。</string>
+    <string name="walkthrough_subtitle">从目录中选择任意功能，在 Olive Branch 真实界面中开启分步交互式引导。</string>
     <string name="walkthrough_toc_title">目录</string>
-    <string name="walkthrough_toc_subtitle">选择想要学习使用的功能，开启应用内引导（共 %1$d 项）</string>
+    <string name="walkthrough_toc_subtitle">选择想要学习的功能以实地浏览全部工具（共 %1$d 个分类）</string>
+    <string name="walkthrough_toc_step_count">%1$d 步</string>
     <string name="walkthrough_start_tour">开始完整引导</string>
     <string name="walkthrough_tour_step_counter">第 %1$d 步（共 %2$d 步）</string>
     <string name="walkthrough_tour_next">下一步</string>
@@ -15,14 +16,14 @@
     <string name="walkthrough_cat_support">支援与紧急求助</string>
     <string name="walkthrough_cat_account">账户与安全</string>
 
-    <string name="walkthrough_topic_cover_title">伪装应用与秘密入口</string>
-    <string name="walkthrough_topic_cover_summary">将 Olive Branch 伪装为每日摘要或健身追踪器，并通过秘密触发词或隐藏橄榄图标进入。</string>
+    <string name="walkthrough_topic_cover_title">设置选项卡与秘密入口</string>
+    <string name="walkthrough_topic_cover_summary">逐一浏览“设置”全部标签：个人资料与伪装应用、密码与触发短语、隐私与 Passkey 及设备权限。</string>
     <string name="walkthrough_topic_cover_step_1">在“设置”中选择“每日摘要”或“健身追踪器”，桌面图标和应用名称会随之切换。</string>
     <string name="walkthrough_topic_cover_step_2">在伪装页搜索栏输入秘密触发短语，或在伪装页“账户”页面双击小橄榄图标。</string>
     <string name="walkthrough_topic_cover_step_3">通过 4–6 位应用 PIN 码或 Android 设备锁验证，即可解锁您的安全空间。</string>
 
-    <string name="walkthrough_topic_exit_title">快速退出与自动锁定</string>
-    <string name="walkthrough_topic_exit_summary">随时一键返回伪装应用，或在无操作与切到后台时自动锁定私密空间。</string>
+    <string name="walkthrough_topic_exit_title">首页快捷方式与快速退出</string>
+    <string name="walkthrough_topic_exit_summary">了解快速退出、私密相机、我的资料、账户活动和更新提醒。</string>
     <string name="walkthrough_topic_exit_step_1">在任意私密页面点击角落的“快速退出”悬浮按钮，立即返回伪装应用。</string>
     <string name="walkthrough_topic_exit_step_2">切换应用或关闭屏幕时，安全空间会自动锁定。</string>
     <string name="walkthrough_topic_exit_step_3">在“设置 → 隐私”中调整闲置自动锁定时间及防截屏保护。</string>
@@ -34,50 +35,118 @@
     <string name="walkthrough_topic_plan_step_3">将安全计划共享给已接受的好友（可随时撤销），或点击请求工作人员咨询。</string>
 
     <string name="walkthrough_topic_notes_title">笔记与事件记录</string>
-    <string name="walkthrough_topic_notes_summary">记录私密笔记及带日期、GPS/地图位置、附件、置顶和编辑历史的事件档案。</string>
+    <string name="walkthrough_topic_notes_summary">记录私密笔记及带日期、GPS/地图位置、附件、置顶、搜索、编辑历史与回收站的事件档案。</string>
     <string name="walkthrough_topic_notes_step_1">创建普通“笔记”或记录包含日期、时间、位置及加密附件的“事件”。</string>
     <string name="walkthrough_topic_notes_step_2">将重要记录置顶、按笔记或事件筛选，并通过关键词搜索。</string>
     <string name="walkthrough_topic_notes_step_3">查看每条记录的修改历史、共享给信任联系人或从回收站恢复。</string>
 
     <string name="walkthrough_topic_docs_title">加密文档、相机与 OCR 识别</string>
-    <string name="walkthrough_topic_docs_summary">存储端到端加密文件、使用应用内相机拍摄、通过本地 OCR 提取文字并安全共享。</string>
+    <string name="walkthrough_topic_docs_summary">存储 AES 加密文件、使用应用内相机私密拍摄、本地 OCR 识别文字并安全共享。</string>
     <string name="walkthrough_topic_docs_step_1">上传 PDF、照片、视频或音频，所有文件在上传前均在本地完成加密。</string>
     <string name="walkthrough_topic_docs_step_2">使用应用内相机直接拍摄证据并加密保存，不会留存在系统公共相册中。</string>
     <string name="walkthrough_topic_docs_step_3">运行本地 OCR 识别图片中的文字并校对保存，随后将所选文件共享给联系人。</string>
 
-    <string name="walkthrough_topic_chat_title">好友、消息、语音与通话</string>
-    <string name="walkthrough_topic_chat_summary">通过好友请求或 48 小时邀请码连接，发送加密消息与仅限聊天的语音，或拨打加密电话。</string>
+    <string name="walkthrough_topic_chat_title">好友、消息、语音、媒体与通话</string>
+    <string name="walkthrough_topic_chat_summary">添加好友或 48 小时邀请码、发送仅限聊天的语音、分享媒体/笔记/计划/定位、通话、搜索与撤回。</string>
     <string name="walkthrough_topic_chat_step_1">通过用户名搜索添加信任的人，或生成 48 小时有效的一次性邀请码/链接。</string>
     <string name="walkthrough_topic_chat_step_2">在单聊或群聊中发送加密文字、仅在聊天中保存的语音消息、附件、笔记、安全计划或实时位置。</string>
     <string name="walkthrough_topic_chat_step_3">发起加密语音通话、搜索聊天记录、撤回消息，或打开“聊天信息”查看成员与共享内容。</string>
 
     <string name="walkthrough_topic_location_title">实时位置与导航</string>
-    <string name="walkthrough_topic_location_summary">向指定联系人共享实时位置、查看他人共享给您的位置并获取路线导航。</string>
+    <string name="walkthrough_topic_location_summary">向选定联系人共享实时位置、浏览已保存地点、查看他人共享定位并开启路线导航。</string>
     <string name="walkthrough_topic_location_step_1">打开位置地图查看当前定位及已保存的地点目录。</string>
     <string name="walkthrough_topic_location_step_2">向选定联系人开启指定时长的实时位置共享，并可随时增删接收人或停止共享。</string>
     <string name="walkthrough_topic_location_step_3">选择正在共享位置的联系人或搜索目的地，开启分段路线导航。</string>
 
     <string name="walkthrough_topic_staff_title">工作人员协助与支持工单</string>
-    <string name="walkthrough_topic_staff_summary">在带工单编号的支持对话中联系机构工作人员，或将现有聊天升级为工作人员支持。</string>
+    <string name="walkthrough_topic_staff_summary">打开支持菜单（+）请求机构工作人员协助或将现有聊天升级为支持工单。</string>
     <string name="walkthrough_topic_staff_step_1">打开底部支持菜单（+）并点击“请求工作人员协助”，或在现有对话中发起申请。</string>
     <string name="walkthrough_topic_staff_step_2">等待系统分配在线工作人员（分配完成前可随时取消申请）。</string>
     <string name="walkthrough_topic_staff_step_3">与工作人员沟通、共享相关笔记或计划，并可按需将已接受的好友加入支持工单。</string>
 
-    <string name="walkthrough_topic_emergency_title">紧急报告 PDF</string>
-    <string name="walkthrough_topic_emergency_summary">生成包含个人资料、事件记录和 GPS 坐标的加密紧急 PDF 报告，并向机构管理员发出警报。</string>
+    <string name="walkthrough_topic_emergency_title">紧急警报与报告 PDF</string>
+    <string name="walkthrough_topic_emergency_summary">打开支持菜单（+）生成含 GPS 位置的加密紧急 PDF 报告并向机构管理员发出警报。</string>
     <string name="walkthrough_topic_emergency_step_1">在安全空间的支持菜单（+）中点击“紧急求助”，或在伪装页长按橄榄图标 2 秒。</string>
     <string name="walkthrough_topic_emergency_step_2">Olive Branch 会将您的资料、事件记录与当前坐标打包为加密 PDF 并存入“文档”。</string>
     <string name="walkthrough_topic_emergency_step_3">联网状态下，机构管理员会收到紧急警报，并可查看报告 PDF 与实时地图位置。</string>
 
     <string name="walkthrough_topic_hotlines_title">援助热线与信任联系人</string>
-    <string name="walkthrough_topic_hotlines_summary">按地区浏览加拿大援助热线、庇护所和法律援助，并管理您的信任安全联系人名录。</string>
+    <string name="walkthrough_topic_hotlines_summary">浏览加拿大各地热线、庇护所与法律援助、收藏常用服务，并管理信任联系人名录。</string>
     <string name="walkthrough_topic_hotlines_step_1">打开“热线资源”，按省份和城市筛选 24/7 危机热线、庇护所、法律援助与心理咨询。</string>
     <string name="walkthrough_topic_hotlines_step_2">点击心形图标收藏重要服务、一键拨号，或在地图上查看目录地点并导航。</string>
     <string name="walkthrough_topic_hotlines_step_3">在“信任联系人”中记录关系说明、标记是否可安全借宿，并关联聊天好友。</string>
 
-    <string name="walkthrough_topic_activity_title">活动历史、通行密钥与设置</string>
-    <string name="walkthrough_topic_activity_summary">查看安全审计日志、注册 Passkey 账户恢复密钥并管理应用权限。</string>
+    <string name="walkthrough_topic_activity_title">账户活动与安全日志</string>
+    <string name="walkthrough_topic_activity_summary">查看带时间戳的设置更改、秘密入口解锁记录、PIN 尝试及截屏隐私警报。</string>
     <string name="walkthrough_topic_activity_step_1">打开“账户活动”查看带时间戳的设置更改、触发记录、PIN 码尝试与隐私事件。</string>
     <string name="walkthrough_topic_activity_step_2">在“设置 → 隐私”中注册 Passkey 账户恢复密钥，以便在新设备上恢复加密文档与聊天。</string>
     <string name="walkthrough_topic_activity_step_3">在“设置 → 权限”中查看并授权相机、麦克风、位置、通知和健康数据权限。</string>
+
+    <string name="wt_step_quick_exit_fab_title">快速退出与自动锁定</string>
+    <string name="wt_step_quick_exit_fab_body">随时点击右下角“快速退出”，立即锁定安全空间并返回伪装应用。</string>
+    <string name="wt_step_home_header_shortcuts_title">私密相机与顶部快捷方式</string>
+    <string name="wt_step_home_header_shortcuts_body">点击顶部相机可直接拍摄至加密存储，或点击齿轮图标进入设置。</string>
+    <string name="wt_step_home_profile_activity_title">我的资料与账户活动</string>
+    <string name="wt_step_home_profile_activity_body">查看个人资料、检查安全审计活动日志，或点击下方各安全工具卡片。</string>
+
+    <string name="wt_step_support_menu_staff_title">支持菜单（+）· 工作人员协助</string>
+    <string name="wt_step_support_menu_staff_body">已为您打开 + 菜单：点击“请求工作人员协助”即可在工单对话中联系机构支持人员。</string>
+    <string name="wt_step_support_menu_staff_escalate_title">取消排队与添加好友</string>
+    <string name="wt_step_support_menu_staff_escalate_body">分配前可随时取消；分配后可共享笔记或计划，也可将已接受的好友加入工单。</string>
+    <string name="wt_step_support_menu_emergency_title">支持菜单（+）· 紧急 PDF</string>
+    <string name="wt_step_support_menu_emergency_body">在此点击“紧急求助”（或在伪装页长按橄榄 2 秒），即可将资料、事件和 GPS 生成加密 PDF。</string>
+    <string name="wt_step_support_menu_emergency_alert_title">管理员紧急警报</string>
+    <string name="wt_step_support_menu_emergency_alert_body">联网时触发紧急求助会在“文档”保存报告，并向管理员发送含实时地图定位的警报。</string>
+
+    <string name="wt_step_plan_checklists_title">主计划、备用方案与清单</string>
+    <string name="wt_step_plan_checklists_body">在此编辑首选计划、备用步骤和应急随身清单；修改离线保存并在联网后同步。</string>
+    <string name="wt_step_plan_share_consult_title">共享计划与工作人员咨询</string>
+    <string name="wt_step_plan_share_consult_body">选择已接受的联系人共享计划（可随时撤销），或发起私密工作人员咨询。</string>
+
+    <string name="wt_step_notes_create_title">创建笔记与带日期事件</string>
+    <string name="wt_step_notes_create_body">记录普通私密笔记，或创建含日期、时间、地图/GPS 位置与加密附件的事件档案。</string>
+    <string name="wt_step_notes_pin_search_title">置顶、筛选与搜索</string>
+    <string name="wt_step_notes_pin_search_body">将重要记录置顶，按笔记或事件筛选，按时间排序或输入关键词搜索。</string>
+    <string name="wt_step_notes_history_trash_title">编辑历史、共享与回收站</string>
+    <string name="wt_step_notes_history_trash_body">查看单条修改历史、共享给信任好友，或在 30 天内从回收站恢复已删内容。</string>
+
+    <string name="wt_step_docs_encrypted_vault_title">加密文档保险库</string>
+    <string name="wt_step_docs_encrypted_vault_body">上传本地 AES 加密的 PDF、照片、视频或音频；语音消息仅保留在聊天中。</string>
+    <string name="wt_step_docs_private_camera_title">应用内相机（不存入相册）</string>
+    <string name="wt_step_docs_private_camera_body">在应用内直接拍摄照片或视频并加密保存，不会留存在手机系统公共相册中。</string>
+    <string name="wt_step_docs_ocr_share_title">本地 OCR 与安全共享</string>
+    <string name="wt_step_docs_ocr_share_body">在本地运行 OCR 提取并校对文档图片文字，然后将所选文件共享给已接受的好友。</string>
+
+    <string name="wt_step_chat_add_friends_title">添加好友与 48 小时邀请码</string>
+    <string name="wt_step_chat_add_friends_body">通过用户名搜索发送好友请求，或生成 48 小时内有效的一次性邀请码或链接。</string>
+    <string name="wt_step_chat_voice_messages_title">单聊、群聊与仅限聊天语音</string>
+    <string name="wt_step_chat_voice_messages_body">开展加密单聊或群聊，并录制仅保存在对话中的加密语音消息。</string>
+    <string name="wt_step_chat_share_media_title">分享媒体、笔记、计划与位置</string>
+    <string name="wt_step_chat_share_media_body">在对话附件中直接发送相机照片、加密文档、笔记/事件、安全计划或实时位置。</string>
+    <string name="wt_step_chat_calls_search_info_title">通话、搜索、撤回与聊天信息</string>
+    <string name="wt_step_chat_calls_search_info_body">发起加密语音通话、搜索消息、撤回已发消息，或打开“聊天信息”查看成员与共享项。</string>
+
+    <string name="wt_step_loc_map_places_title">交互地图与已保存地点</string>
+    <string name="wt_step_loc_map_places_body">在上方地图查看当前位置，按省份筛选庇护所、诊所、法律援助和支持地点。</string>
+    <string name="wt_step_loc_live_sharing_title">实时位置共享与时长</string>
+    <string name="wt_step_loc_live_sharing_body">向选定联系人按指定时长共享实时位置，可随时增删对象或停止共享。</string>
+    <string name="wt_step_loc_navigation_title">分段路线导航</string>
+    <string name="wt_step_loc_navigation_body">点击正在向您共享位置的联系人或地图目的地，即可开启分段路线导航。</string>
+
+    <string name="wt_step_hotlines_directory_title">求助热线、庇护所与收藏</string>
+    <string name="wt_step_hotlines_directory_body">筛选加拿大 24/7 热线、庇护所与法律援助；点击心形收藏、一键拨号或在地图查看。</string>
+    <string name="wt_step_contacts_directory_title">信任安全联系人名录</string>
+    <string name="wt_step_contacts_directory_body">记录信任联系人详情、标记紧急情况下可安全借宿的人，并关联您的聊天好友。</string>
+
+    <string name="wt_step_activity_audit_title">安全与活动审计日志</string>
+    <string name="wt_step_activity_audit_body">查看带时间戳的设置变更、伪装触发解锁、失败 PIN 尝试以及截屏/录屏检测事件。</string>
+
+    <string name="wt_step_settings_profile_cover_title">设置（资料页）· 伪装与资料</string>
+    <string name="wt_step_settings_profile_cover_body">切换伪装应用样式、设置应用 PIN 或设备锁，并编辑个人资料及邮寄地址。</string>
+    <string name="wt_step_settings_password_trigger_title">设置（密码页）· 触发词与凭证</string>
+    <string name="wt_step_settings_password_trigger_body">验证当前凭证后，更换账户密码、应用 PIN 或秘密伪装触发短语。</string>
+    <string name="wt_step_settings_privacy_passkey_title">设置（隐私页）· 闲置、防截屏与通行密钥</string>
+    <string name="wt_step_settings_privacy_passkey_body">设置闲置锁定时长、开启防截屏保护，并注册 Passkey 恢复密钥以迁移加密数据。</string>
+    <string name="wt_step_settings_permissions_title">设置（权限页）· 设备权限</string>
+    <string name="wt_step_settings_permissions_body">集中查看并授权相机、麦克风、后台位置、通知与 Health Connect 权限。</string>
 </resources>

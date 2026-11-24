@@ -4,6 +4,7 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.ui.users.shared.navigation.SafePage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,6 +18,7 @@ class SafeWalkthroughTest {
         assertTrue(userTopics.all { it.stepResIds.size == 3 })
         assertEquals(
             setOf(
+                SafePage.Home,
                 SafePage.Settings,
                 SafePage.SafetyPlan,
                 SafePage.Notes,
@@ -30,35 +32,12 @@ class SafeWalkthroughTest {
             userTopics.map { it.targetPage }.toSet(),
         )
 
-        assertEquals(5, contactTopics.size)
+        assertEquals(6, contactTopics.size)
         assertFalse(contactTopics.any { it.userOnly })
         assertEquals(
-            listOf("safety_plan", "notes_incidents", "documents_ocr", "messaging_calls", "location_map"),
+            listOf("safety_plan", "notes_incidents", "documents_ocr", "messaging_calls", "location_map", "cover_entry"),
             contactTopics.map { it.id },
         )
-    }
-
-    @Test
-    fun firstVisitTopicsMatchThePageAndAccountRole() {
-        assertEquals(
-            listOf("cover_entry", "quick_exit"),
-            walkthroughTopicsForPage(AccountRole.USER, SafePage.Settings).map { it.id },
-        )
-        assertEquals(
-            listOf("documents_ocr", "emergency_report"),
-            walkthroughTopicsForPage(AccountRole.USER, SafePage.Documents).map { it.id },
-        )
-        assertEquals(
-            listOf("documents_ocr"),
-            walkthroughTopicsForPage(AccountRole.SAFE_CONTACT, SafePage.Documents).map { it.id },
-        )
-        assertEquals(
-            listOf("hotlines_contacts"),
-            walkthroughTopicsForPage(AccountRole.USER, SafePage.Contacts).map { it.id },
-        )
-        assertTrue(walkthroughTopicsForPage(AccountRole.SAFE_CONTACT, SafePage.Hotlines).isEmpty())
-        assertTrue(walkthroughTopicsForPage(AccountRole.USER, SafePage.Home).isEmpty())
-        assertTrue(walkthroughTopicsForPage(AccountRole.ADMIN, SafePage.Documents).isEmpty())
     }
 
     @Test
@@ -75,30 +54,55 @@ class SafeWalkthroughTest {
             ),
             userGroups.map { it.category },
         )
-        assertEquals(listOf(WalkthroughCategory.TOOLS), contactGroups.map { it.category })
-        assertEquals(5, contactGroups.single().topics.size)
+        assertEquals(listOf(WalkthroughCategory.PRIVACY, WalkthroughCategory.TOOLS), contactGroups.map { it.category })
+        assertEquals(1, contactGroups.first().topics.size)
+        assertEquals(5, contactGroups.last().topics.size)
     }
 
     @Test
-    fun tourProgressionAndSafeTargetRoutingAvoidSideEffectAutoRequests() {
-        val userTopics = walkthroughTopicsForRole(AccountRole.USER)
-        val byId = userTopics.associateBy { it.id }
+    fun multiStepTourCoversAllMessagingFeaturesAllSettingsTabsAndAutoOpensSupportMenu() {
+        val userSteps = walkthroughTourStepsForRole(AccountRole.USER)
+        val contactSteps = walkthroughTourStepsForRole(AccountRole.SAFE_CONTACT)
 
-        assertEquals(SafePage.Home, byId.getValue("quick_exit").tourPage)
-        assertEquals(WalkthroughAnchor.BottomEnd, byId.getValue("quick_exit").anchor)
-        assertEquals(WalkthroughArrow.SouthEast, byId.getValue("quick_exit").arrow)
+        assertEquals(29, userSteps.size)
+        assertEquals(18, contactSteps.size)
 
-        assertEquals(SafePage.Home, byId.getValue("staff_help").tourPage)
-        assertEquals(WalkthroughArrow.SouthWest, byId.getValue("staff_help").arrow)
-        assertEquals(SafePage.StaffHelp, byId.getValue("staff_help").targetPage)
+        val supportMenuSteps = userSteps.filter { it.openSupportMenu }
+        assertEquals(
+            listOf(
+                "support_menu_staff",
+                "support_menu_staff_escalate",
+                "support_menu_emergency",
+                "support_menu_emergency_alert",
+            ),
+            supportMenuSteps.map { it.id },
+        )
+        assertTrue(supportMenuSteps.all { it.tourPage == SafePage.Home && it.arrow == WalkthroughArrow.SouthWest })
 
-        assertEquals(SafePage.Home, byId.getValue("emergency_report").tourPage)
-        assertEquals(SafePage.Documents, byId.getValue("emergency_report").targetPage)
+        val messagingSteps = userSteps.filter { it.topicId == "messaging_calls" }
+        assertEquals(4, messagingSteps.size)
 
-        assertEquals("quick_exit", nextWalkthroughTourTopicId(userTopics, "cover_entry", 1))
-        assertEquals(null, nextWalkthroughTourTopicId(userTopics, "cover_entry", -1))
-        assertEquals(null, nextWalkthroughTourTopicId(userTopics, "activity_settings", 1))
-        assertEquals("hotlines_contacts", nextWalkthroughTourTopicId(userTopics, "activity_settings", -1))
+        val settingsTabs = userSteps.mapNotNull { it.settingsTabTag }
+        assertEquals(
+            listOf(
+                "settings_tab_profile",
+                "settings_tab_password",
+                "settings_tab_privacy",
+                "settings_tab_permissions",
+            ),
+            settingsTabs,
+        )
+        assertEquals(
+            listOf("settings_tab_profile", "settings_tab_password", "settings_tab_permissions"),
+            contactSteps.mapNotNull { it.settingsTabTag },
+        )
+
+        assertEquals("home_header_shortcuts", nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1))
+        assertNull(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1))
+        assertNull(nextWalkthroughTourStepId(userSteps, "settings_permissions", 1))
+        assertEquals("settings_privacy_passkey", nextWalkthroughTourStepId(userSteps, "settings_permissions", -1))
+        assertEquals("chat_add_friends", firstWalkthroughStepForTopic(AccountRole.USER, "messaging_calls")?.id)
+        assertEquals(4, walkthroughStepCountForTopic(AccountRole.USER, "messaging_calls"))
     }
 
     @Test

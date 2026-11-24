@@ -282,53 +282,59 @@ class SafeSupportUiTest : OliveUiTestBase() {
     }
 
     @Test
-    fun walkthroughOpensFromSupportMenuWithTableOfContentsAndFeatureDemo() {
+    fun walkthroughOpensFromSupportMenuWithAutoExpandedSupportMenuAndAllSettingsTabs() {
         val session = setup()
         toggle()
         compose.onNodeWithTag("support_walkthrough").performClick()
         waitFor("walkthrough_screen")
         assertEquals(SafePage.Walkthrough, session.page)
         compose.onNodeWithTag("walkthrough_toc").assertExists()
-        compose.onNodeWithTag("walkthrough_toc_safety_plan").performScrollTo().performClick()
+
+        compose.onNodeWithTag("walkthrough_toc_staff_help").performScrollTo().performClick()
         waitFor("walkthrough_active_feature")
-        assertEquals(SafePage.SafetyPlan, session.page)
+        assertEquals(SafePage.Home, session.page)
+        compose.onNodeWithTag("support_action_list").assertIsDisplayed()
         compose.onNodeWithTag("walkthrough_tour_arrow").assertExists()
         compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
 
+        compose.onNodeWithTag("walkthrough_tour_toc").performClick()
+        waitFor("walkthrough_toc")
+        compose.onNodeWithTag("walkthrough_toc_cover_entry").performScrollTo().performClick()
+        waitFor("walkthrough_active_feature")
+        assertEquals(SafePage.Settings, session.page)
+        compose.onNodeWithTag("settings_tab_profile").assertIsSelected()
+
         compose.onNodeWithTag("walkthrough_tour_next").performClick()
-        compose.runOnIdle { assertEquals(SafePage.Notes, session.page) }
-        compose.onNodeWithTag("walkthrough_active_feature").assertExists()
+        compose.onNodeWithTag("settings_tab_password").assertIsSelected()
+        compose.onNodeWithTag("walkthrough_tour_next").performClick()
+        compose.onNodeWithTag("settings_tab_privacy").assertIsSelected()
+        compose.onNodeWithTag("walkthrough_tour_next").performClick()
+        compose.onNodeWithTag("settings_tab_permissions").assertIsSelected()
 
         compose.onNodeWithTag("walkthrough_tour_skip").performClick()
         compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
-        compose.runOnIdle { assertEquals(SafePage.Notes, session.page) }
     }
 
     @Test
-    fun firstVisitPopupCanBeDismissedOrOpenItsGuideWithoutBlockingQuickExit() {
+    fun firstLoginAutoOpensWalkthroughWithoutBlockingQuickExitAndNeverReopens() {
         val session = setup()
-        click("safe_notes")
-        waitFor("first_visit_walkthrough")
+        waitFor("walkthrough_active_feature")
         compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithTag("first_visit_dismiss").assertIsDisplayed().performClick()
-        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+        compose.onNodeWithTag("walkthrough_tour_skip").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
 
-        compose.runOnIdle { session.navigation.back() }
-        waitFor("safe_notes")
         click("safe_notes")
-        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+        waitFor("new_private_entry")
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
 
         compose.runOnIdle { session.navigation.openSafePage(SafePage.Documents) }
-        waitFor("first_visit_open_walkthrough")
-        compose.onNodeWithTag("first_visit_open_walkthrough").assertIsDisplayed().performClick()
-        waitFor("walkthrough_active_feature")
-        val title = compose.activity.getString(R.string.walkthrough_topic_docs_title)
-        compose.onNodeWithTag("walkthrough_active_feature")
-            .assert(hasAnyDescendant(hasText(title)))
+        compose.waitForIdle()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
 
-        compose.runOnIdle { session.navigation.back() }
-        compose.runOnIdle { assertEquals(SafePage.Documents, session.page) }
-        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
+        unlock()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
     }
 
     // Checks the trusted contacts open from the support menu instead of settings step with the test's sample data.

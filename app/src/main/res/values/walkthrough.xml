@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="walkthrough_subtitle">Pick any feature from the Table of Contents to start a guided walkthrough right inside the live Olive Branch screen.</string>
+    <string name="walkthrough_subtitle">Pick any feature from the Table of Contents to start an interactive guided tour right inside the live Olive Branch screens.</string>
     <string name="walkthrough_toc_title">Table of contents</string>
-    <string name="walkthrough_toc_subtitle">Choose a feature to start an in-app guided tour (%1$d topics)</string>
+    <string name="walkthrough_toc_subtitle">Choose any feature to tour all of its tools live (%1$d categories)</string>
+    <string name="walkthrough_toc_step_count">%1$d steps</string>
     <string name="walkthrough_start_tour">Start full walkthrough</string>
     <string name="walkthrough_tour_step_counter">Step %1$d of %2$d</string>
     <string name="walkthrough_tour_next">Next</string>
@@ -15,69 +16,138 @@
     <string name="walkthrough_cat_support">Support &amp; emergency</string>
     <string name="walkthrough_cat_account">Account &amp; security</string>
 
-    <string name="walkthrough_topic_cover_title">Cover apps &amp; secret entry</string>
-    <string name="walkthrough_topic_cover_summary">Disguise Olive Branch as Daily Digest or Fitness Tracker and enter with your secret trigger or hidden olive.</string>
+    <string name="walkthrough_topic_cover_title">Settings tabs &amp; secret entry</string>
+    <string name="walkthrough_topic_cover_summary">Tour every Settings tab: Profile &amp; Cover disguise, Password &amp; Trigger phrase, Privacy &amp; Passkeys, and Permissions.</string>
     <string name="walkthrough_topic_cover_step_1">Pick Daily Digest or Fitness Tracker in Settings so the launcher icon and app name blend in on your phone.</string>
     <string name="walkthrough_topic_cover_step_2">Type your secret trigger phrase into the cover search bar, or double-tap the tiny olive icon in the cover Account screen.</string>
     <string name="walkthrough_topic_cover_step_3">Pass your 4–6 digit app PIN or Android device lock check to unlock Your Safe Space.</string>
 
-    <string name="walkthrough_topic_exit_title">Quick Exit &amp; auto-lock</string>
-    <string name="walkthrough_topic_exit_summary">Return to your cover app instantly or let inactivity and backgrounding lock your private session.</string>
+    <string name="walkthrough_topic_exit_title">Home shortcuts &amp; Quick Exit</string>
+    <string name="walkthrough_topic_exit_summary">Explore Quick Exit, the quick Camera capture button, My profile, Account activity, and update reminders.</string>
     <string name="walkthrough_topic_exit_step_1">Tap the floating Quick Exit button in the corner of any private screen to immediately return to your cover app.</string>
     <string name="walkthrough_topic_exit_step_2">Switching apps or turning off your screen locks Your Safe Space automatically.</string>
     <string name="walkthrough_topic_exit_step_3">In Settings → Privacy, adjust the idle-lock timer (and optional screen-capture protection) to fit your routine.</string>
 
     <string name="walkthrough_topic_plan_title">Safety plan</string>
-    <string name="walkthrough_topic_plan_summary">Build primary and backup safety checklists, save offline, share with trusted contacts, or consult with staff.</string>
+    <string name="walkthrough_topic_plan_summary">Build primary and backup safety checklists, save offline, share with trusted contacts, or request staff consultation.</string>
     <string name="walkthrough_topic_plan_step_1">Review and customize your primary plan, backup steps, and emergency grab-bag checklist seeded from onboarding.</string>
     <string name="walkthrough_topic_plan_step_2">Edits save locally right away and sync automatically when you reconnect.</string>
     <string name="walkthrough_topic_plan_step_3">Share your plan with selected accepted contacts (revoke anytime) or tap Request consultation for staff guidance.</string>
 
     <string name="walkthrough_topic_notes_title">Notes &amp; incident records</string>
-    <string name="walkthrough_topic_notes_summary">Document private notes and dated incidents with GPS or map locations, attachments, pinning, and edit history.</string>
+    <string name="walkthrough_topic_notes_summary">Document notes and dated incidents with map locations, attachments, pinning, search, edit history, and trash restore.</string>
     <string name="walkthrough_topic_notes_step_1">Create a Note for general reminders or an Incident to record date, time, location, and encrypted file attachments.</string>
     <string name="walkthrough_topic_notes_step_2">Pin important records to the top, filter by Notes or Incidents, and search by keyword.</string>
     <string name="walkthrough_topic_notes_step_3">View the per-entry edit history log, share an entry with a trusted contact, or restore trashed items.</string>
 
     <string name="walkthrough_topic_docs_title">Encrypted documents, camera &amp; OCR</string>
-    <string name="walkthrough_topic_docs_summary">Store encrypted files, take photos or video inside the app, scan text with on-device OCR, and share securely.</string>
+    <string name="walkthrough_topic_docs_summary">Store AES-encrypted files, capture photos or video privately inside the app, extract text with OCR, and share securely.</string>
     <string name="walkthrough_topic_docs_step_1">Upload PDFs, photos, video, or audio; every file is encrypted on your device before upload.</string>
     <string name="walkthrough_topic_docs_step_2">Use the in-app camera to capture documents directly into encrypted storage without saving to your public gallery.</string>
     <string name="walkthrough_topic_docs_step_3">Run on-device OCR to extract and review text from document photos, then share selected files with accepted contacts.</string>
 
-    <string name="walkthrough_topic_chat_title">Friends, messages, voice &amp; calls</string>
-    <string name="walkthrough_topic_chat_summary">Connect via friend requests or 48-hour invite codes, send encrypted messages and chat-only voice notes, or place calls.</string>
+    <string name="walkthrough_topic_chat_title">Friends, messages, voice, media &amp; calls</string>
+    <string name="walkthrough_topic_chat_summary">Add friends or 48h invites, send chat-only voice notes, share media/notes/plans/location, call, search, unsend, and check Chat Info.</string>
     <string name="walkthrough_topic_chat_step_1">Add trusted people by username search or generate a 48-hour one-time invite code or link.</string>
     <string name="walkthrough_topic_chat_step_2">Exchange encrypted text, chat-only voice messages, attachments, notes, safety plans, or live locations in direct or group chats.</string>
     <string name="walkthrough_topic_chat_step_3">Start an encrypted voice call, search messages, unsend your messages, or open Chat Info to review members and shared items.</string>
 
     <string name="walkthrough_topic_location_title">Live location &amp; navigation</string>
-    <string name="walkthrough_topic_location_summary">Share real-time location with chosen contacts, view locations shared with you, and get turn-by-turn directions.</string>
+    <string name="walkthrough_topic_location_summary">Share real-time location with chosen contacts, browse saved places, view shared pins, and follow turn-by-turn routes.</string>
     <string name="walkthrough_topic_location_step_1">Open the Location map to see your current position and saved places directory.</string>
     <string name="walkthrough_topic_location_step_2">Start live-location sharing for a chosen duration with specific contacts, and add, remove, or stop sharing at any time.</string>
     <string name="walkthrough_topic_location_step_3">Select a contact sharing with you or search a destination to start turn-by-turn route navigation.</string>
 
     <string name="walkthrough_topic_staff_title">Staff help &amp; support chats</string>
-    <string name="walkthrough_topic_staff_summary">Connect with organization support staff in a ticketed support conversation or escalate an existing chat.</string>
+    <string name="walkthrough_topic_staff_summary">Open the Support menu (+) to request an organization staff advocate or escalate an existing conversation.</string>
     <string name="walkthrough_topic_staff_step_1">Open the Support menu (+) and tap Request help from staff, or request staff support from an existing conversation.</string>
     <string name="walkthrough_topic_staff_step_2">Wait while Olive Branch assigns an available staff member (you can cancel the request anytime before assignment).</string>
     <string name="walkthrough_topic_staff_step_3">Chat with assigned staff, share relevant notes or plans, and optionally add an accepted friend to the support ticket.</string>
 
-    <string name="walkthrough_topic_emergency_title">Emergency report PDF</string>
-    <string name="walkthrough_topic_emergency_summary">Generate an encrypted emergency PDF with your profile, notes, and GPS location and alert organization administrators.</string>
+    <string name="walkthrough_topic_emergency_title">Emergency alert &amp; PDF report</string>
+    <string name="walkthrough_topic_emergency_summary">Open the Support menu (+) to compile an encrypted emergency PDF with GPS and notify organization administrators.</string>
     <string name="walkthrough_topic_emergency_step_1">Trigger Emergency from the Support menu (+) inside Your Safe Space, or press and hold the cover olive icon for 2 seconds.</string>
     <string name="walkthrough_topic_emergency_step_2">Olive Branch compiles your profile details, incident records, and current coordinates into an encrypted PDF in Documents.</string>
     <string name="walkthrough_topic_emergency_step_3">When online, organization administrators receive an emergency alert with your report and live map tracking.</string>
 
     <string name="walkthrough_topic_hotlines_title">Hotlines &amp; trusted contacts</string>
-    <string name="walkthrough_topic_hotlines_summary">Browse Canadian hotlines, shelters, and legal aid by region, and maintain your trusted safe-contact list.</string>
+    <string name="walkthrough_topic_hotlines_summary">Browse Canadian crisis lines, shelters, and legal clinics, save favorites, and maintain your trusted safe contacts.</string>
     <string name="walkthrough_topic_hotlines_step_1">Open Hotline resources to filter 24/7 crisis lines, shelters, legal aid, and counseling across Canadian provinces and cities.</string>
     <string name="walkthrough_topic_hotlines_step_2">Tap the heart icon to save important services, dial directly, or view directory locations on the map.</string>
     <string name="walkthrough_topic_hotlines_step_3">In Trusted contacts, record relationship notes, mark who is safe to stay with, and link entries to chat friends.</string>
 
-    <string name="walkthrough_topic_activity_title">Activity history, passkeys &amp; settings</string>
-    <string name="walkthrough_topic_activity_summary">Audit sign-in and trigger history, enroll a Passkey Account Recovery Key, and manage app permissions.</string>
+    <string name="walkthrough_topic_activity_title">Account activity &amp; security log</string>
+    <string name="walkthrough_topic_activity_summary">Inspect timestamped settings edits, cover trigger uses, PIN attempts, and capture privacy events.</string>
     <string name="walkthrough_topic_activity_step_1">Open Account activity to inspect timestamped settings edits, trigger events, PIN attempts, and privacy events.</string>
     <string name="walkthrough_topic_activity_step_2">In Settings → Privacy, enroll a Passkey Account Recovery Key so encrypted files and chats can be restored on a new device.</string>
     <string name="walkthrough_topic_activity_step_3">Use Settings → Permissions to review and grant camera, microphone, location, notification, and health permissions.</string>
+
+    <!-- Multi-step tour titles and bodies -->
+    <string name="wt_step_quick_exit_fab_title">Quick Exit &amp; auto-lock</string>
+    <string name="wt_step_quick_exit_fab_body">Tap Quick exit in the bottom-right corner anytime to lock Your Safe Space and jump back to your cover app.</string>
+    <string name="wt_step_home_header_shortcuts_title">Private camera &amp; header shortcuts</string>
+    <string name="wt_step_home_header_shortcuts_body">Use the top camera icon for private capture straight into encrypted storage, or the gear icon to open Settings.</string>
+    <string name="wt_step_home_profile_activity_title">My profile &amp; Account activity</string>
+    <string name="wt_step_home_profile_activity_body">Check My profile details, audit Account activity logs, or start with any main feature tile below.</string>
+
+    <string name="wt_step_support_menu_staff_title">Support menu (+) · Staff help</string>
+    <string name="wt_step_support_menu_staff_body">We opened the + menu for you: tap Request help from staff to get matched to an organization advocate in a ticketed chat.</string>
+    <string name="wt_step_support_menu_staff_escalate_title">Cancel wait &amp; friend escalation</string>
+    <string name="wt_step_support_menu_staff_escalate_body">While waiting you can cancel anytime; once assigned, share notes/plans or add an accepted friend to your ticket.</string>
+    <string name="wt_step_support_menu_emergency_title">Support menu (+) · Emergency PDF</string>
+    <string name="wt_step_support_menu_emergency_body">Tap Emergency here (or long-press the cover olive for 2s) to compile profile, notes, and GPS into an encrypted PDF.</string>
+    <string name="wt_step_support_menu_emergency_alert_title">Admin emergency alerts</string>
+    <string name="wt_step_support_menu_emergency_alert_body">When online, triggering Emergency saves the PDF in Documents and sends an emergency alert with live map tracking to admins.</string>
+
+    <string name="wt_step_plan_checklists_title">Primary, backup &amp; checklist steps</string>
+    <string name="wt_step_plan_checklists_body">Edit your primary safety plan, backup plan, and emergency grab-bag checklist here. Changes save offline first and auto-sync.</string>
+    <string name="wt_step_plan_share_consult_title">Share plans &amp; staff consultation</string>
+    <string name="wt_step_plan_share_consult_body">Select accepted contacts who can view your safety plan (and revoke anytime), or request a private staff consultation.</string>
+
+    <string name="wt_step_notes_create_title">Create Notes &amp; dated Incidents</string>
+    <string name="wt_step_notes_create_body">Log private reminders as Notes or dated/timed Incidents with map/GPS locations and encrypted photo or file attachments.</string>
+    <string name="wt_step_notes_pin_search_title">Pin, filter &amp; sort records</string>
+    <string name="wt_step_notes_pin_search_body">Pin critical entries to keep them at the top, filter between Notes and Incidents, sort by date, or search by keyword.</string>
+    <string name="wt_step_notes_history_trash_title">Edit history, sharing &amp; trash restore</string>
+    <string name="wt_step_notes_history_trash_body">Inspect per-entry edit logs, share entries with trusted friends, or restore deleted records from Trash within 30 days.</string>
+
+    <string name="wt_step_docs_encrypted_vault_title">Encrypted Document vault</string>
+    <string name="wt_step_docs_encrypted_vault_body">Upload PDFs, photos, video, or audio; every file is AES-encrypted on your device before sync. Voice notes stay in chat only.</string>
+    <string name="wt_step_docs_private_camera_title">In-app Camera (no gallery copy)</string>
+    <string name="wt_step_docs_private_camera_body">Capture photos or video inside Olive Branch so evidence goes straight into encrypted storage, never to your public phone gallery.</string>
+    <string name="wt_step_docs_ocr_share_title">On-device OCR &amp; contact sharing</string>
+    <string name="wt_step_docs_ocr_share_body">Run local OCR text extraction to scan document photos and review extracted text, then share selected files with friends.</string>
+
+    <string name="wt_step_chat_add_friends_title">Add friends &amp; 48h invite codes</string>
+    <string name="wt_step_chat_add_friends_body">Search by username to send friend requests, or generate a single-use 48-hour invite code or shareable link.</string>
+    <string name="wt_step_chat_voice_messages_title">DMs, groups &amp; chat-only voice notes</string>
+    <string name="wt_step_chat_voice_messages_body">Start encrypted 1-on-1 or group conversations and record encrypted voice messages that stay exclusively inside chats.</string>
+    <string name="wt_step_chat_share_media_title">Share media, notes, plans &amp; location</string>
+    <string name="wt_step_chat_share_media_body">Inside any chat, tap attachments to share camera photos, encrypted Documents, Notes/Incidents, Safety plans, or live location.</string>
+    <string name="wt_step_chat_calls_search_info_title">Voice calls, search, unsend &amp; Chat Info</string>
+    <string name="wt_step_chat_calls_search_info_body">Place encrypted voice calls, search messages, unsend anything you sent, or open Chat Info for members and shared items.</string>
+
+    <string name="wt_step_loc_map_places_title">Interactive map &amp; saved places</string>
+    <string name="wt_step_loc_map_places_body">View your live position on the map above and browse shelters, clinics, legal aid, and support places filtered by province.</string>
+    <string name="wt_step_loc_live_sharing_title">Live location sharing &amp; duration</string>
+    <string name="wt_step_loc_live_sharing_body">Share your real-time coordinates for a chosen duration with selected contacts, and add, remove, or stop sharing anytime.</string>
+    <string name="wt_step_loc_navigation_title">Turn-by-turn route navigation</string>
+    <string name="wt_step_loc_navigation_body">Tap any contact sharing with you or pick a destination on the map to launch turn-by-turn directions.</string>
+
+    <string name="wt_step_hotlines_directory_title">Hotlines, shelters &amp; bookmarks</string>
+    <string name="wt_step_hotlines_directory_body">Filter 24/7 crisis lines, shelters, legal aid, and counseling across Canadian regions; favorite with the heart icon, call, or view on map.</string>
+    <string name="wt_step_contacts_directory_title">Trusted safe-contact directory</string>
+    <string name="wt_step_contacts_directory_body">Record trusted contacts’ details, toggle who is safe to stay with in an emergency, and link entries to your chat friends.</string>
+
+    <string name="wt_step_activity_audit_title">Security &amp; trigger activity log</string>
+    <string name="wt_step_activity_audit_body">Review timestamped Settings edits, cover trigger unlocks, failed PIN attempts, and screenshot or screen-recording detections.</string>
+
+    <string name="wt_step_settings_profile_cover_title">Settings (Profile tab) · Cover &amp; identity</string>
+    <string name="wt_step_settings_profile_cover_body">Switch your cover disguise (Daily Digest / Fitness Tracker), choose PIN vs device lock, and update profile or delivery info.</string>
+    <string name="wt_step_settings_password_trigger_title">Settings (Password tab) · Trigger &amp; credentials</string>
+    <string name="wt_step_settings_password_trigger_body">Rotate your account password, PIN, or secret cover trigger phrase while enforcing current credential checks.</string>
+    <string name="wt_step_settings_privacy_passkey_title">Settings (Privacy tab) · Idle, capture &amp; Passkey</string>
+    <string name="wt_step_settings_privacy_passkey_body">Adjust idle auto-lock delay, toggle screen-capture protection, and enroll a Passkey Account Recovery Key for key restoration.</string>
+    <string name="wt_step_settings_permissions_title">Settings (Permissions tab) · Device access</string>
+    <string name="wt_step_settings_permissions_body">Inspect and manage camera, microphone, background location, notifications, and Health Connect permissions in one place.</string>
 </resources>

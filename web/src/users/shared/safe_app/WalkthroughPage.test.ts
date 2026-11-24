@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   clampWalkthroughStep,
+  firstWalkthroughStepForTopic,
   nextWalkthroughTopicIndex,
-  nextWalkthroughTourTopicId,
+  nextWalkthroughTourStepId,
+  walkthroughStepCountForTopic,
   walkthroughTopicGroups,
   walkthroughTopicsForRole,
+  walkthroughTourStepsForRole,
 } from "./WalkthroughCatalog";
 
-describe("WalkthroughCatalog table of contents and live tour helpers", () => {
+describe("WalkthroughCatalog table of contents and multi-step live tour helpers", () => {
   it("lists all user features in the table of contents and filters user-only topics for safe contacts", () => {
     const userTopics = walkthroughTopicsForRole("USER");
     const contactTopics = walkthroughTopicsForRole("SAFE_CONTACT");
@@ -18,7 +21,7 @@ describe("WalkthroughCatalog table of contents and live tour helpers", () => {
     expect(userTopics.map((topic) => topic.id)).toContain("quick_exit");
     expect(userTopics.map((topic) => topic.id)).toContain("staff_help");
 
-    expect(contactTopics).toHaveLength(6);
+    expect(contactTopics).toHaveLength(7);
     expect(contactTopics.some((topic) => topic.userOnly)).toBe(false);
     expect(contactTopics.map((topic) => topic.id)).toEqual([
       "safety_plan",
@@ -27,7 +30,28 @@ describe("WalkthroughCatalog table of contents and live tour helpers", () => {
       "messaging_voice",
       "location",
       "activity_settings",
+      "cover_entry",
     ]);
+  });
+
+  it("includes multi-step coverage for messaging, settings tabs, and hotlines/contacts", () => {
+    const userSteps = walkthroughTourStepsForRole("USER");
+    const contactSteps = walkthroughTourStepsForRole("SAFE_CONTACT");
+
+    expect(userSteps.length).toBeGreaterThanOrEqual(22);
+    expect(contactSteps.every((step) => !step.userOnly)).toBe(true);
+    expect(walkthroughStepCountForTopic("USER", "messaging_voice")).toBe(4);
+    expect(walkthroughStepCountForTopic("USER", "cover_entry")).toBe(3);
+    expect(firstWalkthroughStepForTopic("USER", "messaging_voice")?.id).toBe("chat_add_friends");
+
+    const quickExit = userSteps.find((step) => step.id === "quick_exit_fab");
+    expect(quickExit?.tourPage).toBe("Home");
+    expect(quickExit?.anchor).toBe("bottom-right");
+    expect(quickExit?.arrow).toBe("down-right");
+
+    expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1)).toBe("home_sidebar_nav");
+    expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1)).toBeNull();
+    expect(nextWalkthroughTourStepId(userSteps, "settings_passkey", 1)).toBeNull();
   });
 
   it("groups topics by category in display order and omits empty categories", () => {
@@ -40,20 +64,7 @@ describe("WalkthroughCatalog table of contents and live tour helpers", () => {
       "support",
       "account",
     ]);
-    expect(contactGroups.map((group) => group.category.id)).toEqual(["tools", "account"]);
-  });
-
-  it("routes quick exit popup to Home with bottom-right arrow and advances tour steps safely", () => {
-    const userTopics = walkthroughTopicsForRole("USER");
-    const quickExit = userTopics.find((topic) => topic.id === "quick_exit");
-    expect(quickExit?.tourPage).toBe("Home");
-    expect(quickExit?.anchor).toBe("bottom-right");
-    expect(quickExit?.arrow).toBe("down-right");
-
-    expect(nextWalkthroughTourTopicId(userTopics, "cover_entry", 1)).toBe("quick_exit");
-    expect(nextWalkthroughTourTopicId(userTopics, "cover_entry", -1)).toBeNull();
-    expect(nextWalkthroughTourTopicId(userTopics, "activity_settings", 1)).toBeNull();
-    expect(nextWalkthroughTourTopicId(userTopics, "activity_settings", -1)).toBe("hotlines_contacts");
+    expect(contactGroups.map((group) => group.category.id)).toEqual(["privacy", "tools", "account"]);
   });
 
   it("clamps step and topic navigation indices within bounds", () => {

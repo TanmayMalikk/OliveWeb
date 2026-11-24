@@ -1,6 +1,7 @@
 // Safe-app users and safe contacts: Walkthrough Table of Contents launching live guided in-app tours.
 package com.olive.app.ui.users.shared.walkthrough
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import com.olive.app.ui.shared.OliveButton
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OliveIconButton
 import com.olive.app.ui.shared.OliveOutlinedCard
+import com.olive.app.ui.shared.PaleOlive
 import com.olive.app.ui.shared.SageGreen
 import com.olive.app.ui.users.shared.navigation.FormColumn
 import com.olive.app.ui.users.shared.navigation.Heading
@@ -41,10 +43,10 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 /**
  * Renders the Walkthrough Table of Contents screen. Selecting a feature or tapping Start full
- * walkthrough opens that live feature screen with a floating [WalkthroughCoachmarkOverlay] guide.
+ * walkthrough opens that live feature screen with its multi-step floating [WalkthroughCoachmarkOverlay].
  *
  * @param session Shared session view model owning application state and navigation.
- * @param initialTopicId Unused legacy deep-link parameter kept for signature compatibility.
+ * @param initialTopicId Unused legacy parameter retained for signature compatibility.
  */
 @Composable
 internal fun SafeWalkthroughScreen(
@@ -52,6 +54,7 @@ internal fun SafeWalkthroughScreen(
     @Suppress("UNUSED_PARAMETER") initialTopicId: String? = null,
 ) {
     val topics = remember(session.accountRole) { walkthroughTopicsForRole(session.accountRole) }
+    val steps = remember(session.accountRole) { walkthroughTourStepsForRole(session.accountRole) }
     val groups = remember(topics) { walkthroughTopicGroups(topics) }
     val startTour = LocalWalkthroughTour.current
 
@@ -82,12 +85,12 @@ internal fun SafeWalkthroughScreen(
         OliveOutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    stringResource(R.string.walkthrough_toc_subtitle, topics.size),
+                    stringResource(R.string.walkthrough_toc_subtitle, groups.size),
                     style = MaterialTheme.typography.titleSmall,
                     color = Ink,
                 )
                 OliveButton(
-                    onClick = { topics.firstOrNull()?.let { startTour?.invoke(it.id) } },
+                    onClick = { steps.firstOrNull()?.let { startTour?.invoke(it.id) } },
                     modifier = Modifier.fillMaxWidth().testTag("walkthrough_start_tour"),
                 ) {
                     Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(18.dp))
@@ -115,6 +118,7 @@ internal fun SafeWalkthroughScreen(
                         WalkthroughTocCard(
                             index = displayNumber,
                             topic = topic,
+                            stepCount = walkthroughStepCountForTopic(session.accountRole, topic.id),
                             onSelect = { startTour?.invoke(topic.id) },
                         )
                     }
@@ -129,12 +133,14 @@ internal fun SafeWalkthroughScreen(
  *
  * @param index One-based display order index.
  * @param topic Feature metadata.
+ * @param stepCount Number of live coachmark popups in [topic].
  * @param onSelect Callback launching the live guided walkthrough at [topic].
  */
 @Composable
 private fun WalkthroughTocCard(
     index: Int,
     topic: WalkthroughTopic,
+    stepCount: Int,
     onSelect: () -> Unit,
 ) {
     OliveOutlinedCard(
@@ -169,6 +175,20 @@ private fun WalkthroughTocCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = Muted,
                 )
+                if (stepCount > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = PaleOlive,
+                        border = BorderStroke(1.dp, SageGreen),
+                    ) {
+                        Text(
+                            stringResource(R.string.walkthrough_toc_step_count, stepCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DarkOlive,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
             }
             Icon(
                 Icons.AutoMirrored.Outlined.ArrowForward,

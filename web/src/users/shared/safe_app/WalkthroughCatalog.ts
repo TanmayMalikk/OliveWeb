@@ -1,4 +1,4 @@
-// All safe-app roles: pure TypeScript walkthrough catalog, categories, tour anchors, and navigation helpers.
+// All safe-app roles: pure TypeScript walkthrough catalog, multi-step tour definitions, and helpers.
 import type { Page, Role } from "../../../domain/DomainModels";
 
 export type WebWalkthroughCategory =
@@ -24,6 +24,17 @@ export interface WebWalkthroughTopic {
   userOnly?: boolean;
 }
 
+export interface WebWalkthroughTourStep {
+  id: string;
+  topicId: string;
+  title: string;
+  body: string;
+  tourPage: Page;
+  anchor: WebWalkthroughAnchor;
+  arrow: WebWalkthroughArrow;
+  userOnly?: boolean;
+}
+
 export interface WebWalkthroughCategoryMeta {
   id: WebWalkthroughCategory;
   label: string;
@@ -39,35 +50,17 @@ export const WALKTHROUGH_CATEGORIES: WebWalkthroughCategoryMeta[] = [
 const ALL_TOPICS: WebWalkthroughTopic[] = [
   {
     category: "privacy",
-    id: "cover_entry",
-    title: "Cover website & private entry",
-    summary:
-      "Use the calm public cover site and enter your private workspace using your trigger phrase, personal bookmark link, and optional browser PIN.",
-    steps: [
-      "Keep a disguise theme active on the cover site and enter from your trigger phrase or personal entry link in Settings.",
-      "Open private entry from the cover search trigger, footer entry, or your bookmarked personal link.",
-      "Unlock with your account credentials and verify your 4-digit browser PIN when prompted.",
-    ],
-    targetPage: "Settings",
-    targetLabel: "Settings",
-    tourPage: "Settings",
-    anchor: "bottom-center",
-    arrow: "up",
-    userOnly: true,
-  },
-  {
-    category: "privacy",
     id: "quick_exit",
-    title: "Quick Exit & idle protection",
+    title: "Home shortcuts & Quick Exit",
     summary:
-      "Leave the private workspace in one click or configure automatic lock timeouts if a browser tab stays unattended.",
+      "Leave the private workspace in one click with Quick Exit or jump between workspaces via the sidebar.",
     steps: [
       "Click the floating Quick Exit button in the bottom-right corner at any time to lock your workspace and return to your cover.",
       "Avoid browser autocomplete or public shared computers whenever signing in.",
       "Configure your idle auto-lock minutes under Settings so inactivity returns to the cover automatically.",
     ],
-    targetPage: "Settings",
-    targetLabel: "Settings",
+    targetPage: "Home",
+    targetLabel: "Home",
     tourPage: "Home",
     anchor: "bottom-right",
     arrow: "down-right",
@@ -97,7 +90,7 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     summary:
       "Record private notes or dated incident logs with location details, attachments, pinning, edit history, and soft-delete restore.",
     steps: [
-      "Create Notes or dated Incidents, pin important entries, inspect edit history, or restore deleted records from trash.",
+      "Create a Note for personal reminders or an Incident entry for dated events, locations, and attached files.",
       "Pin critical records to stay at the top and filter or search entries quickly.",
       "Inspect the per-entry edit history drawer, share an entry in chat, or restore items from trash.",
     ],
@@ -114,7 +107,7 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     summary:
       "Store client-encrypted PDFs and photos in the browser, review scanned metadata, and share selected files with accepted contacts.",
     steps: [
-      "Upload PDFs or images here — files are encrypted in your browser before upload and shared only with chosen contacts.",
+      "Upload PDFs, images, or important ID scans — files are encrypted locally with your keyset before upload.",
       "Toggle access per document so only selected accepted trusted contacts can decrypt and open it.",
       "Chat voice recordings stay inside conversations and never clutter your permanent Document vault.",
     ],
@@ -127,11 +120,11 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
   {
     category: "tools",
     id: "messaging_voice",
-    title: "Friends, messages & chat-only voice",
+    title: "Friends, messages, media & voice",
     summary:
-      "Connect with trusted people via friend requests or 48-hour invite codes and exchange end-to-end encrypted chats.",
+      "Add friends or 48-hour invites, send encrypted DMs/group chats and chat-only voice notes, share media/notes/plans/location, and search or unsend.",
     steps: [
-      "Add trusted people via username or 48-hour invite codes and exchange encrypted messages, notes, or chat-only voice.",
+      "Add friends by username or create a 48-hour single-use invite code from Friends & messages.",
       "Send encrypted messages, attachments, notes, safety plans, or short chat-only voice recordings.",
       "Search messages, unsend anything you sent, or open chat details to review shared items.",
     ],
@@ -197,17 +190,250 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
   {
     category: "account",
     id: "activity_settings",
-    title: "Account activity, passkeys & settings",
+    title: "Account activity log",
     summary:
-      "Audit settings changes and trigger history, update privacy controls, and enroll a Passkey Account Recovery Key.",
+      "Audit timestamped settings changes, cover triggers, and failed PIN attempts across devices.",
     steps: [
-      "Inspect timestamped settings edits, triggers, and failed PIN attempts here, or enroll a Passkey recovery key in Settings.",
+      "Open Account activity to filter timestamped settings edits, cover trigger uses, and PIN checks.",
       "Use Settings and My profile to rotate passwords, trigger phrases, email consent, and browser PIN.",
       "Enroll a Passkey Account Recovery Key so encrypted documents and chats restore cleanly on a new browser.",
     ],
     targetPage: "Activity",
     targetLabel: "Account activity",
     tourPage: "Activity",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    category: "privacy",
+    id: "cover_entry",
+    title: "Settings, idle lock & recovery keys",
+    summary:
+      "Tour all Settings tools: idle auto-lock delay, personal entry link, password/trigger/PIN rotation, and Passkey recovery.",
+    steps: [
+      "Adjust your idle auto-lock timeout or rotate your personal bookmark entry link and password.",
+      "Update your trigger phrase or browser PIN cleanly anytime.",
+      "Enroll a Passkey Account Recovery Key to restore encrypted documents and chats on a new browser.",
+    ],
+    targetPage: "Settings",
+    targetLabel: "Settings",
+    tourPage: "Settings",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+];
+
+const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
+  {
+    id: "quick_exit_fab",
+    topicId: "quick_exit",
+    title: "Quick Exit button",
+    body: "Click Quick Exit in the bottom-right corner anytime to immediately lock your workspace and return to your cover site.",
+    tourPage: "Home",
+    anchor: "bottom-right",
+    arrow: "down-right",
+    userOnly: true,
+  },
+  {
+    id: "home_sidebar_nav",
+    topicId: "quick_exit",
+    title: "Workspace navigation & My profile",
+    body: "Use the sidebar links or dashboard cards to switch between your private tools, My profile, and Account activity.",
+    tourPage: "Home",
+    anchor: "bottom-center",
+    arrow: "up",
+    userOnly: true,
+  },
+  {
+    id: "plan_checklists",
+    topicId: "safety_plan",
+    title: "Primary, backup & emergency checklists",
+    body: "Review and customize your primary safety plan, backup steps, and emergency grab-bag checklist here.",
+    tourPage: "SafetyPlan",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "plan_share_consult",
+    topicId: "safety_plan",
+    title: "Trusted contact sharing & consultations",
+    body: "Choose which accepted trusted contacts can view your safety plan (revoke anytime) or request staff consultation.",
+    tourPage: "SafetyPlan",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "notes_create",
+    topicId: "notes_incidents",
+    title: "Notes & dated Incident records",
+    body: "Log private reminders as Notes or dated/timed Incidents with locations and encrypted file attachments.",
+    tourPage: "Notes",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "notes_pin_search",
+    topicId: "notes_incidents",
+    title: "Pin, filter & search entries",
+    body: "Pin key records to the top, switch between Notes and Incidents, or search keywords in real time.",
+    tourPage: "Notes",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "notes_history_trash",
+    topicId: "notes_incidents",
+    title: "Edit history & trash restore",
+    body: "Inspect per-entry edit history logs, share entries in chat, or restore deleted records from trash.",
+    tourPage: "Notes",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "docs_vault",
+    topicId: "documents",
+    title: "Client-encrypted Document vault",
+    body: "Upload PDFs, images, or files here; every file is encrypted in your browser before reaching cloud storage.",
+    tourPage: "Documents",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "docs_share",
+    topicId: "documents",
+    title: "Contact sharing & chat-only audio isolation",
+    body: "Grant or revoke access for accepted contacts per document; chat voice recordings stay isolated inside conversations.",
+    tourPage: "Documents",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "chat_add_friends",
+    topicId: "messaging_voice",
+    title: "Friends & 48-hour invite codes",
+    body: "Search trusted people by username or generate a 48-hour single-use invite code or link to connect safely.",
+    tourPage: "Messages",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "chat_voice_groups",
+    topicId: "messaging_voice",
+    title: "Direct chats, groups & chat-only voice",
+    body: "Exchange end-to-end encrypted text in DMs or group chats and send voice notes stored strictly within chats.",
+    tourPage: "Messages",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "chat_share_items",
+    topicId: "messaging_voice",
+    title: "Share media, notes, plans & location",
+    body: "Use chat attachment controls to send encrypted Documents, Notes/Incidents, Safety plans, or location cards.",
+    tourPage: "Messages",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "chat_search_unsend_info",
+    topicId: "messaging_voice",
+    title: "Search messages, unsend & Chat Info",
+    body: "Search across messages, unsend anything you sent, or open Chat details to inspect participants and shared files.",
+    tourPage: "Messages",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "location_map",
+    topicId: "location",
+    title: "Interactive map & shared pins",
+    body: "Inspect locations shared with you by trusted connections or run an explicit one-time position check here.",
+    tourPage: "Location",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "location_mobile_note",
+    topicId: "location",
+    title: "Continuous live sharing on Android",
+    body: "Use the Olive Branch Android app whenever you need continuous background live sharing or turn-by-turn routes.",
+    tourPage: "Location",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "staff_request",
+    topicId: "staff_help",
+    title: "Request organization staff help",
+    body: "Open a private support ticket here; you can cancel a pending request anytime before a staff advocate claims it.",
+    tourPage: "StaffHelp",
+    anchor: "bottom-center",
+    arrow: "up",
+    userOnly: true,
+  },
+  {
+    id: "staff_ticket_chat",
+    topicId: "staff_help",
+    title: "Collaborate in your support ticket",
+    body: "Once assigned, continue in Friends & messages, share plans or notes, and optionally invite a friend into the ticket.",
+    tourPage: "StaffHelp",
+    anchor: "bottom-center",
+    arrow: "up",
+    userOnly: true,
+  },
+  {
+    id: "hotlines_directory",
+    topicId: "hotlines_contacts",
+    title: "Canadian crisis lines & shelters",
+    body: "Filter 24/7 crisis lines, shelters, and legal aid across Canadian provinces and cities using your saved or current city.",
+    tourPage: "Hotlines",
+    anchor: "bottom-center",
+    arrow: "up",
+    userOnly: true,
+  },
+  {
+    id: "trusted_contacts",
+    topicId: "hotlines_contacts",
+    title: "Trusted safe-contact directory",
+    body: "Store trusted friends' details, note who is safe to stay with in an emergency, and manage personal contacts.",
+    tourPage: "Contacts",
+    anchor: "bottom-center",
+    arrow: "up",
+    userOnly: true,
+  },
+  {
+    id: "activity_audit",
+    topicId: "activity_settings",
+    title: "Account activity security log",
+    body: "Review timestamped Settings edits, cover trigger uses, and PIN attempts to verify account security.",
+    tourPage: "Activity",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "settings_idle_entry",
+    topicId: "cover_entry",
+    title: "Settings · Idle lock & personal entry link",
+    body: "Choose how long before inactivity returns to your cover, copy or rotate your personal bookmark link, and update passwords.",
+    tourPage: "Settings",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "settings_trigger_pin",
+    topicId: "cover_entry",
+    title: "Settings · Trigger phrase, cover & browser PIN",
+    body: "Rotate your secret trigger phrase, cover preference, or 4-digit browser unlock PIN safely from Settings.",
+    tourPage: "Settings",
+    anchor: "bottom-center",
+    arrow: "up",
+  },
+  {
+    id: "settings_passkey",
+    topicId: "cover_entry",
+    title: "Settings · Passkey Account Recovery Key",
+    body: "Enroll a Passkey Account Recovery Key so encrypted documents and chats restore cleanly if you sign in on another browser.",
+    tourPage: "Settings",
     anchor: "bottom-center",
     arrow: "up",
   },
@@ -218,6 +444,24 @@ export function walkthroughTopicsForRole(role: Role | undefined): WebWalkthrough
     return ALL_TOPICS.filter((topic) => !topic.userOnly);
   }
   return ALL_TOPICS;
+}
+
+export function walkthroughTourStepsForRole(role: Role | undefined): WebWalkthroughTourStep[] {
+  if (role === "SAFE_CONTACT") {
+    return ALL_TOUR_STEPS.filter((step) => !step.userOnly);
+  }
+  return ALL_TOUR_STEPS;
+}
+
+export function firstWalkthroughStepForTopic(
+  role: Role | undefined,
+  topicId: string,
+): WebWalkthroughTourStep | undefined {
+  return walkthroughTourStepsForRole(role).find((step) => step.topicId === topicId);
+}
+
+export function walkthroughStepCountForTopic(role: Role | undefined, topicId: string): number {
+  return walkthroughTourStepsForRole(role).filter((step) => step.topicId === topicId).length;
 }
 
 export function walkthroughTopicGroups(
@@ -241,6 +485,17 @@ export function nextWalkthroughTopicIndex(
 ): number {
   if (totalTopics <= 1) return 0;
   return Math.max(0, Math.min(totalTopics - 1, currentIndex + delta));
+}
+
+export function nextWalkthroughTourStepId(
+  steps: WebWalkthroughTourStep[],
+  currentStepId: string,
+  delta: number,
+): string | null {
+  const idx = steps.findIndex((step) => step.id === currentStepId);
+  if (idx < 0) return null;
+  const next = idx + delta;
+  return next >= 0 && next < steps.length ? steps[next].id : null;
 }
 
 export function nextWalkthroughTourTopicId(

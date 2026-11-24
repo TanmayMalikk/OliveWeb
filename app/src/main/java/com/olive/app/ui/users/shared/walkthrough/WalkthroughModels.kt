@@ -1,4 +1,4 @@
-// Safe-app users and safe contacts: walkthrough catalog metadata, in-app tour anchors, and navigation helpers.
+// Safe-app users and safe contacts: walkthrough topics, multi-step live tour catalog, and helpers.
 package com.olive.app.ui.users.shared.walkthrough
 
 import androidx.annotation.StringRes
@@ -54,20 +54,17 @@ internal enum class WalkthroughCategory(@param:StringRes val labelRes: Int) {
 }
 
 /**
- * Metadata describing a single Olive Branch feature covered in the live guided Walkthrough.
+ * High-level topic card shown in the Walkthrough Table of Contents.
  *
  * @property category Grouping section in the Table of Contents.
- * @property id Stable identifier used for test tags, deep links, and tour progression.
+ * @property id Stable topic identifier linked to one or more [WalkthroughTourStep] items.
  * @property titleRes Localized feature title resource ID.
- * @property summaryRes Localized short summary shown in Table of Contents cards and first-visit popups.
- * @property stepResIds Ordered three-step instructions; step 1 is shown in the floating coachmark popup.
- * @property targetPage Primary [SafePage] associated with this feature (used by first-visit triggers).
+ * @property summaryRes Localized short summary shown in Table of Contents cards.
+ * @property stepResIds Legacy three-step summary resource list preserved for catalog parity tests.
+ * @property targetPage Primary [SafePage] associated with this topic.
  * @property targetLabelRes Localized name of [targetPage].
  * @property icon Vector icon representing the feature.
  * @property userOnly Whether the topic is hidden from safe-contact accounts.
- * @property tourPage Live destination page opened during the in-app coachmark tour.
- * @property anchor Screen placement for the floating coachmark card.
- * @property arrow Arrow direction inside the floating coachmark pointing toward the real UI element.
  */
 internal data class WalkthroughTopic(
     val category: WalkthroughCategory,
@@ -79,9 +76,33 @@ internal data class WalkthroughTopic(
     @param:StringRes val targetLabelRes: Int,
     val icon: ImageVector,
     val userOnly: Boolean = false,
-    val tourPage: SafePage = targetPage,
+)
+
+/**
+ * Individual step rendered as a floating coachmark popup during the live in-app walkthrough.
+ *
+ * @property id Stable step identifier.
+ * @property topicId Parent [WalkthroughTopic.id] in the Table of Contents.
+ * @property titleRes Localized popup heading resource ID.
+ * @property bodyRes Localized popup instruction resource ID.
+ * @property tourPage Live [SafePage] displayed behind this coachmark step.
+ * @property anchor Placement alignment for the floating coachmark popup.
+ * @property arrow Directional arrow inside the popup pointing to the highlighted feature.
+ * @property openSupportMenu Whether the `+` Support menu must stay expanded during this step.
+ * @property settingsTabTag Optional `SettingsCategory.tag` selected automatically when on Settings.
+ * @property userOnly Whether this step is restricted to primary user accounts.
+ */
+internal data class WalkthroughTourStep(
+    val id: String,
+    val topicId: String,
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val bodyRes: Int,
+    val tourPage: SafePage,
     val anchor: WalkthroughAnchor = WalkthroughAnchor.BottomCenter,
     val arrow: WalkthroughArrow = WalkthroughArrow.North,
+    val openSupportMenu: Boolean = false,
+    val settingsTabTag: String? = null,
+    val userOnly: Boolean = false,
 )
 
 /**
@@ -98,24 +119,6 @@ internal data class WalkthroughTopicGroup(
 internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
     WalkthroughTopic(
         category = WalkthroughCategory.PRIVACY,
-        id = "cover_entry",
-        titleRes = R.string.walkthrough_topic_cover_title,
-        summaryRes = R.string.walkthrough_topic_cover_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_cover_step_1,
-            R.string.walkthrough_topic_cover_step_2,
-            R.string.walkthrough_topic_cover_step_3,
-        ),
-        targetPage = SafePage.Settings,
-        targetLabelRes = R.string.settings,
-        icon = Icons.Outlined.Lock,
-        userOnly = true,
-        tourPage = SafePage.Settings,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.PRIVACY,
         id = "quick_exit",
         titleRes = R.string.walkthrough_topic_exit_title,
         summaryRes = R.string.walkthrough_topic_exit_summary,
@@ -124,98 +127,10 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
             R.string.walkthrough_topic_exit_step_2,
             R.string.walkthrough_topic_exit_step_3,
         ),
-        targetPage = SafePage.Settings,
-        targetLabelRes = R.string.settings,
+        targetPage = SafePage.Home,
+        targetLabelRes = R.string.home,
         icon = Icons.AutoMirrored.Outlined.ExitToApp,
         userOnly = true,
-        tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.BottomEnd,
-        arrow = WalkthroughArrow.SouthEast,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.TOOLS,
-        id = "safety_plan",
-        titleRes = R.string.walkthrough_topic_plan_title,
-        summaryRes = R.string.walkthrough_topic_plan_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_plan_step_1,
-            R.string.walkthrough_topic_plan_step_2,
-            R.string.walkthrough_topic_plan_step_3,
-        ),
-        targetPage = SafePage.SafetyPlan,
-        targetLabelRes = R.string.support_safety_plan,
-        icon = Icons.Outlined.HealthAndSafety,
-        tourPage = SafePage.SafetyPlan,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.TOOLS,
-        id = "notes_incidents",
-        titleRes = R.string.walkthrough_topic_notes_title,
-        summaryRes = R.string.walkthrough_topic_notes_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_notes_step_1,
-            R.string.walkthrough_topic_notes_step_2,
-            R.string.walkthrough_topic_notes_step_3,
-        ),
-        targetPage = SafePage.Notes,
-        targetLabelRes = R.string.notes_incidents,
-        icon = Icons.Outlined.Description,
-        tourPage = SafePage.Notes,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.TOOLS,
-        id = "documents_ocr",
-        titleRes = R.string.walkthrough_topic_docs_title,
-        summaryRes = R.string.walkthrough_topic_docs_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_docs_step_1,
-            R.string.walkthrough_topic_docs_step_2,
-            R.string.walkthrough_topic_docs_step_3,
-        ),
-        targetPage = SafePage.Documents,
-        targetLabelRes = R.string.support_documents,
-        icon = Icons.Outlined.FolderOpen,
-        tourPage = SafePage.Documents,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.TOOLS,
-        id = "messaging_calls",
-        titleRes = R.string.walkthrough_topic_chat_title,
-        summaryRes = R.string.walkthrough_topic_chat_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_chat_step_1,
-            R.string.walkthrough_topic_chat_step_2,
-            R.string.walkthrough_topic_chat_step_3,
-        ),
-        targetPage = SafePage.Messages,
-        targetLabelRes = R.string.messages,
-        icon = Icons.Outlined.ChatBubbleOutline,
-        tourPage = SafePage.Messages,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
-    ),
-    WalkthroughTopic(
-        category = WalkthroughCategory.TOOLS,
-        id = "location_map",
-        titleRes = R.string.walkthrough_topic_location_title,
-        summaryRes = R.string.walkthrough_topic_location_summary,
-        stepResIds = listOf(
-            R.string.walkthrough_topic_location_step_1,
-            R.string.walkthrough_topic_location_step_2,
-            R.string.walkthrough_topic_location_step_3,
-        ),
-        targetPage = SafePage.Location,
-        targetLabelRes = R.string.location_map,
-        icon = Icons.Outlined.LocationOn,
-        tourPage = SafePage.Location,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.South,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -231,9 +146,6 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_staff_help,
         icon = Icons.Outlined.SupportAgent,
         userOnly = true,
-        tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.BottomStart,
-        arrow = WalkthroughArrow.SouthWest,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -249,9 +161,76 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_documents,
         icon = Icons.Outlined.WarningAmber,
         userOnly = true,
-        tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.BottomStart,
-        arrow = WalkthroughArrow.SouthWest,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.TOOLS,
+        id = "safety_plan",
+        titleRes = R.string.walkthrough_topic_plan_title,
+        summaryRes = R.string.walkthrough_topic_plan_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_plan_step_1,
+            R.string.walkthrough_topic_plan_step_2,
+            R.string.walkthrough_topic_plan_step_3,
+        ),
+        targetPage = SafePage.SafetyPlan,
+        targetLabelRes = R.string.support_safety_plan,
+        icon = Icons.Outlined.HealthAndSafety,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.TOOLS,
+        id = "notes_incidents",
+        titleRes = R.string.walkthrough_topic_notes_title,
+        summaryRes = R.string.walkthrough_topic_notes_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_notes_step_1,
+            R.string.walkthrough_topic_notes_step_2,
+            R.string.walkthrough_topic_notes_step_3,
+        ),
+        targetPage = SafePage.Notes,
+        targetLabelRes = R.string.notes_incidents,
+        icon = Icons.Outlined.Description,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.TOOLS,
+        id = "documents_ocr",
+        titleRes = R.string.walkthrough_topic_docs_title,
+        summaryRes = R.string.walkthrough_topic_docs_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_docs_step_1,
+            R.string.walkthrough_topic_docs_step_2,
+            R.string.walkthrough_topic_docs_step_3,
+        ),
+        targetPage = SafePage.Documents,
+        targetLabelRes = R.string.support_documents,
+        icon = Icons.Outlined.FolderOpen,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.TOOLS,
+        id = "messaging_calls",
+        titleRes = R.string.walkthrough_topic_chat_title,
+        summaryRes = R.string.walkthrough_topic_chat_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_chat_step_1,
+            R.string.walkthrough_topic_chat_step_2,
+            R.string.walkthrough_topic_chat_step_3,
+        ),
+        targetPage = SafePage.Messages,
+        targetLabelRes = R.string.messages,
+        icon = Icons.Outlined.ChatBubbleOutline,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.TOOLS,
+        id = "location_map",
+        titleRes = R.string.walkthrough_topic_location_title,
+        summaryRes = R.string.walkthrough_topic_location_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_location_step_1,
+            R.string.walkthrough_topic_location_step_2,
+            R.string.walkthrough_topic_location_step_3,
+        ),
+        targetPage = SafePage.Location,
+        targetLabelRes = R.string.location_map,
+        icon = Icons.Outlined.LocationOn,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -267,9 +246,6 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_hotlines,
         icon = Icons.Outlined.PhoneInTalk,
         userOnly = true,
-        tourPage = SafePage.Hotlines,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.ACCOUNT,
@@ -285,9 +261,266 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.account_activity,
         icon = Icons.Outlined.History,
         userOnly = true,
+    ),
+    WalkthroughTopic(
+        category = WalkthroughCategory.PRIVACY,
+        id = "cover_entry",
+        titleRes = R.string.walkthrough_topic_cover_title,
+        summaryRes = R.string.walkthrough_topic_cover_summary,
+        stepResIds = listOf(
+            R.string.walkthrough_topic_cover_step_1,
+            R.string.walkthrough_topic_cover_step_2,
+            R.string.walkthrough_topic_cover_step_3,
+        ),
+        targetPage = SafePage.Settings,
+        targetLabelRes = R.string.settings,
+        icon = Icons.Outlined.Lock,
+        userOnly = false,
+    ),
+)
+
+internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
+    WalkthroughTourStep(
+        id = "quick_exit_fab",
+        topicId = "quick_exit",
+        titleRes = R.string.wt_step_quick_exit_fab_title,
+        bodyRes = R.string.wt_step_quick_exit_fab_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.BottomEnd,
+        arrow = WalkthroughArrow.SouthEast,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "home_header_shortcuts",
+        topicId = "quick_exit",
+        titleRes = R.string.wt_step_home_header_shortcuts_title,
+        bodyRes = R.string.wt_step_home_header_shortcuts_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopEnd,
+        arrow = WalkthroughArrow.NorthEast,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "home_profile_activity",
+        topicId = "quick_exit",
+        titleRes = R.string.wt_step_home_profile_activity_title,
+        bodyRes = R.string.wt_step_home_profile_activity_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.South,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "support_menu_staff",
+        topicId = "staff_help",
+        titleRes = R.string.wt_step_support_menu_staff_title,
+        bodyRes = R.string.wt_step_support_menu_staff_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.SouthWest,
+        openSupportMenu = true,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "support_menu_staff_escalate",
+        topicId = "staff_help",
+        titleRes = R.string.wt_step_support_menu_staff_escalate_title,
+        bodyRes = R.string.wt_step_support_menu_staff_escalate_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.SouthWest,
+        openSupportMenu = true,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "support_menu_emergency",
+        topicId = "emergency_report",
+        titleRes = R.string.wt_step_support_menu_emergency_title,
+        bodyRes = R.string.wt_step_support_menu_emergency_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.SouthWest,
+        openSupportMenu = true,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "support_menu_emergency_alert",
+        topicId = "emergency_report",
+        titleRes = R.string.wt_step_support_menu_emergency_alert_title,
+        bodyRes = R.string.wt_step_support_menu_emergency_alert_body,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.SouthWest,
+        openSupportMenu = true,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "plan_checklists",
+        topicId = "safety_plan",
+        titleRes = R.string.wt_step_plan_checklists_title,
+        bodyRes = R.string.wt_step_plan_checklists_body,
+        tourPage = SafePage.SafetyPlan,
+    ),
+    WalkthroughTourStep(
+        id = "plan_share_consult",
+        topicId = "safety_plan",
+        titleRes = R.string.wt_step_plan_share_consult_title,
+        bodyRes = R.string.wt_step_plan_share_consult_body,
+        tourPage = SafePage.SafetyPlan,
+    ),
+    WalkthroughTourStep(
+        id = "notes_create",
+        topicId = "notes_incidents",
+        titleRes = R.string.wt_step_notes_create_title,
+        bodyRes = R.string.wt_step_notes_create_body,
+        tourPage = SafePage.Notes,
+    ),
+    WalkthroughTourStep(
+        id = "notes_pin_search",
+        topicId = "notes_incidents",
+        titleRes = R.string.wt_step_notes_pin_search_title,
+        bodyRes = R.string.wt_step_notes_pin_search_body,
+        tourPage = SafePage.Notes,
+    ),
+    WalkthroughTourStep(
+        id = "notes_history_trash",
+        topicId = "notes_incidents",
+        titleRes = R.string.wt_step_notes_history_trash_title,
+        bodyRes = R.string.wt_step_notes_history_trash_body,
+        tourPage = SafePage.Notes,
+    ),
+    WalkthroughTourStep(
+        id = "docs_encrypted_vault",
+        topicId = "documents_ocr",
+        titleRes = R.string.wt_step_docs_encrypted_vault_title,
+        bodyRes = R.string.wt_step_docs_encrypted_vault_body,
+        tourPage = SafePage.Documents,
+    ),
+    WalkthroughTourStep(
+        id = "docs_private_camera",
+        topicId = "documents_ocr",
+        titleRes = R.string.wt_step_docs_private_camera_title,
+        bodyRes = R.string.wt_step_docs_private_camera_body,
+        tourPage = SafePage.Documents,
+    ),
+    WalkthroughTourStep(
+        id = "docs_ocr_share",
+        topicId = "documents_ocr",
+        titleRes = R.string.wt_step_docs_ocr_share_title,
+        bodyRes = R.string.wt_step_docs_ocr_share_body,
+        tourPage = SafePage.Documents,
+    ),
+    WalkthroughTourStep(
+        id = "chat_add_friends",
+        topicId = "messaging_calls",
+        titleRes = R.string.wt_step_chat_add_friends_title,
+        bodyRes = R.string.wt_step_chat_add_friends_body,
+        tourPage = SafePage.Messages,
+    ),
+    WalkthroughTourStep(
+        id = "chat_voice_messages",
+        topicId = "messaging_calls",
+        titleRes = R.string.wt_step_chat_voice_messages_title,
+        bodyRes = R.string.wt_step_chat_voice_messages_body,
+        tourPage = SafePage.Messages,
+    ),
+    WalkthroughTourStep(
+        id = "chat_share_media",
+        topicId = "messaging_calls",
+        titleRes = R.string.wt_step_chat_share_media_title,
+        bodyRes = R.string.wt_step_chat_share_media_body,
+        tourPage = SafePage.Messages,
+    ),
+    WalkthroughTourStep(
+        id = "chat_calls_search_info",
+        topicId = "messaging_calls",
+        titleRes = R.string.wt_step_chat_calls_search_info_title,
+        bodyRes = R.string.wt_step_chat_calls_search_info_body,
+        tourPage = SafePage.Messages,
+    ),
+    WalkthroughTourStep(
+        id = "loc_map_places",
+        topicId = "location_map",
+        titleRes = R.string.wt_step_loc_map_places_title,
+        bodyRes = R.string.wt_step_loc_map_places_body,
+        tourPage = SafePage.Location,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.South,
+    ),
+    WalkthroughTourStep(
+        id = "loc_live_sharing",
+        topicId = "location_map",
+        titleRes = R.string.wt_step_loc_live_sharing_title,
+        bodyRes = R.string.wt_step_loc_live_sharing_body,
+        tourPage = SafePage.Location,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.South,
+    ),
+    WalkthroughTourStep(
+        id = "loc_navigation",
+        topicId = "location_map",
+        titleRes = R.string.wt_step_loc_navigation_title,
+        bodyRes = R.string.wt_step_loc_navigation_body,
+        tourPage = SafePage.Location,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.South,
+    ),
+    WalkthroughTourStep(
+        id = "hotlines_directory",
+        topicId = "hotlines_contacts",
+        titleRes = R.string.wt_step_hotlines_directory_title,
+        bodyRes = R.string.wt_step_hotlines_directory_body,
+        tourPage = SafePage.Hotlines,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "contacts_directory",
+        topicId = "hotlines_contacts",
+        titleRes = R.string.wt_step_contacts_directory_title,
+        bodyRes = R.string.wt_step_contacts_directory_body,
+        tourPage = SafePage.Contacts,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "activity_audit",
+        topicId = "activity_settings",
+        titleRes = R.string.wt_step_activity_audit_title,
+        bodyRes = R.string.wt_step_activity_audit_body,
         tourPage = SafePage.Activity,
-        anchor = WalkthroughAnchor.BottomCenter,
-        arrow = WalkthroughArrow.North,
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "settings_profile_cover",
+        topicId = "cover_entry",
+        titleRes = R.string.wt_step_settings_profile_cover_title,
+        bodyRes = R.string.wt_step_settings_profile_cover_body,
+        tourPage = SafePage.Settings,
+        settingsTabTag = "settings_tab_profile",
+    ),
+    WalkthroughTourStep(
+        id = "settings_password_trigger",
+        topicId = "cover_entry",
+        titleRes = R.string.wt_step_settings_password_trigger_title,
+        bodyRes = R.string.wt_step_settings_password_trigger_body,
+        tourPage = SafePage.Settings,
+        settingsTabTag = "settings_tab_password",
+    ),
+    WalkthroughTourStep(
+        id = "settings_privacy_passkey",
+        topicId = "cover_entry",
+        titleRes = R.string.wt_step_settings_privacy_passkey_title,
+        bodyRes = R.string.wt_step_settings_privacy_passkey_body,
+        tourPage = SafePage.Settings,
+        settingsTabTag = "settings_tab_privacy",
+        userOnly = true,
+    ),
+    WalkthroughTourStep(
+        id = "settings_permissions",
+        topicId = "cover_entry",
+        titleRes = R.string.wt_step_settings_permissions_title,
+        bodyRes = R.string.wt_step_settings_permissions_body,
+        tourPage = SafePage.Settings,
+        settingsTabTag = "settings_tab_permissions",
     ),
 )
 
@@ -300,6 +533,36 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
 internal fun walkthroughTopicsForRole(role: AccountRole): List<WalkthroughTopic> =
     if (role == AccountRole.SAFE_CONTACT) allWalkthroughTopics.filterNot(WalkthroughTopic::userOnly)
     else allWalkthroughTopics
+
+/**
+ * Filters live coachmark tour steps to the features accessible by [role].
+ *
+ * @param role Account role running the tour.
+ * @return Ordered list of [WalkthroughTourStep] items for that role.
+ */
+internal fun walkthroughTourStepsForRole(role: AccountRole): List<WalkthroughTourStep> =
+    if (role == AccountRole.SAFE_CONTACT) allWalkthroughTourSteps.filterNot(WalkthroughTourStep::userOnly)
+    else allWalkthroughTourSteps
+
+/**
+ * Returns the first [WalkthroughTourStep] belonging to [topicId] for [role], or `null`.
+ *
+ * @param role Account role launching the tour.
+ * @param topicId Table of Contents topic identifier.
+ * @return Matching first step, or `null` if unavailable for [role].
+ */
+internal fun firstWalkthroughStepForTopic(role: AccountRole, topicId: String): WalkthroughTourStep? =
+    walkthroughTourStepsForRole(role).firstOrNull { it.topicId == topicId }
+
+/**
+ * Counts how many live tour steps belong to [topicId] for [role].
+ *
+ * @param role Account role viewing the Table of Contents.
+ * @param topicId Table of Contents topic identifier.
+ * @return Number of coachmark steps under that topic.
+ */
+internal fun walkthroughStepCountForTopic(role: AccountRole, topicId: String): Int =
+    walkthroughTourStepsForRole(role).count { it.topicId == topicId }
 
 /**
  * Groups the given [topics] into ordered Table of Contents sections, omitting empty categories.
@@ -335,21 +598,21 @@ internal fun nextWalkthroughTopicIndex(currentIndex: Int, totalTopics: Int, delt
     if (totalTopics <= 1) 0 else (currentIndex + delta).coerceIn(0, totalTopics - 1)
 
 /**
- * Returns the next topic identifier during a live in-app walkthrough tour, or `null` when moving
- * past the end or before the beginning of [topics].
+ * Returns the next tour step ID during a live in-app walkthrough, or `null` when moving
+ * past the last step or before the first step of [steps].
  *
- * @param topics Ordered list of role-filtered walkthrough topics.
- * @param currentId Currently shown coachmark topic ID.
+ * @param steps Ordered list of role-filtered tour steps.
+ * @param currentStepId Currently displayed coachmark step ID.
  * @param delta Direction to advance (`+1` for Next, `-1` for Back).
- * @return Target topic ID, or `null` when out of bounds.
+ * @return Target step ID, or `null` when out of bounds.
  */
-internal fun nextWalkthroughTourTopicId(
-    topics: List<WalkthroughTopic>,
-    currentId: String,
+internal fun nextWalkthroughTourStepId(
+    steps: List<WalkthroughTourStep>,
+    currentStepId: String,
     delta: Int,
 ): String? {
-    val idx = topics.indexOfFirst { it.id == currentId }
+    val idx = steps.indexOfFirst { it.id == currentStepId }
     if (idx < 0) return null
     val next = idx + delta
-    return if (next in topics.indices) topics[next].id else null
+    return if (next in steps.indices) steps[next].id else null
 }
