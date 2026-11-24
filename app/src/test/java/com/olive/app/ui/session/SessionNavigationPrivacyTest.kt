@@ -94,6 +94,29 @@ class SessionNavigationPrivacyTest {
     }
 
     @Test
+    fun completeWalkthroughTourDismissesStepClearsHistoryAndReturnsToSafeHome() {
+        for (role in listOf(AccountRole.USER, AccountRole.SAFE_CONTACT)) {
+            SessionRuntimeFixture(role).use { f ->
+                val r = f.runtime
+                r.state.screen = SessionScreen.Safe
+                r.state.page = SafePage.Settings
+                r.safePageHistory += listOf(SafePage.Home, SafePage.Notes, SafePage.Messages)
+                r.state.walkthroughTourStepId = "settings_permissions_automatic"
+                r.state.activityCategory = ActivityCategory.Privacy
+                r.state.message = "Temporary status"
+
+                r.navigation.completeWalkthroughTour()
+
+                assertNull(r.state.walkthroughTourStepId)
+                assertEquals(SafePage.Home, r.state.page)
+                assertTrue(r.safePageHistory.isEmpty())
+                assertNull(r.state.activityCategory)
+                assertNull(r.state.message)
+            }
+        }
+    }
+
+    @Test
     fun revocationOfThisAccountClosesItsPrivateWorkspaceAndIgnoresOtherAccounts() {
         SessionRuntimeFixture(AccountRole.SAFE_CONTACT).use { fixture ->
             val session = fixture.runtime

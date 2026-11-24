@@ -71,9 +71,9 @@ class SafeWalkthroughTest {
         val supportMenuSteps = userSteps.filter { it.openSupportMenu }
         assertEquals(
             listOf(
+                "support_menu_quick_links",
                 "support_menu_staff",
                 "support_menu_emergency",
-                "support_menu_quick_links",
             ),
             supportMenuSteps.map { it.id },
         )
@@ -95,11 +95,53 @@ class SafeWalkthroughTest {
 
         val planSteps = userSteps.filter { it.topicId == "safety_plan" }
         assertEquals(6, planSteps.size)
-        assertTrue(planSteps.any { it.action == "plan_primary" })
-        assertTrue(planSteps.any { it.action == "plan_backup" })
+        assertEquals(
+            listOf(
+                "plan_primary_tab",
+                "plan_section_jumps",
+                "plan_backup_tab",
+                "plan_consultation",
+                "plan_share_contacts",
+                "plan_tailor_questionnaire",
+            ),
+            planSteps.map { it.id },
+        )
+
+        val notesSteps = userSteps.filter { it.topicId == "notes_incidents" }
+        assertEquals(
+            listOf(
+                "notes_search_filter_sort",
+                "notes_editor_incident",
+                "notes_editor_attachments",
+                "notes_trash_button",
+            ),
+            notesSteps.map { it.id },
+        )
 
         val messagingSteps = userSteps.filter { it.topicId == "messaging_calls" }
-        assertEquals(5, messagingSteps.size)
+        assertEquals(
+            listOf(
+                "chat_tabs_dms_tickets",
+                "chat_invite_popup",
+                "chat_enter_invite_code",
+                "chat_in_chat_tools",
+                "chat_ticket_tab_archive",
+            ),
+            messagingSteps.map { it.id },
+        )
+
+        // Every topic's steps must appear in a single contiguous block (no split topics).
+        listOf(userSteps, contactSteps).forEach { steps ->
+            val seenTopics = mutableSetOf<String>()
+            var prevTopic: String? = null
+            steps.forEach { step ->
+                if (step.topicId != prevTopic) {
+                    assertTrue("Split topic ${step.topicId}", seenTopics.add(step.topicId))
+                    prevTopic = step.topicId
+                }
+            }
+        }
+        assertEquals("hotlines_region_location", firstWalkthroughStepForTopic(AccountRole.USER, "hotlines_contacts")?.id)
 
         val userSettingsSteps = userSteps.filter { it.settingsTabTag != null }
         assertEquals(12, userSettingsSteps.size)
@@ -119,8 +161,8 @@ class SafeWalkthroughTest {
             contactSettingsSteps.mapNotNull { it.settingsTabTag }.distinct(),
         )
 
-        assertEquals("home_header_shortcuts", nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1))
-        assertNull(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1))
+        assertEquals("home_profile_activity", nextWalkthroughTourStepId(userSteps, "home_header_shortcuts", 1))
+        assertNull(nextWalkthroughTourStepId(userSteps, "home_header_shortcuts", -1))
         assertNull(nextWalkthroughTourStepId(userSteps, "settings_permissions_automatic", 1))
         assertEquals("settings_permissions_features", nextWalkthroughTourStepId(userSteps, "settings_permissions_automatic", -1))
         assertEquals("chat_tabs_dms_tickets", firstWalkthroughStepForTopic(AccountRole.USER, "messaging_calls")?.id)

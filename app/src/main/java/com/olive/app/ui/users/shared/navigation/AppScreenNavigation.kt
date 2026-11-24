@@ -475,7 +475,7 @@ internal fun OliveRoot(
                                 activeStepId = activeTourStep.id,
                                 showBottomControls = showQuickExit || showSupport,
                                 onAdvance = { nextId ->
-                                    if (nextId == null) session.runtime.navigation.dismissWalkthroughTour()
+                                    if (nextId == null) session.runtime.navigation.completeWalkthroughTour()
                                     else startTour(nextId)
                                 },
                                 onOpenContents = {

@@ -56,15 +56,42 @@ describe("WalkthroughCatalog table of contents, highlight targeting, and placeme
     ]);
 
     const planSteps = userSteps.filter((step) => step.topicId === "safety_plan");
-    expect(planSteps.some((step) => step.action === "plan_primary")).toBe(true);
-    expect(planSteps.some((step) => step.action === "plan_backup")).toBe(true);
+    expect(planSteps.map((step) => step.id)).toEqual([
+      "plan_primary_tab",
+      "plan_section_jumps",
+      "plan_backup_tab",
+      "plan_consultation",
+      "plan_share_contacts",
+    ]);
+
+    const messageSteps = userSteps.filter((step) => step.topicId === "messaging_voice");
+    expect(messageSteps.map((step) => step.id)).toEqual([
+      "chat_tabs_dms",
+      "chat_invite_modal",
+      "chat_enter_code",
+      "chat_in_chat_tools",
+      "chat_tickets_tab",
+    ]);
+
+    for (const steps of [userSteps, contactSteps]) {
+      const seen = new Set<string>();
+      let prevTopic = "";
+      for (const step of steps) {
+        if (step.topicId !== prevTopic) {
+          expect(seen.has(step.topicId)).toBe(false);
+          seen.add(step.topicId);
+          prevTopic = step.topicId;
+        }
+      }
+    }
 
     const quickExit = userSteps.find((step) => step.id === "quick_exit_fab");
     expect(quickExit?.tourPage).toBe("Home");
     expect(quickExit?.targetSelector).toBe(".floating-quick-exit");
 
-    expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1)).toBe("home_sidebar_nav");
-    expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1)).toBeNull();
+    expect(nextWalkthroughTourStepId(userSteps, "home_sidebar_nav", 1)).toBe("home_dashboard_cards");
+    expect(nextWalkthroughTourStepId(userSteps, "home_dashboard_cards", 1)).toBe("quick_exit_fab");
+    expect(nextWalkthroughTourStepId(userSteps, "home_sidebar_nav", -1)).toBeNull();
     expect(nextWalkthroughTourStepId(userSteps, "settings_account_sync", 1)).toBeNull();
   });
 

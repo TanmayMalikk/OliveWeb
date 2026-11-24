@@ -250,7 +250,7 @@ export default function SafeApp() {
           role={p.role}
           activeStepId={activeTourStepId}
           onAdvance={(nextId) => {
-            if (!nextId) setActiveTourStepId(null);
+            if (!nextId) navigate("Home");
             else startTour(nextId);
           }}
           onOpenContents={() => {

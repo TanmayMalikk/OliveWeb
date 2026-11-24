@@ -230,6 +230,23 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun dismissWalkthroughTour() {
         runtime.state.walkthroughTourStepId = null
     }
+
+    /**
+     * Completes the live in-app walkthrough and returns cleanly to Safe App Home.
+     */
+    fun completeWalkthroughTour() {
+        with(runtime) {
+            with(state) {
+                walkthroughTourStepId = null
+                if (screen == SessionScreen.Safe) {
+                    safePageHistory.clear()
+                    page = SafePage.Home
+                    activityCategory = null
+                    message = null
+                }
+            }
+        }
+    }
 }
 
 // Signed-in users: stores the selected discreet cover.

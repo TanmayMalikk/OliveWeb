@@ -210,15 +210,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
 
 const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
   {
-    id: "quick_exit_fab",
-    topicId: "quick_exit",
-    title: "Quick Exit button",
-    body: "Click Quick Exit in the bottom-right corner anytime to immediately lock your workspace and return to your cover site.",
-    tourPage: "Home",
-    targetSelector: ".floating-quick-exit",
-    userOnly: true,
-  },
-  {
     id: "home_sidebar_nav",
     topicId: "quick_exit",
     title: "Workspace sidebar navigation",
@@ -237,6 +228,15 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     userOnly: true,
   },
   {
+    id: "quick_exit_fab",
+    topicId: "quick_exit",
+    title: "Quick Exit button",
+    body: "Click Quick Exit in the bottom-right corner anytime to immediately lock your workspace and return to your cover site.",
+    tourPage: "Home",
+    targetSelector: ".floating-quick-exit",
+    userOnly: true,
+  },
+  {
     id: "plan_primary_tab",
     topicId: "safety_plan",
     title: "Safety plan · Primary tab",
@@ -244,15 +244,6 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     tourPage: "SafetyPlan",
     targetSelector: "#primary-plan-tab, #main .panel",
     action: "plan_primary",
-  },
-  {
-    id: "plan_backup_tab",
-    topicId: "safety_plan",
-    title: "Safety plan · Backup tab",
-    body: "We switched to Backup plan: build an alternate safety plan and grab-bag steps in case your primary plan changes.",
-    tourPage: "SafetyPlan",
-    targetSelector: "#backup-plan-tab, #main .panel",
-    action: "plan_backup",
   },
   {
     id: "plan_section_jumps",
@@ -263,6 +254,15 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     targetSelector: ".safety-section-links, #main .panel",
     action: "plan_primary",
     userOnly: true,
+  },
+  {
+    id: "plan_backup_tab",
+    topicId: "safety_plan",
+    title: "Safety plan · Backup tab",
+    body: "We switched to Backup plan: build an alternate safety plan and grab-bag steps in case your primary plan changes.",
+    tourPage: "SafetyPlan",
+    targetSelector: "#backup-plan-tab, #main .panel",
+    action: "plan_backup",
   },
   {
     id: "plan_consultation",
@@ -354,15 +354,6 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     action: "messages_tab_dms",
   },
   {
-    id: "chat_tickets_tab",
-    topicId: "messaging_voice",
-    title: "Messages · Ticket chats & archives",
-    body: "We switched to Ticket chats: open support tickets, manage invited friends on a ticket, or check archived chats.",
-    tourPage: "Messages",
-    targetSelector: ".message-tabs, #main .empty",
-    action: "messages_tab_tickets",
-  },
-  {
     id: "chat_in_chat_tools",
     topicId: "messaging_voice",
     title: "Inside chat · Media, voice, search & unsend",
@@ -370,6 +361,15 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     tourPage: "Messages",
     targetSelector: ".chat-panel, .conversation-sidebar, #main .empty",
     action: "messages_tab_dms",
+  },
+  {
+    id: "chat_tickets_tab",
+    topicId: "messaging_voice",
+    title: "Messages · Ticket chats & archives",
+    body: "We switched to Ticket chats: open support tickets, manage invited friends on a ticket, or check archived chats.",
+    tourPage: "Messages",
+    targetSelector: ".message-tabs, #main .empty",
+    action: "messages_tab_tickets",
   },
   {
     id: "location_lookup",

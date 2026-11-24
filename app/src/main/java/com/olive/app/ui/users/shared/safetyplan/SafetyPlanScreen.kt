@@ -190,8 +190,8 @@ internal fun SafetyPlanScreen(
         when (wt?.action) {
             "plan_primary" -> backup = false
             "plan_backup" -> backup = true
-            "plan_scroll_consult" -> { backup = false; state.animateScrollToItem(1 + SAFETY_CHECKLIST_SECTIONS.size) }
-            "plan_scroll_share" -> { backup = false; state.animateScrollToItem(2 + SAFETY_CHECKLIST_SECTIONS.size) }
+            "plan_scroll_consult" -> state.animateScrollToItem(1 + SAFETY_CHECKLIST_SECTIONS.size)
+            "plan_scroll_share" -> state.animateScrollToItem(2 + SAFETY_CHECKLIST_SECTIONS.size)
             "plan_open_questionnaire" -> { questionnaireOpen = true; wtPopup = true }
         }
         if (wt?.action != "plan_open_questionnaire" && wtPopup) { questionnaireOpen = false; wtPopup = false }
