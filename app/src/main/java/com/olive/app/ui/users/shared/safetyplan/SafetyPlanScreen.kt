@@ -516,7 +516,7 @@ internal fun SafetyPlanScreen(
             onDismiss = { questionnaireOpen = false; wtPopup = false },
             onSave = { updated ->
                 session.saveSafetyIntake(updated)
-                applySafetyIntakeToPlan(context, controller, updated, hasAffectedPeople)
+                applySafetyIntakeToPlan(context, controller, updated, hasAffectedPeople, documentController.state.files)
                 questionnaireOpen = false; wtPopup = false
             },
         )

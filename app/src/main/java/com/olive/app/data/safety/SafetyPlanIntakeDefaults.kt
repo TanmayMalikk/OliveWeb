@@ -107,20 +107,40 @@ internal fun safetyPlanDefaultsFromIntake(
 }
 
 /**
- * Non-destructively appends newly relevant tailored prompts onto an existing encoded checklist while
- * preserving the user's edits, completion checkmarks, and document attachments.
+ * Updates an encoded checklist to match [tailoredPrompts] by removing unedited items in
+ * [removablePrompts] that are no longer relevant and appending missing tailored prompts, while
+ * strictly preserving user edits, checkmarks, custom rows, and document attachments.
  *
  * @param existingValue Currently stored encoded checklist string.
  * @param tailoredPrompts Tailored prompts corresponding to updated questionnaire answers.
+ * @param removablePrompts All questionnaire or default prompt strings eligible for unedited removal.
+ * @param protectedItemIds Item IDs with linked external documents that must never be pruned.
  * @return Updated encoded checklist string within backend length and item count limits.
  */
 internal fun mergeTailoredChecklistItems(
     existingValue: String,
     tailoredPrompts: List<String>,
+    removablePrompts: Collection<String> = emptyList(),
+    protectedItemIds: Set<String> = emptySet(),
 ): String {
     val existing = readSafetyChecklist(existingValue)
-    val seenTexts = existing.mapTo(mutableSetOf()) { it.text.normalizedPrompt() }
-    val merged = existing.toMutableList()
+    val desiredNormalized = tailoredPrompts.mapNotNullTo(mutableSetOf()) { prompt ->
+        prompt.normalizedPrompt().takeIf(String::isNotEmpty)
+    }
+    val removableNormalized = removablePrompts.mapNotNullTo(mutableSetOf()) { prompt ->
+        prompt.normalizedPrompt().takeIf(String::isNotEmpty)
+    }
+    val kept = existing.filterNot { item ->
+        val normalized = item.text.normalizedPrompt()
+        !item.checked &&
+            item.attachmentIds.isEmpty() &&
+            item.excludedAttachmentIds.isEmpty() &&
+            item.id !in protectedItemIds &&
+            normalized in removableNormalized &&
+            normalized !in desiredNormalized
+    }
+    val seenTexts = kept.mapTo(mutableSetOf()) { it.text.normalizedPrompt() }
+    val merged = kept.toMutableList()
     for (prompt in tailoredPrompts) {
         if (merged.size >= MAX_SECTION_ITEMS) break
         val normalized = prompt.normalizedPrompt()
@@ -130,6 +150,62 @@ internal fun mergeTailoredChecklistItems(
         if (encoded.length <= MAX_SECTION_CHARS) merged += candidate
     }
     return writeSafetyChecklist(merged)
+}
+
+/**
+ * Resolves the complete set of built-in questionnaire and default prompt strings ever generated for
+ * [section], so unedited prompts from previous answers can be removed safely on update.
+ *
+ * @param context Android context used to resolve localized checklist resources.
+ * @param section Safety plan section identifier.
+ * @return Set of localized built-in prompt strings for [section].
+ */
+internal fun safetyPlanManagedSectionPrompts(
+    context: Context,
+    section: String,
+): Set<String> = buildSet {
+    addAll(safetyPlanSectionPrompts(context, section, SafetyPlanIntake(completed = false), hasAffectedPeople = false))
+    addAll(safetyPlanSectionPrompts(context, section, SafetyPlanIntake(completed = false), hasAffectedPeople = true))
+    addAll(safetyPlanSectionPrompts(context, section, SafetyPlanIntake(completed = true), hasAffectedPeople = true))
+    ImmigrationStatus.entries.forEach { status ->
+        addAll(
+            safetyPlanSectionPrompts(
+                context,
+                section,
+                SafetyPlanIntake(completed = true, immigrationStatus = status),
+            ),
+        )
+    }
+    FinancialSituation.entries.forEach { financial ->
+        addAll(
+            safetyPlanSectionPrompts(
+                context,
+                section,
+                SafetyPlanIntake(completed = true, financialSituation = financial),
+            ),
+        )
+    }
+    TransportSituation.entries.forEach { transport ->
+        addAll(
+            safetyPlanSectionPrompts(
+                context,
+                section,
+                SafetyPlanIntake(completed = true, transportSituation = transport),
+            ),
+        )
+    }
+    addAll(
+        safetyPlanSectionPrompts(
+            context,
+            section,
+            SafetyPlanIntake(
+                completed = true,
+                abuseTypes = AbuseType.entries.toSet(),
+                dependants = DependantNeed.entries.toSet(),
+                circumstances = SafetyCircumstance.entries.toSet(),
+            ),
+        ),
+    )
 }
 
 /** Builds tailored document checklist string resource IDs from [intake]. */
@@ -154,7 +230,7 @@ private fun documentPromptIds(intake: SafetyPlanIntake, hasAffectedPeople: Boole
         }
         ImmigrationStatus.PREFER_NOT_TO_SAY -> add(R.string.safety_doc_passport_generic)
     }
-    if (DependantNeed.CHILDREN in intake.dependants || (hasAffectedPeople && intake.dependants.isEmpty())) {
+    if (DependantNeed.CHILDREN in intake.dependants || (!intake.completed && hasAffectedPeople && intake.dependants.isEmpty())) {
         add(R.string.safety_doc_children_records)
     }
     if (DependantNeed.ELDER_OR_ADULT_DEPENDANT in intake.dependants) {

@@ -40,6 +40,7 @@ import com.olive.app.data.safety.readSafetyPlanContact
 import com.olive.app.data.safety.safetyChecklistAttachments
 import com.olive.app.data.safety.safetyPlanContactItem
 import com.olive.app.data.safety.safetyPlanDefaultsFromIntake
+import com.olive.app.data.safety.safetyPlanManagedSectionPrompts
 import com.olive.app.data.safety.safetyPlanSectionPrompts
 import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.session.SessionSafetyPlans
@@ -544,19 +545,22 @@ internal fun safetyDefaults(
 ): Map<String, String> = safetyPlanDefaultsFromIntake(context, intake, hasAffectedPeople)
 
 /**
- * Adds newly relevant tailored checklist items to both primary and backup plans without altering
- * or removing the user's existing items, checkmarks, or attachments.
+ * Updates both primary and backup plans from updated questionnaire selections by adding newly
+ * relevant items and removing unedited default/questionnaire items that no longer apply, while
+ * preserving the user's edits, checkmarks, custom rows, and document attachments.
  *
  * @param context Android context used to resolve localized checklist strings.
  * @param controller Active safety-plan controller managing edits and sync.
  * @param intake Updated questionnaire selections.
  * @param hasAffectedPeople Whether affected family members were listed in the user's profile.
+ * @param documents Vault documents used to protect checklist items with uploaded attachments.
  */
 internal fun applySafetyIntakeToPlan(
     context: Context,
     controller: SessionSafetyPlans,
     intake: SafetyPlanIntake,
     hasAffectedPeople: Boolean,
+    documents: List<SafetyDocument> = emptyList(),
 ) {
     val activePlan = controller.plan ?: return
     var changed = false
@@ -565,7 +569,15 @@ internal fun applySafetyIntakeToPlan(
             val key = "${planPrefix}_$section"
             val existing = activePlan.fields[key]?.value ?: return@forEach
             val tailored = safetyPlanSectionPrompts(context, section, intake, hasAffectedPeople)
-            val updated = mergeTailoredChecklistItems(existing, tailored)
+            val removable = safetyPlanManagedSectionPrompts(context, section)
+            val protectedIds = if (section == "documents" && documents.isNotEmpty()) {
+                readSafetyChecklist(existing)
+                    .filter { safetyChecklistAttachments(key, it, documents).isNotEmpty() }
+                    .mapTo(mutableSetOf()) { it.id }
+            } else {
+                emptySet()
+            }
+            val updated = mergeTailoredChecklistItems(existing, tailored, removable, protectedIds)
             if (updated != existing) {
                 controller.edit(key, updated)
                 changed = true

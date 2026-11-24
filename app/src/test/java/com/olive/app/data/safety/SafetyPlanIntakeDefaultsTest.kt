@@ -254,6 +254,136 @@ class SafetyPlanIntakeDefaultsTest {
     }
 
     @Test
+    fun updatingQuestionnaireAnswersAddsNewAndRemovesUneditedObsoleteItemsAcrossAllSections() {
+        val initialIntake = SafetyPlanIntake(
+            completed = true,
+            abuseTypes = setOf(AbuseType.PHYSICAL),
+            immigrationStatus = ImmigrationStatus.CITIZEN,
+            dependants = setOf(DependantNeed.CHILDREN),
+            financialSituation = FinancialSituation.INDEPENDENT,
+            transportSituation = TransportSituation.OWN_VEHICLE,
+            circumstances = setOf(SafetyCircumstance.PRESCRIPTIONS_OR_MEDICAL),
+        )
+        val initialPlan = safetyPlanDefaultsFromIntake(context, initialIntake)
+        val updatedIntake = SafetyPlanIntake(
+            completed = true,
+            abuseTypes = setOf(AbuseType.DIGITAL_OR_STALKING),
+            immigrationStatus = ImmigrationStatus.PERMANENT_RESIDENT,
+            dependants = setOf(DependantNeed.PETS),
+            financialSituation = FinancialSituation.SHARED_OR_MONITORED,
+            transportSituation = TransportSituation.PUBLIC_TRANSIT,
+            circumstances = setOf(SafetyCircumstance.LEGAL_OR_COURT_ORDERS),
+        )
+
+        val updatedFields = SAFETY_SECTIONS.filterNot { it == "contacts" }.associateWith { section ->
+            val beforeItems = readSafetyChecklist(initialPlan.getValue("primary_$section"))
+            val updatedEncoded = mergeTailoredChecklistItems(
+                existingValue = initialPlan.getValue("primary_$section"),
+                tailoredPrompts = safetyPlanSectionPrompts(context, section, updatedIntake),
+                removablePrompts = safetyPlanManagedSectionPrompts(context, section),
+            )
+            val afterItems = readSafetyChecklist(updatedEncoded)
+            val afterTexts = afterItems.map { it.text }
+            assertEquals(safetyPlanSectionPrompts(context, section, updatedIntake).toSet(), afterTexts.toSet())
+            // Stable IDs are preserved for prompts that stayed relevant across the update.
+            beforeItems.filter { it.text in afterTexts }.forEach { keptBefore ->
+                assertEquals(keptBefore.id, afterItems.first { it.text == keptBefore.text }.id)
+            }
+            afterTexts
+        }
+
+        val docs = updatedFields.getValue("documents")
+        assertTrue(context.getString(R.string.safety_doc_pr_card) in docs)
+        assertTrue(context.getString(R.string.safety_doc_pet_records) in docs)
+        assertTrue(context.getString(R.string.safety_doc_court_orders) in docs)
+        assertFalse(context.getString(R.string.safety_doc_citizen_passport) in docs)
+        assertFalse(context.getString(R.string.safety_doc_children_records) in docs)
+        assertFalse(context.getString(R.string.safety_doc_medical_records) in docs)
+
+        val grab = updatedFields.getValue("grab")
+        assertTrue(context.getString(R.string.safety_grab_house_keys) in grab)
+        assertTrue(context.getString(R.string.safety_grab_pets) in grab)
+        assertTrue(context.getString(R.string.safety_grab_abuse_digital_check) in grab)
+        assertFalse(context.getString(R.string.safety_grab_house_and_car_keys) in grab)
+        assertFalse(context.getString(R.string.safety_grab_children) in grab)
+        assertFalse(context.getString(R.string.safety_grab_medicines) in grab)
+
+        val finances = updatedFields.getValue("finances")
+        assertTrue(context.getString(R.string.safety_fin_shared_private_account) in finances)
+        assertFalse(context.getString(R.string.safety_fin_indep_passwords) in finances)
+
+        val destination = updatedFields.getValue("destination")
+        assertTrue(context.getString(R.string.safety_dest_pets) in destination)
+        assertFalse(context.getString(R.string.safety_dest_children) in destination)
+        assertFalse(context.getString(R.string.safety_dest_abuse_physical_exit) in destination)
+
+        val travel = updatedFields.getValue("travel")
+        assertTrue(context.getString(R.string.safety_travel_transit_routes) in travel)
+        assertTrue(context.getString(R.string.safety_travel_abuse_digital_tracking) in travel)
+        assertFalse(context.getString(R.string.safety_travel_vehicle_fuel) in travel)
+
+        val aftercare = updatedFields.getValue("aftercare")
+        assertTrue(context.getString(R.string.safety_after_abuse_digital_security) in aftercare)
+        assertFalse(context.getString(R.string.safety_after_abuse_physical_care) in aftercare)
+    }
+
+    @Test
+    fun updatingQuestionnairePreservesEditedCheckedCustomAndDocumentAttachedRows() {
+        val docsValue = writeSafetyChecklist(
+            listOf(
+                SafetyChecklistItem("unedited-old", context.getString(R.string.safety_doc_citizen_passport), checked = false),
+                SafetyChecklistItem("checked-old", context.getString(R.string.safety_doc_children_records), checked = true),
+                SafetyChecklistItem("attached-old", context.getString(R.string.safety_doc_medical_records), checked = false, attachmentIds = listOf("doc-99")),
+                SafetyChecklistItem("excluded-old", context.getString(R.string.safety_doc_housing_records), checked = false, excludedAttachmentIds = listOf("doc-12")),
+                SafetyChecklistItem("tagged-old", context.getString(R.string.safety_doc_court_orders), checked = false),
+                SafetyChecklistItem("edited-old", context.getString(R.string.safety_doc_pet_records) + " - at vet", checked = false),
+                SafetyChecklistItem("custom-row", "Call neighbour for spare key", checked = false),
+            ),
+        )
+        val newIntake = SafetyPlanIntake(completed = true, immigrationStatus = ImmigrationStatus.PERMANENT_RESIDENT)
+        val merged = readSafetyChecklist(
+            mergeTailoredChecklistItems(
+                existingValue = docsValue,
+                tailoredPrompts = safetyPlanSectionPrompts(context, "documents", newIntake, hasAffectedPeople = true),
+                removablePrompts = safetyPlanManagedSectionPrompts(context, "documents"),
+                protectedItemIds = setOf("tagged-old"),
+            ),
+        )
+        val byId = merged.associateBy { it.id }
+
+        assertFalse("unedited-old" in byId)
+        assertTrue(byId.containsKey("checked-old"))
+        assertTrue(byId.getValue("checked-old").checked)
+        assertTrue(byId.containsKey("attached-old"))
+        assertEquals(listOf("doc-99"), byId.getValue("attached-old").attachmentIds)
+        assertTrue(byId.containsKey("excluded-old"))
+        assertTrue(byId.containsKey("tagged-old"))
+        assertTrue(byId.containsKey("edited-old"))
+        assertTrue(byId.containsKey("custom-row"))
+        assertTrue(merged.any { it.text == context.getString(R.string.safety_doc_pr_card) })
+        // Completed intake with DependantNeed.CHILDREN unchecked omits children's records even with hasAffectedPeople=true.
+        assertFalse(merged.any { !it.checked && it.text == context.getString(R.string.safety_doc_children_records) })
+    }
+
+    @Test
+    fun completingQuestionnaireFromLegacyDefaultsRemovesObsoleteDefaultPrompts() {
+        val legacyGrab = safetyPlanDefaultsFromIntake(context, SafetyPlanIntake(completed = false)).getValue("primary_grab")
+        val updatedIntake = SafetyPlanIntake(completed = true, transportSituation = TransportSituation.PUBLIC_TRANSIT)
+        val merged = readSafetyChecklist(
+            mergeTailoredChecklistItems(
+                existingValue = legacyGrab,
+                tailoredPrompts = safetyPlanSectionPrompts(context, "grab", updatedIntake),
+                removablePrompts = safetyPlanManagedSectionPrompts(context, "grab"),
+            ),
+        ).map { it.text }
+
+        assertTrue(context.getString(R.string.safety_grab_house_keys) in merged)
+        assertFalse("Essential medicines" in merged)
+        assertFalse("Children’s or pets’ essentials, if applicable" in merged)
+        assertFalse("House and vehicle keys" in merged)
+    }
+
+    @Test
     fun allFiveLocalesDefineEverySafetyChecklistQuestionnaireString() {
         val resDir = resolveResDir()
         val englishKeys = parseXmlStrings(File(resDir, "values/safety_checklist.xml")).first.keys
