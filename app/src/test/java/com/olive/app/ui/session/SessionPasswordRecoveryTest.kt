@@ -12,7 +12,9 @@ import com.olive.app.data.account.OpaqueClientProtocol
 import com.olive.app.data.account.OpaqueRecoveryRepository
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountKeysetLocalStore
 import com.olive.app.security.AccountRecoveryKey
+import com.olive.app.security.AccountRecoveryKeyDeviceRecord
 import com.olive.app.security.InputPolicy
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SessionScreen
@@ -21,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -30,6 +33,11 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.Base64
+import java.util.UUID
+import javax.crypto.KeyGenerator
 
 @RunWith(RobolectricTestRunner::class)
 class SessionPasswordRecoveryTest {
@@ -149,18 +157,17 @@ class SessionPasswordRecoveryTest {
                 recovered = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, runtime.epoch)
             }
             fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || job.isCompleted }
+            assertNull(runtime.state.deviceLockRequest)
             runtime.state.passwordRecoveryUnlockRequest?.complete(password)
-            fixture.await { runtime.state.deviceLockRequest != null || job.isCompleted }
-            runtime.state.deviceLockRequest?.let { req ->
-                val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
-                req.complete(cipher)
-            }
             job.join()
 
+            assertNull(runtime.state.deviceLockRequest)
             assertNotNull(recovered)
             assertArrayEquals(ark.encodedCopy(), recovered!!.encodedCopy())
             assertNull(runtime.state.passwordRecoveryUnlockRequest)
-            assertNotNull(runtime.accountKeysets.read(uid))
+            val saved = runtime.accountKeysets.read(uid)
+            assertNotNull(saved)
+            assertEquals(AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED, saved?.deviceRecord?.version)
 
             // Cancellation must fail cleanly without leaving an active request
             var cancelThrown: Throwable? = null
@@ -170,9 +177,11 @@ class SessionPasswordRecoveryTest {
                 }.exceptionOrNull()
             }
             fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || cancelJob.isCompleted }
+            assertNull(runtime.state.deviceLockRequest)
             runtime.state.passwordRecoveryUnlockRequest?.complete(null)
             cancelJob.join()
             assertTrue(cancelThrown != null)
+            assertNull(runtime.state.deviceLockRequest)
             assertNull(runtime.state.passwordRecoveryUnlockRequest)
         }
     }
@@ -204,11 +213,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            enrollDeviceArk(fixture, runtime)
+            enrollDeviceArk(runtime)
 
             runtime.passwordRecovery.enablePasswordRecovery("WrongPassword123!")
-            answerDeviceLock(fixture, runtime)
+            fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_error_incorrect),
                 runtime.state.message
@@ -243,11 +253,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            enrollDeviceArk(fixture, runtime)
+            enrollDeviceArk(runtime)
 
             runtime.passwordRecovery.enablePasswordRecovery("Password123!")
-            answerDeviceLock(fixture, runtime)
+            fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_error_session_expired),
                 runtime.state.message
@@ -290,11 +301,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            enrollDeviceArk(fixture, runtime)
+            enrollDeviceArk(runtime)
 
             runtime.passwordRecovery.enablePasswordRecovery("Password123!")
-            answerDeviceLock(fixture, runtime)
+            fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_error_runtime_unavailable),
                 runtime.state.message
@@ -337,11 +349,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            enrollDeviceArk(fixture, runtime)
+            enrollDeviceArk(runtime)
 
             runtime.passwordRecovery.enablePasswordRecovery("Password123!")
-            answerDeviceLock(fixture, runtime)
+            fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_error_runtime_unavailable),
                 runtime.state.message
@@ -350,23 +363,131 @@ class SessionPasswordRecoveryTest {
     }
 
     /**
-     * Verifies that cancelling device lock authentication displays the setup cancelled message.
+     * Verifies that cancelling OPAQUE password recovery unlock during enrollment displays
+     * the unlock cancelled message without triggering device lock prompts.
      */
     @Test
-    fun enablePasswordRecoveryWithCancelledDeviceLockShowsCancelledMessage() = runBlocking<Unit> {
-        fixture().use { fixture ->
+    fun enablePasswordRecoveryWithCancelledPasswordRecoveryUnlockShowsCancelledMessage() = runBlocking<Unit> {
+        val ark = AccountRecoveryKey.generate()
+        val keyset = AccountKeysetEnvelope.create(uid, ark)
+        val keysetRepo = mock(com.olive.app.data.account.AccountKeysetRepository::class.java)
+        `when`(keysetRepo.fetch(uid)).thenReturn(keyset)
+
+        SessionRuntimeFixture(
+            accountKeysetsOverride = keysetRepo,
+            opaqueRecoveryOverride = fakeRecoveryRepo,
+        ).use { fixture ->
             val runtime = fixture.runtime
-            enrollDeviceArk(fixture, runtime)
+            val identity = AccountIdentity(uid, "fixture_owner")
+            val profile = UserProfile(
+                "fixture_owner", "Synthetic enrolled user", "", "", "2000-01-01",
+                "English", "", "", InputPolicy.triggerHash("moon garden")
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.accountRole = AccountRole.USER
 
             runtime.passwordRecovery.enablePasswordRecovery("Password123!")
-            fixture.await { runtime.state.deviceLockRequest != null }
-            runtime.state.deviceLockRequest?.complete(null)
+            fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || !runtime.state.busy }
+            assertNull(runtime.state.deviceLockRequest)
+            runtime.state.passwordRecoveryUnlockRequest?.complete(null)
             fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_unlock_cancelled),
                 runtime.state.message
             )
+        }
+    }
+
+    /**
+     * Verifies that a legacy v1 device-auth record in local storage does not trigger biometrics,
+     * recovers via OPAQUE password prompt, migrates local storage to v2, and forgets the v1 alias.
+     */
+    @Test
+    fun accountRecoveryKeyMigratesLegacyV1RecordViaOpaqueWithoutBiometrics() = runBlocking<Unit> {
+        val ark = AccountRecoveryKey.generate()
+        val keyset = AccountKeysetEnvelope.create(uid, ark)
+        val exportKey = ByteArray(32) { 9 }
+        val envelope = com.olive.app.security.OpaquePasswordRecoveryEnvelope.create(
+            accountId = uid,
+            opaqueRecordId = "rec_legacy_v1_migration",
+            exportKey = exportKey.copyOf(),
+            recoveryKey = ark,
+        )
+        val unlockClient = object : OpaqueClientProtocol {
+            override suspend fun startRegistration(password: String) = error("Unused")
+            override suspend fun finishRegistration(state: String, response: String, password: String) = error("Unused")
+            override suspend fun startLogin(password: String) = OpaqueClientProtocol.LoginStart("loginState", "startReq")
+            override suspend fun finishLogin(state: String, response: String, password: String) =
+                OpaqueClientProtocol.LoginFinish("finishReq", exportKey.copyOf())
+        }
+        val unlockRepo = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { name, _ ->
+                when (name) {
+                    "opaqueRecoveryBeginUnlock" -> mapOf("sessionId" to "sess_v1", "loginResponse" to "srvLogin")
+                    "opaqueRecoveryFinishUnlock" -> mapOf("envelope" to envelope.toMap())
+                    else -> error("Unexpected call: $name")
+                }
+            },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
+            opaqueClient = unlockClient,
+        )
+        val keysetRepo = mock(com.olive.app.data.account.AccountKeysetRepository::class.java)
+        `when`(keysetRepo.fetch(uid)).thenReturn(keyset)
+
+        SessionRuntimeFixture(
+            accountKeysetsOverride = keysetRepo,
+            opaqueRecoveryOverride = unlockRepo,
+        ).use { fixture ->
+            val runtime = fixture.runtime
+            val identity = AccountIdentity(uid, "fixture_owner")
+            val profile = UserProfile(
+                "fixture_owner", "Synthetic enrolled user", "", "", "2000-01-01",
+                "English", "", "", InputPolicy.triggerHash("moon garden")
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.accountRole = AccountRole.USER
+
+            val legacyProtectionId = UUID.randomUUID().toString()
+            val hash = MessageDigest.getInstance("SHA-256")
+                .digest(uid.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            val legacyAlias = "olive.account.ark.v1.$hash.$legacyProtectionId"
+            val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            store.setKeyEntry(legacyAlias, KeyGenerator.getInstance("AES").apply { init(256) }.generateKey(), null, null)
+            val legacyRecord = AccountRecoveryKeyDeviceRecord(
+                accountId = uid,
+                protectionId = legacyProtectionId,
+                ivBase64 = Base64.getEncoder().encodeToString(ByteArray(12) { 3 }),
+                ciphertextBase64 = Base64.getEncoder().encodeToString(ByteArray(48) { 4 }),
+                version = AccountRecoveryKeyDeviceRecord.VERSION_DEVICE_AUTH,
+            )
+            runtime.accountKeysets.save(AccountKeysetLocalStore.Saved(keyset, legacyRecord))
+
+            var recovered: AccountRecoveryKey? = null
+            val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                recovered = runtime.settings.accountRecoveryKey(uid, runtime.epoch)
+            }
+            fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || job.isCompleted }
+            assertNull(runtime.state.deviceLockRequest)
+            runtime.state.passwordRecoveryUnlockRequest?.complete(password)
+            job.join()
+
+            assertNull(runtime.state.deviceLockRequest)
+            assertNotNull(recovered)
+            assertArrayEquals(ark.encodedCopy(), recovered!!.encodedCopy())
+            val migrated = runtime.accountKeysets.read(uid)
+            assertNotNull(migrated)
+            assertEquals(AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED, migrated?.deviceRecord?.version)
+            assertNotEquals(legacyProtectionId, migrated?.deviceRecord?.protectionId)
+            assertFalse(store.containsAlias(legacyAlias))
         }
     }
 
@@ -396,11 +517,12 @@ class SessionPasswordRecoveryTest {
             runtime.state.screen = SessionScreen.Safe
             runtime.state.accountRole = AccountRole.USER
 
-            enrollDeviceArk(fixture, runtime)
+            enrollDeviceArk(runtime)
 
             runtime.passwordRecovery.enablePasswordRecovery("Password123!")
-            answerDeviceLock(fixture, runtime)
+            fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals(
                 runtime.application.getString(R.string.password_recovery_error_runtime_unavailable),
                 runtime.state.message
@@ -470,27 +592,13 @@ class SessionPasswordRecoveryTest {
             runtime.state.passwordRecoveryEnrolled = true
 
             // Enroll a local keyset and device record properly via protectDeviceRecoveryKey
-            val ark = com.olive.app.security.AccountRecoveryKey.generate()
-            val envelope = com.olive.app.security.AccountKeysetEnvelope.create(uid, ark)
-            val enrollJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
-                runtime.settings.protectDeviceRecoveryKey(uid, ark, envelope, runtime.epoch)
-            }
-            fixture.await { runtime.state.deviceLockRequest != null }
-            runtime.state.deviceLockRequest?.let { req ->
-                val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
-                req.complete(cipher)
-            }
-            enrollJob.join()
+            enrollDeviceArk(runtime)
 
             val newPassword = "NewPassword456!"
             runtime.settings.changePassword(password, newPassword, newPassword)
-            fixture.await { runtime.state.deviceLockRequest != null || !runtime.state.busy }
-            runtime.state.deviceLockRequest?.let { req ->
-                val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
-                req.complete(cipher)
-            }
             fixture.await { !runtime.state.busy }
 
+            assertNull(runtime.state.deviceLockRequest)
             assertEquals("password_changed", runtime.state.message)
             assertEquals("rotated", rotatedOld)
         }
@@ -513,36 +621,13 @@ class SessionPasswordRecoveryTest {
     /**
      * Enrolls an in-memory device account recovery key (ARK) so recovery operations have an active key.
      *
-     * @param fixture the active test session runtime fixture.
      * @param runtime the active session runtime.
      */
-    private suspend fun enrollDeviceArk(fixture: SessionRuntimeFixture, runtime: SessionRuntime) {
+    private suspend fun enrollDeviceArk(runtime: SessionRuntime) {
         val ark = com.olive.app.security.AccountRecoveryKey.generate()
         val envelope = com.olive.app.security.AccountKeysetEnvelope.create(uid, ark)
-        val enrollJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
-            runtime.settings.protectDeviceRecoveryKey(uid, ark, envelope, runtime.epoch)
-        }
-        fixture.await { runtime.state.deviceLockRequest != null }
-        runtime.state.deviceLockRequest?.let { req ->
-            val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
-            req.complete(cipher)
-        }
-        enrollJob.join()
-    }
-
-    /**
-     * Answers pending device lock requests during recovery execution and waits until runtime is no longer busy.
-     *
-     * @param fixture the active test session runtime fixture.
-     * @param runtime the active session runtime.
-     */
-    private suspend fun answerDeviceLock(fixture: SessionRuntimeFixture, runtime: SessionRuntime) {
-        fixture.await { runtime.state.deviceLockRequest != null || !runtime.state.busy }
-        runtime.state.deviceLockRequest?.let { req ->
-            val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
-            req.complete(cipher)
-        }
-        fixture.await { !runtime.state.busy }
+        runtime.settings.protectDeviceRecoveryKey(uid, ark, envelope, runtime.epoch)
+        assertNull(runtime.state.deviceLockRequest)
     }
 
     /**

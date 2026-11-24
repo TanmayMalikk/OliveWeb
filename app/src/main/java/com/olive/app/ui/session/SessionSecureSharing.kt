@@ -73,17 +73,38 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Recovers an authorized room key outside the short online/cache timeout. */
+    /**
+     * Recovers an authorized room key from the account's recovery keyset after verifying an
+     * account-wrapped copy exists, then re-wraps it for the current device.
+     */
     internal suspend fun recoverRoomKey(conversation: ChatConversation): javax.crypto.SecretKey {
         with(runtime) {
             val device = enrollment ?: error("No active account")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
+            if (!secure.hasAccountRoomKey(conversation.id, device.uid)) {
+                error("Account room key unavailable")
+            }
             val keyset = settings.unlockAccountKeysetForMedia(device.uid)
             val recovered = secure.existingRoomKey(conversation.id, device.uid, keyset)
                 ?: error("Account room key unavailable")
-            // Rewrap for this device so later opens use the normal device-key path.
+            val prepared = if (conversation.type == "SUPPORT") {
+                runCatching {
+                    val repository = messagingRepository ?: return@runCatching conversation
+                    conversation.copy(participantUsernames = repository.prepareTicketParticipantNames(conversation.id))
+                }.onFailure { if (it is CancellationException) throw it }
+                    .getOrDefault(conversation)
+            } else conversation
             try {
-                secure.shareWithRegisteredDevices(conversation, recovered)
+                messaging.registerMessagingIdentity(AccountIdentity(device.uid, state.coverUsername))
+                secure.persistCurrentDeviceRoomKey(prepared, device.uid, recovered)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Current session can open cleanly while device-key persistence retries later.
+            }
+            // Rewrap for other registered devices on a best-effort basis.
+            try {
+                secure.shareWithRegisteredDevices(prepared, recovered)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

@@ -77,7 +77,10 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         onKey = keyChanged@{ path, fingerprint ->
                             if (epoch != observationEpoch || enrollment?.uid != uid) return@keyChanged
                             val selected = activeConversation?.takeIf { it.id == conversation.id } ?: return@keyChanged
-                            if (observedKeys.put(path, fingerprint) != fingerprint) {
+                            val previous = observedKeys.put(path, fingerprint)
+                            if (fingerprint.isBlank()) return@keyChanged
+                            val isInitialDirectorySnapshot = previous == null && path.contains("messageDirectory/")
+                            if (!isInitialDirectorySnapshot && previous != fingerprint) {
                                 keyVersion++
                                 if (activeRoomKey == null && !messagingBusy) openConversation(selected)
                             }
@@ -179,7 +182,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             } catch (cacheFailure: Exception) {
                                 if (cacheFailure is CancellationException) throw cacheFailure
                                 val recoveredKey = secureSharing.recoverRoomKey(conversation)
-                                val wrapped = secure.wrappedRoomKey(conversation.id, uid)
+                                val wrapped = runCatching { secure.wrappedRoomKey(conversation.id, uid) }
+                                    .onFailure { if (it is CancellationException) throw it }
+                                    .getOrNull()
                                 if (wrapped != null) {
                                     withContext(Dispatchers.IO) {
                                         chatCache.saveAccess(

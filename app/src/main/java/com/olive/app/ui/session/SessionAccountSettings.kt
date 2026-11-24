@@ -425,12 +425,35 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Returns the account recovery key for [uid], unlocking an app-managed local copy or migrating
+     * legacy/missing records through OPAQUE password recovery without biometric prompts.
+     */
     internal suspend fun accountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val local = withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid) }
         if (local != null) {
-            val key = unlockDeviceRecoveryKey(uid, local.deviceRecord, token)
-            runtime.accountKeysetRepository?.publish(local.envelope)
-            return key
+            if (local.deviceRecord.version == AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED) {
+                val unlocked = runCatching { unlockDeviceRecoveryKey(local.deviceRecord) }
+                    .onFailure { if (it is CancellationException) throw it }
+                    .getOrNull()
+                if (unlocked != null) {
+                    runCatching { runtime.accountKeysetRepository?.publish(local.envelope) }
+                        .onFailure { if (it is CancellationException) throw it }
+                    return unlocked
+                }
+            }
+            val repository = runtime.accountKeysetRepository
+            val remote = repository?.fetch(uid)
+            if (remote != null) {
+                return recoverAccountRecoveryKey(uid, remote, token)
+            }
+            if (repository == null) {
+                return recoverAccountRecoveryKey(uid, local.envelope, token)
+            }
+            withContext(Dispatchers.IO) {
+                runtime.accountKeysets.purge(uid)?.let(AccountRecoveryKeyDeviceProtector()::forget)
+            }
+            return createAccountRecoveryKey(uid, token)
         }
         val remote = runtime.accountKeysetRepository?.fetch(uid)
             ?: return createAccountRecoveryKey(uid, token)
@@ -470,55 +493,42 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         token: Long,
     ): AccountRecoveryKey = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, token)
 
+    /**
+     * Unlocks a locally protected app-managed ARK record without triggering device authentication.
+     */
     private suspend fun unlockDeviceRecoveryKey(
-        uid: String,
         record: AccountRecoveryKeyDeviceRecord,
-        token: Long,
-    ): AccountRecoveryKey {
-        val challenge = withContext(Dispatchers.IO) {
-            AccountRecoveryKeyDeviceProtector().prepare(uid, record)
-        }
-        return try {
-            val cipher = requestDeviceAuthentication(challenge, uid, token)
-            withContext(Dispatchers.IO) { challenge.unlock(cipher) }
-        } finally {
-            challenge.close()
-        }
+    ): AccountRecoveryKey = withContext(Dispatchers.IO) {
+        AccountRecoveryKeyDeviceProtector().unlock(record)
     }
 
+    /**
+     * Encrypts and stores [recoveryKey] under an app-managed Android Keystore key for [uid],
+     * cleaning up any prior local key material once the new record is saved.
+     */
     internal suspend fun protectDeviceRecoveryKey(
         uid: String,
         recoveryKey: AccountRecoveryKey,
         envelope: AccountKeysetEnvelope,
         token: Long,
     ) {
-        val challenge = withContext(Dispatchers.IO) {
-            AccountRecoveryKeyDeviceProtector().prepare(uid, null)
+        check(currentRecoverySession(uid, token)) { "Recovery session changed" }
+        val protector = AccountRecoveryKeyDeviceProtector()
+        val previous = withContext(Dispatchers.IO) {
+            runCatching { runtime.accountKeysets.read(uid)?.deviceRecord }.getOrNull()
         }
-        return try {
-            val cipher = requestDeviceAuthentication(challenge, uid, token)
-            val record = withContext(Dispatchers.IO) { challenge.enroll(cipher, recoveryKey) }
+        val record = withContext(Dispatchers.IO) { protector.protect(uid, recoveryKey) }
+        try {
+            check(currentRecoverySession(uid, token)) { "Recovery session changed" }
             withContext(Dispatchers.IO) {
                 runtime.accountKeysets.save(AccountKeysetLocalStore.Saved(envelope, record))
             }
-            challenge.markStored()
-        } finally {
-            challenge.close()
+        } catch (failure: Throwable) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { protector.forget(record) }
+            throw failure
         }
-    }
-
-    private suspend fun requestDeviceAuthentication(
-        challenge: DeviceAuthenticationChallenge,
-        uid: String,
-        token: Long,
-    ): javax.crypto.Cipher {
-        check(currentRecoverySession(uid, token)) { "Recovery session changed" }
-        val request = DeviceLockRequest(challenge, settingsChange = true)
-        runtime.state.deviceLockRequest = request
-        return try {
-            request.result.await() ?: error("Device authentication was cancelled")
-        } finally {
-            if (runtime.state.deviceLockRequest === request) runtime.state.deviceLockRequest = null
+        if (previous != null && (previous.protectionId != record.protectionId || previous.version != record.version)) {
+            withContext(Dispatchers.IO) { protector.forget(previous) }
         }
     }
 
@@ -551,8 +561,9 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         with(runtime) {
             val token = epoch
             check(currentRecoverySession(uid, token)) { "Account session changed" }
-            val envelope = ensureAccountKeysetForMedia(uid)
             val recoveryKey = accountRecoveryKey(uid, token)
+            val envelope = withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
+                ?: ensureAccountKeysetForMedia(uid)
             return withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
         }
     }

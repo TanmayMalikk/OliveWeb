@@ -5,8 +5,10 @@ import com.olive.app.data.sync.cloudStringMap
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -51,7 +53,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         val keyListeners = (listOf(localKey) + members).map { document ->
             document.addSnapshotListener { snapshot, failure ->
                 if (failure != null || snapshot == null) return@addSnapshotListener
-                val key = snapshot.getString("wrappedKey") ?: snapshot.getString("publicKey") ?: return@addSnapshotListener
+                val key = snapshot.getString("wrappedKey") ?: snapshot.getString("publicKey") ?: ""
                 onKey(document.path, key)
             }
         }
@@ -94,6 +96,75 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         accountKeyset: UnlockedAccountKeyset? = null,
     ): SecretKey? {
         return roomKeyAccess(conversationId, currentUid, accountKeyset = accountKeyset)?.secretKey
+    }
+
+    /** Returns true when this conversation holds an account-recovery room key copy for [currentUid]. */
+    internal suspend fun hasAccountRoomKey(
+        conversationId: String,
+        currentUid: String,
+    ): Boolean {
+        val reference = firestore.collection("conversations").document(conversationId)
+        val snapshot = runCatching { reference.get(Source.SERVER).await() }
+            .recoverCatching { failure ->
+                if (failure is CancellationException) throw failure
+                if (failure is FirebaseFirestoreException &&
+                    failure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                ) {
+                    throw failure
+                }
+                reference.get(Source.DEFAULT).await()
+            }
+            .getOrElse { failure ->
+                if (failure is CancellationException) throw failure
+                return false
+            }
+        val participants = (snapshot.get("participantIds") as? List<*>).orEmpty()
+        return currentUid in participants && snapshot.accountRoomKeys()[currentUid] != null
+    }
+
+    /**
+     * Wraps [roomKey] for only the signed-in device using its verified `messageDirectory` entry and
+     * persists `conversations/{id}/deviceKeys/{currentUid}--{deviceId}` so future opens avoid recovery.
+     */
+    internal suspend fun persistCurrentDeviceRoomKey(
+        conversation: ChatConversation,
+        currentUid: String,
+        roomKey: SecretKey,
+    ): String? {
+        val username = conversation.participantUsernames[currentUid]?.trim()?.lowercase()
+            ?.takeIf(String::isNotBlank) ?: return null
+        val localPublicKey = withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
+        val encodedLocalKey = Base64.getEncoder().encodeToString(localPublicKey.encoded)
+        val deviceId = withContext(Dispatchers.Default) { KeyManager.deviceId(localPublicKey) }
+        val device = firestore.collection("messageDirectory").document(username)
+            .collection("devices").document(deviceId).get(Source.SERVER).await()
+        if (!device.exists() ||
+            device.getString("uid") != currentUid ||
+            device.getString("deviceId") != deviceId ||
+            device.getString("publicKey") != encodedLocalKey
+        ) {
+            return null
+        }
+        val digest = if (device.getString("mgf1Digest") == "SHA-256") {
+            MGF1ParameterSpec.SHA256
+        } else {
+            MGF1ParameterSpec.SHA1
+        }
+        val wrapped = withContext(Dispatchers.Default) {
+            KeyManager.wrapKey(roomKey, localPublicKey, digest)
+        }
+        firestore.collection("conversations").document(conversation.id)
+            .collection("deviceKeys").document("$currentUid--$deviceId")
+            .set(
+                mapOf(
+                    "uid" to currentUid,
+                    "deviceId" to deviceId,
+                    "publicKey" to encodedLocalKey,
+                    "wrappedKey" to wrapped,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+        return wrapped
     }
 
     // Returns a verified envelope for protected offline retention.
