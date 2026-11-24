@@ -397,7 +397,7 @@ internal data class OpaquePasswordRecoveryEnvelope(
         require(expectedAccountId == accountId && expectedRecordId == opaqueRecordId) {
             "Password recovery record belongs to another account or record"
         }
-        require(exportKey.size == EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
+        require(exportKey.size in VALID_EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
         val key = deriveKey(exportKey, decode(saltBase64), accountId)
         val authData = aad(version, accountId, opaqueRecordId, algorithm)
         val plaintext = try {
@@ -420,7 +420,7 @@ internal data class OpaquePasswordRecoveryEnvelope(
         private const val VERSION = 1
         private const val ALGORITHM = "OPAQUE-3DH-HKDF-SHA256-AES-256-GCM"
         private const val RECOVERY_KEY_BYTES = 32
-        private const val EXPORT_KEY_BYTES = 32
+        private val VALID_EXPORT_KEY_BYTES = setOf(32, 64)
         private const val SALT_BYTES = 32
         private const val IV_BYTES = 12
         private const val TAG_BYTES = 16
@@ -441,7 +441,7 @@ internal data class OpaquePasswordRecoveryEnvelope(
         ): OpaquePasswordRecoveryEnvelope {
             require(validAccountId(accountId)) { "Invalid account ID" }
             require(RECORD_ID.matches(opaqueRecordId)) { "Invalid OPAQUE record ID" }
-            require(exportKey.size == EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
+            require(exportKey.size in VALID_EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
             require(salt.size == SALT_BYTES) { "Invalid recovery salt" }
             require(iv.size == IV_BYTES) { "Invalid recovery IV" }
             val key = deriveKey(exportKey, salt, accountId)

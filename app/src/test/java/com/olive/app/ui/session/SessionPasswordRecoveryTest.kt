@@ -188,6 +188,53 @@ class SessionPasswordRecoveryTest {
     }
 
     /**
+     * Verifies that an OPAQUE client bridge operation failure maps to the runtime-unavailable message
+     * rather than generic OPK-01.
+     */
+    @Test
+    fun enablePasswordRecoveryWithOpaqueClientOperationFailureShowsRuntimeUnavailableMessage() = runBlocking<Unit> {
+        val clientFailingClient = object : OpaqueClientProtocol {
+            override suspend fun startRegistration(password: String): OpaqueClientProtocol.RegistrationStart {
+                throw IllegalStateException("OPAQUE client operation failed")
+            }
+            override suspend fun finishRegistration(state: String, response: String, password: String) =
+                OpaqueClientProtocol.RegistrationFinish("record", ByteArray(64))
+            override suspend fun startLogin(password: String) = OpaqueClientProtocol.LoginStart("loginState", "startReq")
+            override suspend fun finishLogin(state: String, response: String, password: String) = null
+        }
+
+        val clientFailingRepo = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
+            authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+            opaqueClient = clientFailingClient,
+        )
+
+        SessionRuntimeFixture(opaqueRecoveryOverride = clientFailingRepo).use { fixture ->
+            val runtime = fixture.runtime
+            val identity = AccountIdentity(uid, "fixture_owner")
+            val profile = UserProfile(
+                "fixture_owner", "Synthetic enrolled user", "", "", "2000-01-01",
+                "English", "", "", InputPolicy.triggerHash("moon garden")
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.accountRole = AccountRole.USER
+
+            enrollDeviceArk(fixture, runtime)
+
+            runtime.passwordRecovery.enablePasswordRecovery("Password123!")
+            answerDeviceLock(fixture, runtime)
+
+            assertEquals(
+                runtime.application.getString(R.string.password_recovery_error_runtime_unavailable),
+                runtime.state.message
+            )
+        }
+    }
+
+    /**
      * Verifies that cancelling device lock authentication displays the setup cancelled message.
      */
     @Test

@@ -152,7 +152,12 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 R.string.passkey_recovery_provider_unavailable
             causes.any { it.message?.contains("No recovery passkeys", ignoreCase = true) == true } ->
                 R.string.password_recovery_remove_blocked_last
-            causes.any { it is IllegalStateException && it.message?.contains("OPAQUE WebAssembly", ignoreCase = true) == true } ->
+            causes.any {
+                it is IllegalStateException && (
+                    it.message?.contains("OPAQUE WebAssembly", ignoreCase = true) == true ||
+                        it.message?.contains("OPAQUE client operation", ignoreCase = true) == true
+                    )
+            } ->
                 R.string.password_recovery_error_runtime_unavailable
             causes.any { it.message?.contains("Account recovery key", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_runtime_unavailable

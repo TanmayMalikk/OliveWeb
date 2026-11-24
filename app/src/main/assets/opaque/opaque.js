@@ -614,7 +614,7 @@ ${val.stack}`;
     },
     startRegistration: async function(password) {
       await opaque.ready;
-      const res = opaque.client.createRegistrationRequest({ password });
+      const res = opaque.client.startRegistration({ password });
       return JSON.stringify({
         clientRegistrationState: res.clientRegistrationState,
         registrationRequest: res.registrationRequest
@@ -622,14 +622,14 @@ ${val.stack}`;
     },
     finishRegistration: async function(state, response, password) {
       await opaque.ready;
-      const res = opaque.client.finalizeRegistrationRequest({
+      const res = opaque.client.finishRegistration({
         clientRegistrationState: state,
         registrationResponse: response,
         password
       });
       return JSON.stringify({
         registrationRecord: res.registrationRecord,
-        exportKey: Array.from(res.exportKey)
+        exportKey: res.exportKey
       });
     },
     startLogin: async function(password) {
@@ -648,9 +648,12 @@ ${val.stack}`;
           loginResponse: response,
           password
         });
+        if (!res) {
+          return JSON.stringify({ error: "incorrect_password" });
+        }
         return JSON.stringify({
           finishLoginRequest: res.finishLoginRequest,
-          exportKey: Array.from(res.exportKey)
+          exportKey: res.exportKey
         });
       } catch (e) {
         return JSON.stringify({ error: "incorrect_password" });
