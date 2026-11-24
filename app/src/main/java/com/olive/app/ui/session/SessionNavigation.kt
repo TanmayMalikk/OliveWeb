@@ -85,6 +85,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 activityCategory = null
                 screenHistory.clear()
                 safePageHistory.clear()
+                walkthroughTourTopicId = null
                 if (accountRole == AccountRole.USER) profile = null
                 attempts = emptyList()
                 message = null
@@ -146,7 +147,9 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun back() {
         with(runtime) {
             with(state) {
-                if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
+                if (screen == SessionScreen.Safe && walkthroughTourTopicId != null) {
+                    walkthroughTourTopicId = null
+                } else if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
                 else if (screen == SessionScreen.Safe && page == SafePage.Activity && activityCategory != null) {
                     activityCategory = null
                     message = null
@@ -202,6 +205,29 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 }
             }
         }
+    }
+
+    /**
+     * Activates the live in-app walkthrough coachmark at [topicId] and navigates to [tourPage].
+     *
+     * @param topicId Walkthrough topic identifier to display.
+     * @param tourPage Destination safe page containing the live target controls.
+     */
+    fun startWalkthroughTour(topicId: String, tourPage: SafePage) {
+        with(runtime) {
+            with(state) {
+                if (screen != SessionScreen.Safe) return
+                walkthroughTourTopicId = topicId
+                if (page != tourPage) navigate(tourPage)
+            }
+        }
+    }
+
+    /**
+     * Dismisses the active in-app walkthrough coachmark without leaving the current safe page.
+     */
+    fun dismissWalkthroughTour() {
+        runtime.state.walkthroughTourTopicId = null
     }
 }
 

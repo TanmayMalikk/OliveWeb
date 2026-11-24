@@ -1,22 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="walkthrough_subtitle">Pick any feature from the Table of Contents to try its interactive sandbox demo, review step-by-step instructions, or jump directly to the live tool.</string>
+    <string name="walkthrough_subtitle">Pick any feature from the Table of Contents to start a guided walkthrough right inside the live Olive Branch screen.</string>
     <string name="walkthrough_toc_title">Table of contents</string>
-    <string name="walkthrough_toc_subtitle">Choose a feature to learn how to use it (%1$d topics)</string>
-    <string name="walkthrough_progress_count">%1$d of %2$d explored</string>
+    <string name="walkthrough_toc_subtitle">Choose a feature to start an in-app guided tour (%1$d topics)</string>
     <string name="walkthrough_start_tour">Start full walkthrough</string>
-    <string name="walkthrough_back_to_toc">Table of contents</string>
-    <string name="walkthrough_feature_counter">Feature %1$d of %2$d</string>
-    <string name="walkthrough_how_it_works">How it works</string>
-    <string name="walkthrough_step_number">Step %1$d</string>
-    <string name="walkthrough_previous_topic">Previous feature</string>
-    <string name="walkthrough_next_topic">Next feature</string>
-    <string name="walkthrough_open_feature">Open %1$s</string>
-    <string name="walkthrough_demo_heading">Interactive sandbox</string>
-    <string name="walkthrough_demo_badge">Practice sandbox · Changes here do not affect your account</string>
-    <string name="walkthrough_demo_reset">Reset demo</string>
-    <string name="walkthrough_demo_done">Practice complete! Reset the demo or open %1$s whenever you are ready.</string>
-    <string name="walkthrough_explored">Explored</string>
+    <string name="walkthrough_tour_step_counter">Step %1$d of %2$d</string>
+    <string name="walkthrough_tour_next">Next</string>
+    <string name="walkthrough_tour_back">Back</string>
+    <string name="walkthrough_tour_skip">Skip</string>
+    <string name="walkthrough_tour_done">Done</string>
+    <string name="walkthrough_tour_contents">Contents</string>
     <string name="walkthrough_cat_privacy">Privacy &amp; entry</string>
     <string name="walkthrough_cat_tools">Core safety tools</string>
     <string name="walkthrough_cat_support">Support &amp; emergency</string>
@@ -87,127 +80,4 @@
     <string name="walkthrough_topic_activity_step_1">Open Account activity to inspect timestamped settings edits, trigger events, PIN attempts, and privacy events.</string>
     <string name="walkthrough_topic_activity_step_2">In Settings → Privacy, enroll a Passkey Account Recovery Key so encrypted files and chats can be restored on a new device.</string>
     <string name="walkthrough_topic_activity_step_3">Use Settings → Permissions to review and grant camera, microphone, location, notification, and health permissions.</string>
-
-    <!-- Sandbox demo strings -->
-    <string name="wt_cover_label">Sample cover disguise:</string>
-    <string name="wt_cover_news">Daily Digest</string>
-    <string name="wt_cover_fitness">Fitness Tracker</string>
-    <string name="wt_cover_trigger_label">Sample cover search box</string>
-    <string name="wt_cover_trigger_hint">Try: \"moon garden\"</string>
-    <string name="wt_cover_trigger_chip">Fill \"moon garden\"</string>
-    <string name="wt_cover_trigger_unlock_btn">Check trigger</string>
-    <string name="wt_cover_trigger_error">Enter \"moon garden\" or double-tap the hidden olive</string>
-    <string name="wt_cover_olive_hint">Double-tap olive</string>
-    <string name="wt_cover_pin_label">Sample PIN (enter 1234)</string>
-    <string name="wt_cover_pin_unlock">Unlock Safe Space</string>
-    <string name="wt_cover_pin_error">Wrong PIN — try 1234 (shakes on error!)</string>
-    <string name="wt_cover_unlocked">PIN accepted — Your Safe Space unlocked in the sandbox!</string>
-
-    <string name="wt_exit_idle_label">Idle auto-lock delay:</string>
-    <string name="wt_exit_1m">1 min</string>
-    <string name="wt_exit_2m">2 min</string>
-    <string name="wt_exit_5m">5 min</string>
-    <string name="wt_exit_inside_title">Simulated Safe Space</string>
-    <string name="wt_exit_inside_body">Private workspace open. Tap Quick Exit to lock immediately and switch to your cover.</string>
-    <string name="wt_exit_button">Quick Exit</string>
-    <string name="wt_exit_cover_title">Disguised Cover Screen</string>
-    <string name="wt_exit_cover_body">Returned to cover immediately (auto-lock timer set to %1$s).</string>
-    <string name="wt_exit_reenter">Re-enter sandbox</string>
-
-    <string name="wt_plan_progress">Checklist: %1$d / %2$d ready</string>
-    <string name="wt_plan_item_1">ID &amp; birth certificate copies</string>
-    <string name="wt_plan_item_2">Spare house and car keys</string>
-    <string name="wt_plan_item_3">Emergency cash &amp; essential medications</string>
-    <string name="wt_plan_share_toggle">Share safety plan with Maya</string>
-    <string name="wt_plan_shared_badge">Shared</string>
-    <string name="wt_plan_private_badge">Private</string>
-
-    <string name="wt_notes_kind_note">Note</string>
-    <string name="wt_notes_kind_incident">Incident</string>
-    <string name="wt_notes_sample_note_title">Emergency bag reminder</string>
-    <string name="wt_notes_sample_note_body">Kept spare charger and ID copies at my desk locker.</string>
-    <string name="wt_notes_sample_incident_title">Oct 12 · Front hallway incident</string>
-    <string name="wt_notes_sample_incident_body">18:30 · 104 St NW, Edmonton · Saved photo &amp; notes.</string>
-    <string name="wt_notes_pinned_badge">Pinned</string>
-    <string name="wt_notes_pin_action">Toggle pin</string>
-    <string name="wt_notes_add_edit">Add sample edit</string>
-    <string name="wt_notes_history_toggle">Edit history (%1$d)</string>
-    <string name="wt_notes_edit_initial">Initial entry created</string>
-    <string name="wt_notes_edit_sample">Updated location and details</string>
-    <string name="wt_notes_trash">Move to trash</string>
-    <string name="wt_notes_trashed_notice">Entry moved to trash. Tap Undo to restore it.</string>
-    <string name="wt_notes_undo">Undo</string>
-
-    <string name="wt_docs_capture_ocr">Capture &amp; run OCR</string>
-    <string name="wt_docs_file_title">Lease_Agreement.pdf</string>
-    <string name="wt_docs_file_pending">Ready to capture &amp; encrypt</string>
-    <string name="wt_docs_file_encrypted">Encrypted (AES-256)</string>
-    <string name="wt_docs_ocr_label">Extracted OCR text (review before saving)</string>
-    <string name="wt_docs_ocr_sample">Lease Agreement · Unit 4B · Notice dated Nov 18</string>
-    <string name="wt_docs_share_toggle">Share document with Maya</string>
-    <string name="wt_docs_voice_note">Voice messages stay in chat and are excluded from Document storage.</string>
-
-    <string name="wt_chat_invite_btn">Generate 48h invite code</string>
-    <string name="wt_chat_invite_value">Invite code: %1$s · Valid 48 hours</string>
-    <string name="wt_chat_msg_input">Type a sample encrypted message</string>
-    <string name="wt_chat_send">Send</string>
-    <string name="wt_chat_voice_btn">Add voice note</string>
-    <string name="wt_chat_sample_incoming">Maya: Checking in — let me know if you need a ride.</string>
-    <string name="wt_chat_sample_voice">Voice message · 0:08</string>
-    <string name="wt_chat_voice_badge">Chat only</string>
-    <string name="wt_chat_unsend">Unsend</string>
-    <string name="wt_chat_unsent">Message unsent</string>
-
-    <string name="wt_loc_recipients">Recipients:</string>
-    <string name="wt_loc_maya">Maya</string>
-    <string name="wt_loc_jordan">Jordan</string>
-    <string name="wt_loc_duration">Duration:</string>
-    <string name="wt_loc_15m">15 min</string>
-    <string name="wt_loc_1h">1 hr</string>
-    <string name="wt_loc_until_stop">Until stopped</string>
-    <string name="wt_loc_start">Start live sharing</string>
-    <string name="wt_loc_stop">Stop sharing</string>
-    <string name="wt_loc_status_off">Live location sharing is paused</string>
-    <string name="wt_loc_status_on">Live sharing active with %1$d contact(s) · %2$s</string>
-    <string name="wt_loc_preview_route">Preview route</string>
-    <string name="wt_loc_route_info">Sample route to Maya: 12 min (4.6 km) · Auto-refresh active</string>
-
-    <string name="wt_staff_request">Request staff help</string>
-    <string name="wt_staff_searching">Looking for available staff members…</string>
-    <string name="wt_staff_cancel">Cancel request</string>
-    <string name="wt_staff_simulate_assign">Simulate staff assigned</string>
-    <string name="wt_staff_ticket_header">Ticket #104 · Assigned to Alex (Staff)</string>
-    <string name="wt_staff_sample_reply">Alex: Hi, I am here to help. What would you like to plan today?</string>
-    <string name="wt_staff_user_reply">Could we review my backup shelter plan?</string>
-    <string name="wt_staff_send_reply">Send sample reply</string>
-    <string name="wt_staff_add_friend">Add trusted friend (Maya) to ticket</string>
-
-    <string name="wt_emerg_generate">Generate sample emergency PDF</string>
-    <string name="wt_emerg_note">Sandbox preview only — no file is created and no alert is sent.</string>
-    <string name="wt_emerg_doc_title">Sample Emergency Report (PDF)</string>
-    <string name="wt_emerg_sec_1">1. Account &amp; emergency context summary</string>
-    <string name="wt_emerg_sec_2">2. Recent incident records &amp; timestamps</string>
-    <string name="wt_emerg_sec_3">3. GPS coordinates (53.5461, -113.4938)</string>
-    <string name="wt_emerg_sec_4">4. Organization admin alert &amp; live map link</string>
-
-    <string name="wt_hotline_all">All</string>
-    <string name="wt_hotline_247">24/7 only</string>
-    <string name="wt_hotline_saved">Saved (%1$d)</string>
-    <string name="wt_hotline_1">Alberta 24/7 Family Violence Info Line</string>
-    <string name="wt_hotline_2">Edmonton Crisis Shelter Intake (24/7)</string>
-    <string name="wt_hotline_3">Legal Aid Alberta Advice Clinic</string>
-    <string name="wt_hotline_save_btn">Toggle bookmark</string>
-    <string name="wt_hotline_contact_label">Maya · Trusted sister</string>
-    <string name="wt_hotline_safe_stay">Safe to stay with</string>
-
-    <string name="wt_act_all">All</string>
-    <string name="wt_act_settings">Settings</string>
-    <string name="wt_act_triggers">Triggers</string>
-    <string name="wt_act_pin">PIN</string>
-    <string name="wt_act_log_1">Settings · Idle timeout changed to 2 min</string>
-    <string name="wt_act_log_2">Triggers · Cover phrase accepted</string>
-    <string name="wt_act_log_3">PIN · Unlocked Safe Space</string>
-    <string name="wt_act_log_4">Settings · Passkey recovery factor enrolled</string>
-    <string name="wt_act_passkey_toggle">Passkey Account Recovery Key enrolled</string>
-    <string name="wt_act_passkey_note">Safeguard: if only 1 passkey remains, removal is blocked to protect recovery access.</string>
 </resources>

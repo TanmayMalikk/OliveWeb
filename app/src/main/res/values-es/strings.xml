@@ -21,6 +21,7 @@
     <string name="enter_your_pin">Ingrese su PIN.</string>
 <string name="locking_soon">Cerrando pronto</string>
     <string name="stay_here">quédate aquí</string>
+    <string name="idle_lock_extend_prompt">Ampliar el tiempo de inactividad</string>
     <string name="read_full_story">Leer historia completa</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">Las noticias en vivo no están disponibles. Comprueba tu conexión y vuelve a intentarlo.</string>
     <string name="privacy_events">Eventos de privacidad</string>

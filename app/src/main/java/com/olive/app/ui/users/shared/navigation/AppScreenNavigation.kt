@@ -43,6 +43,9 @@ import com.olive.app.ui.users.shared.auth.*
 import com.olive.app.ui.users.shared.onboarding.ProfileSetup
 import com.olive.app.ui.users.shared.organization.OrganizationProfileSetup
 import com.olive.app.ui.users.shared.walkthrough.FirstVisitWalkthrough
+import com.olive.app.ui.users.shared.walkthrough.LocalWalkthroughTour
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughCoachmarkOverlay
+import com.olive.app.ui.users.shared.walkthrough.walkthroughTopicsForRole
 import com.olive.app.ui.users.staff.StaffPortal
 import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
@@ -200,11 +203,10 @@ internal fun OliveRoot(
         navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    var guideTopicId by remember(callAccountId) { mutableStateOf<String?>(null) }
-    LaunchedEffect(navigation.screen, navigation.page) {
-        if (navigation.screen != SessionScreen.Safe || navigation.page != SafePage.Walkthrough) {
-            guideTopicId = null
-        }
+    val activeTourTopicId = navigation.walkthroughTourTopicId
+    val startTour: (String) -> Unit = { topicId ->
+        val topic = walkthroughTopicsForRole(session.accountRole).firstOrNull { it.id == topicId }
+        if (topic != null) session.runtime.navigation.startWalkthroughTour(topic.id, topic.tourPage)
     }
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
@@ -342,6 +344,7 @@ internal fun OliveRoot(
                                     CompositionLocalProvider(
                                         LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
                                         LocalQuickExit provides if (userQuickExit) exit else null,
+                                        LocalWalkthroughTour provides startTour,
                                         LocalSafeSystemLauncher provides systemLaunchers.open,
                                         LocalSafePermissionActions provides systemLaunchers.permissions,
                                         LocalSafeUpdateReminder provides update.onDownload,
@@ -377,8 +380,8 @@ internal fun OliveRoot(
                                                 SessionScreen.DevicePin -> DevicePin(session)
                                                 SessionScreen.Pin -> PinPrompt(session)
                                                 SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT) {
-                                                    key(session.coverReset) { SafeContactArea(session, exit, guideTopicId) }
-                                                } else SafeArea(session, exit, guideTopicId)
+                                                    key(session.coverReset) { SafeContactArea(session, exit) }
+                                                } else SafeArea(session, exit)
 
                                                 SessionScreen.Portal -> key(session.coverReset) {
                                                     when (session.accountRole) {
@@ -403,24 +406,37 @@ internal fun OliveRoot(
                                         }
                                     }
                                 }
-                                if (navigation.screen == SessionScreen.Safe && session.profile != null &&
+                                val tourEligible = navigation.screen == SessionScreen.Safe && session.profile != null &&
                                     !privacyHidden && !showPinAnimation && !supportExpanded &&
                                     !callOverlayVisible && navigation.idleCountdownSeconds == null
-                                ) {
+                                if (tourEligible && activeTourTopicId == null) {
                                     FirstVisitWalkthrough(
                                         accountId = callAccountId,
                                         role = session.accountRole,
                                         page = navigation.page,
-                                        onOpenGuide = { topicId ->
-                                            guideTopicId = topicId
-                                            session.navigation.openSafePage(SafePage.Walkthrough)
-                                        },
+                                        onOpenGuide = startTour,
                                         modifier = Modifier.align(Alignment.BottomCenter)
                                             .padding(horizontal = 16.dp)
                                             .padding(bottom = if (showQuickExit || showSupport)
                                                 OlivePrivateLayout.FloatingActionClearance else 12.dp)
                                             .widthIn(max = 440.dp)
                                             .heightIn(max = 240.dp),
+                                    )
+                                }
+                                if (tourEligible && activeTourTopicId != null) {
+                                    WalkthroughCoachmarkOverlay(
+                                        role = session.accountRole,
+                                        activeTopicId = activeTourTopicId,
+                                        showBottomControls = showQuickExit || showSupport,
+                                        onAdvance = { nextId ->
+                                            if (nextId == null) session.runtime.navigation.dismissWalkthroughTour()
+                                            else startTour(nextId)
+                                        },
+                                        onOpenContents = {
+                                            session.runtime.navigation.dismissWalkthroughTour()
+                                            session.navigation.openSafePage(SafePage.Walkthrough)
+                                        },
+                                        onSkip = { session.runtime.navigation.dismissWalkthroughTour() },
                                     )
                                 }
                             }
@@ -451,29 +467,16 @@ internal fun OliveRoot(
                 }
             }
             navigation.idleCountdownSeconds?.let { seconds ->
-                if (navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) AlertDialog(
-                    onDismissRequest = session::noteInteraction,
-                    title = { Text(stringResource(R.string.locking_soon)) },
-                    text = {
-                        Text(
-                            if (session.usesCover) uiText(
-                                R.string.ui_no_activity_returning_to_your_cover_in_value_seconds,
-                                seconds
-                            ) else uiText(
-                                R.string.ui_no_activity_locking_olive_branch_in_value_seconds,
-                                seconds
-                            )
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = session::noteInteraction) {
-                            Text(
-                                stringResource(R.string.stay_here)
-                            )
-                        }
-                    },
-                    dismissButton = { TextButton(onClick = exit) { Text(stringResource(R.string.quick_exit)) } }
-                )
+                if (navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) {
+                    IdleLockWarningDialog(
+                        seconds = seconds,
+                        usesCover = session.usesCover,
+                        currentTimeoutSeconds = session.idleTimeoutSeconds(),
+                        onStayHere = session::noteInteraction,
+                        onExtendTimeout = session::setIdleTimeoutSeconds,
+                        onQuickExit = exit,
+                    )
+                }
             }
         }
         if (isCover && !navigation.privacyBlackout && session.coverEmergencyConfirmation?.first == session.coverAccountId &&

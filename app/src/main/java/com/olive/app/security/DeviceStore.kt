@@ -914,6 +914,22 @@ object IdlePolicy {
         timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }
 
     /**
+     * Returns up to three ascending idle timeout options (in seconds) strictly larger than [currentSeconds]
+     * so users can extend their timeout directly from the inactivity warning dialog.
+     *
+     * @param currentSeconds Currently configured idle timeout duration in seconds.
+     * @return Ascending list of available extension durations, or empty when already at [MAX_TIMEOUT_SECONDS].
+     */
+    fun extendOptions(currentSeconds: Int): List<Int> {
+        val normalized = normalizeTimeout(currentSeconds)
+        val larger = timeoutOptions.filter { it > normalized }
+        if (larger.isEmpty()) return emptyList()
+        return listOf(larger.first(), 300, MAX_TIMEOUT_SECONDS)
+            .filter { it > normalized && it in timeoutOptions }
+            .distinct()
+    }
+
+    /**
      * Computes countdown.
      *
      * @param elapsedMs Duration or timestamp for elapsed, in milliseconds.

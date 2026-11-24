@@ -21,6 +21,7 @@ import {
   PhoneCall,
 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
+import { extendIdleTimeoutOptions } from "../../../session/useSessionSecurity";
 import { Button, Modal } from "../../../components/SharedComponents";
 import type { Page } from "../../../domain/DomainModels";
 import { accounts } from "../../../services/AccountService";
@@ -33,6 +34,8 @@ import SettingsPage from "./AccountSettingsPage";
 import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
 import WalkthroughPage from "./WalkthroughPage";
+import { WalkthroughCoachmark } from "./WalkthroughCoachmark";
+import { walkthroughTopicsForRole } from "./WalkthroughCatalog";
 import {
   DocumentsPage,
   LocationPage,
@@ -93,6 +96,7 @@ export default function SafeApp() {
   const heading = useRef<HTMLHeadingElement>(null);
   const previousPage = useRef(s.page);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTourTopicId, setActiveTourTopicId] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState(0);
   const [dismissedAt, setDismissedAt] = useState(0);
   useEffect(() => {
@@ -126,6 +130,16 @@ export default function SafeApp() {
     s.clearMessage();
     if (s.page === page) heading.current?.focus();
     s.setPage(page);
+  };
+  const startTour = (topicId: string) => {
+    const topic = walkthroughTopicsForRole(p.role).find((item) => item.id === topicId);
+    if (!topic) return;
+    setActiveTourTopicId(topic.id);
+    if (s.page !== topic.tourPage) navigate(topic.tourPage);
+  };
+  const triggerQuickExit = () => {
+    setActiveTourTopicId(null);
+    s.quickExit();
   };
 
   return (
@@ -189,21 +203,57 @@ export default function SafeApp() {
             </div>
           )}
           <Suspense fallback={<p role="status">Opening {title?.toLowerCase()}…</p>}>
-            <CurrentPage />
+            {s.page === "Walkthrough" ? <WalkthroughPage onStartTour={startTour} /> : <CurrentPage />}
           </Suspense>
         </main>
         <footer className="safe-footer">
-          <button className="text-link" onClick={() => void s.perform(s.signOut)}>Sign out</button>
+          <button className="text-link" onClick={() => { setActiveTourTopicId(null); void s.perform(s.signOut); }}>Sign out</button>
         </footer>
       </div>
       {p.role === "USER" && (
-        <Button variant="exit floating-quick-exit" onClick={s.quickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>
+        <Button variant="exit floating-quick-exit" onClick={triggerQuickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>
+      )}
+      {s.idleSeconds === null && (
+        <WalkthroughCoachmark
+          role={p.role}
+          activeTopicId={activeTourTopicId}
+          onAdvance={(nextId) => {
+            if (!nextId) setActiveTourTopicId(null);
+            else startTour(nextId);
+          }}
+          onOpenContents={() => {
+            setActiveTourTopicId(null);
+            navigate("Walkthrough");
+          }}
+          onSkip={() => setActiveTourTopicId(null)}
+        />
       )}
       {s.idleSeconds !== null && (
         <Modal title="Your Safe Space is about to lock" onClose={s.noteInteraction}>
-          <p>Little Grove will reopen in {s.idleSeconds} seconds.</p>
-          <Button onClick={s.noteInteraction}>Stay here</Button>
-          {p.role === "USER" && <Button variant="quiet" onClick={s.quickExit}>Quick Exit</Button>}
+          <div data-idle-modal="true" style={{ display: "grid", gap: "0.75rem" }}>
+            <p style={{ margin: 0 }}>Little Grove will reopen in {s.idleSeconds} seconds.</p>
+            {p.role === "USER" && extendIdleTimeoutOptions(s.idleTimeoutSeconds).length > 0 && (
+              <div style={{ display: "grid", gap: "0.4rem" }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 600 }}>Extend idle timeout</span>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  {extendIdleTimeoutOptions(s.idleTimeoutSeconds).map((seconds) => (
+                    <Button
+                      key={seconds}
+                      variant="outline"
+                      data-testid={`idle-extend-${seconds}`}
+                      onClick={() => void s.perform(() => s.setIdleTimeoutSeconds(seconds))}
+                    >
+                      {seconds === 450 ? "7 min 30 sec" : `${seconds / 60} min`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <Button onClick={s.noteInteraction}>Stay here</Button>
+              {p.role === "USER" && <Button variant="quiet" onClick={triggerQuickExit}>Quick Exit</Button>}
+            </div>
+          </div>
         </Modal>
       )}
     </div>

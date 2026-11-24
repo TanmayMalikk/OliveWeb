@@ -21,6 +21,7 @@
     <string name="enter_your_pin">أدخل رقم التعريف الشخصي الخاص بك.</string>
 <string name="locking_soon">القفل قريبا</string>
     <string name="stay_here">ابق هنا</string>
+    <string name="idle_lock_extend_prompt">تمديد مهلة عدم النشاط</string>
     <string name="read_full_story">قراءة القصة كاملة</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">الأخبار الحية غير متوفرة. تحقق من اتصالك وحاول مرة أخرى.</string>
     <string name="privacy_events">أحداث الخصوصية</string>

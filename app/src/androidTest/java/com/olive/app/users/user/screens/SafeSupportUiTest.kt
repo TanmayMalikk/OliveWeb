@@ -290,11 +290,18 @@ class SafeSupportUiTest : OliveUiTestBase() {
         assertEquals(SafePage.Walkthrough, session.page)
         compose.onNodeWithTag("walkthrough_toc").assertExists()
         compose.onNodeWithTag("walkthrough_toc_safety_plan").performScrollTo().performClick()
-        compose.onNodeWithTag("walkthrough_active_feature").assertExists()
-        compose.onNodeWithTag("walkthrough_demo_plan_item_0").performScrollTo().performClick()
-        compose.onNodeWithTag("walkthrough_demo_feedback").assertExists()
-        compose.onNodeWithTag("walkthrough_open_feature").performScrollTo().performClick()
+        waitFor("walkthrough_active_feature")
         assertEquals(SafePage.SafetyPlan, session.page)
+        compose.onNodeWithTag("walkthrough_tour_arrow").assertExists()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
+
+        compose.onNodeWithTag("walkthrough_tour_next").performClick()
+        compose.runOnIdle { assertEquals(SafePage.Notes, session.page) }
+        compose.onNodeWithTag("walkthrough_active_feature").assertExists()
+
+        compose.onNodeWithTag("walkthrough_tour_skip").performClick()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(SafePage.Notes, session.page) }
     }
 
     @Test

@@ -21,6 +21,7 @@
     <string name="enter_your_pin">输入您的 PIN 码。</string>
 <string name="locking_soon">即将锁定</string>
     <string name="stay_here">留在这里</string>
+    <string name="idle_lock_extend_prompt">延长闲置锁定时间</string>
     <string name="read_full_story">阅读全文</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">无法观看实时新闻。检查您的连接并重试。</string>
     <string name="privacy_events">隐私事件</string>

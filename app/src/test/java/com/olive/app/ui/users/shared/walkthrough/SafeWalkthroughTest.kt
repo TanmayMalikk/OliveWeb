@@ -80,6 +80,28 @@ class SafeWalkthroughTest {
     }
 
     @Test
+    fun tourProgressionAndSafeTargetRoutingAvoidSideEffectAutoRequests() {
+        val userTopics = walkthroughTopicsForRole(AccountRole.USER)
+        val byId = userTopics.associateBy { it.id }
+
+        assertEquals(SafePage.Home, byId.getValue("quick_exit").tourPage)
+        assertEquals(WalkthroughAnchor.BottomEnd, byId.getValue("quick_exit").anchor)
+        assertEquals(WalkthroughArrow.SouthEast, byId.getValue("quick_exit").arrow)
+
+        assertEquals(SafePage.Home, byId.getValue("staff_help").tourPage)
+        assertEquals(WalkthroughArrow.SouthWest, byId.getValue("staff_help").arrow)
+        assertEquals(SafePage.StaffHelp, byId.getValue("staff_help").targetPage)
+
+        assertEquals(SafePage.Home, byId.getValue("emergency_report").tourPage)
+        assertEquals(SafePage.Documents, byId.getValue("emergency_report").targetPage)
+
+        assertEquals("quick_exit", nextWalkthroughTourTopicId(userTopics, "cover_entry", 1))
+        assertEquals(null, nextWalkthroughTourTopicId(userTopics, "cover_entry", -1))
+        assertEquals(null, nextWalkthroughTourTopicId(userTopics, "activity_settings", 1))
+        assertEquals("hotlines_contacts", nextWalkthroughTourTopicId(userTopics, "activity_settings", -1))
+    }
+
+    @Test
     fun stepAndTopicNavigationClampWithinValidBounds() {
         assertEquals(0, clampWalkthroughStep(-3, 3))
         assertEquals(1, clampWalkthroughStep(1, 3))

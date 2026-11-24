@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   clampWalkthroughStep,
   nextWalkthroughTopicIndex,
+  nextWalkthroughTourTopicId,
   walkthroughTopicGroups,
   walkthroughTopicsForRole,
 } from "./WalkthroughCatalog";
 
-describe("WalkthroughCatalog table of contents and navigation helpers", () => {
+describe("WalkthroughCatalog table of contents and live tour helpers", () => {
   it("lists all user features in the table of contents and filters user-only topics for safe contacts", () => {
     const userTopics = walkthroughTopicsForRole("USER");
     const contactTopics = walkthroughTopicsForRole("SAFE_CONTACT");
@@ -40,6 +41,19 @@ describe("WalkthroughCatalog table of contents and navigation helpers", () => {
       "account",
     ]);
     expect(contactGroups.map((group) => group.category.id)).toEqual(["tools", "account"]);
+  });
+
+  it("routes quick exit popup to Home with bottom-right arrow and advances tour steps safely", () => {
+    const userTopics = walkthroughTopicsForRole("USER");
+    const quickExit = userTopics.find((topic) => topic.id === "quick_exit");
+    expect(quickExit?.tourPage).toBe("Home");
+    expect(quickExit?.anchor).toBe("bottom-right");
+    expect(quickExit?.arrow).toBe("down-right");
+
+    expect(nextWalkthroughTourTopicId(userTopics, "cover_entry", 1)).toBe("quick_exit");
+    expect(nextWalkthroughTourTopicId(userTopics, "cover_entry", -1)).toBeNull();
+    expect(nextWalkthroughTourTopicId(userTopics, "activity_settings", 1)).toBeNull();
+    expect(nextWalkthroughTourTopicId(userTopics, "activity_settings", -1)).toBe("hotlines_contacts");
   });
 
   it("clamps step and topic navigation indices within bounds", () => {

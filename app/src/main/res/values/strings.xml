@@ -70,6 +70,7 @@
     <string name="enter_your_pin">Enter your PIN.</string>
 <string name="locking_soon">Locking soon</string>
     <string name="stay_here">Stay here</string>
+    <string name="idle_lock_extend_prompt">Extend idle timeout</string>
     <string name="read_full_story">Read full story</string>
     <string name="live_news_is_unavailable_check_your_connection_and_try_again">Live news is unavailable. Check your connection and try again.</string>
     <string name="privacy_events">Privacy events</string>

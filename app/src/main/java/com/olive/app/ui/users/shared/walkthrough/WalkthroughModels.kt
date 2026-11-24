@@ -1,4 +1,4 @@
-// Safe-app users and safe contacts: walkthrough catalog metadata, categories, and pure navigation helpers.
+// Safe-app users and safe contacts: walkthrough catalog metadata, in-app tour anchors, and navigation helpers.
 package com.olive.app.ui.users.shared.walkthrough
 
 import androidx.annotation.StringRes
@@ -20,6 +20,28 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.ui.users.shared.navigation.SafePage
 
 /**
+ * Placement of an in-app walkthrough coachmark card over the live target screen.
+ */
+internal enum class WalkthroughAnchor {
+    BottomEnd,
+    BottomStart,
+    TopEnd,
+    TopCenter,
+    BottomCenter,
+}
+
+/**
+ * Directional arrow displayed inside the coachmark card to point toward the target control.
+ */
+internal enum class WalkthroughArrow {
+    SouthEast,
+    SouthWest,
+    NorthEast,
+    North,
+    South,
+}
+
+/**
  * Top-level Table of Contents groupings for walkthrough features.
  *
  * @property labelRes Localized section heading resource ID.
@@ -32,17 +54,20 @@ internal enum class WalkthroughCategory(@param:StringRes val labelRes: Int) {
 }
 
 /**
- * Metadata describing a single Olive Branch feature covered in the interactive Walkthrough.
+ * Metadata describing a single Olive Branch feature covered in the live guided Walkthrough.
  *
- * @property category Grouping section in the Table of Contents hub.
- * @property id Stable identifier used for test tags, deep links, and completion tracking.
+ * @property category Grouping section in the Table of Contents.
+ * @property id Stable identifier used for test tags, deep links, and tour progression.
  * @property titleRes Localized feature title resource ID.
- * @property summaryRes Localized short summary shown in cards and first-visit popups.
- * @property stepResIds Ordered three-step how-it-works resource IDs.
- * @property targetPage Destination [SafePage] opened by the "Open feature" shortcut.
- * @property targetLabelRes Localized name of [targetPage] for action button labels.
+ * @property summaryRes Localized short summary shown in Table of Contents cards and first-visit popups.
+ * @property stepResIds Ordered three-step instructions; step 1 is shown in the floating coachmark popup.
+ * @property targetPage Primary [SafePage] associated with this feature (used by first-visit triggers).
+ * @property targetLabelRes Localized name of [targetPage].
  * @property icon Vector icon representing the feature.
  * @property userOnly Whether the topic is hidden from safe-contact accounts.
+ * @property tourPage Live destination page opened during the in-app coachmark tour.
+ * @property anchor Screen placement for the floating coachmark card.
+ * @property arrow Arrow direction inside the floating coachmark pointing toward the real UI element.
  */
 internal data class WalkthroughTopic(
     val category: WalkthroughCategory,
@@ -54,10 +79,13 @@ internal data class WalkthroughTopic(
     @param:StringRes val targetLabelRes: Int,
     val icon: ImageVector,
     val userOnly: Boolean = false,
+    val tourPage: SafePage = targetPage,
+    val anchor: WalkthroughAnchor = WalkthroughAnchor.BottomCenter,
+    val arrow: WalkthroughArrow = WalkthroughArrow.North,
 )
 
 /**
- * Grouped section returned for rendering the Table of Contents hub.
+ * Grouped section returned for rendering the Table of Contents.
  *
  * @property category Section category metadata.
  * @property topics Ordered topics within [category] available to the active role.
@@ -82,6 +110,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.settings,
         icon = Icons.Outlined.Lock,
         userOnly = true,
+        tourPage = SafePage.Settings,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.PRIVACY,
@@ -97,6 +128,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.settings,
         icon = Icons.AutoMirrored.Outlined.ExitToApp,
         userOnly = true,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.BottomEnd,
+        arrow = WalkthroughArrow.SouthEast,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.TOOLS,
@@ -111,6 +145,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetPage = SafePage.SafetyPlan,
         targetLabelRes = R.string.support_safety_plan,
         icon = Icons.Outlined.HealthAndSafety,
+        tourPage = SafePage.SafetyPlan,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.TOOLS,
@@ -125,6 +162,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetPage = SafePage.Notes,
         targetLabelRes = R.string.notes_incidents,
         icon = Icons.Outlined.Description,
+        tourPage = SafePage.Notes,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.TOOLS,
@@ -139,6 +179,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetPage = SafePage.Documents,
         targetLabelRes = R.string.support_documents,
         icon = Icons.Outlined.FolderOpen,
+        tourPage = SafePage.Documents,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.TOOLS,
@@ -153,6 +196,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetPage = SafePage.Messages,
         targetLabelRes = R.string.messages,
         icon = Icons.Outlined.ChatBubbleOutline,
+        tourPage = SafePage.Messages,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.TOOLS,
@@ -167,6 +213,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetPage = SafePage.Location,
         targetLabelRes = R.string.location_map,
         icon = Icons.Outlined.LocationOn,
+        tourPage = SafePage.Location,
+        anchor = WalkthroughAnchor.TopCenter,
+        arrow = WalkthroughArrow.South,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -182,6 +231,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_staff_help,
         icon = Icons.Outlined.SupportAgent,
         userOnly = true,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.BottomStart,
+        arrow = WalkthroughArrow.SouthWest,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -197,6 +249,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_documents,
         icon = Icons.Outlined.WarningAmber,
         userOnly = true,
+        tourPage = SafePage.Home,
+        anchor = WalkthroughAnchor.BottomStart,
+        arrow = WalkthroughArrow.SouthWest,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.SUPPORT,
@@ -212,6 +267,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.support_hotlines,
         icon = Icons.Outlined.PhoneInTalk,
         userOnly = true,
+        tourPage = SafePage.Hotlines,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
     WalkthroughTopic(
         category = WalkthroughCategory.ACCOUNT,
@@ -227,6 +285,9 @@ internal val allWalkthroughTopics: List<WalkthroughTopic> = listOf(
         targetLabelRes = R.string.account_activity,
         icon = Icons.Outlined.History,
         userOnly = true,
+        tourPage = SafePage.Activity,
+        anchor = WalkthroughAnchor.BottomCenter,
+        arrow = WalkthroughArrow.North,
     ),
 )
 
@@ -272,3 +333,23 @@ internal fun clampWalkthroughStep(stepIndex: Int, totalSteps: Int): Int =
  */
 internal fun nextWalkthroughTopicIndex(currentIndex: Int, totalTopics: Int, delta: Int): Int =
     if (totalTopics <= 1) 0 else (currentIndex + delta).coerceIn(0, totalTopics - 1)
+
+/**
+ * Returns the next topic identifier during a live in-app walkthrough tour, or `null` when moving
+ * past the end or before the beginning of [topics].
+ *
+ * @param topics Ordered list of role-filtered walkthrough topics.
+ * @param currentId Currently shown coachmark topic ID.
+ * @param delta Direction to advance (`+1` for Next, `-1` for Back).
+ * @return Target topic ID, or `null` when out of bounds.
+ */
+internal fun nextWalkthroughTourTopicId(
+    topics: List<WalkthroughTopic>,
+    currentId: String,
+    delta: Int,
+): String? {
+    val idx = topics.indexOfFirst { it.id == currentId }
+    if (idx < 0) return null
+    val next = idx + delta
+    return if (next in topics.indices) topics[next].id else null
+}

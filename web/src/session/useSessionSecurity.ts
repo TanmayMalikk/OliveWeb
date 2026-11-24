@@ -29,6 +29,15 @@ function normalizeIdleTimeout(seconds: unknown) {
     ? idleTimeoutOptions.filter((option) => option <= seconds).at(-1) ?? defaultIdleTimeout
     : defaultIdleTimeout;
 }
+export function extendIdleTimeoutOptions(currentSeconds: number): number[] {
+  const normalized = normalizeIdleTimeout(currentSeconds);
+  const larger = idleTimeoutOptions.filter((option) => option > normalized);
+  if (larger.length === 0) return [];
+  const valid = new Set<number>(idleTimeoutOptions);
+  return Array.from(new Set([larger[0], 300, 450])).filter(
+    (option) => option > normalized && valid.has(option),
+  );
+}
 
 // Web private entry: Keeps the safe session locked when it is not in use. It watches navigation, entry links, and idle time, then clears private data before returning to a cover.
 export function useSessionSecurity({
@@ -96,6 +105,8 @@ export function useSessionSecurity({
   async function setIdleTimeoutSeconds(seconds: number) {
     if (!idleUid) return;
     const normalized = normalizeIdleTimeout(seconds);
+    lastInteraction.current = Date.now();
+    setIdleSeconds(null);
     await (await database).put("device", normalized, `idle-timeout:${idleUid}`);
     if (accounts.identity?.uid === idleUid) setIdlePreference({ uid: idleUid, seconds: normalized });
   }
@@ -213,8 +224,13 @@ export function useSessionSecurity({
     }
     noteInteraction();
     const events = ["pointerdown", "keydown", "input"] as const;
+    const onActivity = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-idle-modal]")) return;
+      noteInteraction();
+    };
     events.forEach((event) =>
-      document.addEventListener(event, noteInteraction),
+      document.addEventListener(event, onActivity),
     );
     const lockAt = idleTimeoutSeconds * 1_000;
     const interval = setInterval(() => {
@@ -228,7 +244,7 @@ export function useSessionSecurity({
     return () => {
       clearInterval(interval);
       events.forEach((event) =>
-        document.removeEventListener(event, noteInteraction),
+        document.removeEventListener(event, onActivity),
       );
     };
   }, [buttonOnlyExit, idleTimeoutSeconds, phase, noteInteraction, quickExit, setIdleSeconds]);
