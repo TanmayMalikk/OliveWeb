@@ -97,15 +97,8 @@
     <string name="documents_offline_copy_corrupt">النسخة غير المتصلة تالفة وتمت إزالتها. نزّلها مرة أخرى.</string>
     <string name="documents_key_unavailable">لا يملك هذا الجهاز مفتاح تشفير هذا الملف. افتح المستندات على جهاز معتمد سابقًا لهذا الحساب، أو اطلب من مالك الملف مشاركته مرة أخرى.</string>
     <string name="documents_account_wrapper_missing">لم يُجهّز هذا الملف لاسترداد الحساب. افتحه على الجهاز الذي رفعه ثم شاركه مرة أخرى.</string>
-    <string name="documents_account_recovery_failed">تعذر استعادة الوصول المشفر إلى حسابك. تحقق من الاتصال واختر مفتاح مرور الاسترداد مرة أخرى.</string>
-    <string name="documents_recovery_begin_failed">تعذر بدء الاسترداد. تحقق من الاتصال وحاول مرة أخرى. (RPK-DOC-01)</string>
-    <string name="documents_recovery_passkey_failed">لم يكتمل مفتاح مرور الاسترداد. اختر مفتاح مرور استرداد حسابك وحاول مرة أخرى. (RPK-DOC-02)</string>
-    <string name="documents_recovery_server_failed">تم قبول مفتاح المرور، لكن تعذر التحقق من الاسترداد. تحقق من الاتصال وحاول مرة أخرى. (RPK-DOC-03)</string>
-    <string name="documents_recovery_prf_mismatch">أعاد مفتاح المرور المحدد بيانات استرداد لا تطابق هذا الحساب. (RPK-DOC-04)</string>
-    <string name="documents_recovery_envelope_failed">تعذر على مفتاح المرور المحدد فتح مفتاح استرداد هذا الحساب. (RPK-DOC-05)</string>
-    <string name="documents_recovery_keyset_failed">لا يطابق المفتاح المسترد الملفات المشفرة لهذا الحساب. لا تستبدل مفتاح مرور الاسترداد أو تحذفه. (RPK-DOC-06)</string>
-    <string name="documents_recovery_device_save_failed">تم استرداد الوصول إلى الحساب، لكن تعذر حمايته على هذا الجهاز. أكد مصادقة الجهاز وحاول مرة أخرى. (RPK-DOC-07)</string>
-    <string name="documents_account_keyset_mismatch">ينتمي هذا الملف إلى مجموعة مفاتيح مشفرة مختلفة. استعد مفتاح مرور الاسترداد الأصلي للحساب ثم حاول مرة أخرى.</string>
+    <string name="documents_account_recovery_failed">تعذر استعادة الوصول المشفر إلى حسابك. تحقق من الاتصال وأدخل كلمة مرور الاسترداد مرة أخرى.</string>
+    <string name="documents_account_keyset_mismatch">ينتمي هذا الملف إلى مجموعة مفاتيح مشفرة مختلفة. استعد كلمة مرور الاسترداد الأصلية للحساب ثم حاول مرة أخرى.</string>
     <string name="documents_account_wrapper_failed">تعذر استعادة المفتاح المشفر لهذا الملف. اترك الملف دون تغيير وحاول الاسترداد مرة أخرى.</string>
     <string name="documents_ciphertext_authentication_failed">تعذر التحقق من صحة الملف المشفر. قد يكون تالفًا أو يستخدم مفتاح استرداد مختلفًا.</string>
     <string name="documents_account_mismatch">هذه النسخة غير المتصلة تخص حسابًا آخر.</string>

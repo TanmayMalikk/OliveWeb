@@ -26,12 +26,11 @@ vi.mock("./AccountService", () => ({
     clear: () => { mocks.installed = null; },
   },
 }));
-vi.mock("./PasskeyWebAuthn", () => ({browserPasskeys: {register: vi.fn(), authenticate: vi.fn()}}));
-vi.mock("./PasskeyRecoveryFlow", () => ({
-  createPasskeyRecoveryFlow: () => ({unlock: mocks.unlock}),
+vi.mock("./OpaqueRecoveryFlow", () => ({
+  createOpaqueRecoveryFlow: () => ({unlock: mocks.unlock}),
 }));
-vi.mock("./PasskeyRecovery", async (importOriginal) => ({
-  ...await importOriginal<typeof import("./PasskeyRecovery")>(),
+vi.mock("./AccountKeysetCrypto", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./AccountKeysetCrypto")>(),
   unlockAccountKeyset: mocks.unlockKeyset,
 }));
 vi.mock("firebase/firestore", () => ({doc: vi.fn(), getDoc: mocks.getDoc}));
@@ -39,7 +38,7 @@ vi.mock("firebase/functions", () => ({httpsCallable: () => mocks.callable}));
 
 import { recoverBrowserAccountKeyset } from "./BrowserAccountKeysetRecovery";
 import { accountKeysetSession } from "./AccountService";
-import { accountKeysetWrappers } from "./PasskeyRecovery";
+import { accountKeysetWrappers } from "./AccountKeysetCrypto";
 
 describe("browser account-keyset recovery", () => {
   beforeEach(() => {
@@ -51,21 +50,22 @@ describe("browser account-keyset recovery", () => {
     mocks.unlockKeyset.mockResolvedValue({accountId: "user-a", privateKey: "private"});
   });
 
-  it("unlocks a fetched ciphertext envelope only in the current tab and clears the recovery key", async () => {
+  it("unlocks a fetched ciphertext envelope with OPAQUE password recovery and clears the key", async () => {
     const key = new Uint8Array(32).fill(7);
     mocks.unlock.mockResolvedValue(key);
 
-    await recoverBrowserAccountKeyset("user-a");
+    await recoverBrowserAccountKeyset("user-a", "RecoveryPassword123!");
 
+    expect(mocks.unlock).toHaveBeenCalledWith("user-a", "RecoveryPassword123!");
     expect(mocks.unlockKeyset).toHaveBeenCalledWith("user-a", key, {accountId: "user-a"});
     expect(mocks.install).toHaveBeenCalledWith({accountId: "user-a", privateKey: "private"});
     expect([...key]).toEqual(Array(32).fill(0));
   });
 
-  it("does not prompt for a passkey when the encrypted keyset is absent", async () => {
+  it("does not invoke OPAQUE unlock when the encrypted keyset is absent", async () => {
     mocks.getDoc.mockResolvedValue({exists: () => false});
 
-    await expect(recoverBrowserAccountKeyset("user-a")).rejects.toThrow("has not been set up");
+    await expect(recoverBrowserAccountKeyset("user-a", "RecoveryPassword123!")).rejects.toThrow("has not been set up");
     expect(mocks.unlock).not.toHaveBeenCalled();
   });
 
@@ -94,7 +94,7 @@ describe("browser account-keyset recovery", () => {
     });
 
     expect(accountKeysetSession.current(uid)).toBeNull();
-    await recoverBrowserAccountKeyset(uid);
+    await recoverBrowserAccountKeyset(uid, "RecoveryPassword123!");
 
     const installed = accountKeysetSession.current(uid);
     expect(accountKeysetSession.current("other-user")).toBeNull();

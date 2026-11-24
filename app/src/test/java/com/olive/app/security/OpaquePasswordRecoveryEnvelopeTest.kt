@@ -119,4 +119,35 @@ class OpaquePasswordRecoveryEnvelopeTest {
             Base64.getEncoder().encodeToString(opened.encodedCopy()),
         )
     }
+
+    @Test
+    fun `64-byte OPAQUE export key encrypts and recovers ARK and invalid sizes fail`() {
+        val opaqueExportKey = ByteArray(64) { (it * 3 + 5).toByte() }
+        val envelope = OpaquePasswordRecoveryEnvelope.create(
+            accountId = accountId,
+            opaqueRecordId = recordId,
+            exportKey = opaqueExportKey,
+            recoveryKey = recoveryKey,
+        )
+
+        val opened = envelope.open(
+            expectedAccountId = accountId,
+            expectedRecordId = recordId,
+            exportKey = opaqueExportKey,
+        )
+
+        assertEquals(
+            Base64.getEncoder().encodeToString(recoveryKey.encodedCopy()),
+            Base64.getEncoder().encodeToString(opened.encodedCopy()),
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            OpaquePasswordRecoveryEnvelope.create(
+                accountId = accountId,
+                opaqueRecordId = recordId,
+                exportKey = ByteArray(16) { 1 },
+                recoveryKey = recoveryKey,
+            )
+        }
+    }
 }

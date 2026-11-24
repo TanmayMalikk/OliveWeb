@@ -158,7 +158,10 @@ service cloud.firestore {
       );
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
-      allow update: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid)
+      // Allow idempotent SetOptions.merge() refreshes (only updatedAt may change) while preserving
+      // an existing server-managed passwordRecovery envelope without allowing clients to add/edit/delete it.
+      allow update: if owner(uid) && validAccountKeysetShape(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
     }
 
@@ -205,6 +208,12 @@ service cloud.firestore {
     // OPAQUE recovery records and short-lived unlock sessions are owned exclusively
     // by Cloud Functions with App Check and caller UID enforcement. Direct client access is denied.
     match /accountRecoveryOpaqueRecords/{uid} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery unlock throttling state is owned exclusively by Cloud Functions.
+    // Direct client reads, resets, or deletions are denied so brute-force limits cannot be bypassed.
+    match /accountRecoveryOpaqueThrottle/{uid} {
       allow read, write: if false;
     }
 

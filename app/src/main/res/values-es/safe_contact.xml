@@ -97,15 +97,8 @@
     <string name="documents_offline_copy_corrupt">La copia sin conexión está dañada y se eliminó. Descárgala de nuevo.</string>
     <string name="documents_key_unavailable">Este dispositivo no tiene la clave de cifrado de este archivo. Abre Documentos en un dispositivo ya autorizado para esta cuenta o pide al propietario que vuelva a compartirlo.</string>
     <string name="documents_account_wrapper_missing">Este archivo no se preparó para la recuperación de la cuenta. Ábrelo en el dispositivo que lo subió y vuelve a compartirlo.</string>
-    <string name="documents_account_recovery_failed">No pudimos restaurar el acceso cifrado de tu cuenta. Revisa la conexión y elige de nuevo tu llave de acceso de recuperación.</string>
-    <string name="documents_recovery_begin_failed">No se pudo iniciar la recuperación. Revisa la conexión e inténtalo de nuevo. (RPK-DOC-01)</string>
-    <string name="documents_recovery_passkey_failed">No se completó la llave de acceso de recuperación. Elige la llave de acceso de recuperación de tu cuenta e inténtalo de nuevo. (RPK-DOC-02)</string>
-    <string name="documents_recovery_server_failed">La llave de acceso fue aceptada, pero no se pudo verificar la recuperación. Revisa la conexión e inténtalo de nuevo. (RPK-DOC-03)</string>
-    <string name="documents_recovery_prf_mismatch">La llave de acceso seleccionada devolvió datos de recuperación que no coinciden con esta cuenta. (RPK-DOC-04)</string>
-    <string name="documents_recovery_envelope_failed">La llave de acceso seleccionada no pudo desbloquear la clave de recuperación de esta cuenta. (RPK-DOC-05)</string>
-    <string name="documents_recovery_keyset_failed">La clave recuperada no coincide con los archivos cifrados de esta cuenta. No reemplaces ni elimines la llave de acceso de recuperación. (RPK-DOC-06)</string>
-    <string name="documents_recovery_device_save_failed">Se recuperó el acceso a la cuenta, pero no se pudo proteger en este dispositivo. Confirma la autenticación del dispositivo e inténtalo de nuevo. (RPK-DOC-07)</string>
-    <string name="documents_account_keyset_mismatch">Este archivo pertenece a un conjunto de claves cifradas diferente. Restaura la llave de acceso de recuperación original de la cuenta e inténtalo de nuevo.</string>
+    <string name="documents_account_recovery_failed">No pudimos restaurar el acceso cifrado de tu cuenta. Revisa la conexión e introduce de nuevo tu contraseña de recuperación.</string>
+    <string name="documents_account_keyset_mismatch">Este archivo pertenece a un conjunto de claves cifradas diferente. Restaura la contraseña de recuperación original de la cuenta e inténtalo de nuevo.</string>
     <string name="documents_account_wrapper_failed">No se pudo restaurar la clave cifrada de este archivo. Mantén el archivo sin cambios e intenta la recuperación otra vez.</string>
     <string name="documents_ciphertext_authentication_failed">No se pudo autenticar el archivo cifrado. Puede estar dañado o usar una clave de recuperación diferente.</string>
     <string name="documents_account_mismatch">Esta copia sin conexión pertenece a otra cuenta.</string>

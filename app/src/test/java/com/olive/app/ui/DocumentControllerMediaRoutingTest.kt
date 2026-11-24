@@ -20,8 +20,6 @@ import com.olive.app.ui.users.user.documents.OpenedMedia
 import com.olive.app.ui.users.user.documents.MediaAccessRecoveryResult
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.documents.mediaFailureResource
-import com.olive.app.ui.session.PasskeyRecoveryStage
-import com.olive.app.ui.session.PasskeyRecoveryStageException
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -239,22 +237,6 @@ class DocumentControllerMediaRoutingTest {
             com.olive.app.R.string.documents_ciphertext_authentication_failed,
             mediaFailureResource(MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED)),
         )
-        val stageResources = mapOf(
-            PasskeyRecoveryStage.BEGIN_UNLOCK to com.olive.app.R.string.documents_recovery_begin_failed,
-            PasskeyRecoveryStage.REQUEST_PASSKEY to com.olive.app.R.string.documents_recovery_passkey_failed,
-            PasskeyRecoveryStage.COMPLETE_UNLOCK to com.olive.app.R.string.documents_recovery_server_failed,
-            PasskeyRecoveryStage.VERIFY_PRF_INPUT to com.olive.app.R.string.documents_recovery_prf_mismatch,
-            PasskeyRecoveryStage.OPEN_RECOVERY_ENVELOPE to com.olive.app.R.string.documents_recovery_envelope_failed,
-            PasskeyRecoveryStage.VALIDATE_ACCOUNT_KEYSET to com.olive.app.R.string.documents_recovery_keyset_failed,
-            PasskeyRecoveryStage.PROTECT_DEVICE_COPY to com.olive.app.R.string.documents_recovery_device_save_failed,
-        )
-        stageResources.forEach { (stage, resource) ->
-            val failure = MediaAccessException(
-                MediaAccessError.ACCOUNT_RECOVERY_FAILED,
-                PasskeyRecoveryStageException(stage, IllegalStateException("fixture")),
-            )
-            assertEquals(resource, mediaFailureResource(failure))
-        }
     }
 
     @Test

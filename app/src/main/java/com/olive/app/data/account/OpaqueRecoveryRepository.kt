@@ -36,14 +36,14 @@ internal interface OpaqueClientProtocol {
 }
 
 /**
- * Repository for zero-knowledge password recovery failsafe.
+ * Repository for zero-knowledge password recovery.
  *
- * Facilitates the client-side OPAQUE exchange with Cloud Functions to enroll and unlock
+ * Facilitates the client-side OPAQUE exchange with Cloud Functions to enroll, rotate, and unlock
  * the Account Recovery Key (ARK). The plaintext password and export key never leave the client.
  */
 internal class OpaqueRecoveryRepository(
     private val callable: AccountRecoveryCallable = FirebaseAccountRecoveryCallable(),
-    private val authenticator: PasskeyRecoveryAuthenticator = FirebasePasskeyRecoveryAuthenticator(),
+    private val authenticator: AccountRecoveryAuthenticator = FirebaseAccountRecoveryAuthenticator(),
     private val opaqueClient: OpaqueClientProtocol,
 ) {
     /** Enrolls an OPAQUE password recovery failsafe for an existing unlocked ARK. */
@@ -173,13 +173,6 @@ internal class OpaqueRecoveryRepository(
         return newEnvelope
     }
 
-    /** Removes password recovery fallback. Blocked if no passkeys exist. */
-    suspend fun remove(accountId: String, password: String) {
-        authenticator.reauthenticate(accountId, password)
-        val result = response(callable.call(REMOVE, emptyMap()))
-        check(result["success"] == true) { "Failed to remove password recovery" }
-    }
-
     private fun response(value: Any?): Map<String, Any?> =
         (value as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v }
             ?: error("Invalid response from recovery service")
@@ -190,6 +183,5 @@ internal class OpaqueRecoveryRepository(
         private const val BEGIN_UNLOCK = "opaqueRecoveryBeginUnlock"
         private const val FINISH_UNLOCK = "opaqueRecoveryFinishUnlock"
         private const val ROTATE = "opaqueRecoveryRotate"
-        private const val REMOVE = "opaqueRecoveryRemove"
     }
 }

@@ -135,6 +135,22 @@ internal suspend fun awaitOpaqueBridgePayload(
 }
 
 /**
+ * Decodes a base64url-encoded OPAQUE export key returned by the WebView bridge payload.
+ *
+ * @param payload JSON payload produced by the bundled OPAQUE client bridge.
+ * @return raw export key bytes used locally to wrap or unwrap the recovery envelope.
+ */
+internal fun decodeOpaqueExportKey(payload: JSONObject): ByteArray {
+    val encoded = payload.optString("exportKey", "")
+    require(encoded.isNotBlank()) { "Missing OPAQUE export key" }
+    return try {
+        java.util.Base64.getUrlDecoder().decode(encoded)
+    } catch (failure: IllegalArgumentException) {
+        throw IllegalArgumentException("Invalid OPAQUE export key encoding", failure)
+    }
+}
+
+/**
  * Android implementation of OpaqueClientProtocol using headless WebView and WASM.
  * Executes RustCrypto opaque-ke compiled WebAssembly bundle securely on the local device.
  */
@@ -163,10 +179,10 @@ internal class AndroidOpaqueClient(
             view.loadUrl("file:///android_asset/opaque/opaque.html")
         }
 
-        // Wait until bridge confirms wasm readiness
+        // Wait until bridge confirms wasm readiness (up to 5 seconds for cold start)
         var ready = false
         var attempts = 0
-        while (!ready && attempts < 50) {
+        while (!ready && attempts < 100) {
             val eval = evalJs(view, "window.opaqueBridge && window.opaqueBridge.isReady")
             if (eval == "true") {
                 ready = true
@@ -239,11 +255,9 @@ internal class AndroidOpaqueClient(
             OpaqueBridgeMethod.FINISH_REGISTRATION,
             listOf(state, response, password),
         )
-        val keyArr = res.getJSONArray("exportKey")
-        val exportKey = ByteArray(keyArr.length()) { i -> keyArr.getInt(i).toByte() }
         return OpaqueClientProtocol.RegistrationFinish(
             registrationRecord = res.getString("registrationRecord"),
-            exportKey = exportKey,
+            exportKey = decodeOpaqueExportKey(res),
         )
     }
 
@@ -267,11 +281,9 @@ internal class AndroidOpaqueClient(
         if (res.optString("error") == "incorrect_password" || !res.has("exportKey")) {
             return null
         }
-        val keyArr = res.getJSONArray("exportKey")
-        val exportKey = ByteArray(keyArr.length()) { i -> keyArr.getInt(i).toByte() }
         return OpaqueClientProtocol.LoginFinish(
             finishLoginRequest = res.getString("finishLoginRequest"),
-            exportKey = exportKey,
+            exportKey = decodeOpaqueExportKey(res),
         )
     }
 

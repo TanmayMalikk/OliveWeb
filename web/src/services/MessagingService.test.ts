@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { accountKeysetWrappers } from "./PasskeyRecovery";
+import { accountKeysetWrappers } from "./AccountKeysetCrypto";
 import { roomKey } from "./MessagingService";
 
 const mocks = vi.hoisted(() => ({

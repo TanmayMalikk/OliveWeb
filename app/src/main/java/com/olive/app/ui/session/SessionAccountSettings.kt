@@ -15,7 +15,6 @@ import com.olive.app.data.account.SafeContact
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.profileChanges
-import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.security.*
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -426,11 +425,6 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    fun refreshPasskeyRecovery() = runtime.passkeyRecoveryController.refreshPasskeyRecovery()
-    fun enablePasskeyRecovery() = runtime.passkeyRecoveryController.enablePasskeyRecovery()
-    fun removePasskeyRecovery(credentialId: String, password: String) =
-        runtime.passkeyRecoveryController.removePasskeyRecovery(credentialId, password)
-
     internal suspend fun accountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val local = withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid) }
         if (local != null) {
@@ -463,7 +457,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Recovers and validates the account recovery key through a passkey PRF assertion.
+     * Recovers and validates the account recovery key through OPAQUE password recovery.
      *
      * @param uid Authenticated account whose encrypted keyset is being recovered.
      * @param keyset Server-fetched encrypted account keyset used to validate the recovered key.
@@ -474,7 +468,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         uid: String,
         keyset: AccountKeysetEnvelope,
         token: Long,
-    ): AccountRecoveryKey = runtime.passkeyRecoveryController.recoverAccountRecoveryKey(uid, keyset, token)
+    ): AccountRecoveryKey = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, token)
 
     private suspend fun unlockDeviceRecoveryKey(
         uid: String,

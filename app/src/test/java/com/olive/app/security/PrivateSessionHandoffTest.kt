@@ -3,34 +3,32 @@ package com.olive.app.security
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class PasskeySystemHandoffPolicyTest {
+class PrivateSessionHandoffTest {
     @Test
     fun `every trusted system handoff independently suppresses quick exit`() {
-        repeat(64) { mask ->
-            val flags = BooleanArray(6) { index -> mask and (1 shl index) != 0 }
+        repeat(32) { mask ->
+            val flags = BooleanArray(5) { index -> mask and (1 shl index) != 0 }
             assertEquals(
                 "mask=$mask",
                 mask != 0,
                 trustedSystemHandoffActive(
                     deviceCredential = flags[0],
-                    passkeyCredential = flags[1],
-                    runtimePermission = flags[2],
-                    externalFilePicker = flags[3],
-                    callPermission = flags[4],
-                    safeSystemActivity = flags[5],
+                    runtimePermission = flags[1],
+                    externalFilePicker = flags[2],
+                    callPermission = flags[3],
+                    safeSystemActivity = flags[4],
                 ),
             )
         }
     }
 
     @Test
-    fun `repeated passkey transitions remain protected`() {
+    fun `repeated biometric transitions remain protected`() {
         repeat(100) {
             assertEquals(
                 true,
                 trustedSystemHandoffActive(
-                    deviceCredential = false,
-                    passkeyCredential = true,
+                    deviceCredential = true,
                     runtimePermission = false,
                     externalFilePicker = false,
                     callPermission = false,

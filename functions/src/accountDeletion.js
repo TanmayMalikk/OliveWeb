@@ -46,6 +46,8 @@ exports.adminDeleteAccount = onCall(async (request) => {
   await db.recursiveDelete(db.collection("accountKeysets").doc(uid));
   await db.recursiveDelete(db.collection("accountKeyDirectories").doc(uid));
   await db.recursiveDelete(db.collection("accountRecoveryPasskeys").doc(uid));
+  await db.recursiveDelete(db.collection("accountRecoveryOpaqueRecords").doc(uid));
+  await db.recursiveDelete(db.collection("accountRecoveryOpaqueThrottle").doc(uid));
   await deleteQuery(db.collection("supportRequests").where("ownerUid", "==", uid));
   // Removes a deleted staff assignment without deleting the user's safety plan.
   const sharedPlans = await db.collection("safetyPlans").where("staffUid", "==", uid).get();

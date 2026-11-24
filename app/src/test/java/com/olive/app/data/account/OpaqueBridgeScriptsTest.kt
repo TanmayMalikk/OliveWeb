@@ -135,4 +135,20 @@ class OpaqueBridgeScriptsTest {
         }
         assertEquals("OPAQUE client operation timed out", timedOut.message)
     }
+
+    @Test
+    fun `export key decoder parses 64-byte base64url strings and rejects missing values`() {
+        val raw = ByteArray(64) { index -> (index * 7 + 3).toByte() }
+        val encoded = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
+        val decoded = decodeOpaqueExportKey(JSONObject().put("exportKey", encoded))
+
+        org.junit.Assert.assertArrayEquals(raw, decoded)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            decodeOpaqueExportKey(JSONObject())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            decodeOpaqueExportKey(JSONObject().put("exportKey", ""))
+        }
+    }
 }

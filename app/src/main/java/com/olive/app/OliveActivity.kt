@@ -38,6 +38,7 @@ import com.olive.app.security.trustedSystemHandoffActive
 import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.users.user.account.PasswordRecoveryUnlockDialog
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -69,9 +70,6 @@ class OliveActivity : FragmentActivity() {
     // Create device authentication after Android has attached this activity to its app context.
     private val deviceLock by lazy(LazyThreadSafetyMode.NONE) {
         com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
-    }
-    private val passkeyCredentials by lazy(LazyThreadSafetyMode.NONE) {
-        com.olive.app.security.AndroidPasskeyCredentials(this)
     }
 
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
@@ -139,11 +137,6 @@ class OliveActivity : FragmentActivity() {
                 authentication?.let(deviceLock::show)
                 onDispose { deviceLock.cancel() }
             }
-            val passkeyRequest = session.passkeyCredentialRequest
-            DisposableEffect(passkeyRequest) {
-                passkeyRequest?.let(passkeyCredentials::show)
-                onDispose { passkeyCredentials.cancel() }
-            }
 
             val selectedCover = session.coverType
             val selectedRole = session.accountRole
@@ -187,6 +180,7 @@ class OliveActivity : FragmentActivity() {
             ) {
                 OliveTheme {
                     OliveRoot(session, locationPermissionVersion, closeApp = ::closeAfterQuickExit)
+                    PasswordRecoveryUnlockDialog(session)
                 }
             }
         }
@@ -242,7 +236,6 @@ class OliveActivity : FragmentActivity() {
         session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
-        passkeyCredentials.resume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         removeRecentPrivacyCoverAfterRedraw()
@@ -333,7 +326,6 @@ class OliveActivity : FragmentActivity() {
 
     private fun systemHandoffActive() = trustedSystemHandoffActive(
         deviceCredential = deviceLock.awaitingCredential,
-        passkeyCredential = passkeyCredentials.awaitingCredential,
         runtimePermission = permissions.awaitingResult,
         externalFilePicker = session.externalFilePickerOpen,
         callPermission = session.callPermissionRequestOpen,

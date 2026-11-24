@@ -129,16 +129,34 @@ function Cover() {
 // All roles use the same zero-knowledge, tab-scoped recovery action.
 function EncryptedAccessRecovery() {
   const s = useSession();
+  const [password, setPassword] = useState("");
   if (!s.cloudMode || (s.phase !== "safe" && s.phase !== "portal") || s.hasEncryptedAccess) return null;
   return (
     <section className="account-recovery-notice" aria-labelledby="encrypted-access-heading">
       <div>
         <h2 id="encrypted-access-heading">Unlock encrypted access</h2>
-        <p>Use a recovery passkey to open encrypted documents and messages on this browser.</p>
+        <p>Enter your Olive Branch recovery password to open encrypted documents and messages on this browser.</p>
       </div>
-      <Button disabled={s.busy} onClick={() => void s.perform(s.recoverEncryptedAccess)}>
-        {s.busy ? "Unlocking…" : "Use recovery passkey"}
-      </Button>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const entered = password;
+          setPassword("");
+          void s.perform(() => s.recoverEncryptedAccess(entered));
+        }}
+      >
+        <Field
+          label="Recovery password"
+          type="password"
+          autoComplete="off"
+          value={password}
+          disabled={s.busy}
+          onChange={(event: { target: { value: string } }) => setPassword(event.target.value)}
+        />
+        <Button type="submit" disabled={s.busy || !password}>
+          {s.busy ? "Unlocking…" : "Unlock with password"}
+        </Button>
+      </form>
     </section>
   );
 }
