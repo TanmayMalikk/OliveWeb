@@ -290,6 +290,24 @@ test('passkey recovery factors are callable-service-only', async () => {
   }
 });
 
+test('opaque recovery throttling state is callable-service-only', async () => {
+  const uid = 'opaque-throttle-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('opaque-throttle-bob').firestore();
+  const throttlePath = `accountRecoveryOpaqueThrottle/${uid}`;
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), throttlePath), {failedAttempts: 5, lockedUntil: Date.now() + 60000});
+  });
+
+  for (const client of [alice, bob, env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(client, throttlePath)));
+    await assertFails(getDocs(collection(client, 'accountRecoveryOpaqueThrottle')));
+    await assertFails(setDoc(doc(client, throttlePath), {failedAttempts: 0, lockedUntil: 0}));
+    await assertFails(updateDoc(doc(client, throttlePath), {failedAttempts: 0}));
+    await assertFails(deleteDoc(doc(client, throttlePath)));
+  }
+});
+
 test('safety plan reads require valid path identity and bounded access fields', async () => {
   const ownerUid='rules-plan-owner';
   const owner=env.authenticatedContext(ownerUid,{role:'USER'}).firestore();

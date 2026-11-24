@@ -10,7 +10,6 @@ import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRepository
 import com.olive.app.data.account.AccountKeysetRepository
-import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.OpaqueRecoveryRepository
 import com.olive.app.data.account.AndroidOpaqueClient
 import com.olive.app.data.account.AccountRole
@@ -96,7 +95,6 @@ internal class SessionDataSources(
     val locations: LocationSharingDataSource?,
     val adminLocations: AdminLocationRepository?,
     val accountKeysets: AccountKeysetRepository?,
-    val passkeyRecovery: PasskeyRecoveryRepository?,
     val opaqueRecovery: OpaqueRecoveryRepository? = null,
 ) {
     companion object {
@@ -124,7 +122,6 @@ internal class SessionDataSources(
                 locations = if (localMode) null else LocationSharingRepository(application),
                 adminLocations = if (localMode) null else AdminLocationRepository(),
                 accountKeysets = if (localMode) null else AccountKeysetRepository(),
-                passkeyRecovery = if (localMode) null else PasskeyRecoveryRepository(),
                 opaqueRecovery = if (localMode) null else OpaqueRecoveryRepository(opaqueClient = AndroidOpaqueClient(application)),
             )
         }
@@ -270,24 +267,13 @@ internal class DeviceLockRequest internal constructor(
     }
 }
 
-internal sealed interface PasskeyCredentialResult {
-    data class Registration(val serverResponseJson: String) : PasskeyCredentialResult
-    data class Assertion(val value: PasskeyPrfProtocol.AssertionResult) : PasskeyCredentialResult
-    data class Failure(val reason: PasskeyCredentialFailure) : PasskeyCredentialResult
-}
+/** Holds an active in-app prompt asking the user for their backup recovery password. */
+internal class PasswordRecoveryUnlockRequest internal constructor() {
+    internal val result = CompletableDeferred<String?>()
 
-internal class PasskeyCredentialFailureException(
-    val reason: PasskeyCredentialFailure,
-) : Exception(reason.name)
-
-/** One Activity-owned Credential Manager ceremony; raw PRF JSON never enters session state. */
-internal class PasskeyCredentialRequest internal constructor(
-    val requestJson: String,
-    val assertion: Boolean,
-) {
-    internal val result = CompletableDeferred<PasskeyCredentialResult?>()
-    fun complete(value: PasskeyCredentialResult?) {
-        result.complete(value)
+    /** Delivers the entered recovery password or null if the prompt was dismissed. */
+    fun complete(password: String?) {
+        result.complete(password)
     }
 }
 
@@ -408,7 +394,6 @@ internal class SessionRuntime(
     val safetyDocumentRepository get() = dataSources.safetyDocuments
     val locationSharingRepository get() = dataSources.locations
     val accountKeysetRepository get() = dataSources.accountKeysets
-    val passkeyRecoveryRepository get() = dataSources.passkeyRecovery
     val opaqueRecoveryRepository get() = dataSources.opaqueRecovery
     private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
     var enrollment: DeviceEnrollment?
@@ -460,7 +445,6 @@ internal class SessionRuntime(
     val safety = SessionSafetyPlans(this)
     val staffSupport = StaffSupportController(this)
     val settings = SessionSettings(this)
-    val passkeyRecoveryController = SessionPasskeyRecovery(this)
     val passwordRecovery = SessionPasswordRecovery(this)
     val operations = SessionOperations(this)
 

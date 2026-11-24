@@ -15,7 +15,6 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
-import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.messaging.ChatMembershipEvent
@@ -107,9 +106,7 @@ internal class SessionViewModel @JvmOverloads constructor(
     val activityCategory get() = runtime.state.activityCategory
     val busy get() = runtime.state.busy
     val deviceLockRequest get() = runtime.state.deviceLockRequest
-    val passkeyCredentialRequest get() = runtime.state.passkeyCredentialRequest
-    val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
-        get() = runtime.state.passkeyRecoveryCredentials
+    val passwordRecoveryUnlockRequest get() = runtime.state.passwordRecoveryUnlockRequest
     val passwordRecoveryEnrolled: Boolean? get() = runtime.state.passwordRecoveryEnrolled
     // Signed-in account, privacy, and activity state.
     val message get() = runtime.state.message
@@ -442,15 +439,10 @@ internal interface SessionAccountManagementActions {
     // Checks the current password before replacing it with the new password.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
-    fun refreshPasskeyRecovery() = runtime.settings.refreshPasskeyRecovery()
-    fun enablePasskeyRecovery() = runtime.settings.enablePasskeyRecovery()
-    fun removePasskeyRecovery(credentialId: String, password: String) =
-        runtime.settings.removePasskeyRecovery(credentialId, password)
     fun refreshPasswordRecovery() = runtime.passwordRecovery.refreshPasswordRecovery()
     fun enablePasswordRecovery(password: String) = runtime.passwordRecovery.enablePasswordRecovery(password)
     fun rotatePasswordRecovery(oldPassword: String, newPassword: String) =
         runtime.passwordRecovery.rotatePasswordRecovery(oldPassword, newPassword)
-    fun removePasswordRecovery(password: String) = runtime.passwordRecovery.removePasswordRecovery(password)
     fun unlockWithPasswordRecovery(password: String) = runtime.passwordRecovery.unlockWithPasswordRecovery(password)
 }
 

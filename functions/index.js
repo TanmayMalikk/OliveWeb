@@ -5,7 +5,6 @@ const publicAccounts = require("./src/publicAccounts");
 exports.createPublicAccount = publicAccounts.createPublicAccount;
 Object.assign(exports, require("./src/organizationAccounts"));
 Object.assign(exports, require("./src/accountDeletion"));
-Object.assign(exports, require("./src/passkeyRecovery"));
 Object.assign(exports, require("./src/opaqueRecovery"));
 Object.assign(exports, require("./src/safetyPlans"));
 Object.assign(exports, require("./src/safetyConsultations"));

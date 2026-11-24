@@ -86,14 +86,28 @@ test("opaque recovery requires an existing version-one encrypted account keyset"
   }
 });
 
-test("opaque recovery removal recognizes only an owned stored passkey credential", () => {
-  const snapshot = (...documents) => ({
-    docs: documents.map(({ id, ownerUid }) => ({ id, data: () => ({ credentialId: id, ownerUid }) })),
-  });
+test("opaque recovery rate-limits after 5 failed unlock attempts until cooldown expires", () => {
+  const start = 1_700_000_000_000;
+  let state = null;
+  for (let attempt = 1; attempt < opaqueRecovery.MAX_UNLOCK_ATTEMPTS; attempt++) {
+    state = opaqueRecovery.nextThrottleState(state, start + attempt);
+    assert.equal(state.failedAttempts, attempt);
+    assert.equal(state.lockedUntil, 0);
+    assert.equal(opaqueRecovery.isUnlockThrottled(state, start + attempt), false);
+  }
 
-  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot(), "uid-a"), false);
-  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot({ id: "cred-1", ownerUid: "uid-b" }), "uid-a"), false);
-  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot({ id: "cred-1", ownerUid: "uid-a" }), "uid-a"), true);
+  state = opaqueRecovery.nextThrottleState(state, start + 10);
+  assert.equal(state.failedAttempts, opaqueRecovery.MAX_UNLOCK_ATTEMPTS);
+  assert.equal(state.lockedUntil, start + 10 + opaqueRecovery.THROTTLE_WINDOW_MS);
+  assert.equal(opaqueRecovery.isUnlockThrottled(state, start + 11), true);
+  assert.equal(
+    opaqueRecovery.isUnlockThrottled(state, state.lockedUntil + 1),
+    false,
+  );
+
+  const afterExpiry = opaqueRecovery.nextThrottleState(state, state.lockedUntil + 1);
+  assert.equal(afterExpiry.failedAttempts, 1);
+  assert.equal(afterExpiry.lockedUntil, 0);
 });
 
 test("opaque recovery fails closed when its persistent server setup is unavailable", async () => {

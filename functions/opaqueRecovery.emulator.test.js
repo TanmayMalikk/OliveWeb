@@ -120,26 +120,14 @@ test("opaque recovery callable lifecycle: register, unlock, rotate, and removal 
   });
   assert.deepEqual(unlockResult.envelope, envelope);
 
-  // 9. Removal safeguard: removal fails if no passkey recovery factor enrolled
+  // 9. Recovery password cannot be removed once enabled (OPAQUE is the sole recovery factor)
   await assert.rejects(
     opaqueRecovery.opaqueRecoveryRemove.run({ auth: userAuth, data: {} }),
-    /Cannot remove password recovery without an active passkey recovery factor/i
+    /Account recovery password cannot be removed once enabled/i
   );
 
-  // Store a passkey in the same owner-scoped collection used by passkey recovery.
-  const credentialId = "cred_test_123456789";
-  await db.collection("accountRecoveryPasskeys").doc(uid).collection("credentials").doc(credentialId).set({
-    ownerUid: uid,
-    allowedUsers: [uid],
-    credentialId,
-  });
-
-  // Now removal should succeed
-  const removeResult = await opaqueRecovery.opaqueRecoveryRemove.run({ auth: userAuth, data: {} });
-  assert.equal(removeResult.success, true);
-
   const keysetAfter = await db.collection("accountKeysets").doc(uid).get();
-  assert.equal(keysetAfter.data().passwordRecovery, undefined);
+  assert.ok(keysetAfter.data().passwordRecovery);
   const opaqueAfter = await db.collection("accountRecoveryOpaqueRecords").doc(uid).get();
-  assert.equal(opaqueAfter.exists, false);
+  assert.equal(opaqueAfter.exists, true);
 });

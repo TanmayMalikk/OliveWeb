@@ -412,10 +412,10 @@ export function SessionProvider({
   }
 
   // A recovered private key remains non-extractable and is kept only in this browser tab.
-  async function recoverEncryptedAccess() {
+  async function recoverEncryptedAccess(password: string) {
     const uid = accounts.identity?.uid;
     if (!cloudMode || !uid) throw new Error("Sign in before recovering encrypted access.");
-    await recoverBrowserAccountKeyset(uid);
+    await recoverBrowserAccountKeyset(uid, password);
     setMessage("Encrypted documents and messages are unlocked for this browser tab.");
   }
 

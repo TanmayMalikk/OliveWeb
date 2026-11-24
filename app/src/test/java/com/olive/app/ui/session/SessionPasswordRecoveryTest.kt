@@ -5,19 +5,26 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRecoveryAuthenticator
 import com.olive.app.data.account.AccountRecoveryCallable
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.OpaqueClientProtocol
 import com.olive.app.data.account.OpaqueRecoveryRepository
-import com.olive.app.data.account.PasskeyRecoveryAuthenticator
 import com.olive.app.data.account.UserProfile
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountRecoveryKey
 import com.olive.app.security.InputPolicy
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
@@ -40,25 +47,133 @@ class SessionPasswordRecoveryTest {
 
     private val fakeRecoveryRepo = OpaqueRecoveryRepository(
         callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
-        authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+        authenticator = AccountRecoveryAuthenticator { _, _ -> },
         opaqueClient = fakeOpaqueClient,
     )
 
     @Test
-    fun removePasswordRecoveryIsBlockedWhenNoPasskeysAreEnrolled() = runBlocking<Unit> {
-        fixture().use { fixture ->
-            val runtime = fixture.runtime
-            val state = runtime.state
-            state.screen = SessionScreen.Safe
-            state.accountRole = AccountRole.USER
-            state.passkeyRecoveryCredentials = emptyList()
+    fun unlockThrottledMapsResourceExhaustedToThrottledMessage() = runBlocking<Unit> {
+        val throttledClient = object : OpaqueClientProtocol {
+            override suspend fun startRegistration(password: String) = OpaqueClientProtocol.RegistrationStart("state", "req")
+            override suspend fun finishRegistration(state: String, response: String, password: String) =
+                OpaqueClientProtocol.RegistrationFinish("record", ByteArray(32))
+            override suspend fun startLogin(password: String) = OpaqueClientProtocol.LoginStart("loginState", "startReq")
+            override suspend fun finishLogin(state: String, response: String, password: String) =
+                OpaqueClientProtocol.LoginFinish("finishReq", ByteArray(32))
+        }
+        val throttledRepo = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { _, _ ->
+                kotlinx.coroutines.delay(1)
+                throw functionsFailure(
+                    "Too many failed recovery attempts.",
+                    FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED,
+                )
+            },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
+            opaqueClient = throttledClient,
+        )
+        val keysetRepo = mock(com.olive.app.data.account.AccountKeysetRepository::class.java)
+        `when`(keysetRepo.fetch(uid)).thenReturn(AccountKeysetEnvelope.create(uid, AccountRecoveryKey.generate()))
 
-            runtime.passwordRecovery.removePasswordRecovery(password)
+        SessionRuntimeFixture(
+            accountKeysetsOverride = keysetRepo,
+            opaqueRecoveryOverride = throttledRepo,
+        ).use { fixture ->
+            val runtime = fixture.runtime
+            val identity = AccountIdentity(uid, "fixture_owner")
+            val profile = UserProfile(
+                "fixture_owner", "Synthetic enrolled user", "", "", "2000-01-01",
+                "English", "", "", InputPolicy.triggerHash("moon garden")
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.accountRole = AccountRole.USER
+
+            runtime.passwordRecovery.unlockWithPasswordRecovery(password)
+            fixture.await { !runtime.state.busy }
 
             assertEquals(
-                runtime.application.getString(R.string.password_recovery_remove_blocked_last),
-                state.message
+                runtime.application.getString(R.string.password_recovery_error_throttled),
+                runtime.state.message,
             )
+        }
+    }
+
+    @Test
+    fun recoverAccountRecoveryKeyPromptsForPasswordUnlocksAndProtectsDeviceCopy() = runBlocking<Unit> {
+        val ark = AccountRecoveryKey.generate()
+        val keyset = AccountKeysetEnvelope.create(uid, ark)
+        val exportKey = ByteArray(32) { 5 }
+        val envelope = com.olive.app.security.OpaquePasswordRecoveryEnvelope.create(
+            accountId = uid,
+            opaqueRecordId = "rec_1234567890abcdef",
+            exportKey = exportKey.copyOf(),
+            recoveryKey = ark,
+        )
+        val unlockClient = object : OpaqueClientProtocol {
+            override suspend fun startRegistration(password: String) = error("Unused")
+            override suspend fun finishRegistration(state: String, response: String, password: String) = error("Unused")
+            override suspend fun startLogin(password: String) = OpaqueClientProtocol.LoginStart("loginState", "startReq")
+            override suspend fun finishLogin(state: String, response: String, password: String) =
+                OpaqueClientProtocol.LoginFinish("finishReq", exportKey.copyOf())
+        }
+        val unlockRepo = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { name, _ ->
+                when (name) {
+                    "opaqueRecoveryBeginUnlock" -> mapOf("sessionId" to "sess_1", "loginResponse" to "srvLogin")
+                    "opaqueRecoveryFinishUnlock" -> mapOf("envelope" to envelope.toMap())
+                    else -> error("Unexpected call: $name")
+                }
+            },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
+            opaqueClient = unlockClient,
+        )
+
+        SessionRuntimeFixture(opaqueRecoveryOverride = unlockRepo).use { fixture ->
+            val runtime = fixture.runtime
+            val identity = AccountIdentity(uid, "fixture_owner")
+            val profile = UserProfile(
+                "fixture_owner", "Synthetic enrolled user", "", "", "2000-01-01",
+                "English", "", "", InputPolicy.triggerHash("moon garden")
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = SessionScreen.Safe
+            runtime.state.accountRole = AccountRole.USER
+
+            var recovered: AccountRecoveryKey? = null
+            val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                recovered = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, runtime.epoch)
+            }
+            fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || job.isCompleted }
+            runtime.state.passwordRecoveryUnlockRequest?.complete(password)
+            fixture.await { runtime.state.deviceLockRequest != null || job.isCompleted }
+            runtime.state.deviceLockRequest?.let { req ->
+                val cipher = req.challenge.promptCipher ?: req.challenge.legacyCipher()
+                req.complete(cipher)
+            }
+            job.join()
+
+            assertNotNull(recovered)
+            assertArrayEquals(ark.encodedCopy(), recovered!!.encodedCopy())
+            assertNull(runtime.state.passwordRecoveryUnlockRequest)
+            assertNotNull(runtime.accountKeysets.read(uid))
+
+            // Cancellation must fail cleanly without leaving an active request
+            var cancelThrown: Throwable? = null
+            val cancelJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                cancelThrown = runCatching {
+                    runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, runtime.epoch)
+                }.exceptionOrNull()
+            }
+            fixture.await { runtime.state.passwordRecoveryUnlockRequest != null || cancelJob.isCompleted }
+            runtime.state.passwordRecoveryUnlockRequest?.complete(null)
+            cancelJob.join()
+            assertTrue(cancelThrown != null)
+            assertNull(runtime.state.passwordRecoveryUnlockRequest)
         }
     }
 
@@ -70,7 +185,7 @@ class SessionPasswordRecoveryTest {
     fun enablePasswordRecoveryWithIncorrectAccountPasswordShowsIncorrectPasswordMessage() = runBlocking<Unit> {
         val failingAuthRepo = OpaqueRecoveryRepository(
             callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ ->
+            authenticator = AccountRecoveryAuthenticator { _, _ ->
                 throw FirebaseAuthInvalidCredentialsException("ERROR_WRONG_PASSWORD", "The password is invalid")
             },
             opaqueClient = fakeOpaqueClient,
@@ -109,7 +224,7 @@ class SessionPasswordRecoveryTest {
     fun enablePasswordRecoveryWithExpiredSessionShowsSessionExpiredMessage() = runBlocking<Unit> {
         val expiredAuthRepo = OpaqueRecoveryRepository(
             callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ ->
+            authenticator = AccountRecoveryAuthenticator { _, _ ->
                 throw FirebaseAuthInvalidUserException("ERROR_USER_NOT_FOUND", "User not found")
             },
             opaqueClient = fakeOpaqueClient,
@@ -134,7 +249,7 @@ class SessionPasswordRecoveryTest {
             answerDeviceLock(fixture, runtime)
 
             assertEquals(
-                runtime.application.getString(R.string.passkey_recovery_reauth_session_expired),
+                runtime.application.getString(R.string.password_recovery_error_session_expired),
                 runtime.state.message
             )
         }
@@ -158,7 +273,7 @@ class SessionPasswordRecoveryTest {
 
         val runtimeFailingRepo = OpaqueRecoveryRepository(
             callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
             opaqueClient = failingClient,
         )
 
@@ -205,7 +320,7 @@ class SessionPasswordRecoveryTest {
 
         val clientFailingRepo = OpaqueRecoveryRepository(
             callable = AccountRecoveryCallable { _, _ -> emptyMap<String, Any?>() },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
             opaqueClient = clientFailingClient,
         )
 
@@ -249,7 +364,7 @@ class SessionPasswordRecoveryTest {
             fixture.await { !runtime.state.busy }
 
             assertEquals(
-                runtime.application.getString(R.string.passkey_recovery_setup_cancelled),
+                runtime.application.getString(R.string.password_recovery_unlock_cancelled),
                 runtime.state.message
             )
         }
@@ -264,7 +379,7 @@ class SessionPasswordRecoveryTest {
             callable = AccountRecoveryCallable { _, _ ->
                 throw functionsFailure("OPAQUE recovery is not configured.", FirebaseFunctionsException.Code.FAILED_PRECONDITION)
             },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
             opaqueClient = fakeOpaqueClient,
         )
 
@@ -330,16 +445,14 @@ class SessionPasswordRecoveryTest {
                     else -> emptyMap<String, Any?>()
                 }
             },
-            authenticator = PasskeyRecoveryAuthenticator { _, _ -> },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
             opaqueClient = rotatingClient,
         )
 
         val keysetRepo = mock(com.olive.app.data.account.AccountKeysetRepository::class.java)
-        val passkeyRecoveryRepo = mock(com.olive.app.data.account.PasskeyRecoveryRepository::class.java)
 
         SessionRuntimeFixture(
             accountKeysetsOverride = keysetRepo,
-            passkeyRecoveryOverride = passkeyRecoveryRepo,
             opaqueRecoveryOverride = rotatingRepo
         ).use { fixture ->
             val runtime = fixture.runtime

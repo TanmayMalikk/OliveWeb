@@ -8,7 +8,9 @@ import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.OpaqueRecoveryRepository
+import com.olive.app.security.AccountKeysetEnvelope
 import com.olive.app.security.AccountKeysetException
+import com.olive.app.security.AccountRecoveryKey
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,10 +18,7 @@ import kotlinx.coroutines.withContext
 import javax.crypto.AEADBadTagException
 
 /**
- * Controller managing zero-knowledge password recovery failsafe workflows.
- *
- * Implements failsafe-only recovery when no passkeys are enrolled, when passkeys fail,
- * or when the user explicitly chooses password recovery. Passkeys are always preferred first.
+ * Controller managing primary zero-knowledge OPAQUE password recovery workflows.
  */
 internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
 
@@ -73,28 +72,38 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         }
     }
 
-    fun removePasswordRecovery(password: String) = with(runtime) {
-        with(state) {
-            val uid = enrollment?.uid ?: return@with
-            val recovery = opaqueRecoveryRepository ?: return@with
-            if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
+    /**
+     * Prompts the signed-in user for their recovery password, unlocks the encrypted account keyset
+     * via OPAQUE, validates it against the server-stored keyset, and seals a local device copy.
+     *
+     * @param uid Authenticated account whose encrypted keyset is being recovered.
+     * @param keyset Server-fetched encrypted account keyset used to validate the recovered key.
+     * @param token Session generation used to reject stale authentication results.
+     * @return The validated account recovery key held only in client memory.
+     */
+    internal suspend fun recoverAccountRecoveryKey(
+        uid: String,
+        keyset: AccountKeysetEnvelope,
+        token: Long,
+    ): AccountRecoveryKey = with(runtime) {
+        val recovery = checkNotNull(opaqueRecoveryRepository) { "Password recovery service is unavailable" }
+        val password = requestPasswordRecoveryUnlock(uid, token)
+        val recoveryKey = recovery.unlock(uid, password)
+        withContext(Dispatchers.IO) { keyset.unlock(uid, recoveryKey) }
+        settings.protectDeviceRecoveryKey(uid, recoveryKey, keyset, token)
+        return recoveryKey
+    }
 
-            // Safeguard: Block removal if no passkey recovery factors are enrolled
-            val passkeys = passkeyRecoveryCredentials
-            if (passkeys.isNullOrEmpty()) {
-                message = application.getString(R.string.password_recovery_remove_blocked_last)
-                return@with
-            }
-
-            operations.runOperation(
-                application.getString(R.string.password_recovery_error_unsupported),
-                failureFor = ::passwordRecoveryFailure,
-            ) { token ->
-                recovery.remove(uid, password)
-                if (currentRecoverySession(uid, token)) {
-                    passwordRecoveryEnrolled = false
-                    message = application.getString(R.string.password_recovery_removed)
-                }
+    private suspend fun requestPasswordRecoveryUnlock(uid: String, token: Long): String = with(runtime) {
+        check(currentRecoverySession(uid, token)) { "Recovery session changed" }
+        val request = PasswordRecoveryUnlockRequest()
+        state.passwordRecoveryUnlockRequest = request
+        return try {
+            request.result.await()?.takeIf { it.isNotEmpty() }
+                ?: throw IllegalStateException("Password recovery was cancelled")
+        } finally {
+            if (state.passwordRecoveryUnlockRequest === request) {
+                state.passwordRecoveryUnlockRequest = null
             }
         }
     }
@@ -135,7 +144,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
             badCredentials != null ->
                 R.string.password_recovery_error_incorrect
             invalidUser != null ->
-                R.string.passkey_recovery_reauth_session_expired
+                R.string.password_recovery_error_session_expired
             networkEx != null ->
                 R.string.password_recovery_error_connection
             causes.any { it is IllegalArgumentException && it.message?.contains("Incorrect recovery password", ignoreCase = true) == true } ->
@@ -144,14 +153,10 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 R.string.password_recovery_error_corrupted
             causes.any { it.message?.contains("belongs to another", ignoreCase = true) == true || it.message?.contains("mismatch", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_account_mismatch
-            causes.any { it.message?.contains("active passkey", ignoreCase = true) == true } ->
-                R.string.password_recovery_remove_blocked_last
             causes.any { it is IllegalStateException && it.message?.contains("cancelled", ignoreCase = true) == true } ->
-                R.string.passkey_recovery_setup_cancelled
+                R.string.password_recovery_unlock_cancelled
             causes.any { it.message?.contains("Secure lock screen", ignoreCase = true) == true || it.message?.contains("device lock", ignoreCase = true) == true } ->
-                R.string.passkey_recovery_provider_unavailable
-            causes.any { it.message?.contains("No recovery passkeys", ignoreCase = true) == true } ->
-                R.string.password_recovery_remove_blocked_last
+                R.string.password_recovery_error_device_lock_required
             causes.any {
                 it is IllegalStateException && (
                     it.message?.contains("OPAQUE WebAssembly", ignoreCase = true) == true ||
@@ -162,16 +167,16 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
             causes.any { it.message?.contains("Account recovery key", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_runtime_unavailable
             functions != null -> when (functions.code) {
+                FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->
+                    R.string.password_recovery_error_throttled
                 FirebaseFunctionsException.Code.PERMISSION_DENIED ->
                     if (functions.message?.contains("revoked", ignoreCase = true) == true) R.string.password_recovery_error_revoked
                     else R.string.password_recovery_error_incorrect
                 FirebaseFunctionsException.Code.FAILED_PRECONDITION -> when {
-                    functions.message?.contains("passkey", ignoreCase = true) == true ->
-                        R.string.password_recovery_remove_blocked_last
                     functions.message?.contains("OPAQUE", ignoreCase = true) == true ->
                         R.string.password_recovery_error_runtime_unavailable
                     functions.message?.contains("Sign in again", ignoreCase = true) == true ->
-                        R.string.passkey_recovery_sign_in_again
+                        R.string.password_recovery_error_session_expired
                     else -> R.string.password_recovery_error_unsupported
                 }
                 FirebaseFunctionsException.Code.UNAVAILABLE,
@@ -180,7 +185,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 FirebaseFunctionsException.Code.NOT_FOUND ->
                     R.string.password_recovery_error_corrupted
                 FirebaseFunctionsException.Code.UNAUTHENTICATED ->
-                    R.string.passkey_recovery_reauth_session_expired
+                    R.string.password_recovery_error_session_expired
                 else -> R.string.password_recovery_error_unsupported
             }
             firestore != null -> when (firestore.code) {

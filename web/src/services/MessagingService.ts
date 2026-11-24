@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore";
 import { accountKeysetSession, firebase } from "./AccountService";
 import { database } from "./LocalDataStore";
-import { accountKeysetWrappers } from "./PasskeyRecovery";
+import { accountKeysetWrappers } from "./AccountKeysetCrypto";
 import type { Identity } from "../domain/DomainModels";
 export interface DirectoryUser {
   uid: string;

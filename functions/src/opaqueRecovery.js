@@ -11,6 +11,9 @@ const ENVELOPE_IV_BYTES = 12;
 const ENVELOPE_CIPHERTEXT_BYTES = 48;
 const RECENT_AUTHENTICATION_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
+const MAX_UNLOCK_ATTEMPTS = 5;
+const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const THROTTLE_COLLECTION = "accountRecoveryOpaqueThrottle";
 const opaqueServerSetup = defineSecret("OPAQUE_SERVER_SETUP");
 const callableOptions = { secrets: [opaqueServerSetup], enforceAppCheck: true, invoker: "public" };
 
@@ -116,22 +119,46 @@ function requireStoredAccountKeyset(value, uid) {
 }
 
 /**
- * Confirms that a stored recovery passkey belongs to the authenticated account.
+ * Returns whether an account's recovery unlock attempts are currently inside a lockout window.
  *
- * @param {FirebaseFirestore.QuerySnapshot} credentials Passkey credential query result.
- * @param {string} uid Authenticated account identifier.
- * @return {boolean} True only when an owned credential is present.
+ * @param {object | null | undefined} throttleData Stored throttle document payload.
+ * @param {number} [now=Date.now()] Current epoch milliseconds.
+ * @return {boolean} True when max failed attempts were reached and cooldown has not expired.
  */
-function hasPasskeyRecovery(credentials, uid) {
-  return credentials.docs.some((document) => {
-    const credential = document.data();
-    return credential?.ownerUid === uid && credential?.credentialId === document.id;
-  });
+function isUnlockThrottled(throttleData, now = Date.now()) {
+  return Boolean(
+    throttleData &&
+      typeof throttleData.failedAttempts === "number" &&
+      throttleData.failedAttempts >= MAX_UNLOCK_ATTEMPTS &&
+      typeof throttleData.lockedUntil === "number" &&
+      now < throttleData.lockedUntil
+  );
+}
+
+/**
+ * Computes the next failed-attempt throttle state after an incorrect OPAQUE password verification.
+ *
+ * @param {object | null | undefined} throttleData Existing throttle document payload.
+ * @param {number} [now=Date.now()] Current epoch milliseconds.
+ * @return {{failedAttempts: number, lockedUntil: number, updatedAt: number}} Updated throttle state.
+ */
+function nextThrottleState(throttleData, now = Date.now()) {
+  const previousLockExpired =
+    typeof throttleData?.lockedUntil === "number" &&
+    throttleData.lockedUntil > 0 &&
+    now >= throttleData.lockedUntil;
+  const previousAttempts =
+    !previousLockExpired && Number.isFinite(throttleData?.failedAttempts)
+      ? throttleData.failedAttempts
+      : 0;
+  const failedAttempts = previousAttempts + 1;
+  const lockedUntil = failedAttempts >= MAX_UNLOCK_ATTEMPTS ? now + THROTTLE_WINDOW_MS : 0;
+  return { failedAttempts, lockedUntil, updatedAt: now };
 }
 
 /**
  * 1. opaqueRecoveryBeginRegistration
- * Initiates OPAQUE registration for password recovery fallback.
+ * Initiates OPAQUE registration for account recovery.
  */
 const opaqueRecoveryBeginRegistration = onCall(callableOptions, async (request) => {
   const uid = authenticatedUid(request);
@@ -206,7 +233,14 @@ const opaqueRecoveryBeginUnlock = onCall(callableOptions, async (request) => {
     throw new HttpsError("invalid-argument", "Invalid OPAQUE login request.");
   }
 
-  const opaqueDoc = await db.collection("accountRecoveryOpaqueRecords").doc(uid).get();
+  const throttleRef = db.collection(THROTTLE_COLLECTION).doc(uid);
+  const [opaqueDoc, throttleDoc] = await Promise.all([
+    db.collection("accountRecoveryOpaqueRecords").doc(uid).get(),
+    throttleRef.get(),
+  ]);
+  if (isUnlockThrottled(throttleDoc.exists ? throttleDoc.data() : null)) {
+    throw new HttpsError("resource-exhausted", "Too many failed recovery attempts. Try again later.");
+  }
   if (!opaqueDoc.exists || opaqueDoc.data()?.ownerUid !== uid) {
     throw new HttpsError("not-found", "No password recovery enrolled for this account.");
   }
@@ -258,6 +292,12 @@ const opaqueRecoveryFinishUnlock = onCall(callableOptions, async (request) => {
     throw new HttpsError("deadline-exceeded", "Recovery unlock session expired.");
   }
 
+  const throttleRef = db.collection(THROTTLE_COLLECTION).doc(uid);
+  const throttleSnap = await throttleRef.get();
+  if (isUnlockThrottled(throttleSnap.exists ? throttleSnap.data() : null)) {
+    throw new HttpsError("resource-exhausted", "Too many failed recovery attempts. Try again later.");
+  }
+
   await opaque.ready;
   try {
     opaque.server.finishLogin({
@@ -265,8 +305,15 @@ const opaqueRecoveryFinishUnlock = onCall(callableOptions, async (request) => {
       finishLoginRequest,
     });
   } catch (err) {
+    await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(throttleRef);
+      const next = nextThrottleState(current.exists ? current.data() : null);
+      transaction.set(throttleRef, { ownerUid: uid, ...next });
+    });
     throw new HttpsError("permission-denied", "Incorrect recovery password.");
   }
+
+  await throttleRef.delete().catch(() => {});
 
   const keysetDoc = await db.collection("accountKeysets").doc(uid).get();
   const passwordRecovery = keysetDoc.data()?.passwordRecovery;
@@ -331,34 +378,15 @@ const opaqueRecoveryRotate = onCall(callableOptions, async (request) => {
 
 /**
  * 6. opaqueRecoveryRemove
- * Removes password recovery factor with safeguard blocking lockout if no passkey exists.
+ * Disallows removal once an OPAQUE recovery password is enabled because it is the sole recovery factor.
  */
 const opaqueRecoveryRemove = onCall(callableOptions, async (request) => {
-  const uid = authenticatedUid(request);
+  authenticatedUid(request);
   requireRecentAuthentication(request);
-
-  const keysetDocRef = db.collection("accountKeysets").doc(uid);
-  const opaqueDocRef = db.collection("accountRecoveryOpaqueRecords").doc(uid);
-  const passkeyQuery = db.collection("accountRecoveryPasskeys").doc(uid)
-    .collection("credentials").where("ownerUid", "==", uid).limit(1);
-
-  await db.runTransaction(async (transaction) => {
-    const keysetDoc = await transaction.get(keysetDocRef);
-    const passkeys = await transaction.get(passkeyQuery);
-    if (!keysetDoc.exists || !hasPasskeyRecovery(passkeys, uid)) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Cannot remove password recovery without an active passkey recovery factor."
-      );
-    }
-
-    transaction.update(keysetDocRef, {
-      passwordRecovery: FieldValue.delete(),
-    });
-    transaction.delete(opaqueDocRef);
-  });
-
-  return { success: true };
+  throw new HttpsError(
+    "failed-precondition",
+    "Account recovery password cannot be removed once enabled."
+  );
 });
 
 module.exports = {
@@ -369,10 +397,13 @@ module.exports = {
   opaqueRecoveryRotate,
   opaqueRecoveryRemove,
   _test: {
+    MAX_UNLOCK_ATTEMPTS,
+    THROTTLE_WINDOW_MS,
     recoveryEnvelope,
     opaqueRegistrationRecord,
     requireStoredAccountKeyset,
-    hasPasskeyRecovery,
+    isUnlockThrottled,
+    nextThrottleState,
     requiredRecordId,
     getServerSetup,
   },

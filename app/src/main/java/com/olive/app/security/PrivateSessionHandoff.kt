@@ -3,12 +3,11 @@ package com.olive.app.security
 /** True only while Android temporarily owns the foreground for an approved app operation. */
 internal fun trustedSystemHandoffActive(
     deviceCredential: Boolean,
-    passkeyCredential: Boolean,
     runtimePermission: Boolean,
     externalFilePicker: Boolean,
     callPermission: Boolean,
     safeSystemActivity: Boolean,
-): Boolean = deviceCredential || passkeyCredential || runtimePermission || externalFilePicker ||
+): Boolean = deviceCredential || runtimePermission || externalFilePicker ||
     callPermission || safeSystemActivity
 
 /** Holds a credential result only until the private activity is visible again. */

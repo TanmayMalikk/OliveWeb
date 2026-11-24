@@ -1,9 +1,9 @@
 package com.olive.app.security
 
+import com.olive.app.data.account.AccountRecoveryAuthenticator
 import com.olive.app.data.account.AccountRecoveryCallable
 import com.olive.app.data.account.OpaqueClientProtocol
 import com.olive.app.data.account.OpaqueRecoveryRepository
-import com.olive.app.data.account.PasskeyRecoveryAuthenticator
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -32,7 +32,7 @@ class OpaqueRecoveryRepositoryTest {
         }
 
         var reauthenticated = false
-        val fakeAuthenticator = PasskeyRecoveryAuthenticator { _, _ -> reauthenticated = true }
+        val fakeAuthenticator = AccountRecoveryAuthenticator { _, _ -> reauthenticated = true }
 
         val fakeOpaqueClient = object : OpaqueClientProtocol {
             override suspend fun startRegistration(password: String) =
@@ -150,7 +150,7 @@ class OpaqueRecoveryRepositoryTest {
         }
 
         var reauthenticated = false
-        val fakeAuthenticator = PasskeyRecoveryAuthenticator { _, _ -> reauthenticated = true }
+        val fakeAuthenticator = AccountRecoveryAuthenticator { _, _ -> reauthenticated = true }
 
         val newExportKey = ByteArray(32) { 9 }
         val fakeOpaqueClient = object : OpaqueClientProtocol {
@@ -186,33 +186,5 @@ class OpaqueRecoveryRepositoryTest {
             Base64.getEncoder().encodeToString(recoveryKey.encodedCopy()),
             Base64.getEncoder().encodeToString(recoveredArk.encodedCopy()),
         )
-    }
-
-    @Test
-    fun `removal sends remove callable after reauthenticating`() = runBlocking {
-        var reauthenticated = false
-        val calls = mutableListOf<String>()
-        val fakeCallable = AccountRecoveryCallable { name, _ ->
-            calls += name
-            mapOf("success" to true)
-        }
-        val fakeAuthenticator = PasskeyRecoveryAuthenticator { _, _ -> reauthenticated = true }
-        val fakeOpaqueClient = object : OpaqueClientProtocol {
-            override suspend fun startRegistration(password: String) = error("Not called")
-            override suspend fun finishRegistration(state: String, response: String, password: String) = error("Not called")
-            override suspend fun startLogin(password: String) = error("Not called")
-            override suspend fun finishLogin(state: String, response: String, password: String) = error("Not called")
-        }
-
-        val repository = OpaqueRecoveryRepository(
-            callable = fakeCallable,
-            authenticator = fakeAuthenticator,
-            opaqueClient = fakeOpaqueClient,
-        )
-
-        repository.remove(accountId, password)
-
-        assertTrue(reauthenticated)
-        assertEquals(listOf("opaqueRecoveryRemove"), calls)
     }
 }

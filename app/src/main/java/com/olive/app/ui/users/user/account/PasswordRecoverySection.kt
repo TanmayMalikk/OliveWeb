@@ -6,7 +6,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,13 +25,12 @@ import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 /**
- * Settings section for zero-knowledge password recovery failsafe.
- * Passkeys are always preferred first; password recovery is offered only as a backup.
+ * Settings section for zero-knowledge OPAQUE password recovery.
+ * Once enabled, password recovery remains active permanently to protect encrypted data access.
  */
 @Composable
 internal fun PasswordRecoverySection(session: SessionViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
-    var showRemoveDialog by remember { mutableStateOf(false) }
 
     var passwordInput by remember { mutableStateOf("") }
 
@@ -55,13 +53,12 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
 
     val isEnrolled = session.passwordRecoveryEnrolled == true
     if (isEnrolled) {
-        OutlinedButton(
-            onClick = { showRemoveDialog = true },
-            enabled = !session.busy,
-            modifier = Modifier.testTag("remove_recovery_password_button"),
-        ) {
-            Text(stringResource(R.string.password_recovery_remove))
-        }
+        Text(
+            stringResource(R.string.password_recovery_active_status),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.testTag("password_recovery_active_status"),
+        )
     } else {
         Button(
             onClick = { showAddDialog = true },
@@ -86,7 +83,7 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Field(
-                        label = stringResource(R.string.passkey_recovery_reauth_password),
+                        label = stringResource(R.string.password_recovery_account_password_label),
                         value = passwordInput,
                         tag = "password_recovery_enroll_input",
                         secret = true,
@@ -119,69 +116,61 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
             },
         )
     }
+}
 
-    if (showRemoveDialog) {
-        val passkeys = session.passkeyRecoveryCredentials
-        val isBlocked = passkeys.isNullOrEmpty()
-        AlertDialog(
-            onDismissRequest = {
-                showRemoveDialog = false
+/**
+ * Prompts the signed-in user for their backup recovery password when encrypted access
+ * must be unlocked via OPAQUE on a new or cleared device.
+ *
+ * @param session Active session ViewModel holding any pending unlock request.
+ */
+@Composable
+internal fun PasswordRecoveryUnlockDialog(session: SessionViewModel) {
+    val request = session.passwordRecoveryUnlockRequest ?: return
+    var passwordInput by remember(request) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = {
+            passwordInput = ""
+            request.complete(null)
+        },
+        title = { Text(stringResource(R.string.password_recovery_unlock_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.password_recovery_unlock_prompt),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Field(
+                    label = stringResource(R.string.password_recovery_account_password_label),
+                    value = passwordInput,
+                    tag = "password_recovery_unlock_input",
+                    secret = true,
+                    showSecretToggle = true,
+                    enabled = true,
+                ) { passwordInput = it }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val pwd = passwordInput
+                    passwordInput = ""
+                    request.complete(pwd)
+                },
+                enabled = passwordInput.isNotEmpty(),
+                modifier = Modifier.testTag("confirm_password_recovery_unlock"),
+            ) {
+                Text(stringResource(R.string.password_recovery_unlock_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
                 passwordInput = ""
-            },
-            title = { Text(stringResource(R.string.password_recovery_remove)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (isBlocked) {
-                        Text(
-                            stringResource(R.string.password_recovery_remove_blocked_last),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    } else {
-                        Text(stringResource(R.string.password_recovery_warning))
-                        Field(
-                            label = stringResource(R.string.passkey_recovery_reauth_password),
-                            value = passwordInput,
-                            tag = "password_recovery_remove_password_input",
-                            secret = true,
-                            showSecretToggle = true,
-                            enabled = !session.busy,
-                        ) { passwordInput = it }
-                    }
-                }
-            },
-            confirmButton = {
-                if (isBlocked) {
-                    TextButton(onClick = {
-                        showRemoveDialog = false
-                        passwordInput = ""
-                    }) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            val pwd = passwordInput
-                            showRemoveDialog = false
-                            passwordInput = ""
-                            session.removePasswordRecovery(pwd)
-                        },
-                        enabled = passwordInput.isNotEmpty() && !session.busy,
-                        modifier = Modifier.testTag("confirm_remove_password_recovery"),
-                    ) {
-                        Text(stringResource(R.string.password_recovery_remove))
-                    }
-                }
-            },
-            dismissButton = {
-                if (!isBlocked) {
-                    TextButton(onClick = {
-                        showRemoveDialog = false
-                        passwordInput = ""
-                    }) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                }
-            },
-        )
-    }
+                request.complete(null)
+            }) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }

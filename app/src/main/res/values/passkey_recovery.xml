@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- This contains only the public relying-party association, never key material. -->
-    <string name="asset_statements" translatable="false">[{"include":"https://yourolivebranch.ca/.well-known/assetlinks.json"}]</string>
-</resources>

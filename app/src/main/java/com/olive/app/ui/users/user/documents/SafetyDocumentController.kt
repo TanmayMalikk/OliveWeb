@@ -21,8 +21,6 @@ import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.R
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
-import com.olive.app.ui.session.PasskeyRecoveryStage
-import com.olive.app.ui.session.PasskeyRecoveryStageException
 import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
@@ -559,9 +557,6 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         return R.string.documents_device_verification_failed
     }
     val reason = (failure as? MediaAccessException)?.reason
-    val recoveryStage = generateSequence(failure) { it.cause }
-        .filterIsInstance<PasskeyRecoveryStageException>()
-        .firstOrNull()?.stage
     return when (reason) {
         MediaAccessError.NOT_CACHED -> R.string.documents_not_available_offline
         MediaAccessError.NETWORK_REQUIRED -> R.string.documents_network_required
@@ -570,16 +565,7 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
         MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
         MediaAccessError.ACCOUNT_WRAPPER_MISSING -> R.string.documents_account_wrapper_missing
-        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> when (recoveryStage) {
-            PasskeyRecoveryStage.BEGIN_UNLOCK -> R.string.documents_recovery_begin_failed
-            PasskeyRecoveryStage.REQUEST_PASSKEY -> R.string.documents_recovery_passkey_failed
-            PasskeyRecoveryStage.COMPLETE_UNLOCK -> R.string.documents_recovery_server_failed
-            PasskeyRecoveryStage.VERIFY_PRF_INPUT -> R.string.documents_recovery_prf_mismatch
-            PasskeyRecoveryStage.OPEN_RECOVERY_ENVELOPE -> R.string.documents_recovery_envelope_failed
-            PasskeyRecoveryStage.VALIDATE_ACCOUNT_KEYSET -> R.string.documents_recovery_keyset_failed
-            PasskeyRecoveryStage.PROTECT_DEVICE_COPY -> R.string.documents_recovery_device_save_failed
-            else -> R.string.documents_account_recovery_failed
-        }
+        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> R.string.documents_account_recovery_failed
         MediaAccessError.ACCOUNT_KEYSET_MISMATCH -> R.string.documents_account_keyset_mismatch
         MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED -> R.string.documents_account_wrapper_failed
         MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED -> R.string.documents_ciphertext_authentication_failed
