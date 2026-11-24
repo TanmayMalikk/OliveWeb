@@ -59,12 +59,23 @@ test("Olive Crossing shows the complete world width without side panning on PC",
   await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
 
   const board = page.locator(".crossing-stage > svg");
-  await expect(board).toHaveAttribute("viewBox", /^0 0 \d+ \d+$/);
-  const initialViewBox = await board.getAttribute("viewBox");
-
   await page.getByRole("button", { name: "Start Olive Crossing" }).click();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(async () => {
+    const stage = document.querySelector(".crossing-stage > svg");
+    const viewBox = stage?.getAttribute("viewBox");
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    return Boolean(viewBox) && stage?.getAttribute("viewBox") === viewBox;
+  });
+  const initialViewBox = await board.getAttribute("viewBox");
+  const viewport = initialViewBox?.trim().split(/\s+/).map(Number) ?? [];
+  expect(viewport).toHaveLength(4);
+  expect(viewport.every(Number.isFinite)).toBe(true);
+  expect(viewport[2]).toBeGreaterThan(0);
+  expect(viewport[3]).toBeGreaterThan(0);
+
+  for (const key of ["ArrowRight", "ArrowRight", "ArrowLeft", "ArrowLeft"]) {
+    await page.keyboard.press(key);
+  }
   await expect(board).toHaveAttribute("viewBox", initialViewBox!);
   expect(
     await page.locator(".crossing-stage").evaluate(

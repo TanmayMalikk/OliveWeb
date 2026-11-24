@@ -92,6 +92,26 @@ internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
     }.distinct()
 }
 
+/**
+ * Applies authenticated private metadata after the document key is recovered on-device.
+ *
+ * @param metadata Decrypted JSON authenticated by the document's AES-GCM key.
+ * @return A viewer-ready copy without persisting plaintext metadata.
+ */
+internal fun SafetyDocument.withDecryptedMetadata(metadata: JSONObject): SafetyDocument {
+    val ocr = documentOcrMetadataFrom(metadata)
+    return copy(
+        name = (metadata.opt("name") as? String)?.trim()?.take(160)
+            ?.takeIf(String::isNotBlank) ?: name,
+        mimeType = (metadata.opt("mimeType") as? String)?.trim()?.take(120)
+            ?.takeIf(String::isNotBlank) ?: mimeType,
+        ocrText = ocr?.text ?: ocrText,
+        ocrConfidence = ocr?.confidence ?: ocrConfidence,
+        ocrSuccessful = ocr?.successful ?: ocrSuccessful,
+        tags = if (metadata.has("tags")) documentTagsFrom(metadata) else tags,
+    )
+}
+
 interface SafetyDocumentDataSource {
     // Lists every safety document this account is allowed to open.
     suspend fun listFor(uid: String): DocumentListSnapshot
@@ -106,6 +126,13 @@ interface SafetyDocumentDataSource {
     suspend fun getFor(uid: String, id: String): SafetyDocument
     /** Returns encrypted-at-rest index metadata without contacting Firebase. */
     fun cachedFor(uid: String, id: String): SafetyDocument? = null
+    /**
+     * Retains authenticated metadata and the current-device wrapper in encrypted local storage.
+     *
+     * @param uid Account-isolated encrypted-index partition.
+     * @param document Locally authenticated record to retain.
+     */
+    fun rememberRecovered(uid: String, document: SafetyDocument) = Unit
     // Wraps the document key for new recipients before sharing it.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) {
@@ -587,6 +614,7 @@ private const val MAX_OCR_TEXT_LENGTH = 50_000
 class IndexedSafetyDocumentRepository(
     private val remote: SafetyDocumentDataSource,
     private val index: DocumentIndexDataSource,
+    private val deviceId: () -> String = { KeyManager.deviceId() },
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SafetyDocumentDataSource {
     override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
@@ -637,6 +665,16 @@ class IndexedSafetyDocumentRepository(
     override fun cachedFor(uid: String, id: String): SafetyDocument? =
         index.read(uid).documents.firstOrNull { it.id == id && uid in it.allowedUsers }
 
+    override fun rememberRecovered(uid: String, document: SafetyDocument) {
+        require(uid in document.allowedUsers)
+        val current = index.read(uid)
+        index.replace(
+            uid,
+            current.documents.filterNot { it.id == document.id } + document,
+            current.lastSyncedAt ?: clock(),
+        )
+    }
+
     override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) =
         remote.share(document, ownerUid, recipients)
 
@@ -666,7 +704,23 @@ class IndexedSafetyDocumentRepository(
 
     private fun persist(uid: String, snapshot: DocumentListSnapshot): DocumentListSnapshot {
         if (snapshot.source != DocumentListSource.SERVER) return snapshot
-        val saved = index.replace(uid, snapshot.documents, snapshot.lastSyncedAt ?: clock())
+        val local = index.read(uid).documents.associateBy(SafetyDocument::id)
+        val deviceKey = "$uid--${deviceId()}"
+        val merged = snapshot.documents.map { incoming ->
+            val previous = local[incoming.id]
+            val localWrapper = previous?.deviceWrappedKeys?.get(deviceKey)
+            if (localWrapper.isNullOrBlank() || incoming.deviceWrappedKeys[deviceKey] != null) incoming
+            else incoming.copy(
+                name = previous.name,
+                mimeType = previous.mimeType,
+                ocrText = previous.ocrText,
+                ocrConfidence = previous.ocrConfidence,
+                ocrSuccessful = previous.ocrSuccessful,
+                tags = previous.tags,
+                deviceWrappedKeys = incoming.deviceWrappedKeys + (deviceKey to localWrapper),
+            )
+        }
+        val saved = index.replace(uid, merged, snapshot.lastSyncedAt ?: clock())
         return DocumentListSnapshot(saved.documents, DocumentListSource.SERVER, saved.lastSyncedAt)
     }
 }

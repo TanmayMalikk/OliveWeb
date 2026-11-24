@@ -350,3 +350,164 @@ internal data class PasskeyRecoveryEnvelope(
         private fun decode(value: String): ByteArray = Base64.getDecoder().decode(value)
     }
 }
+
+/**
+ * Ciphertext envelope for one ARK protected by an OPAQUE export key.
+ *
+ * This provides zero-knowledge password recovery failsafe. Only this opaque value
+ * crosses Firebase. The export key, derived KEK, and raw ARK remain strictly client-side
+ * and are zeroed immediately after use.
+ */
+internal data class OpaquePasswordRecoveryEnvelope(
+    val version: Int,
+    val accountId: String,
+    val opaqueRecordId: String,
+    val algorithm: String,
+    val saltBase64: String,
+    val ivBase64: String,
+    val ciphertextBase64: String,
+) {
+    init {
+        require(version == VERSION) { "Unsupported password recovery version" }
+        require(validAccountId(accountId)) { "Invalid account ID" }
+        require(RECORD_ID.matches(opaqueRecordId)) { "Invalid OPAQUE record ID" }
+        require(algorithm == ALGORITHM) { "Unsupported password recovery algorithm" }
+        require(decode(saltBase64).size == SALT_BYTES) { "Invalid recovery salt" }
+        require(decode(ivBase64).size == IV_BYTES) { "Invalid recovery IV" }
+        require(decode(ciphertextBase64).size == RECOVERY_KEY_BYTES + TAG_BYTES) {
+            "Invalid encrypted recovery key"
+        }
+    }
+
+    internal fun toMap(): Map<String, Any> = mapOf(
+        "version" to version,
+        "accountId" to accountId,
+        "opaqueRecordId" to opaqueRecordId,
+        "algorithm" to algorithm,
+        "salt" to saltBase64,
+        "iv" to ivBase64,
+        "ciphertext" to ciphertextBase64,
+    )
+
+    internal fun open(
+        expectedAccountId: String,
+        expectedRecordId: String,
+        exportKey: ByteArray,
+    ): AccountRecoveryKey {
+        require(expectedAccountId == accountId && expectedRecordId == opaqueRecordId) {
+            "Password recovery record belongs to another account or record"
+        }
+        require(exportKey.size == EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
+        val key = deriveKey(exportKey, decode(saltBase64), accountId)
+        val authData = aad(version, accountId, opaqueRecordId, algorithm)
+        val plaintext = try {
+            Cipher.getInstance(AES_GCM).run {
+                init(Cipher.DECRYPT_MODE, SecretKeySpec(key, AES), GCMParameterSpec(TAG_BITS, decode(ivBase64)))
+                updateAAD(authData)
+                doFinal(decode(ciphertextBase64))
+            }
+        } finally {
+            key.fill(0)
+        }
+        return try {
+            AccountRecoveryKey.fromEncoded(plaintext)
+        } finally {
+            plaintext.fill(0)
+        }
+    }
+
+    companion object {
+        private const val VERSION = 1
+        private const val ALGORITHM = "OPAQUE-3DH-HKDF-SHA256-AES-256-GCM"
+        private const val RECOVERY_KEY_BYTES = 32
+        private const val EXPORT_KEY_BYTES = 32
+        private const val SALT_BYTES = 32
+        private const val IV_BYTES = 12
+        private const val TAG_BYTES = 16
+        private const val TAG_BITS = TAG_BYTES * Byte.SIZE_BITS
+        private const val AES = "AES"
+        private const val AES_GCM = "AES/GCM/NoPadding"
+        private const val HMAC_SHA_256 = "HmacSHA256"
+        private const val HKDF_PREFIX = "olive-branch/password-recovery/v1/"
+        private val RECORD_ID = Regex("[A-Za-z0-9_-]{16,1024}")
+
+        internal fun create(
+            accountId: String,
+            opaqueRecordId: String,
+            exportKey: ByteArray,
+            recoveryKey: AccountRecoveryKey,
+            salt: ByteArray = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes),
+            iv: ByteArray = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes),
+        ): OpaquePasswordRecoveryEnvelope {
+            require(validAccountId(accountId)) { "Invalid account ID" }
+            require(RECORD_ID.matches(opaqueRecordId)) { "Invalid OPAQUE record ID" }
+            require(exportKey.size == EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
+            require(salt.size == SALT_BYTES) { "Invalid recovery salt" }
+            require(iv.size == IV_BYTES) { "Invalid recovery IV" }
+            val key = deriveKey(exportKey, salt, accountId)
+            val authData = aad(VERSION, accountId, opaqueRecordId, ALGORITHM)
+            val rawRecoveryKey = recoveryKey.encodedCopy()
+            val ciphertext = try {
+                Cipher.getInstance(AES_GCM).run {
+                    init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, AES), GCMParameterSpec(TAG_BITS, iv))
+                    updateAAD(authData)
+                    doFinal(rawRecoveryKey)
+                }
+            } finally {
+                rawRecoveryKey.fill(0)
+                key.fill(0)
+            }
+            return OpaquePasswordRecoveryEnvelope(
+                VERSION,
+                accountId,
+                opaqueRecordId,
+                ALGORITHM,
+                encode(salt),
+                encode(iv),
+                encode(ciphertext),
+            )
+        }
+
+        internal fun fromMap(value: Map<*, *>): OpaquePasswordRecoveryEnvelope = OpaquePasswordRecoveryEnvelope(
+            version = (value["version"] as? Number)?.toInt()
+                ?: throw IllegalArgumentException("Invalid recovery version"),
+            accountId = value["accountId"] as? String
+                ?: throw IllegalArgumentException("Invalid account ID"),
+            opaqueRecordId = value["opaqueRecordId"] as? String
+                ?: throw IllegalArgumentException("Invalid OPAQUE record ID"),
+            algorithm = value["algorithm"] as? String ?: ALGORITHM,
+            saltBase64 = value["salt"] as? String
+                ?: throw IllegalArgumentException("Invalid recovery salt"),
+            ivBase64 = value["iv"] as? String
+                ?: throw IllegalArgumentException("Invalid recovery IV"),
+            ciphertextBase64 = value["ciphertext"] as? String
+                ?: throw IllegalArgumentException("Invalid encrypted recovery key"),
+        )
+
+        /** RFC 5869 HKDF-SHA-256 bound to purpose, version, and UID. */
+        private fun deriveKey(exportKey: ByteArray, salt: ByteArray, accountId: String): ByteArray {
+            val extract = Mac.getInstance(HMAC_SHA_256).run {
+                init(SecretKeySpec(salt, HMAC_SHA_256))
+                doFinal(exportKey)
+            }
+            val info = (HKDF_PREFIX + accountId).toByteArray(Charsets.UTF_8)
+            return try {
+                Mac.getInstance(HMAC_SHA_256).run {
+                    init(SecretKeySpec(extract, HMAC_SHA_256))
+                    doFinal(info + byteArrayOf(1))
+                }
+            } finally {
+                extract.fill(0)
+            }
+        }
+
+        private fun aad(version: Int, accountId: String, recordId: String, algorithm: String) =
+            "$version|$accountId|$recordId|$algorithm".toByteArray(Charsets.UTF_8)
+
+        private fun validAccountId(value: String) = value.length in 1..128 &&
+            value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+        private fun encode(value: ByteArray) = Base64.getEncoder().encodeToString(value)
+        private fun decode(value: String): ByteArray = Base64.getDecoder().decode(value)
+    }
+}
+

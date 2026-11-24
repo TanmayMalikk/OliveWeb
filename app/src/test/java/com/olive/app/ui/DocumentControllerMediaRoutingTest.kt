@@ -16,8 +16,12 @@ import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.OcrReview
 import com.olive.app.ui.users.user.documents.MediaTransferOperations
+import com.olive.app.ui.users.user.documents.OpenedMedia
+import com.olive.app.ui.users.user.documents.MediaAccessRecoveryResult
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.documents.mediaFailureResource
+import com.olive.app.ui.session.PasskeyRecoveryStage
+import com.olive.app.ui.session.PasskeyRecoveryStageException
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -133,7 +137,7 @@ class DocumentControllerMediaRoutingTest {
         )
         controller.prepare(VIEWER_UID)
 
-        controller.download(document) {}
+        controller.download(document) { _, _ -> }
         assertEquals(setOf(document.id), controller.state.openingDocumentIds)
         release.complete(Unit)
         assertTrue(controller.state.openingDocumentIds.isEmpty())
@@ -215,6 +219,42 @@ class DocumentControllerMediaRoutingTest {
             com.olive.app.R.string.documents_access_revoked,
             mediaFailureResource(MediaAccessException(MediaAccessError.ACCESS_REVOKED)),
         )
+    }
+
+    @Test
+    fun `account recovery failures each present specific guidance`() {
+        assertEquals(
+            com.olive.app.R.string.documents_account_recovery_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_account_keyset_mismatch,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_KEYSET_MISMATCH)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_account_wrapper_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED)),
+        )
+        assertEquals(
+            com.olive.app.R.string.documents_ciphertext_authentication_failed,
+            mediaFailureResource(MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED)),
+        )
+        val stageResources = mapOf(
+            PasskeyRecoveryStage.BEGIN_UNLOCK to com.olive.app.R.string.documents_recovery_begin_failed,
+            PasskeyRecoveryStage.REQUEST_PASSKEY to com.olive.app.R.string.documents_recovery_passkey_failed,
+            PasskeyRecoveryStage.COMPLETE_UNLOCK to com.olive.app.R.string.documents_recovery_server_failed,
+            PasskeyRecoveryStage.VERIFY_PRF_INPUT to com.olive.app.R.string.documents_recovery_prf_mismatch,
+            PasskeyRecoveryStage.OPEN_RECOVERY_ENVELOPE to com.olive.app.R.string.documents_recovery_envelope_failed,
+            PasskeyRecoveryStage.VALIDATE_ACCOUNT_KEYSET to com.olive.app.R.string.documents_recovery_keyset_failed,
+            PasskeyRecoveryStage.PROTECT_DEVICE_COPY to com.olive.app.R.string.documents_recovery_device_save_failed,
+        )
+        stageResources.forEach { (stage, resource) ->
+            val failure = MediaAccessException(
+                MediaAccessError.ACCOUNT_RECOVERY_FAILED,
+                PasskeyRecoveryStageException(stage, IllegalStateException("fixture")),
+            )
+            assertEquals(resource, mediaFailureResource(failure))
+        }
     }
 
     @Test
@@ -380,14 +420,19 @@ class DocumentControllerMediaRoutingTest {
             onFailure: (String) -> Unit,
         ) = Unit
         // Checks the download file step with the test's sample data.
-        override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
+        override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia {
             downloadCount++
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
             release?.await()
             failure?.let { throw it }
-            return file
+            return OpenedMedia(document, file)
         }
+        override suspend fun restoreDeviceAccess(
+            documents: List<SafetyDocument>,
+            viewerUid: String,
+            keyset: com.olive.app.security.UnlockedAccountKeyset,
+        ) = MediaAccessRecoveryResult(emptyList(), emptySet(), emptySet())
         override suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String) = Unit
         override suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String) = Unit
         override fun onDocumentSnapshot(

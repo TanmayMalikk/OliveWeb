@@ -9,6 +9,13 @@ const { _test: recovery } = require("./src/passkeyRecovery");
 
 const b64 = (size, value = 5) => Buffer.alloc(size, value).toString("base64");
 
+test("passkey recovery uses a recognizable account label without changing the stable user ID", () => {
+  assert.equal(recovery.accountDisplayName({email: "person@example.com"}), "person@example.com");
+  for (const token of [null, {}, {email: ""}, {email: "not-an-email"}, {email: "a".repeat(255)}]) {
+    assert.equal(recovery.accountDisplayName(token), "Olive Branch account");
+  }
+});
+
 test("passkey recovery accepts only a complete opaque ARK envelope for its owner and credential", () => {
   const envelope = {
     version: 1,
@@ -118,6 +125,7 @@ test("passkey recovery rejects uploaded PRF outputs but permits non-secret suppo
 });
 
 test("passkey recovery exposes only bounded public factor metadata", () => {
+  const createdAt = {toMillis: () => 1_795_000_000_000};
   assert.deepEqual(recovery.credentialSummary({
     credentialId: "credential_abcdefghijklmnop",
     deviceType: "multiDevice",
@@ -125,10 +133,40 @@ test("passkey recovery exposes only bounded public factor metadata", () => {
     publicKey: Buffer.alloc(77, 4),
     envelope: {ciphertext: "secret"},
     prfInput: b64(32),
+    createdAt,
   }), {
     credentialId: "credential_abcdefghijklmnop",
     deviceType: "multiDevice",
     backedUp: true,
+    createdAtEpochMillis: 1_795_000_000_000,
+  });
+});
+
+test("passkey recovery preserves a stored credential creation timestamp for its owner summary", () => {
+  const createdAt = {toMillis: () => 1_795_000_000_000};
+  const record = recovery.storedCredential({
+    exists: true,
+    id: "credential_abcdefghijklmnop",
+    data: () => ({
+      ownerUid: "uid-a",
+      allowedUsers: ["uid-a"],
+      credentialId: "credential_abcdefghijklmnop",
+      publicKey: Buffer.alloc(77, 4),
+      counter: 0,
+      transports: ["internal"],
+      deviceType: "multiDevice",
+      backedUp: true,
+      envelope: {ciphertext: "opaque"},
+      prfInput: b64(32),
+      createdAt,
+    }),
+  }, "uid-a");
+
+  assert.deepEqual(recovery.credentialSummary(record), {
+    credentialId: "credential_abcdefghijklmnop",
+    deviceType: "multiDevice",
+    backedUp: true,
+    createdAtEpochMillis: 1_795_000_000_000,
   });
 });
 

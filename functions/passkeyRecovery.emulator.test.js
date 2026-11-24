@@ -45,7 +45,10 @@ const recovery = require("./src/passkeyRecovery");
 Module._load = originalLoad;
 const {db} = require("./src/firebaseAdminClient");
 
-const auth = (uid) => ({uid, token: {auth_time: Math.floor(Date.now() / 1000)}});
+const auth = (uid) => ({
+  uid,
+  token: {auth_time: Math.floor(Date.now() / 1000), email: `${uid}@example.com`},
+});
 const b64 = (size, value) => Buffer.alloc(size, value).toString("base64");
 
 test("callable enrollment and unlock keep Firestore reads before challenge deletion", {
@@ -54,6 +57,8 @@ test("callable enrollment and unlock keep Firestore reads before challenge delet
   const uid = `passkey-emulator-${Date.now()}`;
   const request = {auth: auth(uid), data: {}};
   const started = await recovery.passkeyRecoveryBeginEnrollment.run(request);
+  assert.equal(started.options.user.name, `${uid}@example.com`);
+  assert.equal(started.options.user.displayName, "Olive Branch recovery");
   const registrationResponse = {id: credentialId, clientExtensionResults: {prf: {enabled: true}}};
   const proof = await recovery.passkeyRecoveryContinueEnrollment.run({
     ...request,

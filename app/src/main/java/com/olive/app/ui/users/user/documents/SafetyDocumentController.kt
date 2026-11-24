@@ -21,6 +21,8 @@ import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.R
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
+import com.olive.app.ui.session.PasskeyRecoveryStage
+import com.olive.app.ui.session.PasskeyRecoveryStageException
 import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
@@ -185,16 +187,18 @@ internal class SafetyDocumentsController(
     }
 
     // Downloads and decrypts an allowed document, then opens its in-app viewer.
-    fun download(document: SafetyDocument, onReady: (File) -> Unit) {
+    fun download(document: SafetyDocument, onReady: (SafetyDocument, File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         if (!beginOpening(document.id)) return
         val token = generation
         scope.launch {
             try {
                 runCatching { openDocument(document, viewerUid) }
-                    .onSuccess { file ->
-                        if (token == generation && state.ownerUid == viewerUid) onReady(file)
-                        else file.delete()
+                    .onSuccess { opened ->
+                        rememberRecoveredDocument(viewerUid, opened.document)
+                        if (token == generation && state.ownerUid == viewerUid) {
+                            onReady(opened.document, opened.file)
+                        } else opened.file.delete()
                     }
                     .onFailure { failure ->
                         if (failure is CancellationException) throw failure
@@ -231,9 +235,11 @@ internal class SafetyDocumentsController(
                         source.getFor(viewerUid, documentId)
                     } else source.cachedFor(viewerUid, documentId)
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
-                    val file = openDocument(document, viewerUid)
-                    if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                    else file.delete()
+                    val opened = openDocument(document, viewerUid)
+                    rememberRecoveredDocument(viewerUid, opened.document)
+                    if (token == generation && state.ownerUid == viewerUid) {
+                        onReady(opened.document, opened.file)
+                    } else opened.file.delete()
                 }.onFailure { failure ->
                     if (failure is CancellationException) throw failure
                     if (token == generation) {
@@ -348,8 +354,11 @@ internal class SafetyDocumentsController(
                 val relevant = available.filter { it.id in relevantIds }
                 val files = linkedMapOf<String, EmergencyReportMedia>()
                 relevant.forEach { document ->
-                    val file = runCatching { openDocument(document, ownerUid) }.getOrNull()
-                    files[document.id] = EmergencyReportMedia(document, file)
+                    val opened = runCatching { openDocument(document, ownerUid) }.getOrNull()
+                    files[document.id] = EmergencyReportMedia(
+                        opened?.document ?: document,
+                        opened?.file,
+                    )
                 }
                 withContext(Dispatchers.IO) {
                     renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
@@ -485,11 +494,11 @@ internal class SafetyDocumentsController(
     }
 
     // Opens a saved document after its encrypted content is ready.
-    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
+    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): OpenedMedia =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
         } else {
-            checkNotNull(repository).download(applicationContext, document)
+            OpenedMedia(document, checkNotNull(repository).download(applicationContext, document))
         }
 
     private fun beginOpening(documentId: String): Boolean {
@@ -508,16 +517,51 @@ internal class SafetyDocumentsController(
         }
     }
 
+    /**
+     * Applies restored metadata immediately and commits it to the encrypted account index.
+     *
+     * @param ownerUid Active account that owns the encrypted index partition.
+     * @param documents Locally authenticated records carrying current-device wrappers.
+     */
+    internal suspend fun rememberRecoveredDocuments(
+        ownerUid: String,
+        documents: List<SafetyDocument>,
+    ) {
+        withContext(Dispatchers.IO) {
+            documents.forEach { repository?.rememberRecovered(ownerUid, it) }
+        }
+        if (state.ownerUid == ownerUid) {
+            val recovered = documents.associateBy(SafetyDocument::id)
+            state = state.copy(files = state.files.map { recovered[it.id] ?: it })
+        }
+    }
+
+    private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
+        if (state.ownerUid == ownerUid) {
+            state = state.copy(files = state.files.map { if (it.id == document.id) document else it })
+        }
+        scope.launch(Dispatchers.IO) { repository?.rememberRecovered(ownerUid, document) }
+    }
+
     private fun localizedFailure(failure: Throwable): String {
         return failureMessageResolver(failure)
     }
 }
 
+/**
+ * Maps bounded media and recovery failures to localized user guidance.
+ *
+ * @param failure Failure returned by the encrypted media access pipeline.
+ * @return String resource describing the safe next action without exposing cryptographic details.
+ */
 internal fun mediaFailureResource(failure: Throwable): Int {
     if (failure is MediaDeviceVerificationException) {
         return R.string.documents_device_verification_failed
     }
     val reason = (failure as? MediaAccessException)?.reason
+    val recoveryStage = generateSequence(failure) { it.cause }
+        .filterIsInstance<PasskeyRecoveryStageException>()
+        .firstOrNull()?.stage
     return when (reason) {
         MediaAccessError.NOT_CACHED -> R.string.documents_not_available_offline
         MediaAccessError.NETWORK_REQUIRED -> R.string.documents_network_required
@@ -525,6 +569,20 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.ACCESS_REVOKED -> R.string.documents_access_revoked
         MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
         MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
+        MediaAccessError.ACCOUNT_WRAPPER_MISSING -> R.string.documents_account_wrapper_missing
+        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> when (recoveryStage) {
+            PasskeyRecoveryStage.BEGIN_UNLOCK -> R.string.documents_recovery_begin_failed
+            PasskeyRecoveryStage.REQUEST_PASSKEY -> R.string.documents_recovery_passkey_failed
+            PasskeyRecoveryStage.COMPLETE_UNLOCK -> R.string.documents_recovery_server_failed
+            PasskeyRecoveryStage.VERIFY_PRF_INPUT -> R.string.documents_recovery_prf_mismatch
+            PasskeyRecoveryStage.OPEN_RECOVERY_ENVELOPE -> R.string.documents_recovery_envelope_failed
+            PasskeyRecoveryStage.VALIDATE_ACCOUNT_KEYSET -> R.string.documents_recovery_keyset_failed
+            PasskeyRecoveryStage.PROTECT_DEVICE_COPY -> R.string.documents_recovery_device_save_failed
+            else -> R.string.documents_account_recovery_failed
+        }
+        MediaAccessError.ACCOUNT_KEYSET_MISMATCH -> R.string.documents_account_keyset_mismatch
+        MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED -> R.string.documents_account_wrapper_failed
+        MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED -> R.string.documents_ciphertext_authentication_failed
         MediaAccessError.ACCOUNT_MISMATCH -> R.string.documents_account_mismatch
         MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed

@@ -11,6 +11,8 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRepository
 import com.olive.app.data.account.AccountKeysetRepository
 import com.olive.app.data.account.PasskeyRecoveryRepository
+import com.olive.app.data.account.OpaqueRecoveryRepository
+import com.olive.app.data.account.AndroidOpaqueClient
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminRepository
 import com.olive.app.data.account.CoverType
@@ -95,6 +97,7 @@ internal class SessionDataSources(
     val adminLocations: AdminLocationRepository?,
     val accountKeysets: AccountKeysetRepository?,
     val passkeyRecovery: PasskeyRecoveryRepository?,
+    val opaqueRecovery: OpaqueRecoveryRepository? = null,
 ) {
     companion object {
         // Creates the cloud repository bundle used by a signed-in Firebase account.
@@ -122,6 +125,7 @@ internal class SessionDataSources(
                 adminLocations = if (localMode) null else AdminLocationRepository(),
                 accountKeysets = if (localMode) null else AccountKeysetRepository(),
                 passkeyRecovery = if (localMode) null else PasskeyRecoveryRepository(),
+                opaqueRecovery = if (localMode) null else OpaqueRecoveryRepository(opaqueClient = AndroidOpaqueClient(application)),
             )
         }
     }
@@ -269,7 +273,12 @@ internal class DeviceLockRequest internal constructor(
 internal sealed interface PasskeyCredentialResult {
     data class Registration(val serverResponseJson: String) : PasskeyCredentialResult
     data class Assertion(val value: PasskeyPrfProtocol.AssertionResult) : PasskeyCredentialResult
+    data class Failure(val reason: PasskeyCredentialFailure) : PasskeyCredentialResult
 }
+
+internal class PasskeyCredentialFailureException(
+    val reason: PasskeyCredentialFailure,
+) : Exception(reason.name)
 
 /** One Activity-owned Credential Manager ceremony; raw PRF JSON never enters session state. */
 internal class PasskeyCredentialRequest internal constructor(
@@ -400,6 +409,7 @@ internal class SessionRuntime(
     val locationSharingRepository get() = dataSources.locations
     val accountKeysetRepository get() = dataSources.accountKeysets
     val passkeyRecoveryRepository get() = dataSources.passkeyRecovery
+    val opaqueRecoveryRepository get() = dataSources.opaqueRecovery
     private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment
@@ -450,6 +460,8 @@ internal class SessionRuntime(
     val safety = SessionSafetyPlans(this)
     val staffSupport = StaffSupportController(this)
     val settings = SessionSettings(this)
+    val passkeyRecoveryController = SessionPasskeyRecovery(this)
+    val passwordRecovery = SessionPasswordRecovery(this)
     val operations = SessionOperations(this)
 
     val configured get() = enrollment != null
@@ -495,7 +507,12 @@ internal class SessionRuntime(
 // Uses a 25-second timeout by default; Android authentication gets longer. Epoch/job checks reject canceled work.
 internal class SessionOperations(private val runtime: SessionRuntime) {
     // Runs one session task with a timeout and a readable error message.
-    fun runOperation(failure: String, timeoutMillis: Long = 25_000, block: suspend (Long) -> Unit) {
+    fun runOperation(
+        failure: String,
+        timeoutMillis: Long = 25_000,
+        failureFor: (Exception) -> String = { failure },
+        block: suspend (Long) -> Unit,
+    ) {
         with(runtime) {
             with(state) {
                 val token = epoch
@@ -512,8 +529,8 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                             application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (_: Exception) { // Convert unexpected operation failures into the feature's prepared user-facing error.
-                        if (epoch == token) finalFailure = failure
+                    } catch (error: Exception) {
+                        if (epoch == token) finalFailure = failureFor(error)
                     } finally {
                         if (operationJob === runningJob) {
                             operationJob = null

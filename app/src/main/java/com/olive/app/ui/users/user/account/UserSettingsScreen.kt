@@ -73,6 +73,8 @@ import com.olive.app.ui.shared.BirthdayPicker
 import com.olive.app.ui.shared.rememberBirthdayInput
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.math.roundToInt
+import java.text.DateFormat
+import java.util.Date
 
 
 // Saves profile and situation edits from the user settings screen.
@@ -99,11 +101,15 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var recoveryCredentialToRemove by remember { mutableStateOf<String?>(null) }
+    var recoveryPasskeyRemovalPassword by remember { mutableStateOf("") }
     val cacheUid = session.coverAccountId
     val recoveryCredentials = session.passkeyRecoveryCredentials
     LaunchedEffect(cacheUid) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
-        if (userRole && cacheUid != null) session.refreshPasskeyRecovery()
+        if (userRole && cacheUid != null) {
+            session.refreshPasskeyRecovery()
+            session.refreshPasswordRecovery()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -355,15 +361,26 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     recoveryCredentials.isEmpty() ->
                                         Text(stringResource(R.string.passkey_recovery_none))
                                     else -> recoveryCredentials.forEachIndexed { index, credential ->
+                                        val typeLabel = stringResource(
+                                            if (credential.backedUp) R.string.passkey_recovery_synced_factor
+                                            else R.string.passkey_recovery_device_factor,
+                                        )
+                                        val label = credential.createdAtEpochMillis?.let { createdAt ->
+                                            stringResource(
+                                                R.string.passkey_recovery_factor_created_at,
+                                                typeLabel,
+                                                DateFormat.getDateTimeInstance(
+                                                    DateFormat.MEDIUM,
+                                                    DateFormat.SHORT,
+                                                ).format(Date(createdAt)),
+                                            )
+                                        } ?: typeLabel
                                         Row(
                                             Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(
-                                                stringResource(
-                                                    if (credential.backedUp) R.string.passkey_recovery_synced_factor
-                                                    else R.string.passkey_recovery_device_factor,
-                                                ),
+                                                label,
                                                 modifier = Modifier.weight(1f),
                                             )
                                             OutlinedButton(
@@ -386,32 +403,55 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 recoveryCredentialToRemove?.let { credentialId ->
                                     val removingLastCredential = recoveryCredentials?.size == 1
                                     AlertDialog(
-                                        onDismissRequest = { recoveryCredentialToRemove = null },
+                                        onDismissRequest = {
+                                            recoveryCredentialToRemove = null
+                                            recoveryPasskeyRemovalPassword = ""
+                                        },
                                         title = { Text(stringResource(
                                             if (removingLastCredential) R.string.passkey_recovery_remove_last_title
                                             else R.string.passkey_recovery_remove_confirm_title,
                                         )) },
-                                        text = { Text(stringResource(
-                                            if (removingLastCredential) R.string.passkey_recovery_remove_last_help
-                                            else R.string.passkey_recovery_remove_confirm_help,
-                                        )) },
+                                        text = {
+                                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                Text(stringResource(
+                                                    if (removingLastCredential) R.string.passkey_recovery_remove_last_help
+                                                    else R.string.passkey_recovery_remove_confirm_help,
+                                                ))
+                                                if (!removingLastCredential) {
+                                                    Field(
+                                                        label = stringResource(R.string.passkey_recovery_reauth_password),
+                                                        value = recoveryPasskeyRemovalPassword,
+                                                        tag = "confirm_recovery_passkey_removal_password",
+                                                        secret = true,
+                                                        showSecretToggle = true,
+                                                        enabled = !session.busy,
+                                                    ) { recoveryPasskeyRemovalPassword = it.take(128) }
+                                                }
+                                            }
+                                        },
                                         confirmButton = {
                                             if (!removingLastCredential) {
                                                 Button(onClick = {
+                                                    val password = recoveryPasskeyRemovalPassword
                                                     recoveryCredentialToRemove = null
-                                                    session.removePasskeyRecovery(credentialId)
-                                                }) {
+                                                    recoveryPasskeyRemovalPassword = ""
+                                                    session.removePasskeyRecovery(credentialId, password)
+                                                }, enabled = recoveryPasskeyRemovalPassword.isNotEmpty()) {
                                                     Text(stringResource(R.string.passkey_recovery_remove))
                                                 }
                                             }
                                         },
                                         dismissButton = {
-                                            TextButton(onClick = { recoveryCredentialToRemove = null }) {
+                                            TextButton(onClick = {
+                                                recoveryCredentialToRemove = null
+                                                recoveryPasskeyRemovalPassword = ""
+                                            }) {
                                                 Text(stringResource(R.string.cancel))
                                             }
                                         },
                                     )
                                 }
+                                PasswordRecoverySection(session)
                             }
                             HorizontalDivider()
                             Text(

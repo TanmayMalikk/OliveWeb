@@ -143,6 +143,85 @@ internal fun OliveRoot(
     val accessibilityRoot = (view.parent as? ComposeView) ?: view
     val privacyHidden = navigation.privacyBlackout
     val privateArea = navigation.screen == SessionScreen.Safe || navigation.screen == SessionScreen.Portal
+    val recovery = session.encryptedAccessRecoveryState
+    val recoveryDocumentSignature = session.documents.state.files.joinToString("|") {
+        "${it.id}:${it.createdAt}:${it.ciphertextSha256}:${it.deviceWrappedKeys.size}"
+    }
+    val recoveryConversationSignature = session.messages.conversations.joinToString("|") {
+        "${it.id}:${it.updatedAt}"
+    }
+    LaunchedEffect(privateArea, privacyHidden, callAccountId, session.coverUsername, session.accountRole) {
+        if (privateArea && !privacyHidden && session.accountRole == AccountRole.USER &&
+            callAccountId.isNotBlank() && session.coverUsername.isNotBlank()
+        ) {
+            session.documents.load(callAccountId, session.coverUsername, session.localMode)
+        }
+    }
+    LaunchedEffect(
+        privateArea,
+        privacyHidden,
+        callAccountId,
+        recoveryDocumentSignature,
+        recoveryConversationSignature,
+    ) {
+        if (privateArea && !privacyHidden && callAccountId.isNotBlank()) {
+            session.evaluateEncryptedAccess()
+        }
+    }
+    if (privateArea && !privacyHidden && (recovery.promptVisible || recovery.restoring)) {
+        AlertDialog(
+            onDismissRequest = { if (!recovery.restoring) session.dismissEncryptedAccess() },
+            title = { Text(stringResource(R.string.restore_encrypted_access_title)) },
+            text = {
+                if (recovery.restoring) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(24.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Text(stringResource(R.string.restoring_encrypted_access))
+                    }
+                } else {
+                    Text(stringResource(R.string.restore_encrypted_access_body))
+                }
+            },
+            confirmButton = {
+                if (!recovery.restoring) {
+                    TextButton(onClick = {
+                        session.noteInteraction()
+                        session.restoreEncryptedAccess()
+                    }) { Text(stringResource(R.string.restore_access)) }
+                }
+            },
+            dismissButton = {
+                if (!recovery.restoring) {
+                    TextButton(onClick = session::dismissEncryptedAccess) {
+                        Text(stringResource(R.string.later))
+                    }
+                }
+            },
+        )
+    }
+    if (privateArea && !privacyHidden && recovery.notice != null) {
+        AlertDialog(
+            onDismissRequest = session::clearEncryptedAccessNotice,
+            title = { Text(stringResource(R.string.encrypted_access_result_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        when (checkNotNull(recovery.notice)) {
+                            EncryptedAccessRecoveryNotice.SUCCESS -> R.string.encrypted_access_restored
+                            EncryptedAccessRecoveryNotice.PARTIAL -> R.string.encrypted_access_partially_restored
+                            EncryptedAccessRecoveryNotice.FAILED -> R.string.encrypted_access_restore_failed
+                        },
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = session::clearEncryptedAccessNotice) {
+                    Text(stringResource(R.string.ok))
+                }
+            },
+        )
+    }
     val systemLaunchers = rememberSafeSystemLaunchers(session)
     val update = rememberSafeAppUpdate(
         enabled = privateArea && !privacyHidden && !session.localMode,
