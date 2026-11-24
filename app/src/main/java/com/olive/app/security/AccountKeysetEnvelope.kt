@@ -487,6 +487,12 @@ internal data class OpaquePasswordRecoveryEnvelope(
 
         /**
          * Builds AES-GCM additional authenticated data binding version, UID, record ID, and algorithm.
+         *
+         * @param version Recovery envelope format version.
+         * @param accountId Firebase UID of the owning account.
+         * @param recordId Unique OPAQUE password recovery record identifier.
+         * @param algorithm Cryptographic suite identifier protecting the recovery key.
+         * @return UTF-8 bytes supplied as AES-GCM additional authenticated data.
          */
         private fun aad(version: Int, accountId: String, recordId: String, algorithm: String) =
             "$version|$accountId|$recordId|$algorithm".toByteArray(Charsets.UTF_8)

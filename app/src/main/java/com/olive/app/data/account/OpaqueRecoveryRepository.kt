@@ -54,9 +54,40 @@ internal interface OpaqueClientProtocol {
         val exportKey: ByteArray,
     )
 
+    /**
+     * Begins OPAQUE password-recovery registration on the client.
+     *
+     * @param password User-chosen recovery password.
+     * @return Client registration state and opaque request payload for the server.
+     */
     suspend fun startRegistration(password: String): RegistrationStart
+
+    /**
+     * Completes OPAQUE registration from the server response and derives the export key.
+     *
+     * @param state Client registration state returned by [startRegistration].
+     * @param response Server registration response payload.
+     * @param password User-chosen recovery password.
+     * @return Completed registration record and export key for envelope encryption.
+     */
     suspend fun finishRegistration(state: String, response: String, password: String): RegistrationFinish
+
+    /**
+     * Begins an OPAQUE login ceremony to recover an account key on a new device.
+     *
+     * @param password User-entered recovery password.
+     * @return Client login state and start-login request payload.
+     */
     suspend fun startLogin(password: String): LoginStart
+
+    /**
+     * Completes an OPAQUE login ceremony and derives the export key when the password matches.
+     *
+     * @param state Client login state returned by [startLogin].
+     * @param response Server login response payload.
+     * @param password User-entered recovery password.
+     * @return Completed login proof and export key, or `null` if verification failed locally.
+     */
     suspend fun finishLogin(state: String, response: String, password: String): LoginFinish?
 }
 
@@ -71,7 +102,14 @@ internal class OpaqueRecoveryRepository(
     private val authenticator: AccountRecoveryAuthenticator = FirebaseAccountRecoveryAuthenticator(),
     private val opaqueClient: OpaqueClientProtocol,
 ) {
-    /** Enrolls an OPAQUE password recovery failsafe for an existing unlocked ARK. */
+    /**
+     * Enrolls an OPAQUE password recovery failsafe for an existing unlocked ARK.
+     *
+     * @param accountId Firebase UID of the signed-in account.
+     * @param password User-chosen recovery password.
+     * @param recoveryKey Unlocked [AccountRecoveryKey] to wrap in the recovery envelope.
+     * @return The enrolled [OpaquePasswordRecoveryEnvelope] stored on the server.
+     */
     suspend fun enroll(
         accountId: String,
         password: String,
@@ -115,7 +153,13 @@ internal class OpaqueRecoveryRepository(
         return envelope
     }
 
-    /** Unlocks and recovers the Account Recovery Key using the account password on a new device. */
+    /**
+     * Unlocks and recovers the Account Recovery Key using the account password on a new device.
+     *
+     * @param accountId Firebase UID of the signed-in account.
+     * @param password Recovery password entered by the user.
+     * @return The decrypted [AccountRecoveryKey].
+     */
     suspend fun unlock(
         accountId: String,
         password: String,
@@ -151,7 +195,15 @@ internal class OpaqueRecoveryRepository(
         }
     }
 
-    /** Rotates the recovery password and updates the recovery envelope atomically. */
+    /**
+     * Rotates the recovery password and updates the recovery envelope atomically.
+     *
+     * @param accountId Firebase UID of the signed-in account.
+     * @param oldPassword Current recovery password to reauthenticate and unlock with if needed.
+     * @param newPassword New recovery password to enroll.
+     * @param currentRecoveryKey Already unlocked recovery key, or `null` to unlock via [oldPassword].
+     * @return The newly enrolled [OpaquePasswordRecoveryEnvelope].
+     */
     suspend fun rotate(
         accountId: String,
         oldPassword: String,
@@ -198,6 +250,12 @@ internal class OpaqueRecoveryRepository(
         return newEnvelope
     }
 
+    /**
+     * Validates and normalizes a callable map response from the recovery backend.
+     *
+     * @param value Raw data payload returned by [AccountRecoveryCallable.call].
+     * @return String-keyed map extracted from [value].
+     */
     private fun response(value: Any?): Map<String, Any?> =
         (value as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v }
             ?: error("Invalid response from recovery service")
@@ -269,6 +327,12 @@ internal class AccountKeysetRepository(
         }
     }
 
+    /**
+     * Checks from the server whether OPAQUE password recovery is enrolled for [accountId].
+     *
+     * @param accountId Firebase UID of the signed-in account.
+     * @return True when the server account keyset contains a password recovery envelope.
+     */
     suspend fun isPasswordRecoveryEnrolled(accountId: String): Boolean {
         require(auth.currentUser?.uid == accountId) { "Sign in again before checking recovery" }
         val snapshot = firestore.collection(COLLECTION).document(accountId).get(Source.SERVER).await()
@@ -296,12 +360,24 @@ internal fun interface AccountRecoveryCallable {
 
 /** Confirms a sensitive recovery-factor action with Firebase without exposing a password to a callable. */
 internal fun interface AccountRecoveryAuthenticator {
+    /**
+     * Reauthenticates [accountId] with Firebase using [password] before managing recovery.
+     *
+     * @param accountId Expected Firebase UID of the signed-in user.
+     * @param password Account password used to verify fresh Firebase credentials.
+     */
     suspend fun reauthenticate(accountId: String, password: String)
 }
 
 internal class FirebaseAccountRecoveryAuthenticator(
     private val authProvider: () -> FirebaseAuth = FirebaseAuth::getInstance,
 ) : AccountRecoveryAuthenticator {
+    /**
+     * Reauthenticates the active Firebase user with [password] and refreshes their ID token.
+     *
+     * @param accountId Expected Firebase UID of the signed-in user.
+     * @param password Account password used to create an email credential.
+     */
     override suspend fun reauthenticate(accountId: String, password: String) {
         require(password.isNotEmpty()) { "Enter your account password" }
         val auth = authProvider()
@@ -471,6 +547,11 @@ internal class AndroidOpaqueClient(
 
     private var webView: WebView? = null
 
+    /**
+     * Lazily initializes the offscreen WebView hosting the bundled OPAQUE WebAssembly bridge.
+     *
+     * @return Ready [WebView] instance once `window.opaqueBridge.isReady` evaluates to true.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun ensureReady(): WebView = withContext(Dispatchers.Main) {
         webView?.let { return@withContext it }
@@ -483,6 +564,12 @@ internal class AndroidOpaqueClient(
 
         suspendCancellableCoroutine<Unit> { cont ->
             view.webViewClient = object : WebViewClient() {
+                /**
+                 * Resumes waiting coroutine when the local OPAQUE bridge HTML finishes loading.
+                 *
+                 * @param view WebView that finished loading.
+                 * @param url Loaded page URL, if supplied by Android.
+                 */
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (cont.isActive) cont.resume(Unit)
                 }
@@ -549,6 +636,12 @@ internal class AndroidOpaqueClient(
         }
     }
 
+    /**
+     * Starts an OPAQUE registration flow in the bundled WASM bridge.
+     *
+     * @param password User-chosen recovery password.
+     * @return Serialized client registration state and registration request payload.
+     */
     override suspend fun startRegistration(password: String): OpaqueClientProtocol.RegistrationStart {
         val res = runBridge(OpaqueBridgeMethod.START_REGISTRATION, listOf(password))
         return OpaqueClientProtocol.RegistrationStart(
@@ -557,6 +650,14 @@ internal class AndroidOpaqueClient(
         )
     }
 
+    /**
+     * Completes an OPAQUE registration flow and decodes the derived export key.
+     *
+     * @param state Serialized client state returned by [startRegistration].
+     * @param response Server registration response string.
+     * @param password User-chosen recovery password.
+     * @return Serialized registration record and decoded 32/64-byte export key.
+     */
     override suspend fun finishRegistration(
         state: String,
         response: String,
@@ -572,6 +673,12 @@ internal class AndroidOpaqueClient(
         )
     }
 
+    /**
+     * Starts an OPAQUE login flow in the bundled WASM bridge.
+     *
+     * @param password User-entered recovery password.
+     * @return Serialized client login state and start-login request payload.
+     */
     override suspend fun startLogin(password: String): OpaqueClientProtocol.LoginStart {
         val res = runBridge(OpaqueBridgeMethod.START_LOGIN, listOf(password))
         return OpaqueClientProtocol.LoginStart(
@@ -580,6 +687,14 @@ internal class AndroidOpaqueClient(
         )
     }
 
+    /**
+     * Completes an OPAQUE login flow and returns the decoded export key on password match.
+     *
+     * @param state Serialized client login state returned by [startLogin].
+     * @param response Server login response string.
+     * @param password User-entered recovery password.
+     * @return Final login request and export key, or `null` when the password does not match.
+     */
     override suspend fun finishLogin(
         state: String,
         response: String,

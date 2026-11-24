@@ -1000,5 +1000,8 @@ data class ChatMessage(
 
 // Gives each screen one handle for stopping a live chat listener safely.
 fun interface ChatSubscription {
+    /**
+     * Detaches the active chat snapshot listener and releases associated resources.
+     */
     fun close()
 }

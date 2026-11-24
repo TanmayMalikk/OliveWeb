@@ -27,6 +27,8 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 /**
  * Settings section for zero-knowledge OPAQUE password recovery.
  * Once enabled, password recovery remains active permanently to protect encrypted data access.
+ *
+ * @param session Active [SessionViewModel] providing recovery state and password-recovery actions.
  */
 @Composable
 internal fun PasswordRecoverySection(session: SessionViewModel) {

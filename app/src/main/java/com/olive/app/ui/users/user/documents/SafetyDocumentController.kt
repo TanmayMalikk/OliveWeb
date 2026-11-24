@@ -708,6 +708,9 @@ internal class SafetyDocumentsController(
 
     /**
      * Persists updated metadata for a single recovered document.
+     *
+     * @param ownerUid Firebase UID of the signed-in document owner.
+     * @param document Document record whose local metadata and key wrappers were recovered.
      */
     private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
         if (state.ownerUid == ownerUid) {

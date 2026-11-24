@@ -601,7 +601,16 @@ object MediaCipher {
     }
 }
 
-/** True only while Android temporarily owns the foreground for an approved app operation. */
+/**
+ * Checks whether Android temporarily owns the foreground for an approved app operation.
+ *
+ * @param deviceCredential True while a biometric or device-credential prompt is active.
+ * @param runtimePermission True while a system runtime permission dialog is open.
+ * @param externalFilePicker True while the system file or media picker is open.
+ * @param callPermission True while a call-related permission prompt is open.
+ * @param safeSystemActivity True while another approved safe-app system activity is open.
+ * @return True if any trusted Android system handoff is currently in progress.
+ */
 internal fun trustedSystemHandoffActive(
     deviceCredential: Boolean,
     runtimePermission: Boolean,
@@ -615,13 +624,28 @@ internal fun trustedSystemHandoffActive(
 internal class LifecycleResultGate<T>(private val discard: (T) -> Unit = {}) {
     private var pending: T? = null
 
+    /**
+     * Returns [value] immediately when the activity is [resumed], or stages it until resume.
+     *
+     * @param value Newly produced credential or prompt result.
+     * @param resumed Whether the host activity is currently resumed.
+     * @return [value] if [resumed] is true, or `null` when queued for delivery on resume.
+     */
     fun offer(value: T, resumed: Boolean): T? {
         cancel()
         return if (resumed) value else null.also { pending = value }
     }
 
+    /**
+     * Consumes and returns the pending credential result staged before resume.
+     *
+     * @return The staged result, or `null` if none is waiting.
+     */
     fun resume(): T? = pending.also { pending = null }
 
+    /**
+     * Discards any staged result and clears the pending reference.
+     */
     fun cancel() {
         pending?.let(discard)
         pending = null

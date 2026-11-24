@@ -816,14 +816,29 @@ internal interface SessionAccountManagementActions {
      */
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
-    /** Refreshes whether OPAQUE password recovery is enrolled for the signed-in account. */
+    /**
+     * Refreshes whether OPAQUE password recovery is enrolled for the signed-in account.
+     */
     fun refreshPasswordRecovery() = runtime.passwordRecovery.refreshPasswordRecovery()
-    /** Enrolls OPAQUE password recovery protecting the user's Account Recovery Key. */
+    /**
+     * Enrolls OPAQUE password recovery protecting the user's Account Recovery Key.
+     *
+     * @param password User-chosen recovery password protecting the enrolled OPAQUE record.
+     */
     fun enablePasswordRecovery(password: String) = runtime.passwordRecovery.enablePasswordRecovery(password)
-    /** Rotates the user's OPAQUE password recovery secret after verifying [oldPassword]. */
+    /**
+     * Rotates the user's OPAQUE password recovery secret after verifying [oldPassword].
+     *
+     * @param oldPassword Current recovery password to verify before rotating.
+     * @param newPassword Replacement recovery password to enroll.
+     */
     fun rotatePasswordRecovery(oldPassword: String, newPassword: String) =
         runtime.passwordRecovery.rotatePasswordRecovery(oldPassword, newPassword)
-    /** Unlocks encrypted account access on a new device using [password]. */
+    /**
+     * Unlocks encrypted account access on a new device using [password].
+     *
+     * @param password Recovery password entered to complete OPAQUE unlock.
+     */
     fun unlockWithPasswordRecovery(password: String) = runtime.passwordRecovery.unlockWithPasswordRecovery(password)
 }
 

@@ -317,7 +317,11 @@ internal class DeviceLockRequest internal constructor(
 internal class PasswordRecoveryUnlockRequest internal constructor() {
     internal val result = CompletableDeferred<String?>()
 
-    /** Delivers the entered recovery password or null if the prompt was dismissed. */
+    /**
+     * Delivers the entered recovery password or null if the prompt was dismissed.
+     *
+     * @param password Recovery password entered by the user, or `null` when cancelled.
+     */
     fun complete(password: String?) {
         result.complete(password)
     }

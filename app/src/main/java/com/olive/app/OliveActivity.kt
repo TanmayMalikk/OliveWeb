@@ -390,9 +390,11 @@ class OliveActivity : FragmentActivity() {
     }
 
     /**
-     * Returns whether an expected Android system handoff (biometric, permission, or picker) is active.
+     * Checks whether an expected Android system handoff (biometric, permission, or picker) is active.
+     *
+     * @return True when leaving the foreground is caused by a trusted system prompt or picker.
      */
-    private fun systemHandoffActive() = trustedSystemHandoffActive(
+    private fun systemHandoffActive(): Boolean = trustedSystemHandoffActive(
         deviceCredential = deviceLock.awaitingCredential,
         runtimePermission = permissions.awaitingResult,
         externalFilePicker = session.externalFilePickerOpen,

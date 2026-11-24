@@ -22,6 +22,9 @@ import javax.crypto.AEADBadTagException
  */
 internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
 
+    /**
+     * Queries the backend to update whether OPAQUE password recovery is enrolled for this session.
+     */
     fun refreshPasswordRecovery() = with(runtime) {
         val uid = enrollment?.uid ?: return@with
         scope.launch {
@@ -34,6 +37,11 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Enrolls OPAQUE password recovery using [password] for the signed-in safe user.
+     *
+     * @param password User-chosen recovery password protecting the Account Recovery Key.
+     */
     fun enablePasswordRecovery(password: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -53,6 +61,12 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Rotates the account's OPAQUE password recovery secret from [oldPassword] to [newPassword].
+     *
+     * @param oldPassword Current recovery password used to authorize the rotation.
+     * @param newPassword Replacement recovery password to enroll.
+     */
     fun rotatePasswordRecovery(oldPassword: String, newPassword: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -94,6 +108,13 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         return recoveryKey
     }
 
+    /**
+     * Prompts the UI for the user's recovery password and suspends until entered or cancelled.
+     *
+     * @param uid Expected Firebase UID for the active session.
+     * @param token Session generation epoch captured when the operation began.
+     * @return Non-empty recovery password entered by the user.
+     */
     private suspend fun requestPasswordRecoveryUnlock(uid: String, token: Long): String = with(runtime) {
         check(currentRecoverySession(uid, token)) { "Recovery session changed" }
         val request = PasswordRecoveryUnlockRequest()
@@ -108,6 +129,11 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Unlocks and seals the account's recovery key locally using [password].
+     *
+     * @param password Recovery password entered to complete OPAQUE unlock.
+     */
     fun unlockWithPasswordRecovery(password: String) = with(runtime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
@@ -202,6 +228,13 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         return runtime.application.getString(stringRes)
     }
 
+    /**
+     * Returns true while [uid] and [token] still match the active signed-in session.
+     *
+     * @param uid Expected Firebase UID captured before async work.
+     * @param token Session epoch captured before async work.
+     * @return True when neither the signed-in account nor session epoch changed.
+     */
     private fun currentRecoverySession(uid: String, token: Long): Boolean = with(runtime) {
         enrollment?.uid == uid && epoch == token
     }
