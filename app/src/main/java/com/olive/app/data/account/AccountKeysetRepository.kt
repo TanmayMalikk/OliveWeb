@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
 import com.olive.app.security.AccountKeysetEnvelope
@@ -42,7 +43,7 @@ internal class AccountKeysetRepository(
             "updatedAt" to FieldValue.serverTimestamp(),
         )
         firestore.batch().apply {
-            set(firestore.collection(COLLECTION).document(envelope.accountId), payload)
+            set(firestore.collection(COLLECTION).document(envelope.accountId), payload, SetOptions.merge())
             set(firestore.collection(DIRECTORY).document(envelope.accountId), directory)
         }.commit().await()
     }

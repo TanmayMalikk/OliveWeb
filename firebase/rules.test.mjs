@@ -214,6 +214,8 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
     });
   });
   await assertSucceeds(getDoc(target));
+  await assertSucceeds(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }, { merge: true }));
+  await assertFails(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }));
 
   await env.withSecurityRulesDisabled(async context => {
     await updateDoc(doc(context.firestore(), 'accountKeysets', uid), {
