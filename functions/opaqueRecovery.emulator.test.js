@@ -23,6 +23,7 @@ test("opaque recovery callable lifecycle: register, unlock, rotate, and removal 
   skip: process.env.FIRESTORE_EMULATOR_HOST ? false : "Run when Firestore emulator is active.",
 }, async () => {
   await opaque.ready;
+  process.env.OPAQUE_SERVER_SETUP = opaque.server.createSetup();
   const uid = `opaque-user-${Date.now()}`;
   const password = "correct-recovery-password-123";
   const userAuth = auth(uid);
@@ -125,13 +126,13 @@ test("opaque recovery callable lifecycle: register, unlock, rotate, and removal 
     /Cannot remove password recovery without an active passkey recovery factor/i
   );
 
-  // Add dummy passkey recovery to accountKeysets
-  await db.collection("accountKeysets").doc(uid).set(
-    {
-      passkeyRecovery: { version: 1, credentialId: "cred_test_123" },
-    },
-    { merge: true }
-  );
+  // Store a passkey in the same owner-scoped collection used by passkey recovery.
+  const credentialId = "cred_test_123456789";
+  await db.collection("accountRecoveryPasskeys").doc(uid).collection("credentials").doc(credentialId).set({
+    ownerUid: uid,
+    allowedUsers: [uid],
+    credentialId,
+  });
 
   // Now removal should succeed
   const removeResult = await opaqueRecovery.opaqueRecoveryRemove.run({ auth: userAuth, data: {} });

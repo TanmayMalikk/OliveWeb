@@ -86,20 +86,19 @@ test("opaque recovery requires an existing version-one encrypted account keyset"
   }
 });
 
-test("opaque recovery removal is blocked when no passkey recovery factor exists", () => {
-  const accountWithoutPasskey = {
-    accountId: "uid-a",
-    version: 1,
-    passwordRecovery: { version: 1 },
-    // no passkey recovery
-  };
-  assert.equal(opaqueRecovery.canRemovePasswordRecovery(accountWithoutPasskey), false);
+test("opaque recovery removal recognizes only an owned stored passkey credential", () => {
+  const snapshot = (...documents) => ({
+    docs: documents.map(({ id, ownerUid }) => ({ id, data: () => ({ credentialId: id, ownerUid }) })),
+  });
 
-  const accountWithPasskey = {
-    accountId: "uid-a",
-    version: 1,
-    passwordRecovery: { version: 1 },
-    passkeyRecovery: { version: 1, credentialId: "cred-1" },
-  };
-  assert.equal(opaqueRecovery.canRemovePasswordRecovery(accountWithPasskey), true);
+  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot(), "uid-a"), false);
+  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot({ id: "cred-1", ownerUid: "uid-b" }), "uid-a"), false);
+  assert.equal(opaqueRecovery.hasPasskeyRecovery(snapshot({ id: "cred-1", ownerUid: "uid-a" }), "uid-a"), true);
+});
+
+test("opaque recovery fails closed when its persistent server setup is unavailable", async () => {
+  await assert.rejects(
+    opaqueRecovery.getServerSetup(""),
+    /OPAQUE recovery is not configured/i
+  );
 });

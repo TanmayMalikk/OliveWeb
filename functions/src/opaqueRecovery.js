@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const opaque = require("@serenity-kit/opaque");
 const { db, FieldValue } = require("./firebaseAdminClient");
 
@@ -10,17 +11,21 @@ const ENVELOPE_IV_BYTES = 12;
 const ENVELOPE_CIPHERTEXT_BYTES = 48;
 const RECENT_AUTHENTICATION_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 1000;
-const callableOptions = { enforceAppCheck: true, invoker: "public" };
+const opaqueServerSetup = defineSecret("OPAQUE_SERVER_SETUP");
+const callableOptions = { secrets: [opaqueServerSetup], enforceAppCheck: true, invoker: "public" };
 
-// Server long-term setup for OPAQUE. Fallback to a stable deterministic setup for tests/dev.
-let cachedServerSetup = process.env.OPAQUE_SERVER_SETUP || null;
-
-async function getServerSetup() {
+/**
+ * Returns the stable OPAQUE server setup supplied by Firebase Secret Manager.
+ *
+ * @param {string} configuredSetup Serialized OPAQUE server setup.
+ * @return {Promise<string>} Persistent server setup used for registration and login.
+ */
+async function getServerSetup(configuredSetup = opaqueServerSetup.value()) {
   await opaque.ready;
-  if (!cachedServerSetup) {
-    cachedServerSetup = opaque.server.createSetup();
+  if (typeof configuredSetup !== "string" || configuredSetup.length < 16) {
+    throw new HttpsError("failed-precondition", "OPAQUE recovery is not configured.");
   }
-  return cachedServerSetup;
+  return configuredSetup;
 }
 
 function authenticatedUid(request) {
@@ -110,16 +115,18 @@ function requireStoredAccountKeyset(value, uid) {
   return value;
 }
 
-function canRemovePasswordRecovery(keysetData) {
-  if (!keysetData) return false;
-  // User must retain at least one passkey recovery factor to prevent accidental complete lock-out.
-  if (keysetData.passkeyRecovery && typeof keysetData.passkeyRecovery === "object") {
-    return true;
-  }
-  if (Array.isArray(keysetData.passkeys) && keysetData.passkeys.length > 0) {
-    return true;
-  }
-  return false;
+/**
+ * Confirms that a stored recovery passkey belongs to the authenticated account.
+ *
+ * @param {FirebaseFirestore.QuerySnapshot} credentials Passkey credential query result.
+ * @param {string} uid Authenticated account identifier.
+ * @return {boolean} True only when an owned credential is present.
+ */
+function hasPasskeyRecovery(credentials, uid) {
+  return credentials.docs.some((document) => {
+    const credential = document.data();
+    return credential?.ownerUid === uid && credential?.credentialId === document.id;
+  });
 }
 
 /**
@@ -332,10 +339,13 @@ const opaqueRecoveryRemove = onCall(callableOptions, async (request) => {
 
   const keysetDocRef = db.collection("accountKeysets").doc(uid);
   const opaqueDocRef = db.collection("accountRecoveryOpaqueRecords").doc(uid);
+  const passkeyQuery = db.collection("accountRecoveryPasskeys").doc(uid)
+    .collection("credentials").where("ownerUid", "==", uid).limit(1);
 
   await db.runTransaction(async (transaction) => {
     const keysetDoc = await transaction.get(keysetDocRef);
-    if (!keysetDoc.exists || !canRemovePasswordRecovery(keysetDoc.data())) {
+    const passkeys = await transaction.get(passkeyQuery);
+    if (!keysetDoc.exists || !hasPasskeyRecovery(passkeys, uid)) {
       throw new HttpsError(
         "failed-precondition",
         "Cannot remove password recovery without an active passkey recovery factor."
@@ -362,7 +372,7 @@ module.exports = {
     recoveryEnvelope,
     opaqueRegistrationRecord,
     requireStoredAccountKeyset,
-    canRemovePasswordRecovery,
+    hasPasskeyRecovery,
     requiredRecordId,
     getServerSetup,
   },
