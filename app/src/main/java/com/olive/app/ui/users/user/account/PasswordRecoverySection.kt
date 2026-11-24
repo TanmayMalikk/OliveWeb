@@ -2,8 +2,6 @@ package com.olive.app.ui.users.user.account
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -34,13 +32,9 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 @Composable
 internal fun PasswordRecoverySection(session: SessionViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
-    var showChangeDialog by remember { mutableStateOf(false) }
     var showRemoveDialog by remember { mutableStateOf(false) }
 
     var passwordInput by remember { mutableStateOf("") }
-    var oldPasswordInput by remember { mutableStateOf("") }
-    var newPasswordInput by remember { mutableStateOf("") }
-    var confirmPasswordInput by remember { mutableStateOf("") }
 
     HorizontalDivider()
     Text(
@@ -61,24 +55,12 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
 
     val isEnrolled = session.passwordRecoveryEnrolled == true
     if (isEnrolled) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        OutlinedButton(
+            onClick = { showRemoveDialog = true },
+            enabled = !session.busy,
+            modifier = Modifier.testTag("remove_recovery_password_button"),
         ) {
-            OutlinedButton(
-                onClick = { showChangeDialog = true },
-                enabled = !session.busy,
-                modifier = Modifier.testTag("change_recovery_password_button"),
-            ) {
-                Text(stringResource(R.string.password_recovery_change))
-            }
-            OutlinedButton(
-                onClick = { showRemoveDialog = true },
-                enabled = !session.busy,
-                modifier = Modifier.testTag("remove_recovery_password_button"),
-            ) {
-                Text(stringResource(R.string.password_recovery_remove))
-            }
+            Text(stringResource(R.string.password_recovery_remove))
         }
     } else {
         Button(
@@ -131,74 +113,6 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
                 TextButton(onClick = {
                     showAddDialog = false
                     passwordInput = ""
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
-
-    if (showChangeDialog) {
-        val passwordsMatch = newPasswordInput.isNotEmpty() && newPasswordInput == confirmPasswordInput
-        AlertDialog(
-            onDismissRequest = {
-                showChangeDialog = false
-                oldPasswordInput = ""
-                newPasswordInput = ""
-                confirmPasswordInput = ""
-            },
-            title = { Text(stringResource(R.string.password_recovery_change)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Field(
-                        label = stringResource(R.string.current_password),
-                        value = oldPasswordInput,
-                        tag = "password_recovery_old_password_input",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.busy,
-                    ) { oldPasswordInput = it }
-                    Field(
-                        label = stringResource(R.string.new_password),
-                        value = newPasswordInput,
-                        tag = "password_recovery_new_password_input",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.busy,
-                    ) { newPasswordInput = it }
-                    Field(
-                        label = stringResource(R.string.confirm_password),
-                        value = confirmPasswordInput,
-                        tag = "password_recovery_confirm_password_input",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.busy,
-                    ) { confirmPasswordInput = it }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val old = oldPasswordInput
-                        val newP = newPasswordInput
-                        showChangeDialog = false
-                        oldPasswordInput = ""
-                        newPasswordInput = ""
-                        confirmPasswordInput = ""
-                        session.rotatePasswordRecovery(old, newP)
-                    },
-                    enabled = oldPasswordInput.isNotEmpty() && passwordsMatch && !session.busy,
-                    modifier = Modifier.testTag("confirm_change_password_recovery"),
-                ) {
-                    Text(stringResource(R.string.password_recovery_change))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showChangeDialog = false
-                    oldPasswordInput = ""
-                    newPasswordInput = ""
-                    confirmPasswordInput = ""
                 }) {
                     Text(stringResource(R.string.cancel))
                 }
