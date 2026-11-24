@@ -83,9 +83,8 @@ test("deployment keeps the existing callable endpoint names", () => {
   const endpoints = require("./index");
   const names = ["friendInviteCurrent", "friendInviteCreate", "friendInviteClaim", "messagingAuthorizePeer",
     "adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
-    "passkeyRecoveryBeginEnrollment", "passkeyRecoveryContinueEnrollment", "passkeyRecoveryCompleteEnrollment",
-    "passkeyRecoveryBeginUnlock", "passkeyRecoveryCompleteUnlock", "passkeyRecoveryListCredentials",
-    "passkeyRecoveryRemoveCredential",
+    "opaqueRecoveryBeginRegistration", "opaqueRecoveryFinishRegistration", "opaqueRecoveryBeginUnlock",
+    "opaqueRecoveryFinishUnlock", "opaqueRecoveryRotate", "opaqueRecoveryRemove",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",

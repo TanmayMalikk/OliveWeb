@@ -21,6 +21,9 @@ test("plan owner edits checklist steps, previews documents and opens the consult
   await openPlan(page);
   const documents = page.getByRole("group", { name: "Important documents" });
   const row = (index: number) => documents.getByRole("textbox", { name: "Important documents step " + index });
+  const statusBanner = page.getByRole("status").filter({
+    has: page.getByRole("button", { name: "Dismiss" }),
+  });
   await expect(row(1)).toHaveValue("Prepare identification");
   await page.getByRole("tab", { name: "Primary plan" }).press("ArrowRight");
   await expect(row(1)).toHaveValue("Backup identification");
@@ -32,7 +35,7 @@ test("plan owner edits checklist steps, previews documents and opens the consult
   await documents.getByRole("button", { name: "Add step" }).click();
   await row(3).fill("Pack copies");
   await row(3).blur();
-  await expect(page.getByRole("status").filter({ hasText: "Important documents saved." }).first()).toBeVisible();
+  await expect(statusBanner).toContainText("Important documents saved.");
   await documents.getByRole("button", { name: "Remove Important documents step 3" }).click();
   await expect(row(3)).toHaveCount(0);
 
@@ -50,7 +53,7 @@ test("plan owner edits checklist steps, previews documents and opens the consult
 
   await page.getByRole("checkbox", { name: "Trusted", exact: true }).check();
   await page.getByRole("button", { name: "Save sharing" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Safe contact access updated." }).first()).toBeVisible();
+  await expect(statusBanner).toContainText("Safe contact access updated.");
   await page.getByRole("button", { name: "Request consultation" }).click();
   await page.getByRole("button", { name: "Open consultation ticket" }).click();
   const navigation = await page.evaluate(() => (window as Window & {panelEvents?: unknown[][]}).panelEvents);

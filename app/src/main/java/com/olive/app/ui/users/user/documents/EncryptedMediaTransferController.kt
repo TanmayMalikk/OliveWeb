@@ -15,6 +15,7 @@ import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.data.safety.isChatOnlyMediaMetadata
+import com.olive.app.data.safety.withDecryptedMetadata
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.security.AccountKeysetWrappedKey
@@ -57,6 +58,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+
+internal data class OpenedMedia(val document: SafetyDocument, val file: File)
 
 internal interface MediaTransferOperations {
     /**
@@ -111,9 +114,24 @@ internal interface MediaTransferOperations {
      *
      * @param document Safety document metadata record.
      * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for download file.
+     * @return The opened [OpenedMedia] containing resolved document metadata and plaintext preview file.
      */
-    suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File
+    suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia
+
+    /**
+     * Restores recoverable media metadata and device wrappers with one unlocked account keyset.
+     *
+     * @param documents Authorized encrypted media records visible to the account.
+     * @param viewerUid Active Firebase account identifier.
+     * @param keyset Account private key unlocked for this foreground recovery operation.
+     * @return Locally restored records, rejected IDs, and wrappers awaiting server synchronization.
+     */
+    suspend fun restoreDeviceAccess(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult
+
     /**
      * Builds available offline.
      *
@@ -178,12 +196,14 @@ internal class MediaTransferController(
     private val preparationFailureResolver:(Context,Throwable,MediaKind)->String=::preparationFailureMessage,
 ):MediaTransferOperations {
     private val applicationContext=context.applicationContext
+    private val accessRecovery = EncryptedMediaAccessRecovery(repository)
     private var observedOwnerUid:String?=null
     private var publishedMediaIds:Set<String> = emptySet()
     private val observationJobs=mutableMapOf<String,Job>()
     private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
     private val downloadGate=DocumentDownloadGate()
     private val sessionDecryptedCache = java.util.concurrent.ConcurrentHashMap<String, File>()
+    private val sessionOpenedCache = java.util.concurrent.ConcurrentHashMap<String, OpenedMedia>()
     private val speculativeCiphertextFiles = java.util.concurrent.ConcurrentHashMap<String, File>()
     private val uiStateFlow = MutableStateFlow(MediaTransferUiState())
     val uiState: StateFlow<MediaTransferUiState> = uiStateFlow.asStateFlow()
@@ -401,25 +421,26 @@ internal class MediaTransferController(
      *
      * @param document Safety document metadata record.
      * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for download file.
+     * @return The opened [OpenedMedia] for this document.
      */
-    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
+    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):OpenedMedia {
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
-        sessionDecryptedCache[document.id]?.takeIf { it.isFile && it.length() > 0 }?.let { return it }
+        sessionOpenedCache[document.id]?.takeIf { it.file.isFile && it.file.length() > 0 }?.let { return it }
         state=MediaTransferState.Preparing("downloading")
         return try {
             val opened=withContext(Dispatchers.IO) {
                 downloadGate.withDocumentLock(document.id) {
-                    sessionDecryptedCache[document.id]?.takeIf { it.isFile && it.length() > 0 }?.let { return@withDocumentLock it }
+                    sessionOpenedCache[document.id]?.takeIf { it.file.isFile && it.file.length() > 0 }?.let { return@withDocumentLock it }
                     downloadEncrypted(document,viewerUid)
                 }
             }
-            refreshOfflineCopies(viewerUid,listOf(document))
+            refreshOfflineCopies(viewerUid,listOf(opened.document))
             opened.also { state=MediaTransferState.Idle }
         } catch(failure:Exception) {
             if (failure is MediaAccessException && failure.reason == MediaAccessError.ACCESS_REVOKED) {
                 offlineCache.remove(viewerUid, document.id)
                 sessionDecryptedCache.remove(document.id)
+                sessionOpenedCache.remove(document.id)
             }
             val message=failure.localizedMessage ?: "Unable to download encrypted media"
             state=MediaTransferState.Failed(null,message,true)
@@ -483,6 +504,20 @@ internal class MediaTransferController(
     }
 
     /**
+     * Restores recoverable media metadata and device wrappers with one unlocked account keyset.
+     *
+     * @param documents Authorized encrypted media records visible to the account.
+     * @param viewerUid Active Firebase account identifier.
+     * @param keyset Account private key unlocked by one foreground recovery confirmation.
+     * @return Locally restored records, rejected IDs, and wrappers awaiting server synchronization.
+     */
+    override suspend fun restoreDeviceAccess(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult = accessRecovery.restore(documents, viewerUid, keyset)
+
+    /**
      * Builds available offline.
      *
      * @param document Safety document metadata record.
@@ -524,6 +559,7 @@ internal class MediaTransferController(
         withContext(Dispatchers.IO) { downloadGate.withDocumentLock(document.id) {
             offlineCache.remove(viewerUid, document.id)
             sessionDecryptedCache.remove(document.id)
+            sessionOpenedCache.remove(document.id)
         } }
         offlineCopies = offlineCopies + (document.id to OfflineMediaAvailability.NOT_CACHED)
     }
@@ -807,13 +843,13 @@ internal class MediaTransferController(
     }
 
     /**
-     * Executes the encrypted download workflow without exposing plaintext to Firebase or R2.
+     * Opens verified cached ciphertext or downloads it before local decryption.
      *
-     * @param document Safety document metadata record.
-     * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for download encrypted.
+     * @param document Encrypted media record authorized for the active account.
+     * @param viewerUid Active Firebase account identifier.
+     * @return Authenticated plaintext and its locally recovered private metadata.
      */
-    private suspend fun downloadEncrypted(document:SafetyDocument,viewerUid:String):File {
+    private suspend fun downloadEncrypted(document:SafetyDocument,viewerUid:String):OpenedMedia {
         offlineCache.verifiedCiphertext(viewerUid, document)?.let {
             return decryptCiphertext(it, document, viewerUid)
         }
@@ -923,29 +959,41 @@ internal class MediaTransferController(
     }
 
     /**
-     * Decrypts ciphertext.
+     * Recovers the media key, authenticates private metadata, and decrypts a temporary preview.
      *
-     * @param encrypted Encrypted supplied to [decryptCiphertext].
-     * @param document Safety document metadata record.
-     * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for decrypt ciphertext.
+     * @param encrypted Verified ciphertext stored in app-private storage.
+     * @param document Server-visible authorization data and encrypted private metadata.
+     * @param viewerUid Active Firebase account identifier.
+     * @return Viewer-ready metadata and an app-private temporary plaintext file.
      */
-    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File = withContext(Dispatchers.IO) {
+    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):OpenedMedia = withContext(Dispatchers.IO) {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
         var recoveredViaAccountKeyset = false
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
             .getOrElse { deviceFailure ->
                 val accountWrapper=document.accountWrappedKeys[viewerUid]
-                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
-                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrNull()
-                    ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,deviceFailure)
+                    ?: throw MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_MISSING,deviceFailure)
+                val keyset=runCatching { accountKeysetUnlocker(viewerUid) }.getOrElse {
+                    throw MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED,it)
+                } ?: throw MediaAccessException(MediaAccessError.ACCOUNT_RECOVERY_FAILED,deviceFailure)
+                if(keyset.keyId != accountWrapper.keyId || keyset.epoch != accountWrapper.epoch) {
+                    throw MediaAccessException(MediaAccessError.ACCOUNT_KEYSET_MISMATCH)
+                }
                 recoveredViaAccountKeyset = true
                 runCatching { accountWrapper.unwrap(keyset) }
-                    .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
+                    .getOrElse { throw MediaAccessException(MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED,it) }
             }
+        val resolvedDocument = try {
+            if (document.encryptedMetadata.isBlank()) document else document.withDecryptedMetadata(
+                JSONObject(EncryptionUtils.decryptText(document.encryptedMetadata, key)),
+            )
+        } catch (failure: Exception) {
+            throw MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure)
+        }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
-        val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+        val extension=resolvedDocument.name.substringAfterLast('.',"")
+            .takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
         val partial = File.createTempFile("preview-", ".part", opened)
         val target = File(opened, partial.nameWithoutExtension + (extension?.let { ".$it" } ?: ".preview"))
         try {
@@ -953,7 +1001,8 @@ internal class MediaTransferController(
                 MediaCipher.decrypt(input,output,key)
             } }
             check(partial.renameTo(target))
-            sessionDecryptedCache[document.id] = target
+            val openedMedia = OpenedMedia(resolvedDocument, target)
+            sessionOpenedCache[document.id] = openedMedia
             if (recoveredViaAccountKeyset) {
                 scope.launch(Dispatchers.IO) {
                     runCatching {
@@ -966,10 +1015,11 @@ internal class MediaTransferController(
                     }.onFailure { if (it is CancellationException) throw it }
                 }
             }
-            return@withContext target
+            return@withContext openedMedia
         } catch(failure:Exception) {
             partial.delete()
-            throw failure
+            if (failure is MediaAccessException) throw failure
+            throw MediaAccessException(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure)
         }
     }
 

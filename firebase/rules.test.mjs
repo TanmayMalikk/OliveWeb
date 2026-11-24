@@ -165,6 +165,9 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
   const bob = env.authenticatedContext('keyset-bob').firestore();
   const anonymous = env.unauthenticatedContext().firestore();
   const target = doc(alice, 'accountKeysets', uid);
+  await assertSucceeds(getDoc(target));
+  await assertFails(getDoc(doc(bob, 'accountKeysets', uid)));
+  await assertFails(getDoc(doc(anonymous, 'accountKeysets', uid)));
   const envelope = {
     version: 1,
     accountId: uid,
@@ -189,6 +192,43 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
     await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
       ...envelope,
       updatedAt: Date.now(),
+    });
+  });
+  await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      passwordRecovery: {
+        version: 1,
+        accountId: uid,
+        opaqueRecordId: 'rec_1234567890123456',
+        algorithm: 'OPAQUE-3DH-HKDF-SHA256-AES-256-GCM',
+        salt: `${'A'.repeat(43)}=`,
+        iv: 'A'.repeat(16),
+        ciphertext: 'A'.repeat(64),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await assertSucceeds(getDoc(target));
+  await assertSucceeds(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }, { merge: true }));
+  await assertFails(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      'passwordRecovery.salt': 'invalid',
+    });
+  });
+  await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      version: 2,
+      updatedAt: serverTimestamp(),
     });
   });
   await assertFails(getDoc(target));
@@ -247,6 +287,24 @@ test('passkey recovery factors are callable-service-only', async () => {
     await assertFails(getDoc(doc(client, credentialPath)));
     await assertFails(getDoc(doc(client, challengePath)));
     await assertFails(setDoc(doc(client, credentialPath), {ownerUid: uid, ciphertext: 'forged'}));
+  }
+});
+
+test('opaque recovery throttling state is callable-service-only', async () => {
+  const uid = 'opaque-throttle-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('opaque-throttle-bob').firestore();
+  const throttlePath = `accountRecoveryOpaqueThrottle/${uid}`;
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), throttlePath), {failedAttempts: 5, lockedUntil: Date.now() + 60000});
+  });
+
+  for (const client of [alice, bob, env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(client, throttlePath)));
+    await assertFails(getDocs(collection(client, 'accountRecoveryOpaqueThrottle')));
+    await assertFails(setDoc(doc(client, throttlePath), {failedAttempts: 0, lockedUntil: 0}));
+    await assertFails(updateDoc(doc(client, throttlePath), {failedAttempts: 0}));
+    await assertFails(deleteDoc(doc(client, throttlePath)));
   }
 });
 

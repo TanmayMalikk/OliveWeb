@@ -105,9 +105,8 @@ service cloud.firestore {
     // Account keysets contain an ARK-encrypted private key, never an ARK or a raw file key.
     // The owner can create its initial ciphertext envelope and retry the exact same envelope; future
     // rotations require a dedicated, reviewed migration rather than a broad client update rule.
-    function validAccountKeysetShape(data, uid) {
-      return data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt'])
-        && data.version == 1
+    function validAccountKeysetFields(data, uid) {
+      return data.version == 1
         && data.accountId is string && data.accountId == uid
         && data.keyId is string && data.keyId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
         && data.epoch is int && data.epoch == 1
@@ -119,15 +118,52 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function validAccountKeysetInitialShape(data, uid) {
+      return data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt'])
+        && validAccountKeysetFields(data, uid);
+    }
+
+    function validPasswordRecoveryEnvelope(data, uid) {
+      return data is map
+        && data.keys().hasOnly(['version','accountId','opaqueRecordId','algorithm','salt','iv','ciphertext','createdAt','updatedAt'])
+        && data.keys().hasAll(['version','accountId','opaqueRecordId','algorithm','salt','iv','ciphertext','createdAt','updatedAt'])
+        && data.version == 1
+        && data.accountId is string && data.accountId == uid
+        && data.opaqueRecordId is string
+        && data.opaqueRecordId.size() >= 16 && data.opaqueRecordId.size() <= 1024
+        && data.opaqueRecordId.matches('^[A-Za-z0-9_-]+$')
+        && data.algorithm == 'OPAQUE-3DH-HKDF-SHA256-AES-256-GCM'
+        && data.salt is string && data.salt.matches('^[A-Za-z0-9+/]{43}=$')
+        && data.iv is string && data.iv.matches('^[A-Za-z0-9+/]{16}$')
+        && data.ciphertext is string && data.ciphertext.matches('^[A-Za-z0-9+/]{64}$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validAccountKeysetShape(data, uid) {
+      return validAccountKeysetInitialShape(data, uid)
+        || (
+          data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt','passwordRecovery'])
+          && data.keys().hasAll(['passwordRecovery'])
+          && validAccountKeysetFields(data, uid)
+          && validPasswordRecoveryEnvelope(data.passwordRecovery, uid)
+        );
+    }
+
     function validAccountKeysetWrite(data, uid) {
-      return validAccountKeysetShape(data, uid) && data.updatedAt == request.time;
+      return validAccountKeysetInitialShape(data, uid) && data.updatedAt == request.time;
     }
 
     match /accountKeysets/{uid} {
+      // A first-run owner must be able to distinguish an absent keyset from an access denial.
+      // Existing records still have to pass the ciphertext-envelope schema before being returned.
       allow get: if owner(uid) && (resource == null || validAccountKeysetShape(resource.data, uid));
       allow list, delete: if false;
       allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
-      allow update: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid)
+      // Allow idempotent SetOptions.merge() refreshes (only updatedAt may change) while preserving
+      // an existing server-managed passwordRecovery envelope without allowing clients to add/edit/delete it.
+      allow update: if owner(uid) && validAccountKeysetShape(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
     }
 
@@ -168,6 +204,18 @@ service cloud.firestore {
     // exclusively by callable functions. An encrypted envelope is released only after a verified,
     // user-present passkey assertion, never through a direct Firestore read.
     match /accountRecoveryPasskeys/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery records and short-lived unlock sessions are owned exclusively
+    // by Cloud Functions with App Check and caller UID enforcement. Direct client access is denied.
+    match /accountRecoveryOpaqueRecords/{uid} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery unlock throttling state is owned exclusively by Cloud Functions.
+    // Direct client reads, resets, or deletions are denied so brute-force limits cannot be bypassed.
+    match /accountRecoveryOpaqueThrottle/{uid} {
       allow read, write: if false;
     }
 

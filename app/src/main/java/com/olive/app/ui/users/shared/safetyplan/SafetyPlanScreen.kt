@@ -403,8 +403,8 @@ internal fun SafetyPlanScreen(
                                     attachmentsEditable = !organizationEditor && !safeContact,
                                     documents = documentController.state.files.filter { it.ownerUid == ownerUid },
                                     onOpenDocument = { document ->
-                                        documentController.download(document) { file ->
-                                            openedDocument = document to file
+                                        documentController.download(document) { resolved, file ->
+                                            openedDocument = resolved to file
                                         }
                                     },
                                     onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {

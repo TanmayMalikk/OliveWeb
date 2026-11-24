@@ -19,7 +19,7 @@ import {
 import { accountKeysetSession, firebase } from "./AccountService";
 import { database } from "./LocalDataStore";
 import { authorizeMessagingPeer } from "./FriendInviteService";
-import { accountKeysetWrappers } from "./PasskeyRecovery";
+import { accountKeysetWrappers } from "./AccountKeysetCrypto";
 import type { Identity } from "../domain/DomainModels";
 export interface DirectoryUser {
   uid: string;

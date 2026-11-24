@@ -15,8 +15,11 @@ import com.olive.app.data.account.SafeContact
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.profileChanges
-import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.security.*
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -428,6 +431,14 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         currentPassword,
                         newPassword
                     )
+                    if (state.passwordRecoveryEnrolled == true) {
+                        try {
+                            val ark = accountRecoveryKey(device.uid, token)
+                            opaqueRecoveryRepository?.rotate(device.uid, currentPassword, newPassword, ark)
+                        } catch (e: Exception) {
+                            android.util.Log.e("SessionAccountSettings", "Failed to rotate password recovery", e)
+                        }
+                    }
                     withContext(Dispatchers.IO) {
                         store.recordSettings(
                             device.uid, SettingsEvent(
@@ -448,75 +459,6 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    /** Loads the user's enrolled passkey recovery credentials into session state. */
-    fun refreshPasskeyRecovery() = with(runtime) {
-        val uid = enrollment?.uid ?: return@with
-        val repository = passkeyRecoveryRepository ?: return@with
-        scope.launch {
-            val credentials = runCatching { repository.listCredentials() }.getOrNull() ?: return@launch
-            if (enrollment?.uid == uid) state.passkeyRecoveryCredentials = credentials
-        }
-    }
-
-    /** Enrolls a new passkey recovery factor protecting the user's Account Recovery Key. */
-    fun enablePasskeyRecovery() = with(runtime) {
-        with(state) {
-            val uid = enrollment?.uid ?: return@with
-            val recovery = passkeyRecoveryRepository ?: return@with
-            if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
-            operations.runOperation(
-                application.getString(R.string.passkey_recovery_setup_failed),
-                timeoutMillis = 180_000,
-            ) { token ->
-                val ark = accountRecoveryKey(uid, token, ensureRemotePublished = true)
-                val registration = recovery.beginEnrollment()
-                val registrationResult = requestPasskey(
-                    PasskeyPrfProtocol.registrationRequest(registration.options), false, uid, token,
-                ) as? PasskeyCredentialResult.Registration ?: error("Passkey registration was cancelled")
-                val proof = recovery.continueEnrollment(registration.challengeId, registrationResult.serverResponseJson)
-                val assertion = requestPasskey(
-                    PasskeyPrfProtocol.assertionRequest(proof.options, proof.prfInputs), true, uid, token,
-                ) as? PasskeyCredentialResult.Assertion ?: error("Passkey verification was cancelled")
-                val result = assertion.value
-                try {
-                    check(proof.prfInputs.containsKey(result.credentialId)) {
-                        "Passkey proof selected an unexpected credential"
-                    }
-                    val envelope = PasskeyRecoveryEnvelope.create(uid, result.credentialId, result.prfOutput, ark)
-                    recovery.completeEnrollment(proof.challengeId, result.serverResponseJson, envelope)
-                } finally {
-                    result.prfOutput.fill(0)
-                }
-                val credentials = recovery.listCredentials()
-                if (currentRecoverySession(uid, token)) {
-                    passkeyRecoveryCredentials = credentials
-                    message = application.getString(R.string.passkey_recovery_enabled)
-                }
-            }
-        }
-    }
-
-    /**
-     * Removes an enrolled passkey recovery credential and refreshes the stored list.
-     *
-     * @param credentialId The WebAuthn credential identifier for the passkey.
-     */
-    fun removePasskeyRecovery(credentialId: String) = with(runtime) {
-        with(state) {
-            val uid = enrollment?.uid ?: return@with
-            val recovery = passkeyRecoveryRepository ?: return@with
-            if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
-            operations.runOperation(application.getString(R.string.passkey_recovery_remove_failed)) { token ->
-                recovery.removeCredential(credentialId)
-                val credentials = recovery.listCredentials()
-                if (currentRecoverySession(uid, token)) {
-                    passkeyRecoveryCredentials = credentials
-                    message = application.getString(R.string.passkey_recovery_removed)
-                }
-            }
-        }
-    }
-
     /**
      * Publishes the user's encrypted account keyset envelope to Firestore once per session epoch.
      *
@@ -528,21 +470,17 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Obtains the unlocked [AccountRecoveryKey], recovering from passkey or provisioning if missing.
+     * Obtains the unlocked [AccountRecoveryKey], recovering via OPAQUE password recovery or provisioning if missing.
      *
      * @param uid The account UID used to scope this operation.
      * @param token The session epoch captured when the operation started.
-     * @param ensureRemotePublished Whether to publish the local account keyset if the server needs it.
      * @return The unlocked account recovery key for the active account.
      */
-    private suspend fun accountRecoveryKey(
-        uid: String, token: Long, ensureRemotePublished: Boolean = false,
-    ): AccountRecoveryKey {
+    internal suspend fun accountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
         val local = withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid) }
         if (local != null) {
             val key = unlockDeviceRecoveryKey(uid, local.deviceRecord, token)
-            if (ensureRemotePublished) publishKeyset(local.envelope)
-            else runtime.scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local.envelope) } }
+            runtime.scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local.envelope) } }
             return key
         }
         val remote = runtime.accountKeysetRepository?.fetch(uid) ?: return createAccountRecoveryKey(uid, token)
@@ -576,40 +514,18 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Unlocks [keyset] via a passkey PRF assertion and re-wraps the ARK under device authentication.
+     * Recovers and validates the account recovery key through OPAQUE password recovery.
      *
-     * @param uid The account UID used to scope this operation.
-     * @param keyset The account keyset used for encryption or recovery.
-     * @param token The session epoch captured when the operation started.
-     * @return The recovery key unwrapped from the passkey-protected envelope.
+     * @param uid Authenticated account whose encrypted keyset is being recovered.
+     * @param keyset Server-fetched encrypted account keyset used to validate the recovered key.
+     * @param token Session generation used to reject stale authentication results.
+     * @return The validated account recovery key held only in client memory.
      */
     private suspend fun recoverAccountRecoveryKey(
         uid: String,
         keyset: AccountKeysetEnvelope,
         token: Long,
-    ): AccountRecoveryKey {
-        val repository = checkNotNull(runtime.passkeyRecoveryRepository)
-        val start = repository.beginUnlock()
-        val assertion = requestPasskey(
-            PasskeyPrfProtocol.assertionRequest(start.options, start.prfInputs),
-            assertion = true,
-            uid = uid,
-            token = token,
-        ) as? PasskeyCredentialResult.Assertion ?: error("Passkey recovery was cancelled")
-        val result = assertion.value
-        try {
-            val completion = repository.completeUnlock(start.challengeId, result.serverResponseJson)
-            check(start.prfInputs[result.credentialId] == completion.prfInput) {
-                "Passkey recovery input mismatch"
-            }
-            val recoveryKey = completion.envelope.open(uid, result.credentialId, result.prfOutput)
-            withContext(Dispatchers.IO) { keyset.unlock(uid, recoveryKey) }
-            protectDeviceRecoveryKey(uid, recoveryKey, keyset, token)
-            return recoveryKey
-        } finally {
-            result.prfOutput.fill(0)
-        }
-    }
+    ): AccountRecoveryKey = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, token)
 
     /**
      * Unlocks a local [AccountRecoveryKey] using biometric or device credential authentication.
@@ -643,7 +559,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param envelope The encrypted envelope carrying the account keyset.
      * @param token The session epoch captured when the operation started.
      */
-    private suspend fun protectDeviceRecoveryKey(
+    internal suspend fun protectDeviceRecoveryKey(
         uid: String,
         recoveryKey: AccountRecoveryKey,
         envelope: AccountKeysetEnvelope,
@@ -684,33 +600,6 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
             request.result.await() ?: error("Device authentication was cancelled")
         } finally {
             if (runtime.state.deviceLockRequest === request) runtime.state.deviceLockRequest = null
-        }
-    }
-
-    /**
-     * Requests an Activity-hosted Credential Manager ceremony for passkey recovery.
-     *
-     * @param requestJson The serialized WebAuthn request passed to Credential Manager.
-     * @param assertion Whether the request is an assertion rather than registration.
-     * @param uid The account UID used to scope this operation.
-     * @param token The session epoch captured when the operation started.
-     * @return The credential result returned by Android Credential Manager.
-     */
-    private suspend fun requestPasskey(
-        requestJson: String,
-        assertion: Boolean,
-        uid: String,
-        token: Long,
-    ): PasskeyCredentialResult {
-        check(currentRecoverySession(uid, token)) { "Recovery session changed" }
-        val request = PasskeyCredentialRequest(requestJson, assertion)
-        runtime.state.passkeyCredentialRequest = request
-        return try {
-            request.result.await() ?: error("Passkey request was cancelled")
-        } finally {
-            if (runtime.state.passkeyCredentialRequest === request) {
-                runtime.state.passkeyCredentialRequest = null
-            }
         }
     }
 

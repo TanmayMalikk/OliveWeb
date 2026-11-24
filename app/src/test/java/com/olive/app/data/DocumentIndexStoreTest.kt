@@ -26,7 +26,7 @@ class DocumentIndexStoreTest {
         val remote = FakeRemote()
         val original = document("standalone-evidence", ALICE).copy(evidence = false)
         remote.documents = listOf(original)
-        val repository = IndexedSafetyDocumentRepository(remote, index)
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" })
         repository.listFor(ALICE)
         repository.setEvidence(original, ALICE, true)
         assertTrue(repository.cachedFor(ALICE, original.id)!!.evidence)
@@ -78,7 +78,7 @@ class DocumentIndexStoreTest {
         val index = DocumentIndexStore(FakeJsonVault())
         index.replace(ALICE, listOf(document("kept", ALICE), document("revoked", ALICE)), 100)
         val remote = FakeRemote()
-        val repository = IndexedSafetyDocumentRepository(remote, index) { 500 }
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" }) { 500 }
         val observed = mutableListOf<DocumentListSnapshot>()
         repository.observeFor(ALICE, observed::add) { error(it) }
 
@@ -94,6 +94,39 @@ class DocumentIndexStoreTest {
         )
         assertEquals(listOf("kept"), index.read(ALICE).documents.map { it.id })
         assertEquals(400L, index.read(ALICE).lastSyncedAt)
+    }
+
+    @Test
+    fun `recovered metadata and current device wrapper survive a stale server snapshot`() = runBlocking {
+        val index = DocumentIndexStore(FakeJsonVault())
+        val remote = FakeRemote()
+        val encrypted = document("recovered", ALICE).copy(
+            name = "Encrypted document",
+            mimeType = "application/octet-stream",
+            deviceWrappedKeys = emptyMap(),
+        )
+        remote.documents = listOf(encrypted)
+        val repository = IndexedSafetyDocumentRepository(
+            remote = remote,
+            index = index,
+            clock = { 500 },
+            deviceId = { "new-device" },
+        )
+        repository.listFor(ALICE)
+        repository.rememberRecovered(
+            ALICE,
+            encrypted.copy(
+                name = "recovered.pdf",
+                mimeType = "application/pdf",
+                deviceWrappedKeys = mapOf("$ALICE--new-device" to "local-device-wrapper"),
+            ),
+        )
+
+        val refreshed = repository.listFor(ALICE).documents.single()
+
+        assertEquals("recovered.pdf", refreshed.name)
+        assertEquals("application/pdf", refreshed.mimeType)
+        assertEquals("local-device-wrapper", refreshed.deviceWrappedKeys["$ALICE--new-device"])
     }
 
     @Test

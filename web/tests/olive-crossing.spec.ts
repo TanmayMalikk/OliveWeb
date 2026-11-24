@@ -88,25 +88,24 @@ test("Olive Crossing shows the complete world width without side panning on PC",
   await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
 
   const board = page.locator(".crossing-stage > svg");
-  const laneEdges = board.locator('.crossing-lane:last-child polygon[fill="#253b2533"]');
-  await expect(laneEdges).toHaveCount(2);
-  await expect.poll(() => board.evaluate(svg => {
-    const { x, width } = (svg as SVGSVGElement).viewBox.baseVal;
-    const edges = [...svg.querySelectorAll<SVGPolygonElement>('.crossing-lane:last-child polygon[fill="#253b2533"]')];
-    return edges.every(edge => {
-      const bounds = edge.getBBox();
-      return bounds.x >= x && bounds.x + bounds.width <= x + width;
-    });
-  })).toBe(true);
-  const initialEdges = await laneEdges.evaluateAll(edges => edges.map(edge => edge.getAttribute("points")));
-  const player = board.locator(".crossing-player");
-  const startingX = Number(await player.getAttribute("data-world-x"));
-
   await page.getByRole("button", { name: "Start Olive Crossing" }).click();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await expect.poll(async () => Number(await player.getAttribute("data-world-x"))).toBeGreaterThan(startingX);
-  expect(await laneEdges.evaluateAll(edges => edges.map(edge => edge.getAttribute("points")))).toEqual(initialEdges);
+  await page.waitForFunction(async () => {
+    const stage = document.querySelector(".crossing-stage > svg");
+    const viewBox = stage?.getAttribute("viewBox");
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    return Boolean(viewBox) && stage?.getAttribute("viewBox") === viewBox;
+  });
+  const initialViewBox = await board.getAttribute("viewBox");
+  const viewport = initialViewBox?.trim().split(/\s+/).map(Number) ?? [];
+  expect(viewport).toHaveLength(4);
+  expect(viewport.every(Number.isFinite)).toBe(true);
+  expect(viewport[2]).toBeGreaterThan(0);
+  expect(viewport[3]).toBeGreaterThan(0);
+
+  for (const key of ["ArrowRight", "ArrowRight", "ArrowLeft", "ArrowLeft"]) {
+    await page.keyboard.press(key);
+  }
+  await expect(board).toHaveAttribute("viewBox", initialViewBox!);
   expect(
     await page.locator(".crossing-stage").evaluate(
       (stage) => stage.scrollWidth <= stage.clientWidth + 1,

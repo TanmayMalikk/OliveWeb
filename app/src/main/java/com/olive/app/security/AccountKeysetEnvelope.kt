@@ -1,13 +1,7 @@
 package com.olive.app.security
 
-import android.os.Build
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.Base64 as AndroidBase64
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
-import java.security.KeyStore
-import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
@@ -16,7 +10,6 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import java.util.UUID
 import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -299,23 +292,26 @@ internal data class AccountKeysetEnvelope(
 }
 
 /**
- * Web-compatible ciphertext envelope for one ARK protected by a passkey PRF result.
+ * Ciphertext envelope for one ARK protected by an OPAQUE export key.
  *
- * Only this opaque value crosses Firebase. The PRF result, derived KEK, and raw ARK remain in the
- * client operation and are cleared where the platform exposes mutable byte arrays.
+ * This provides zero-knowledge password recovery failsafe. Only this opaque value
+ * crosses Firebase. The export key, derived KEK, and raw ARK remain strictly client-side
+ * and are zeroed immediately after use.
  */
-internal data class PasskeyRecoveryEnvelope(
+internal data class OpaquePasswordRecoveryEnvelope(
     val version: Int,
     val accountId: String,
-    val credentialId: String,
+    val opaqueRecordId: String,
+    val algorithm: String,
     val saltBase64: String,
     val ivBase64: String,
     val ciphertextBase64: String,
 ) {
     init {
-        require(version == VERSION) { "Unsupported passkey recovery envelope" }
+        require(version == VERSION) { "Unsupported password recovery version" }
         require(validAccountId(accountId)) { "Invalid account ID" }
-        require(CREDENTIAL_ID.matches(credentialId)) { "Invalid passkey credential ID" }
+        require(RECORD_ID.matches(opaqueRecordId)) { "Invalid OPAQUE record ID" }
+        require(algorithm == ALGORITHM) { "Unsupported password recovery algorithm" }
         require(decode(saltBase64).size == SALT_BYTES) { "Invalid recovery salt" }
         require(decode(ivBase64).size == IV_BYTES) { "Invalid recovery IV" }
         require(decode(ciphertextBase64).size == RECOVERY_KEY_BYTES + TAG_BYTES) {
@@ -331,7 +327,8 @@ internal data class PasskeyRecoveryEnvelope(
     internal fun toMap(): Map<String, Any> = mapOf(
         "version" to version,
         "accountId" to accountId,
-        "credentialId" to credentialId,
+        "opaqueRecordId" to opaqueRecordId,
+        "algorithm" to algorithm,
         "salt" to saltBase64,
         "iv" to ivBase64,
         "ciphertext" to ciphertextBase64,
@@ -347,18 +344,19 @@ internal data class PasskeyRecoveryEnvelope(
      */
     internal fun open(
         expectedAccountId: String,
-        expectedCredentialId: String,
-        prfOutput: ByteArray,
+        expectedRecordId: String,
+        exportKey: ByteArray,
     ): AccountRecoveryKey {
-        require(expectedAccountId == accountId && expectedCredentialId == credentialId) {
-            "Passkey recovery record belongs to another account or credential"
+        require(expectedAccountId == accountId && expectedRecordId == opaqueRecordId) {
+            "Password recovery record belongs to another account or record"
         }
-        require(prfOutput.size == PRF_BYTES) { "Invalid passkey recovery output" }
-        val key = deriveKey(prfOutput, decode(saltBase64))
+        require(exportKey.size in VALID_EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
+        val key = deriveKey(exportKey, decode(saltBase64), accountId)
+        val authData = aad(version, accountId, opaqueRecordId, algorithm)
         val plaintext = try {
             Cipher.getInstance(AES_GCM).run {
                 init(Cipher.DECRYPT_MODE, SecretKeySpec(key, AES), GCMParameterSpec(TAG_BITS, decode(ivBase64)))
-                updateAAD(aad(accountId, credentialId))
+                updateAAD(authData)
                 doFinal(decode(ciphertextBase64))
             }
         } finally {
@@ -373,8 +371,9 @@ internal data class PasskeyRecoveryEnvelope(
 
     companion object {
         private const val VERSION = 1
+        private const val ALGORITHM = "OPAQUE-3DH-HKDF-SHA256-AES-256-GCM"
         private const val RECOVERY_KEY_BYTES = 32
-        private const val PRF_BYTES = 32
+        private val VALID_EXPORT_KEY_BYTES = setOf(32, 64)
         private const val SALT_BYTES = 32
         private const val IV_BYTES = 12
         private const val TAG_BYTES = 16
@@ -382,8 +381,8 @@ internal data class PasskeyRecoveryEnvelope(
         private const val AES = "AES"
         private const val AES_GCM = "AES/GCM/NoPadding"
         private const val HMAC_SHA_256 = "HmacSHA256"
-        private const val HKDF_INFO = "olive.account.ark.passkey-prf.v1"
-        private val CREDENTIAL_ID = Regex("[A-Za-z0-9_-]{16,1024}")
+        private const val HKDF_PREFIX = "olive-branch/password-recovery/v1/"
+        private val RECORD_ID = Regex("[A-Za-z0-9_-]{16,1024}")
 
         /**
          * Encrypts [recoveryKey] under a key derived from WebAuthn [prfOutput] and random salt/IV.
@@ -398,33 +397,35 @@ internal data class PasskeyRecoveryEnvelope(
          */
         internal fun create(
             accountId: String,
-            credentialId: String,
-            prfOutput: ByteArray,
+            opaqueRecordId: String,
+            exportKey: ByteArray,
             recoveryKey: AccountRecoveryKey,
             salt: ByteArray = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes),
             iv: ByteArray = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes),
-        ): PasskeyRecoveryEnvelope {
+        ): OpaquePasswordRecoveryEnvelope {
             require(validAccountId(accountId)) { "Invalid account ID" }
-            require(CREDENTIAL_ID.matches(credentialId)) { "Invalid passkey credential ID" }
-            require(prfOutput.size == PRF_BYTES) { "Invalid passkey recovery output" }
+            require(RECORD_ID.matches(opaqueRecordId)) { "Invalid OPAQUE record ID" }
+            require(exportKey.size in VALID_EXPORT_KEY_BYTES) { "Invalid OPAQUE export key" }
             require(salt.size == SALT_BYTES) { "Invalid recovery salt" }
             require(iv.size == IV_BYTES) { "Invalid recovery IV" }
-            val key = deriveKey(prfOutput, salt)
+            val key = deriveKey(exportKey, salt, accountId)
+            val authData = aad(VERSION, accountId, opaqueRecordId, ALGORITHM)
             val rawRecoveryKey = recoveryKey.encodedCopy()
             val ciphertext = try {
                 Cipher.getInstance(AES_GCM).run {
                     init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, AES), GCMParameterSpec(TAG_BITS, iv))
-                    updateAAD(aad(accountId, credentialId))
+                    updateAAD(authData)
                     doFinal(rawRecoveryKey)
                 }
             } finally {
                 rawRecoveryKey.fill(0)
                 key.fill(0)
             }
-            return PasskeyRecoveryEnvelope(
+            return OpaquePasswordRecoveryEnvelope(
                 VERSION,
                 accountId,
-                credentialId,
+                opaqueRecordId,
+                ALGORITHM,
                 encode(salt),
                 encode(iv),
                 encode(ciphertext),
@@ -432,18 +433,19 @@ internal data class PasskeyRecoveryEnvelope(
         }
 
         /**
-         * Parses a [PasskeyRecoveryEnvelope] from a map returned by Cloud Functions.
+         * Parses an [OpaquePasswordRecoveryEnvelope] from a map returned by Cloud Functions.
          *
          * @param value The stored field map to parse.
-         * @return The recovery envelope containing the passkey-protected key.
+         * @return The recovery envelope containing the OPAQUE-protected key.
          */
-        internal fun fromMap(value: Map<*, *>): PasskeyRecoveryEnvelope = PasskeyRecoveryEnvelope(
+        internal fun fromMap(value: Map<*, *>): OpaquePasswordRecoveryEnvelope = OpaquePasswordRecoveryEnvelope(
             version = (value["version"] as? Number)?.toInt()
                 ?: throw IllegalArgumentException("Invalid recovery version"),
             accountId = value["accountId"] as? String
                 ?: throw IllegalArgumentException("Invalid account ID"),
-            credentialId = value["credentialId"] as? String
-                ?: throw IllegalArgumentException("Invalid passkey credential ID"),
+            opaqueRecordId = value["opaqueRecordId"] as? String
+                ?: throw IllegalArgumentException("Invalid OPAQUE record ID"),
+            algorithm = value["algorithm"] as? String ?: ALGORITHM,
             saltBase64 = value["salt"] as? String
                 ?: throw IllegalArgumentException("Invalid recovery salt"),
             ivBase64 = value["iv"] as? String
@@ -453,21 +455,23 @@ internal data class PasskeyRecoveryEnvelope(
         )
 
         /**
-         * RFC 5869 HKDF-SHA-256. A 256-bit key needs only the first expansion block.
+         * RFC 5869 HKDF-SHA-256 bound to purpose, version, and UID.
          *
-         * @param prfOutput The credential manager's PRF output for this passkey.
+         * @param exportKey The OPAQUE export key bytes for this user.
          * @param salt The salt used to derive the wrapping key.
+         * @param accountId The owning account UID.
          * @return The 32-byte wrapping key derived with HKDF-SHA-256.
          */
-        private fun deriveKey(prfOutput: ByteArray, salt: ByteArray): ByteArray {
+        private fun deriveKey(exportKey: ByteArray, salt: ByteArray, accountId: String): ByteArray {
             val extract = Mac.getInstance(HMAC_SHA_256).run {
                 init(SecretKeySpec(salt, HMAC_SHA_256))
-                doFinal(prfOutput)
+                doFinal(exportKey)
             }
+            val info = (HKDF_PREFIX + accountId).toByteArray(Charsets.UTF_8)
             return try {
                 Mac.getInstance(HMAC_SHA_256).run {
                     init(SecretKeySpec(extract, HMAC_SHA_256))
-                    doFinal(HKDF_INFO.toByteArray(Charsets.UTF_8) + byteArrayOf(1))
+                    doFinal(info + byteArrayOf(1))
                 }
             } finally {
                 extract.fill(0)
@@ -475,14 +479,10 @@ internal data class PasskeyRecoveryEnvelope(
         }
 
         /**
-         * Builds AES-GCM additional authenticated data binding context to [accountId] and [credentialId].
-         *
-         * @param accountId The account ID that owns the key or record.
-         * @param credentialId The WebAuthn credential identifier for the passkey.
-         * @return The UTF-8 bytes supplied as additional authenticated data for AES-GCM.
+         * Builds AES-GCM additional authenticated data binding version, UID, record ID, and algorithm.
          */
-        private fun aad(accountId: String, credentialId: String) =
-            "$HKDF_INFO|$accountId|$credentialId".toByteArray(Charsets.UTF_8)
+        private fun aad(version: Int, accountId: String, recordId: String, algorithm: String) =
+            "$version|$accountId|$recordId|$algorithm".toByteArray(Charsets.UTF_8)
 
         /**
          * Checks that [value] is a non-empty URL/path-safe account UID string.
@@ -506,448 +506,5 @@ internal data class PasskeyRecoveryEnvelope(
          * @return The bytes decoded from the Base64 string.
          */
         private fun decode(value: String): ByteArray = Base64.getDecoder().decode(value)
-    }
-}
-
-/** Account-scoped local copies of encrypted keyset material; neither entry contains a raw ARK. */
-internal class AccountKeysetLocalStore(private val vault: JsonVault) {
-    internal data class Saved(
-        val envelope: AccountKeysetEnvelope,
-        val deviceRecord: AccountRecoveryKeyDeviceRecord,
-    )
-
-    /**
-     * Reads the local encrypted keyset envelope and device record for [accountId], if present.
-     *
-     * @param accountId The account ID that owns the key or record.
-     * @return The stored keyset envelope and recovery record, or null when unavailable or unreadable.
-     */
-    fun read(accountId: String): Saved? {
-        val value = vault.read().optJSONObject(SECTION)?.optJSONObject(accountId) ?: return null
-        return try {
-            Saved(
-                AccountKeysetEnvelope.fromJson(value.getJSONObject("envelope")),
-                AccountRecoveryKeyDeviceRecord.fromJson(value.getJSONObject("deviceRecord")),
-            ).also {
-                check(it.envelope.accountId == accountId && it.deviceRecord.accountId == accountId) {
-                    "Stored account keyset belongs to another account"
-                }
-            }
-        } catch (failure: Exception) {
-            throw AccountKeysetException("Stored account keyset is invalid", failure)
-        }
-    }
-
-    /**
-     * Persists a validated encrypted keyset envelope and device-protected ARK record into the local vault.
-     *
-     * @param value The paired account envelope and device-protected recovery key record.
-     */
-    fun save(value: Saved) {
-        require(value.envelope.accountId == value.deviceRecord.accountId) { "Account keyset record mismatch" }
-        vault.update { root ->
-            root.child(SECTION).put(value.envelope.accountId, JSONObject().apply {
-                put("envelope", value.envelope.toJson())
-                put("deviceRecord", value.deviceRecord.toJson())
-            })
-        }
-    }
-
-    /**
-     * Removes every local ciphertext envelope and device-protected ARK record for this account.
-     *
-     * @param accountId The account ID that owns the key or record.
-     * @return The device protection record that was removed, or null when there was no record.
-     */
-    fun purge(accountId: String): AccountRecoveryKeyDeviceRecord? {
-        var removed: AccountRecoveryKeyDeviceRecord? = null
-        vault.update { root ->
-            val entries = root.optJSONObject(SECTION) ?: return@update
-            entries.optJSONObject(accountId)?.let { value ->
-                removed = runCatching {
-                    AccountRecoveryKeyDeviceRecord.fromJson(value.getJSONObject("deviceRecord"))
-                }.getOrNull()
-            }
-            entries.remove(accountId)
-        }
-        return removed
-    }
-
-    private companion object {
-        const val SECTION = "accountKeysets"
-    }
-}
-
-/**
- * Single WebAuthn JSON boundary for production passkey recovery.
- * PRF output is extracted and removed here before a response can be sent to Firebase.
- */
-internal object PasskeyPrfProtocol {
-    const val RP_ID = "yourolivebranch.ca"
-    private val CREDENTIAL_ID = Regex("[A-Za-z0-9_-]{16,1024}")
-
-    internal data class AssertionResult(
-        val credentialId: String,
-        val serverResponseJson: String,
-        val prfOutput: ByteArray,
-    )
-
-    /**
-     * Validates and serializes WebAuthn passkey registration options for Credential Manager.
-     *
-     * @param options The WebAuthn options returned for the current ceremony.
-     * @return The validated registration options serialized for Credential Manager.
-     */
-    fun registrationRequest(options: Map<*, *>): String = JSONObject(options).apply {
-        require(nonEmpty(optString("challenge"))) { "Invalid registration challenge" }
-        require(optJSONObject("rp")?.optString("id") == RP_ID) { "Invalid relying party" }
-        require(nonEmpty(optJSONObject("user")?.optString("id"))) { "Invalid passkey user" }
-    }.toString()
-
-    /**
-     * Injects per-credential PRF evaluation salts into WebAuthn assertion options for Credential Manager.
-     *
-     * @param options The WebAuthn options returned for the current ceremony.
-     * @param prfInputs The per-credential PRF evaluation salts returned by the server.
-     * @return The assertion request JSON with per-credential PRF input salts.
-     */
-    fun assertionRequest(options: Map<*, *>, prfInputs: Map<String, String>): String {
-        val request = JSONObject(options)
-        require(nonEmpty(request.optString("challenge"))) { "Invalid assertion challenge" }
-        require(request.optString("rpId") == RP_ID) { "Invalid relying party" }
-        require(prfInputs.isNotEmpty()) { "No passkey recovery factors are available" }
-        val values = JSONObject()
-        prfInputs.forEach { (credentialId, encoded) ->
-            require(CREDENTIAL_ID.matches(credentialId)) { "Invalid passkey credential ID" }
-            val input = decodeBase64(encoded)
-            require(input.size == PRF_BYTES) { "Invalid PRF input" }
-            values.put(credentialId, JSONObject().put("first", base64Url(input)))
-            input.fill(0)
-        }
-        val extensions = request.optJSONObject("extensions") ?: JSONObject()
-        extensions.put("prf", JSONObject().put("evalByCredential", values))
-        return request.put("extensions", extensions).toString()
-    }
-
-    /**
-     * Extracts the raw 32-byte PRF output locally and strips secret PRF results before server submission.
-     *
-     * @param authenticationResponseJson The WebAuthn authentication response received from Credential Manager.
-     * @return The local PRF output and the sanitized assertion JSON for server verification.
-     */
-    fun assertionResult(authenticationResponseJson: String): AssertionResult {
-        val response = JSONObject(authenticationResponseJson)
-        val credentialId = response.optString("id")
-        require(CREDENTIAL_ID.matches(credentialId)) { "Invalid passkey credential ID" }
-        val prf = response.optJSONObject("clientExtensionResults")
-            ?.optJSONObject("prf") ?: throw IllegalArgumentException("Missing PRF result")
-        val encoded = prf.optJSONObject("results")?.optString("first").orEmpty()
-        val output = runCatching { Base64.getUrlDecoder().decode(encoded) }
-            .getOrElse { throw IllegalArgumentException("Invalid PRF result", it) }
-        require(output.size == PRF_BYTES) {
-            output.fill(0)
-            "Invalid PRF result"
-        }
-        prf.remove("results")
-        return AssertionResult(credentialId, response.toString(), output)
-    }
-
-    /**
-     * Strips any client-side PRF results from a registration response before server verification.
-     *
-     * @param registrationResponseJson The WebAuthn registration response from Credential Manager.
-     * @return The registration response JSON with client-side PRF results removed.
-     */
-    fun registrationResult(registrationResponseJson: String): String {
-        val response = JSONObject(registrationResponseJson)
-        require(CREDENTIAL_ID.matches(response.optString("id"))) { "Invalid passkey credential ID" }
-        response.optJSONObject("clientExtensionResults")
-            ?.optJSONObject("prf")
-            ?.remove("results")
-        return response.toString()
-    }
-
-    /**
-     * Decodes standard Base64 PRF input strings and wraps failures as [IllegalArgumentException].
-     *
-     * @param value The Base64-encoded PRF input.
-     * @return The decoded PRF input bytes.
-     */
-    private fun decodeBase64(value: String): ByteArray = try {
-        Base64.getDecoder().decode(value)
-    } catch (error: IllegalArgumentException) {
-        throw IllegalArgumentException("Invalid PRF input", error)
-    }
-
-    /**
-     * Encodes raw bytes as unpadded Base64URL text.
-     *
-     * @param value The bytes to encode as unpadded Base64URL text.
-     * @return The URL-safe Base64 representation without padding.
-     */
-    private fun base64Url(value: ByteArray): String =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(value)
-
-    /**
-     * Returns true when [value] is non-blank and within WebAuthn field size bounds.
-     *
-     * @param value The optional WebAuthn text field to validate.
-     * @return True when the value has non-blank text and is at most 2,048 characters.
-     */
-    private fun nonEmpty(value: String?) = !value.isNullOrBlank() && value.length <= 2048
-
-    private const val PRF_BYTES = 32
-}
-
-/** Durable record for an ARK copy encrypted under one authentication-bound device key. */
-internal data class AccountRecoveryKeyDeviceRecord(
-    val accountId: String,
-    val protectionId: String,
-    val ivBase64: String,
-    val ciphertextBase64: String,
-) {
-    init {
-        require(validAccountId(accountId)) { "Invalid account ID" }
-        require(runCatching { UUID.fromString(protectionId) }.isSuccess) { "Invalid device protection ID" }
-        require(decode(ivBase64).size == IV_BYTES) { "Invalid device protection IV" }
-        require(decode(ciphertextBase64).size > TAG_BYTES) { "Invalid protected recovery key" }
-    }
-
-    /**
-     * Serializes this device-protected ARK record into a [JSONObject].
-     *
-     * @return A JSON object containing the serialized fields.
-     */
-    internal fun toJson() = JSONObject().apply {
-        put("version", VERSION)
-        put("accountId", accountId)
-        put("protectionId", protectionId)
-        put("iv", ivBase64)
-        put("ciphertext", ciphertextBase64)
-    }
-
-    /**
-     * Returns the AES-GCM additional authenticated data binding version, account, and protection IDs.
-     *
-     * @return The UTF-8 bytes supplied as additional authenticated data for AES-GCM.
-     */
-    internal fun aad() = "$VERSION|$accountId|$protectionId".toByteArray(Charsets.UTF_8)
-
-    companion object {
-        private const val VERSION = 1
-        private const val IV_BYTES = 12
-        private const val TAG_BYTES = 16
-
-        /**
-         * Deserializes and validates an [AccountRecoveryKeyDeviceRecord] from a [JSONObject].
-         *
-         * @param value The serialized JSON record to parse.
-         * @return The decoded device protection record.
-         */
-        internal fun fromJson(value: JSONObject): AccountRecoveryKeyDeviceRecord {
-            require(value.getInt("version") == VERSION) { "Unsupported device protection record" }
-            return AccountRecoveryKeyDeviceRecord(
-                value.getString("accountId"), value.getString("protectionId"),
-                value.getString("iv"), value.getString("ciphertext"),
-            )
-        }
-
-        /**
-         * Checks that [value] is a non-empty URL/path-safe account UID string.
-         *
-         * @param value The candidate account identifier to validate.
-         * @return True when the identifier has 1–128 letters, digits, underscores, or hyphens.
-         */
-        private fun validAccountId(value: String) = value.length in 1..128 &&
-            value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
-        /**
-         * Decodes a Base64 string into raw bytes.
-         *
-         * @param value The Base64 string to decode.
-         * @return The decoded bytes.
-         */
-        private fun decode(value: String) = Base64.getDecoder().decode(value)
-    }
-}
-
-/**
- * Android Keystore Device Protection Key boundary for a local ARK copy.
- *
- * The caller must bind [AccountRecoveryKeyDeviceChallenge.promptCipher] to a biometric/device
- * credential prompt before calling [AccountRecoveryKeyDeviceChallenge.enroll] or [unlock].
- */
-internal class AccountRecoveryKeyDeviceProtector {
-    /**
-     * Prepares an Android Keystore key and cipher challenge for enrolling or unlocking a local ARK.
-     *
-     * @param accountId The account ID that owns the key or record.
-     * @param saved The existing saved record, if one is available.
-     * @return The prepared Keystore challenge used for enrollment or recovery.
-     */
-    fun prepare(
-        accountId: String,
-        saved: AccountRecoveryKeyDeviceRecord?,
-    ): AccountRecoveryKeyDeviceChallenge {
-        require(saved == null || saved.accountId == accountId) { "Account recovery record mismatch" }
-        val protectionId = saved?.protectionId ?: UUID.randomUUID().toString()
-        val alias = alias(accountId, protectionId)
-        val store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val key = (store.getKey(alias, null) as? SecretKey) ?: run {
-            check(saved == null) { "Device protection key is unavailable; recover this account again." }
-            KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE).run {
-                init(spec(alias))
-                generateKey()
-            }
-        }
-        return try {
-            AccountRecoveryKeyDeviceChallenge(accountId, key, saved, protectionId, alias)
-        } catch (failure: Exception) {
-            if (saved == null) runCatching { store.deleteEntry(alias) }
-            throw failure
-        }
-    }
-
-    /**
-     * Removes a device key after its encrypted ARK record has been purged.
-     *
-     * @param record The stored record used for the operation.
-     */
-    fun forget(record: AccountRecoveryKeyDeviceRecord) {
-        runCatching {
-            KeyStore.getInstance(ANDROID_KEYSTORE).apply {
-                load(null)
-                deleteEntry(alias(record.accountId, record.protectionId))
-            }
-        }
-    }
-
-    /**
-     * Derives the Keystore key alias from [accountId] and [protectionId].
-     *
-     * @param accountId The account ID that owns the key or record.
-     * @param protectionId The ID of this device-bound recovery key record.
-     * @return The deterministic Android Keystore alias for the account and protection ID.
-     */
-    private fun alias(accountId: String, protectionId: String): String =
-        "olive.account.ark.v1." + MessageDigest.getInstance("SHA-256")
-            .digest(accountId.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) } +
-            "." + protectionId
-
-    /**
-     * Builds an authentication-bound AES-GCM Android Keystore key specification for [alias].
-     *
-     * @param alias The Android Keystore alias for the key.
-     * @return The Android Keystore specification for an authentication-bound AES-GCM key.
-     */
-    private fun spec(alias: String) = KeyGenParameterSpec.Builder(
-        alias,
-        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-    ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-        .setKeySize(256)
-        .setUserAuthenticationRequired(true)
-        .apply {
-            if (Build.VERSION.SDK_INT >= 30) {
-                setUserAuthenticationParameters(
-                    0,
-                    KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                setUserAuthenticationValidityDurationSeconds(10)
-            }
-        }.build()
-
-    private companion object {
-        const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    }
-}
-
-/** One short-lived DPK operation; unfinished enrollment deletes its staged Keystore key. */
-internal class AccountRecoveryKeyDeviceChallenge internal constructor(
-    private val accountId: String,
-    private val key: SecretKey,
-    private val saved: AccountRecoveryKeyDeviceRecord?,
-    private val protectionId: String,
-    private val alias: String,
-) : DeviceAuthenticationChallenge {
-    private var committed = false
-    override val enrolling get() = saved == null
-    override val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
-    private var legacyCipher: Cipher? = null
-
-    /**
-     * Allocates and remembers an unlocked AES-GCM cipher for legacy pre-API-30 prompts.
-     *
-     * @return The initialized cipher for the legacy Android authentication prompt.
-     */
-    override fun legacyCipher(): Cipher = newCipher().also { legacyCipher = it }
-
-    /**
-     * Encrypts [recoveryKey] with the authenticated Keystore [cipher] into a device record.
-     *
-     * @param cipher The authenticated cipher used for the cryptographic operation.
-     * @param recoveryKey The account recovery key used to protect or open the private keyset.
-     * @return The device record containing the encrypted account recovery key and its metadata.
-     */
-    internal fun enroll(cipher: Cipher, recoveryKey: AccountRecoveryKey): AccountRecoveryKeyDeviceRecord {
-        check(enrolling && cipher === (promptCipher ?: legacyCipher))
-        val raw = recoveryKey.encodedCopy()
-        return try {
-            cipher.updateAAD("1|$accountId|$protectionId".toByteArray(Charsets.UTF_8))
-            val ciphertext = cipher.doFinal(raw)
-            AccountRecoveryKeyDeviceRecord(
-                accountId, protectionId,
-                AndroidBase64.encodeToString(cipher.iv, AndroidBase64.NO_WRAP),
-                AndroidBase64.encodeToString(ciphertext, AndroidBase64.NO_WRAP),
-            )
-        } finally {
-            raw.fill(0)
-        }
-    }
-
-    /**
-     * Decrypts the stored device record using the authenticated Keystore [cipher].
-     *
-     * @param cipher The authenticated cipher used for the cryptographic operation.
-     * @return The account recovery key decrypted from the supplied record.
-     */
-    internal fun unlock(cipher: Cipher): AccountRecoveryKey {
-        val record = checkNotNull(saved)
-        check(!enrolling && cipher === (promptCipher ?: legacyCipher))
-        cipher.updateAAD(record.aad())
-        val raw = cipher.doFinal(AndroidBase64.decode(record.ciphertextBase64, AndroidBase64.NO_WRAP))
-        return try {
-            AccountRecoveryKey.fromEncoded(raw)
-        } finally {
-            raw.fill(0)
-        }
-    }
-
-    /** Marks the newly enrolled Keystore entry as committed so [close] preserves it. */
-    internal fun markStored() {
-        committed = true
-    }
-
-    /** Deletes any uncommitted newly generated Keystore key if enrollment did not finish. */
-    internal fun close() {
-        if (enrolling && !committed) runCatching {
-            KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(alias) }
-        }
-    }
-
-    /**
-     * Initializes an AES-GCM cipher for encrypting a new ARK or decrypting [saved].
-     *
-     * @return The AES-GCM cipher initialized for enrollment or recovery as appropriate.
-     */
-    private fun newCipher(): Cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
-        val record = saved
-        if (record == null) init(Cipher.ENCRYPT_MODE, key)
-        else init(
-            Cipher.DECRYPT_MODE,
-            key,
-            GCMParameterSpec(128, AndroidBase64.decode(record.ivBase64, AndroidBase64.NO_WRAP)),
-        )
     }
 }

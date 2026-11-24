@@ -10,7 +10,6 @@ import com.olive.app.data.account.AdminAccountSummary
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.FailedAttempt
-import com.olive.app.data.account.PasskeyRecoveryRepository
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
@@ -60,8 +59,8 @@ internal data class SessionAccountState(
     val credentialFieldError: CredentialFieldError? = null,
     val inputErrorVersion: Int = 0,
     val creatingAccount: Boolean = false,
-    val passkeyCredentialRequest: PasskeyCredentialRequest? = null,
-    val passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>? = null,
+    val passwordRecoveryUnlockRequest: PasswordRecoveryUnlockRequest? = null,
+    val passwordRecoveryEnrolled: Boolean? = null,
 )
 
 internal data class SessionActivityState(
@@ -234,12 +233,12 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var creatingAccount: Boolean
         get() = accountSnapshot.creatingAccount
         set(value) = updateAccount { it.copy(creatingAccount = value) }
-    var passkeyCredentialRequest: PasskeyCredentialRequest?
-        get() = accountSnapshot.passkeyCredentialRequest
-        set(value) = updateAccount { it.copy(passkeyCredentialRequest = value) }
-    var passkeyRecoveryCredentials: List<PasskeyRecoveryRepository.Credential>?
-        get() = accountSnapshot.passkeyRecoveryCredentials
-        set(value) = updateAccount { it.copy(passkeyRecoveryCredentials = value) }
+    var passwordRecoveryUnlockRequest: PasswordRecoveryUnlockRequest?
+        get() = accountSnapshot.passwordRecoveryUnlockRequest
+        set(value) = updateAccount { it.copy(passwordRecoveryUnlockRequest = value) }
+    var passwordRecoveryEnrolled: Boolean?
+        get() = accountSnapshot.passwordRecoveryEnrolled
+        set(value) = updateAccount { it.copy(passwordRecoveryEnrolled = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
     val activityState = activityFlow.asStateFlow()

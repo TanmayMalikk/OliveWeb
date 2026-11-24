@@ -63,8 +63,8 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 pinAuthorizedEpoch = -1L
                 deviceLockRequest?.complete(null)
                 deviceLockRequest = null
-                passkeyCredentialRequest?.complete(null)
-                passkeyCredentialRequest = null
+                passwordRecoveryUnlockRequest?.complete(null)
+                passwordRecoveryUnlockRequest = null
                 operationJob?.cancel()
                 operationJob = null
                 idleJob?.cancel()

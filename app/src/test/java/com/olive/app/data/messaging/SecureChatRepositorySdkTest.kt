@@ -3,6 +3,9 @@ package com.olive.app.data.messaging
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountKeysetWrappedKey
+import com.olive.app.security.AccountRecoveryKey
 import com.olive.app.support.FirestoreTestDriver
 import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.runBlocking
@@ -109,6 +112,89 @@ class SecureChatRepositorySdkTest {
             assertArrayEquals(key.encoded, KeyManager.unwrapKey(saved["wrappedKey"] as String).encoded)
             assertFalse(transport.records.containsKey("conversations/chat/deviceKeys/other--intruder"))
             assertFalse(transport.records.containsKey("conversations/chat/deviceKeys/friend--broken"))
+        }
+    }
+
+    @Test
+    fun oneAccountUnlockRestoresRepeatedChatClassesAndIsolatesInvalidAccess() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val keyset = envelope.unlock("owner", recoveryKey)
+            val publicKey = KeyManager.getOrCreatePublicKey()
+            val deviceId = KeyManager.deviceId(publicKey)
+            val encodedPublicKey = Base64.getEncoder().encodeToString(publicKey.encoded)
+            transport.records["messageDirectory/owner_fixture/devices/$deviceId"] = mapOf(
+                "uid" to "owner",
+                "deviceId" to deviceId,
+                "publicKey" to encodedPublicKey,
+                "mgf1Digest" to "SHA-1",
+            )
+            val originalKeys = mutableMapOf<String, javax.crypto.SecretKey>()
+            val conversations = (0 until 12).map { index ->
+                val id = "recover-$index"
+                val roomKey = EncryptionUtils.generateSymmetricKey()
+                originalKeys[id] = roomKey
+                val item = conversation.copy(
+                    id = id,
+                    friendshipId = "pair-$index",
+                    type = if (index % 2 == 0) "DIRECT" else "SUPPORT",
+                )
+                transport.records["conversations/$id"] = mapOf(
+                    "participantIds" to item.participantIds,
+                    "accountRoomKeys" to mapOf(
+                        "owner" to AccountKeysetWrappedKey(
+                            envelope.keyId,
+                            envelope.epoch,
+                            "RSA-OAEP-256",
+                            KeyManager.wrapForAccountKeyset(roomKey, keyset.publicKey),
+                        ).toMap(),
+                    ),
+                )
+                item
+            }
+            val anotherRecoveryKey = AccountRecoveryKey.generate()
+            val anotherEnvelope = AccountKeysetEnvelope.create("owner", anotherRecoveryKey)
+            val anotherKeyset = anotherEnvelope.unlock("owner", anotherRecoveryKey)
+            val corrupt = conversation.copy(id = "corrupt", friendshipId = "pair-corrupt")
+            transport.records["conversations/corrupt"] = mapOf(
+                "participantIds" to corrupt.participantIds,
+                "accountRoomKeys" to mapOf(
+                    "owner" to AccountKeysetWrappedKey(
+                        anotherEnvelope.keyId,
+                        anotherEnvelope.epoch,
+                        "RSA-OAEP-256",
+                        KeyManager.wrapForAccountKeyset(
+                            EncryptionUtils.generateSymmetricKey(),
+                            anotherKeyset.publicKey,
+                        ),
+                    ).toMap(),
+                ),
+            )
+            val revoked = conversation.copy(id = "revoked", friendshipId = "pair-revoked")
+            transport.records["conversations/revoked"] = mapOf(
+                "participantIds" to listOf("friend"),
+            )
+
+            val candidates = repository.accountAccessRecovery.candidates(
+                conversations + corrupt + revoked,
+                "owner",
+            )
+            assertEquals((conversations.map { it.id } + "corrupt").toSet(), candidates.map { it.id }.toSet())
+
+            val first = repository.accountAccessRecovery.restore(conversations + corrupt + revoked, "owner", keyset)
+            assertEquals(conversations.map { it.id }.toSet(), first.recovered.map { it.conversation.id }.toSet())
+            assertEquals(setOf("corrupt", "revoked"), first.failedIds)
+            first.recovered.forEach { access ->
+                assertArrayEquals(
+                    originalKeys.getValue(access.conversation.id).encoded,
+                    KeyManager.unwrapKey(access.wrappedRoomKey).encoded,
+                )
+            }
+
+            val repeated = repository.accountAccessRecovery.restore(conversations, "owner", keyset)
+            assertEquals(conversations.map { it.id }.toSet(), repeated.recovered.map { it.conversation.id }.toSet())
+            assertTrue(repeated.failedIds.isEmpty())
         }
     }
 

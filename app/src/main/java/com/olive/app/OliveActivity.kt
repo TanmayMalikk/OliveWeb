@@ -34,9 +34,11 @@ import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.AccountRole
 import com.olive.app.notification.OliveNotificationManager
 import com.olive.app.notification.LocalNotificationEventHandler
+import com.olive.app.security.trustedSystemHandoffActive
 import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.users.user.account.PasswordRecoveryUnlockDialog
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -81,9 +83,6 @@ class OliveActivity : FragmentActivity() {
     // Create device authentication after Android has attached this activity to its app context.
     private val deviceLock by lazy(LazyThreadSafetyMode.NONE) {
         com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
-    }
-    private val passkeyCredentials by lazy(LazyThreadSafetyMode.NONE) {
-        com.olive.app.security.AndroidPasskeyCredentials(this)
     }
 
     private val screenCaptureProtectionEnabled get() =
@@ -164,11 +163,6 @@ class OliveActivity : FragmentActivity() {
                 authentication?.let(deviceLock::show)
                 onDispose { deviceLock.cancel() }
             }
-            val passkeyRequest = session.passkeyCredentialRequest
-            DisposableEffect(passkeyRequest) {
-                passkeyRequest?.let(passkeyCredentials::show)
-                onDispose { passkeyCredentials.cancel() }
-            }
 
             val selectedCover = session.coverType
             val selectedRole = session.accountRole
@@ -213,6 +207,7 @@ class OliveActivity : FragmentActivity() {
             ) {
                 OliveTheme {
                     OliveRoot(session, locationPermissionVersion, closeApp = ::closeAfterQuickExit)
+                    PasswordRecoveryUnlockDialog(session)
                 }
             }
         }
@@ -263,9 +258,7 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // The Safe App stays on its current page until the system permission result arrives.
-        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
-        ) session.navigation.background()
+        if (!systemHandoffActive()) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
     }
@@ -276,9 +269,7 @@ class OliveActivity : FragmentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
-            !session.externalFilePickerOpen && !session.callPermissionRequestOpen && !session.safeSystemActivityOpen
-        ) session.navigation.background()
+        if (!systemHandoffActive()) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
     }
@@ -351,8 +342,7 @@ class OliveActivity : FragmentActivity() {
      * Applies the privacy policy when the app is no longer visible.
      */
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !passkeyCredentials.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
-            !session.callPermissionRequestOpen && !session.safeSystemActivityOpen && (session.deviceLockRequest != null ||
+        if (!systemHandoffActive() && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,
@@ -387,6 +377,17 @@ class OliveActivity : FragmentActivity() {
             runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
         }
     }
+
+    /**
+     * Returns whether an expected Android system handoff (biometric, permission, or picker) is active.
+     */
+    private fun systemHandoffActive() = trustedSystemHandoffActive(
+        deviceCredential = deviceLock.awaitingCredential,
+        runtimePermission = permissions.awaitingResult,
+        externalFilePicker = session.externalFilePickerOpen,
+        callPermission = session.callPermissionRequestOpen,
+        safeSystemActivity = session.safeSystemActivityOpen,
+    )
 
     /**
      * Closes after quick exit.

@@ -23,7 +23,7 @@ import { authorizeMessagingPeer } from "./FriendInviteService";
 import {
   accountKeysetWrappers,
   type AccountWrappedKey,
-} from "./PasskeyRecovery";
+} from "./AccountKeysetCrypto";
 import type { Identity } from "../domain/DomainModels";
 
 type StoredMedia = {

@@ -46,7 +46,7 @@ export type SessionValue = {
   beginEntry: () => Promise<void>;
   quickExit: () => void;
   unlock: (pin: string) => Promise<void>;
-  recoverEncryptedAccess: () => Promise<void>;
+  recoverEncryptedAccess: (password: string) => Promise<void>;
   hasEncryptedAccess: boolean;
   saveProfile: (profile: Profile, action?: string) => Promise<void>;
   saveEntry: (entry: Entry) => Promise<void>;

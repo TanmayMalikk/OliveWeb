@@ -237,16 +237,18 @@ internal class SafetyDocumentsController(
      * @param document Safety document metadata record.
      * @param onReady Callback invoked when ready changes or occurs.
      */
-    fun download(document: SafetyDocument, onReady: (File) -> Unit) {
+    fun download(document: SafetyDocument, onReady: (SafetyDocument, File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         if (!beginOpening(document.id)) return
         val token = generation
         scope.launch {
             try {
                 runCatching { openDocument(document, viewerUid) }
-                    .onSuccess { file ->
-                        if (token == generation && state.ownerUid == viewerUid) onReady(file)
-                        else file.delete()
+                    .onSuccess { opened ->
+                        rememberRecoveredDocument(viewerUid, opened.document)
+                        if (token == generation && state.ownerUid == viewerUid) {
+                            onReady(opened.document, opened.file)
+                        } else opened.file.delete()
                     }
                     .onFailure { failure ->
                         if (failure is CancellationException) throw failure
@@ -289,9 +291,11 @@ internal class SafetyDocumentsController(
                         source.getFor(viewerUid, documentId)
                     } else source.cachedFor(viewerUid, documentId)
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
-                    val file = openDocument(document, viewerUid)
-                    if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                    else file.delete()
+                    val opened = openDocument(document, viewerUid)
+                    rememberRecoveredDocument(viewerUid, opened.document)
+                    if (token == generation && state.ownerUid == viewerUid) {
+                        onReady(opened.document, opened.file)
+                    } else opened.file.delete()
                 }.onFailure { failure ->
                     if (failure is CancellationException) throw failure
                     if (token == generation) {
@@ -457,8 +461,11 @@ internal class SafetyDocumentsController(
                 val relevant = available.filter { it.id in relevantIds }
                 val files = linkedMapOf<String, EmergencyReportMedia>()
                 relevant.forEach { document ->
-                    val file = runCatching { openDocument(document, ownerUid) }.getOrNull()
-                    files[document.id] = EmergencyReportMedia(document, file)
+                    val opened = runCatching { openDocument(document, ownerUid) }.getOrNull()
+                    files[document.id] = EmergencyReportMedia(
+                        opened?.document ?: document,
+                        opened?.file,
+                    )
                 }
                 withContext(Dispatchers.IO) {
                     renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
@@ -634,13 +641,13 @@ internal class SafetyDocumentsController(
      *
      * @param document Safety document metadata record.
      * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for open document.
+     * @return The resulting [OpenedMedia] for open document.
      */
-    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
+    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): OpenedMedia =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
         } else {
-            checkNotNull(repository).download(applicationContext, document)
+            OpenedMedia(document, checkNotNull(repository).download(applicationContext, document))
         }
 
     /**
@@ -672,6 +679,35 @@ internal class SafetyDocumentsController(
     }
 
     /**
+     * Applies restored metadata immediately and commits it to the encrypted account index.
+     *
+     * @param ownerUid Active account that owns the encrypted index partition.
+     * @param documents Locally authenticated records carrying current-device wrappers.
+     */
+    internal suspend fun rememberRecoveredDocuments(
+        ownerUid: String,
+        documents: List<SafetyDocument>,
+    ) {
+        withContext(Dispatchers.IO) {
+            documents.forEach { repository?.rememberRecovered(ownerUid, it) }
+        }
+        if (state.ownerUid == ownerUid) {
+            val recovered = documents.associateBy(SafetyDocument::id)
+            state = state.copy(files = state.files.map { recovered[it.id] ?: it })
+        }
+    }
+
+    /**
+     * Persists updated metadata for a single recovered document.
+     */
+    private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
+        if (state.ownerUid == ownerUid) {
+            state = state.copy(files = state.files.map { if (it.id == document.id) document else it })
+        }
+        scope.launch(Dispatchers.IO) { repository?.rememberRecovered(ownerUid, document) }
+    }
+
+    /**
      * Computes localized failure.
      *
      * @param failure Exception or failure reason encountered during execution.
@@ -683,10 +719,10 @@ internal class SafetyDocumentsController(
 }
 
 /**
- * Computes media failure resource.
+ * Maps bounded media and recovery failures to localized user guidance.
  *
- * @param failure Exception or failure reason encountered during execution.
- * @return The computed media failure resource numeric value.
+ * @param failure Failure returned by the encrypted media access pipeline.
+ * @return String resource describing the safe next action without exposing cryptographic details.
  */
 internal fun mediaFailureResource(failure: Throwable): Int {
     if (failure is MediaDeviceVerificationException) {
@@ -700,6 +736,11 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.ACCESS_REVOKED -> R.string.documents_access_revoked
         MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
         MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
+        MediaAccessError.ACCOUNT_WRAPPER_MISSING -> R.string.documents_account_wrapper_missing
+        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> R.string.documents_account_recovery_failed
+        MediaAccessError.ACCOUNT_KEYSET_MISMATCH -> R.string.documents_account_keyset_mismatch
+        MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED -> R.string.documents_account_wrapper_failed
+        MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED -> R.string.documents_ciphertext_authentication_failed
         MediaAccessError.ACCOUNT_MISMATCH -> R.string.documents_account_mismatch
         MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed

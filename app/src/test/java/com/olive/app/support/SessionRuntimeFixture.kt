@@ -23,6 +23,8 @@ internal class SessionRuntimeFixture(
     val documents: SafetyDocumentDataSource? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
     localMode: Boolean = false,
+    accountKeysetsOverride: com.olive.app.data.account.AccountKeysetRepository? = null,
+    opaqueRecoveryOverride: com.olive.app.data.account.OpaqueRecoveryRepository? = null,
 ) : AutoCloseable {
     private val keys = TestAndroidKeyStore.install()
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -45,7 +47,7 @@ internal class SessionRuntimeFixture(
         `when`(accounts.authenticatedUsername()).thenReturn("fixture_owner")
         runtime = SessionRuntime(application, scope, SessionDataSources(
             accounts, admin, messaging, secureChat, secureDocuments, null, documents, null, null,
-            null, null,
+            accountKeysetsOverride, opaqueRecoveryOverride,
         ), localMode = localMode, prioritySyncOverride = PrioritySyncCoordinator(application, null))
         runtime.enrollment = DeviceEnrollment("owner", "", role)
         runtime.state.accountRole = role

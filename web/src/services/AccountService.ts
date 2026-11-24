@@ -9,7 +9,7 @@ import {
 } from "./LocalDataStore";
 import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
 import { readStoredObject } from "./StoredAccountJson";
-import type { UnlockedAccountKeyset } from "./PasskeyRecovery";
+import type { UnlockedAccountKeyset } from "./AccountKeysetCrypto";
 import {
   emptyHistory,
   emptyProfile,
