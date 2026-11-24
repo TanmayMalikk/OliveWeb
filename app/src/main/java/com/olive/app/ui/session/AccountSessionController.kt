@@ -426,7 +426,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         enrollment = null
                         deliveryAddress =
                             DeliveryAddress()
-                        language = "English"
+                        language = ""
                         coverDob = ""
                         coverFullName = ""
                         coverUsername = ""

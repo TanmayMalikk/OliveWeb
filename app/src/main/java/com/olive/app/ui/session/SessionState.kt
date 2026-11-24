@@ -50,7 +50,7 @@ internal data class SessionAccountState(
     val profile: UserProfile? = null,
     val pendingSync: Boolean = false,
     val deliveryAddress: DeliveryAddress = DeliveryAddress(),
-    val language: String = "English",
+    val language: String = "",
     val coverDob: String = "",
     val coverFullName: String = "",
     val coverUsername: String = "",

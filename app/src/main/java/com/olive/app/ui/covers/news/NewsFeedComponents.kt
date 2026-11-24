@@ -44,7 +44,7 @@ import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.olive.app.ui.shared.systemLocale
 
 /** Category chips in display order; each maps to a Google News topic section except "All". */
 internal val NEWS_TOPIC_CATEGORIES = listOf(
@@ -140,9 +140,12 @@ internal fun NewsDateHeader(
     modifier: Modifier = Modifier
 ) {
     val uiText = rememberResourceText()
-    val dateText = remember {
-        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
+    val locale = systemLocale()
+    val dateFormat = remember(locale) {
+        val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEEMMMMd")
+        DateTimeFormatter.ofPattern(pattern, locale)
     }
+    val dateText = LocalDate.now().format(dateFormat)
     Surface(
         modifier = modifier.fillMaxWidth().testTag("news_date_header"),
         color = Cream,

@@ -3,6 +3,7 @@ package com.olive.app.data.news
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.icu.util.ULocale
 import android.text.Html
 import android.util.Xml
 import android.webkit.WebResourceRequest
@@ -13,7 +14,6 @@ import androidx.core.content.edit
 import com.olive.app.data.media.sha256Hex
 import com.olive.app.data.network.decodeJsonObject
 import com.olive.app.data.network.encodeToJsonObject
-import com.olive.app.ui.shared.AppLocaleManager
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URL
@@ -87,19 +87,20 @@ class GoogleNewsRepository(
     /**
      * Builds the Google News language and country query for the selected locale.
      *
-     * @param language Language supplied to [rssLocaleQuery].
+     * @param languageTag The device's primary BCP 47 language tag.
      * @return The resulting rss locale query string.
      */
-    fun rssLocaleQuery(language: String): String {
-        val langTag = AppLocaleManager.getLanguageTag(language)
-        return when (langTag) {
-            "fr" -> "hl=fr-CA&gl=CA&ceid=CA:fr"
-            "es" -> "hl=es-419&gl=MX&ceid=MX:es-419"
-            "ar" -> "hl=ar&gl=SA&ceid=SA:ar"
-            "tl" -> "hl=tl&gl=PH&ceid=PH:tl"
-            "zh-rCN", "zh" -> "hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
-            else -> "hl=en-CA&gl=CA&ceid=CA:en"
-        }
+    fun rssLocaleQuery(languageTag: String): String {
+        val locale = Locale.forLanguageTag(languageTag)
+        val language = locale.language
+        val editionLocale = ULocale.addLikelySubtags(ULocale.forLocale(locale))
+        val market = editionLocale.country
+        val displayLanguage = "hl=${locale.toLanguageTag()}"
+        if (language.isEmpty() || market.length != 2 || !market.all(Char::isLetter)) return displayLanguage
+        val editionLanguage = if (language == "zh" && editionLocale.script.isNotEmpty()) {
+            "zh-${editionLocale.script}"
+        } else language
+        return "$displayLanguage&gl=$market&ceid=$market:$editionLanguage"
     }
 
     /**
@@ -210,7 +211,7 @@ class GoogleNewsRepository(
  * @return The resulting local published date string.
  */
 fun NewsArticle.localPublishedDate(language: String): String = runCatching {
-    val locale = Locale.forLanguageTag(AppLocaleManager.getLanguageTag(language))
+    val locale = Locale.forLanguageTag(language)
     ZonedDateTime.parse(published, DateTimeFormatter.RFC_1123_DATE_TIME)
         .withZoneSameInstant(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))

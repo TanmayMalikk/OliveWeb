@@ -1,6 +1,7 @@
 // News cover users: shows the daily digest cover.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.systemLocale
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
@@ -15,6 +16,14 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,9 +38,12 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +77,8 @@ internal fun NewsCover(
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
+    val locale = systemLocale()
+    val languageTag = locale.toLanguageTag()
     val tabSaver = remember {
         Saver<String, String>(
             save = { if (it == "Account") "Today" else it },
@@ -81,7 +95,7 @@ internal fun NewsCover(
         )
     }
     var selected by rememberSaveable(session.coverAccountId, stateSaver = articleSaver) { mutableStateOf<NewsArticle?>(null) }
-    var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
+    var articles by remember(languageTag) { mutableStateOf<List<NewsArticle>>(emptyList()) }
     var completedRequest by remember { mutableStateOf<List<Any>?>(null) }
     var newsError by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -158,7 +172,7 @@ internal fun NewsCover(
         }
     }
     // Back closes an article first, then returns through the previous news tabs.
-    val back = rememberOliveBack(interactive, preview = tab != "Today" || tabHistory.isNotEmpty()) {
+    val back = rememberOliveBack(interactive && selected == null, preview = tab != "Today" || tabHistory.isNotEmpty()) {
         // Opens the selected news section or saved-article view.
         when {
             selected != null -> selected = null
@@ -174,7 +188,7 @@ internal fun NewsCover(
         }
     }
     val request = listOf(
-        session.language,
+        languageTag,
         scope,
         refresh,
         session.coverReset,
@@ -194,21 +208,23 @@ internal fun NewsCover(
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
         if (articles.isEmpty()) {
-            val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
+            val cached = withContext(Dispatchers.IO) { feedCache.load(languageTag, scope) }
                 ?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
-            val instant = cached.ifEmpty { curatedOfflineArticles(currentPlace) }
+            val instant = cached.ifEmpty {
+                if (locale.language == "en") curatedOfflineArticles(currentPlace) else emptyList()
+            }
                 .filter { category == "All" || it.topic.equals(category, true) }
             if (instant.isNotEmpty()) articles = instant
         }
         // Use the fallback when news cover is unavailable.
         try {
-            GoogleNewsRepository().latest(session.language, scope, currentPlace, category).also {
+            GoogleNewsRepository().latest(languageTag, scope, currentPlace, category).also {
                 articles = it
                 newsError = it.isEmpty()
                 // Only the unfiltered edition is cached so category feeds never overwrite it.
                 if (category == "All") withContext(Dispatchers.IO) {
                     feedCache.save(
-                        session.language,
+                        languageTag,
                         scope,
                         currentPlace,
                         it
@@ -218,10 +234,12 @@ internal fun NewsCover(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
+            val cached = withContext(Dispatchers.IO) { feedCache.load(languageTag, scope) }
                 ?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
-            // Offline: show the cached edition, else evergreen stories so the cover never looks empty.
-            articles = cached.ifEmpty { curatedOfflineArticles(currentPlace) }
+            // Bundled evergreen articles are available in English.
+            articles = cached.ifEmpty {
+                if (locale.language == "en") curatedOfflineArticles(currentPlace) else emptyList()
+            }
                 .filter { category == "All" || it.topic.equals(category, true) }
             newsError = true
         }
@@ -264,159 +282,159 @@ internal fun NewsCover(
         locationEditorOpen = false
         refresh++
     })
-    Scaffold(containerColor = Cream, contentWindowInsets = WindowInsets.safeDrawing, topBar = {
-        TopAppBar(
-            title = {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Outlined.Newspaper,
-                            null,
-                            Modifier.size(22.dp).testTag("cover_brand_news"),
-                            tint = OliveGreen
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            uiText(R.string.ui_daily_digest),
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OliveGreen
-                        )
-                    }
-                    if (tab == "Today" && selected == null) Text(
-                        if (scope == NewsScope.LOCAL) uiText(
-                            R.string.local_edition
-                        ) else uiText(R.string.global_edition),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Muted
-                    )
-                }
-            },
-            actions = {
-                if (tab == "Today" && selected == null) {
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = WarmWhite,
-                        border = BorderStroke(0.8.dp, SoftGray),
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                onClick = { scope = NewsScope.LOCAL },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (scope == NewsScope.LOCAL) OliveGreen else Color.Transparent,
-                                contentColor = if (scope == NewsScope.LOCAL) Cream else Ink,
-                                modifier = Modifier.height(32.dp).testTag("news_scope_local")
-                            ) {
-                                Row(
-                                    Modifier.padding(horizontal = 9.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(14.dp))
-                                    Text(
-                                        uiText(R.string.local),
-                                        fontSize = 13.sp,
-                                        fontWeight = if (scope == NewsScope.LOCAL) FontWeight.Bold else FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                            Surface(
-                                onClick = { scope = NewsScope.GLOBAL },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (scope == NewsScope.GLOBAL) OliveGreen else Color.Transparent,
-                                contentColor = if (scope == NewsScope.GLOBAL) Cream else Ink,
-                                modifier = Modifier.height(32.dp).testTag("news_scope_global")
-                            ) {
-                                Row(
-                                    Modifier.padding(horizontal = 9.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Outlined.Public, null, Modifier.size(14.dp))
-                                    Text(
-                                        uiText(R.string.global),
-                                        fontSize = 13.sp,
-                                        fontWeight = if (scope == NewsScope.GLOBAL) FontWeight.Bold else FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    IconButton(
-                        onClick = { refresh++ },
-                        enabled = !loading,
-                        modifier = Modifier.size(38.dp)
-                    ) { Icon(Icons.Outlined.Refresh, uiText(R.string.refresh), Modifier.size(20.dp)) }
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Cream),
-        )
-    }, bottomBar = {
-        NavigationBar(
-            modifier = Modifier.testTag("cover_navigation"),
+    val reading = selected != null
+    Box(Modifier.fillMaxSize().clipToBounds()) {
+        Scaffold(
+            modifier = if (reading) Modifier.clearAndSetSemantics { hideFromAccessibility() } else Modifier,
             containerColor = Cream,
-            tonalElevation = 0.dp
-        ) {
-            listOf("Today", "Saved", "Account").forEach { choice ->
-                NavigationBarItem(
-                    selected = tab == choice, onClick = {
-                        if (choice == tab && selected == null) {
-                            val activeListState = when (tab) {
-                                "Today" -> todayListState
-                                "Saved" -> savedListState
-                                else -> accountListState
+            contentWindowInsets = WindowInsets.safeDrawing,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.Newspaper,
+                                    null,
+                                    Modifier.size(22.dp).testTag("cover_brand_news"),
+                                    tint = OliveGreen
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    uiText(R.string.ui_daily_digest),
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OliveGreen
+                                )
                             }
-                            locationSaveScope.launch { activeListState.scrollToItem(0) }
-                        } else {
-                            if (choice != tab) tabHistory += tab
-                            selected = null
-                            tab = choice
-                            if (choice == "Account") session.recordSettingsInteraction(
-                                "Daily Digest",
-                                "Opened account page"
+                            if (tab == "Today") Text(
+                                if (scope == NewsScope.LOCAL) uiText(
+                                    R.string.local_edition
+                                ) else uiText(R.string.global_edition),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Muted
                             )
                         }
                     },
-                    icon = {
-                        Icon(
-                            when (choice) {
-                                "Today" -> Icons.AutoMirrored.Outlined.Article
-                                "Saved" -> if (tab == choice) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder
-                                else -> Icons.Outlined.PersonOutline
-                            }, null
-                        )
-                    },
-                    label = {
-                        Text(
-                            // Opens the selected news section or saved-article view.
-                            when (choice) {
-                                "Today" -> uiText(R.string.today)
-                                "Saved" -> uiText(R.string.saved)
-                                else -> uiText(
-                                    R.string.account
-                                )
+                    actions = {
+                        if (tab == "Today") {
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = WarmWhite,
+                                border = BorderStroke(0.8.dp, SoftGray),
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        onClick = { scope = NewsScope.LOCAL },
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = if (scope == NewsScope.LOCAL) OliveGreen else Color.Transparent,
+                                        contentColor = if (scope == NewsScope.LOCAL) Cream else Ink,
+                                        modifier = Modifier.height(32.dp).testTag("news_scope_local")
+                                    ) {
+                                        Row(
+                                            Modifier.padding(horizontal = 9.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.LocationOn, null, Modifier.size(14.dp))
+                                            Text(
+                                                uiText(R.string.local),
+                                                fontSize = 13.sp,
+                                                fontWeight = if (scope == NewsScope.LOCAL) FontWeight.Bold else FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                    Surface(
+                                        onClick = { scope = NewsScope.GLOBAL },
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = if (scope == NewsScope.GLOBAL) OliveGreen else Color.Transparent,
+                                        contentColor = if (scope == NewsScope.GLOBAL) Cream else Ink,
+                                        modifier = Modifier.height(32.dp).testTag("news_scope_global")
+                                    ) {
+                                        Row(
+                                            Modifier.padding(horizontal = 9.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.Public, null, Modifier.size(14.dp))
+                                            Text(
+                                                uiText(R.string.global),
+                                                fontSize = 13.sp,
+                                                fontWeight = if (scope == NewsScope.GLOBAL) FontWeight.Bold else FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                        )
-                    })
-            }
-        }
-    }) { padding ->
-        val article = selected
-        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
-            OliveUndoOverlay(scopeKey = session.coverAccountId, enabled = interactive) {
-                OliveRouteEntrance(article?.link ?: tab, back) {
-                    if (article != null && tab != "Account") {
-                        val onBookmark = newsBookmarkAction(session, article)
-                        NewsArticleReader(
-                            article, saved.any { it.link == article.link }, interactive,
-                            modifier = Modifier.fillMaxSize().testTag("news_cover"),
-                            onBack = { selected = null }, onBookmark = onBookmark)
-                    } else {
+                            IconButton(
+                                onClick = { refresh++ },
+                                enabled = !loading,
+                                modifier = Modifier.size(38.dp)
+                            ) { Icon(Icons.Outlined.Refresh, uiText(R.string.refresh), Modifier.size(20.dp)) }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Cream),
+                )
+            },
+            bottomBar = {
+                NavigationBar(
+                    modifier = Modifier.testTag("cover_navigation"),
+                    containerColor = Cream,
+                    tonalElevation = 0.dp
+                ) {
+                    listOf("Today", "Saved", "Account").forEach { choice ->
+                        NavigationBarItem(
+                            selected = tab == choice, onClick = {
+                                if (choice == tab && selected == null) {
+                                    val activeListState = when (tab) {
+                                        "Today" -> todayListState
+                                        "Saved" -> savedListState
+                                        else -> accountListState
+                                    }
+                                    locationSaveScope.launch { activeListState.scrollToItem(0) }
+                                } else {
+                                    if (choice != tab) tabHistory += tab
+                                    selected = null
+                                    tab = choice
+                                    if (choice == "Account") session.recordSettingsInteraction(
+                                        "Daily Digest",
+                                        "Opened account page"
+                                    )
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    when (choice) {
+                                        "Today" -> Icons.AutoMirrored.Outlined.Article
+                                        "Saved" -> if (tab == choice) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder
+                                        else -> Icons.Outlined.PersonOutline
+                                    }, null
+                                )
+                            },
+                            label = {
+                                Text(
+                                    // Opens the selected news section or saved-article view.
+                                    when (choice) {
+                                        "Today" -> uiText(R.string.today)
+                                        "Saved" -> uiText(R.string.saved)
+                                        else -> uiText(
+                                            R.string.account
+                                        )
+                                    }
+                                )
+                            })
+                    }
+                }
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+                OliveUndoOverlay(scopeKey = session.coverAccountId, enabled = interactive && !reading) {
+                    OliveRouteEntrance(tab, back) {
                         NewsFeed(
                             session,
                             NewsFeedState(
@@ -444,15 +462,46 @@ internal fun NewsCover(
                                     readingHistory = emptyList()
                                 },
                             ),
-                                Modifier.fillMaxSize(),
-                                listState = when (tab) {
-                                    "Today" -> todayListState
-                                    "Saved" -> savedListState
-                                    else -> accountListState
-                                },
+                            Modifier.fillMaxSize(),
+                            listState = when (tab) {
+                                "Today" -> todayListState
+                                "Saved" -> savedListState
+                                else -> accountListState
+                            },
                         )
                     }
                 }
+            }
+        }
+        AnimatedContent(
+            targetState = selected,
+            modifier = Modifier.matchParentSize(),
+            transitionSpec = {
+                val enter = if (targetState != null) slideInVertically(tween(280)) { it }
+                    else EnterTransition.None
+                val exit = if (initialState != null) slideOutVertically(tween(220)) { it }
+                    else ExitTransition.None
+                enter togetherWith exit
+            },
+            contentKey = { it?.link },
+            label = "News article reader",
+        ) { article ->
+            if (article != null) {
+                val readerActive = interactive && selected?.link == article.link
+                Box(Modifier.fillMaxSize().background(Cream).windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    OliveUndoOverlay(scopeKey = session.coverAccountId, enabled = readerActive) {
+                        NewsArticleReader(
+                            article = article,
+                            saved = saved.any { it.link == article.link },
+                            active = readerActive,
+                            modifier = Modifier.fillMaxSize().testTag("news_cover"),
+                            onBack = { selected = null },
+                            onBookmark = newsBookmarkAction(session, article),
+                        )
+                    }
+                }
+            } else {
+                Spacer(Modifier.fillMaxSize())
             }
         }
     }

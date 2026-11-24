@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalResources
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.R
-import java.util.Locale
 import kotlin.math.pow
 
 
@@ -489,76 +488,6 @@ internal fun CoverType.localizedTitle(text: ResourceText) = text(
     }
 )
 
-internal object AppLocaleManager {
-
-    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Chinese")
-
-    /**
-     * Reads Android's current language tag for app formatting.
-     *
-     * @param language Language supplied to [getLanguageTag].
-     * @return The resulting get language tag string.
-     */
-    fun getLanguageTag(language: String): String {
-        return when (language.trim().lowercase()) {
-            "french", "fr", "français" -> "fr"
-            "spanish", "es", "español" -> "es"
-            "arabic", "ar", "العربية" -> "ar"
-            "chinese", "zh", "zh-cn", "zh-rcn", "中文" -> "zh-rCN"
-            else -> "en"
-        }
-    }
-
-    /**
-     * Returns the readable name of Android's current language.
-     *
-     * @param language Language supplied to [getDisplayLanguage].
-     * @return The resulting get display language string.
-     */
-    fun getDisplayLanguage(language: String): String {
-        return when (getLanguageTag(language)) {
-            "fr" -> "Français"
-            "es" -> "Español"
-            "ar" -> "العربية"
-            "zh-rCN" -> "中文"
-            else -> "English"
-        }
-    }
-
-    /**
-     * Reads the phone's language tag, such as en-CA or fr-CA.
-     *
-     * @return The resulting resolve system default language tag string.
-     */
-    fun resolveSystemDefaultLanguageTag(): String {
-        val systemLocale = Locale.getDefault()
-        val lang = systemLocale.language.lowercase()
-        return when (lang) {
-            "fr" -> "fr"
-            "es" -> "es"
-            "ar" -> "ar"
-            "zh" -> "zh-rCN"
-            "en" -> "en"
-            else -> "en"
-        }
-    }
-
-    /**
-     * Reads the phone's language name for the language picker.
-     *
-     * @return The resulting resolve system default language name string.
-     */
-    fun resolveSystemDefaultLanguageName(): String {
-        return when (resolveSystemDefaultLanguageTag()) {
-            "fr" -> "French"
-            "es" -> "Spanish"
-            "ar" -> "Arabic"
-            "zh-rCN" -> "Chinese"
-            else -> "English"
-        }
-    }
-
-}
 
 /**
  * Pure Android Canvas Custom View.

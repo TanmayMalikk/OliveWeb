@@ -2,6 +2,7 @@
 package com.olive.app.ui.users.user.account
 
 
+import com.olive.app.ui.shared.systemLocale
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveCard as Card
@@ -725,6 +726,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
  */
 @Composable
 internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) {
+    val locale = systemLocale()
     val uiText = rememberResourceText()
     FormColumn {
         SafeBack(session)
@@ -756,7 +758,7 @@ internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) 
                     )
                 }
             }
-            add(uiText(R.string.preferred_language) to profile.language)
+            add(uiText(R.string.preferred_language) to locale.getDisplayLanguage(locale))
             add(
                 uiText(R.string.region_city_state) to profile.region
             )

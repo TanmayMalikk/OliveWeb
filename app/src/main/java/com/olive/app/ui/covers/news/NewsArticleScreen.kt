@@ -4,7 +4,6 @@ package com.olive.app.ui.covers.news
 import com.olive.app.ui.shared.OliveButton as Button
 import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveIconButton as IconButton
-import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 
 import android.graphics.Bitmap
@@ -48,6 +47,7 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -336,15 +336,20 @@ internal fun NewsArticleReader(
 
     Column(modifier.oliveBackPreview(backProgress)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp).testTag("news_reader_toolbar"),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, modifier = Modifier.testTag("news_reader_back")) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, null)
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.back_to_stories))
+            IconButton(onClick = onBack, modifier = Modifier.testTag("news_reader_back")) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.back_to_stories))
             }
             Spacer(Modifier.weight(1f))
+            IconButton(onClick = onBookmark, modifier = Modifier.testTag("news_reader_bookmark")) {
+                Icon(
+                    if (saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
+                    if (saved) uiText(R.string.a11y_remove_bookmark) else uiText(R.string.a11y_save_article),
+                    tint = OliveGreen
+                )
+            }
             IconButton(
                 onClick = {
                     textZoom = when (textZoom) {
@@ -354,7 +359,7 @@ internal fun NewsArticleReader(
                     }
                     browser?.settings?.textZoom = textZoom
                 },
-                enabled = browser != null && !failed
+                enabled = browser != null || failed
             ) {
                 Icon(Icons.Outlined.FormatSize, uiText(R.string.news_text_size), tint = OliveGreen)
             }
@@ -376,21 +381,11 @@ internal fun NewsArticleReader(
             IconButton(onClick = { browser?.reload() }, enabled = browser != null && !failed) {
                 Icon(Icons.Outlined.Refresh, uiText(R.string.a11y_refresh_article))
             }
-            IconButton(onClick = onBookmark, modifier = Modifier.testTag("news_reader_bookmark")) {
-                Icon(
-                    if (saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    if (saved) uiText(R.string.a11y_remove_bookmark) else uiText(R.string.a11y_save_article),
-                    tint = OliveGreen
-                )
-            }
         }
-        Text(
-            article.title, modifier = Modifier.padding(horizontal = 20.dp),
-            style = MaterialTheme.typography.titleMedium, maxLines = 2
-        )
         Text(
             if (host.isNotBlank()) "$host · $readingTime" else readingTime,
             color = Muted, style = MaterialTheme.typography.labelSmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 5.dp)
                 .testTag("news_reader_host")
         )
@@ -601,16 +596,16 @@ internal fun NewsArticleReader(
                             article.title,
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            lineHeight = 26.sp,
+                            fontSize = 20.sp * (textZoom / 100f),
+                            lineHeight = 26.sp * (textZoom / 100f),
                             color = Ink
                         )
                         if (article.summary.isNotBlank()) {
                             Text(
                                 article.summary,
                                 fontFamily = FontFamily.Serif,
-                                fontSize = 15.sp,
-                                lineHeight = 22.sp,
+                                fontSize = 15.sp * (textZoom / 100f),
+                                lineHeight = 22.sp * (textZoom / 100f),
                                 color = Ink
                             )
                         }

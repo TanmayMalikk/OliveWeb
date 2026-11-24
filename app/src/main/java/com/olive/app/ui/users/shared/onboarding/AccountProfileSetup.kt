@@ -1,6 +1,7 @@
 // All safe-app roles: collects profile details during account setup.
 package com.olive.app.ui.users.shared.onboarding
 
+import com.olive.app.ui.shared.systemLocale
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
@@ -200,7 +201,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val dob = birthday
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
     var emailConsent by remember(existing) { mutableStateOf(existing?.emailCommunicationConsent == true) }
-    val language = existing?.language?.ifBlank { "English" } ?: "English"
+    val locale = systemLocale()
+    val language = locale.getDisplayLanguage(locale).ifBlank { locale.toLanguageTag() }
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
     var trigger by remember { mutableStateOf("") }

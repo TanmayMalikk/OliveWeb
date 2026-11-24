@@ -1,6 +1,7 @@
 // News cover users: lists headlines and opens saved articles.
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.shared.systemLocale
 import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveIconButton as IconButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
@@ -97,6 +98,7 @@ internal fun NewsFeed(
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
+    val languageTag = systemLocale().toLanguageTag()
     val shareTitle = uiText(R.string.news_share_article)
     with(feed) {
         PullToRefreshBox(isRefreshing = loading, onRefresh = actions.refresh, modifier = modifier) {
@@ -257,7 +259,7 @@ internal fun NewsFeed(
                         if (hero != null) item(key = "hero_${hero.link}") {
                             NewsHeroCard(
                                 hero,
-                                session.language,
+                                languageTag,
                                 saved.any { it.link == hero.link },
                                 onOpen = { actions.openArticle(hero) },
                                 onBookmark = newsBookmarkAction(session, hero))
@@ -265,7 +267,7 @@ internal fun NewsFeed(
                         items(if (hero != null) visible.drop(1) else visible, key = { it.link }) { article ->
                             SwipeableNewsArticleCard(
                                 article,
-                                session.language,
+                                languageTag,
                                 saved.any { it.link == article.link },
                                 onOpen = { actions.openArticle(article) },
                                 onBookmark = newsBookmarkAction(session, article),

@@ -251,7 +251,7 @@ class SessionStateTest {
                     assertSame(runtime.staffSupport, vm.staffSupport)
                     assertFalse(vm.pendingSync)
                     assertEquals("", vm.deliveryAddress.city)
-                    assertEquals("English", vm.language)
+                    assertEquals("", vm.language)
                     assertEquals("", vm.coverDob)
                     assertEquals("", vm.coverFullName)
                     assertEquals("fixture_owner", vm.coverUsername)
