@@ -28,7 +28,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
-
 // A separate authentication-bound key guards device-lock entry. Cover storage stays usable while locked.
 internal class DeviceLockKey(private val namespace: String) {
     /**
@@ -599,5 +598,32 @@ object MediaCipher {
             cipher.doFinal()?.let(output::write)
             output.flush()
         } finally { buffer.fill(0) }
+    }
+}
+
+/** True only while Android temporarily owns the foreground for an approved app operation. */
+internal fun trustedSystemHandoffActive(
+    deviceCredential: Boolean,
+    runtimePermission: Boolean,
+    externalFilePicker: Boolean,
+    callPermission: Boolean,
+    safeSystemActivity: Boolean,
+): Boolean = deviceCredential || runtimePermission || externalFilePicker ||
+    callPermission || safeSystemActivity
+
+/** Holds a credential result only until the private activity is visible again. */
+internal class LifecycleResultGate<T>(private val discard: (T) -> Unit = {}) {
+    private var pending: T? = null
+
+    fun offer(value: T, resumed: Boolean): T? {
+        cancel()
+        return if (resumed) value else null.also { pending = value }
+    }
+
+    fun resume(): T? = pending.also { pending = null }
+
+    fun cancel() {
+        pending?.let(discard)
+        pending = null
     }
 }

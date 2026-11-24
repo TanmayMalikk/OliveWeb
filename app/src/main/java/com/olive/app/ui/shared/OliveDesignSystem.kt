@@ -84,6 +84,9 @@ import com.olive.app.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
+import android.content.res.Resources
+import androidx.compose.ui.platform.LocalConfiguration
+import java.util.Locale
 
 /**
  * Rounds card corners with a smooth join between the curve and each straight edge.
@@ -747,4 +750,14 @@ internal fun AppVersionFooter() {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
+}
+
+/**
+ * Reads the first Android system language, even when Olive has no matching strings.
+ *
+ * @return The first Android system locale, or the default locale if the list is empty.
+ */
+@Composable
+internal fun systemLocale(): Locale = remember(LocalConfiguration.current) {
+    Resources.getSystem().configuration.locales[0] ?: Locale.getDefault()
 }
