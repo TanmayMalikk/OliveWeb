@@ -535,6 +535,7 @@
     <string name="password_recovery_unlock_cancelled">Account recovery was cancelled. No changes were made. Code: OPK-09.</string>
     <string name="password_recovery_error_device_lock_required">Turn on a device screen lock before enabling or restoring account recovery. Code: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">Could not initialize the secure cryptographic runtime on this device. Please restart the app and try again.</string>
+    <string name="password_recovery_error_not_enrolled">Password recovery is not set up for this account, so encrypted access cannot be restored on this device.</string>
     <string name="password_recovery_unlock_title">Unlock encrypted access</string>
     <string name="password_recovery_unlock_prompt">Enter your Olive Branch recovery password to restore encrypted chats and files on this device.</string>
     <string name="password_recovery_unlock_confirm">Unlock</string>

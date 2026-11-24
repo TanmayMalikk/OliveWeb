@@ -680,6 +680,47 @@ class SessionPasswordRecoveryTest {
         }
     }
 
+    @Test
+    fun encryptedAccessRestoreFailureMapsNotEnrolledAndFallsBackForUnexpectedErrors() = runBlocking<Unit> {
+        fixture().use { fixture ->
+            val runtime = fixture.runtime
+            val notEnrolled = functionsFailure(
+                "No password recovery enrolled for this account.",
+                FirebaseFunctionsException.Code.NOT_FOUND,
+            )
+
+            assertEquals(
+                runtime.application.getString(R.string.password_recovery_error_not_enrolled),
+                runtime.passwordRecovery.passwordRecoveryFailure(notEnrolled),
+            )
+            assertEquals(
+                runtime.application.getString(R.string.password_recovery_error_not_enrolled),
+                runtime.passwordRecovery.encryptedAccessRestoreFailure(notEnrolled),
+            )
+            assertEquals(
+                runtime.application.getString(R.string.encrypted_access_restore_failed),
+                runtime.passwordRecovery.encryptedAccessRestoreFailure(RuntimeException("unexpected")),
+            )
+        }
+    }
+
+    @Test
+    fun canRecoverAccountKeysetRequiresLocalAppManagedArkOrEnrolledPasswordRecovery() = runBlocking<Unit> {
+        val keysets = unenrolledKeysets()
+        fixture(keysets).use { fixture ->
+            val runtime = fixture.runtime
+
+            assertFalse(runtime.settings.canRecoverAccountKeyset(uid))
+
+            `when`(keysets.isPasswordRecoveryEnrolled(uid)).thenReturn(true)
+            assertTrue(runtime.settings.canRecoverAccountKeyset(uid))
+
+            `when`(keysets.isPasswordRecoveryEnrolled(uid)).thenReturn(false)
+            enrollDeviceArk(runtime)
+            assertTrue(runtime.settings.canRecoverAccountKeyset(uid))
+        }
+    }
+
     private suspend fun unenrolledKeysets() = mock(AccountKeysetRepository::class.java).also {
         `when`(it.isPasswordRecoveryEnrolled(uid)).thenReturn(false)
     }

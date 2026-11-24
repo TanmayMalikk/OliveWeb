@@ -511,6 +511,24 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /**
+     * Checks whether encrypted access can be unlocked on this device without failing on a missing
+     * OPAQUE recovery record.
+     *
+     * @param uid The account UID used to check local and remote recovery readiness.
+     * @return True if an app-managed local ARK exists or OPAQUE password recovery is enrolled.
+     */
+    internal suspend fun canRecoverAccountKeyset(uid: String): Boolean = with(runtime) {
+        val local = withContext(Dispatchers.IO) { accountKeysets.read(uid) }
+        if (local != null && local.deviceRecord.version == AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED) {
+            return@with true
+        }
+        val repository = accountKeysetRepository ?: return@with false
+        val enrolled = repository.isPasswordRecoveryEnrolled(uid)
+        if (enrollment?.uid == uid) state.passwordRecoveryEnrolled = enrolled
+        enrolled
+    }
+
+    /**
      * Generates a new Account Recovery Key and envelope, protects it locally, and publishes it.
      *
      * @param uid The account UID used to scope this operation.

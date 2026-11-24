@@ -223,7 +223,7 @@ internal fun OliveRoot(
             title = { Text(stringResource(R.string.encrypted_access_result_title)) },
             text = {
                 Text(
-                    stringResource(
+                    recovery.noticeMessage ?: stringResource(
                         when (checkNotNull(recovery.notice)) {
                             EncryptedAccessRecoveryNotice.SUCCESS -> R.string.encrypted_access_restored
                             EncryptedAccessRecoveryNotice.PARTIAL -> R.string.encrypted_access_partially_restored

@@ -24,6 +24,7 @@ internal data class EncryptedAccessRecoveryState(
     val mediaCount: Int = 0,
     val chatCount: Int = 0,
     val notice: EncryptedAccessRecoveryNotice? = null,
+    val noticeMessage: String? = null,
 )
 
 /** Coordinates one explicit account unlock across independent media and chat key recovery. */
@@ -45,6 +46,8 @@ internal class EncryptedAccessRecoveryController(
     private val rememberMedia: suspend (String, List<SafetyDocument>) -> Unit,
     private val rememberChat: (String, RecoveredChatAccess, String, Long) -> Unit,
     private val now: () -> Long = System::currentTimeMillis,
+    private val canRestore: suspend (String) -> Boolean = { true },
+    private val failureMessage: (Throwable) -> String? = { null },
 ) {
     var state by mutableStateOf(EncryptedAccessRecoveryState())
         private set
@@ -100,7 +103,16 @@ internal class EncryptedAccessRecoveryController(
             }
             if (token != generation || state.ownerUid != ownerUid) return@launch
             chatCandidates = chats.distinctBy(ChatConversation::id)
-            val visible = mediaCandidates.isNotEmpty() || chatCandidates.isNotEmpty()
+            val hasCandidates = mediaCandidates.isNotEmpty() || chatCandidates.isNotEmpty()
+            val recoverable = if (!hasCandidates) false else try {
+                canRestore(ownerUid)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                true
+            }
+            if (token != generation || state.ownerUid != ownerUid) return@launch
+            val visible = hasCandidates && recoverable
             state = state.copy(
                 scanning = false,
                 promptVisible = visible && dismissedSignature != signature,
@@ -128,7 +140,7 @@ internal class EncryptedAccessRecoveryController(
         val token = generation
         val media = mediaCandidates
         val chats = chatCandidates
-        state = state.copy(promptVisible = false, restoring = true, notice = null)
+        state = state.copy(promptVisible = false, restoring = true, notice = null, noticeMessage = null)
         restoration = scope.launch {
             try {
                 val keyset = unlock(ownerUid)
@@ -153,12 +165,17 @@ internal class EncryptedAccessRecoveryController(
                     restoring = false,
                     notice = if (failed) EncryptedAccessRecoveryNotice.PARTIAL
                     else EncryptedAccessRecoveryNotice.SUCCESS,
+                    noticeMessage = null,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 if (token == generation && state.ownerUid == ownerUid) {
-                    state = state.copy(restoring = false, notice = EncryptedAccessRecoveryNotice.FAILED)
+                    state = state.copy(
+                        restoring = false,
+                        notice = EncryptedAccessRecoveryNotice.FAILED,
+                        noticeMessage = failureMessage(failure)?.takeIf { it.isNotBlank() },
+                    )
                 }
             }
         }
@@ -166,6 +183,6 @@ internal class EncryptedAccessRecoveryController(
 
     /** Clears transient messaging after it has been announced by the UI. */
     fun clearNotice() {
-        state = state.copy(notice = null)
+        state = state.copy(notice = null, noticeMessage = null)
     }
 }

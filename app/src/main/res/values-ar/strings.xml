@@ -544,6 +544,7 @@
     <string name="password_recovery_unlock_cancelled">تم إلغاء استرداد الحساب ولم تُجرَ أي تغييرات. الرمز: OPK-09.</string>
     <string name="password_recovery_error_device_lock_required">فعّل قفل شاشة الجهاز قبل إعداد أو استعادة استرداد الحساب. الرمز: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">تعذر تهيئة بيئة التشفير الآمنة على هذا الجهاز. يرجى إعادة تشغيل التطبيق والمحاولة مرة أخرى.</string>
+    <string name="password_recovery_error_not_enrolled">لم يتم إعداد استرداد كلمة المرور لهذا الحساب، لذا لا يمكن استعادة الوصول المشفر على هذا الجهاز.</string>
     <string name="password_recovery_unlock_title">فتح الوصول المشفّر</string>
     <string name="password_recovery_unlock_prompt">أدخل كلمة مرور الاسترداد الخاصة بـ Olive Branch لاستعادة محادثاتك وملفاتك المشفرة على هذا الجهاز.</string>
     <string name="password_recovery_unlock_confirm">فتح</string>

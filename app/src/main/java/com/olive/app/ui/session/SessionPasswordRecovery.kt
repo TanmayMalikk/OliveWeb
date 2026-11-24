@@ -185,7 +185,23 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
      * @param failure Throwable thrown during a password recovery operation.
      * @return Human-readable string suitable for display in the UI.
      */
-    internal fun passwordRecoveryFailure(failure: Throwable): String {
+    internal fun passwordRecoveryFailure(failure: Throwable): String =
+        runtime.application.getString(
+            passwordRecoveryFailureRes(failure, R.string.password_recovery_error_unsupported),
+        )
+
+    /**
+     * Resolves a user-friendly error message when restoring encrypted media or chat access fails.
+     *
+     * @param failure Throwable thrown during encrypted access recovery.
+     * @return Human-readable string suitable for display in the encrypted access dialog.
+     */
+    internal fun encryptedAccessRestoreFailure(failure: Throwable): String =
+        runtime.application.getString(
+            passwordRecoveryFailureRes(failure, R.string.encrypted_access_restore_failed),
+        )
+
+    private fun passwordRecoveryFailureRes(failure: Throwable, fallbackRes: Int): Int {
         android.util.Log.w("SessionPasswordRecovery", "Password recovery failure: ${failure.javaClass.simpleName}: ${failure.message}", failure)
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
         val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()
@@ -194,7 +210,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         val invalidUser = causes.filterIsInstance<FirebaseAuthInvalidUserException>().firstOrNull()
         val networkEx = causes.filterIsInstance<FirebaseNetworkException>().firstOrNull()
 
-        val stringRes = when {
+        return when {
             badCredentials != null ->
                 R.string.password_recovery_error_incorrect
             invalidUser != null ->
@@ -236,11 +252,16 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 FirebaseFunctionsException.Code.UNAVAILABLE,
                 FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ->
                     R.string.password_recovery_error_connection
-                FirebaseFunctionsException.Code.NOT_FOUND ->
-                    R.string.password_recovery_error_corrupted
+                FirebaseFunctionsException.Code.NOT_FOUND -> when {
+                    functions.message?.contains("No password recovery enrolled", ignoreCase = true) == true ->
+                        R.string.password_recovery_error_not_enrolled
+                    functions.message?.contains("session expired", ignoreCase = true) == true ->
+                        R.string.password_recovery_error_session_expired
+                    else -> R.string.password_recovery_error_corrupted
+                }
                 FirebaseFunctionsException.Code.UNAUTHENTICATED ->
                     R.string.password_recovery_error_session_expired
-                else -> R.string.password_recovery_error_unsupported
+                else -> fallbackRes
             }
             firestore != null -> when (firestore.code) {
                 FirebaseFirestoreException.Code.UNAVAILABLE,
@@ -248,12 +269,10 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                     R.string.password_recovery_error_connection
                 FirebaseFirestoreException.Code.PERMISSION_DENIED ->
                     R.string.password_recovery_error_revoked
-                else -> R.string.password_recovery_error_unsupported
+                else -> fallbackRes
             }
-            else -> R.string.password_recovery_error_unsupported
+            else -> fallbackRes
         }
-
-        return runtime.application.getString(stringRes)
     }
 
     /**

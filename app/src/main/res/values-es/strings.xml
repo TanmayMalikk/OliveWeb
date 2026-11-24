@@ -535,6 +535,7 @@
     <string name="password_recovery_unlock_cancelled">Se canceló la recuperación de cuenta. No se realizaron cambios. Código: OPK-09.</string>
     <string name="password_recovery_error_device_lock_required">Activa el bloqueo de pantalla del dispositivo antes de configurar o restaurar la recuperación de cuenta. Código: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">No se pudo inicializar el entorno criptográfico seguro en este dispositivo. Reinicia la aplicación e inténtalo de nuevo.</string>
+    <string name="password_recovery_error_not_enrolled">La recuperación con contraseña no está configurada para esta cuenta, por lo que no se puede restaurar el acceso cifrado en este dispositivo.</string>
     <string name="password_recovery_unlock_title">Desbloquear acceso cifrado</string>
     <string name="password_recovery_unlock_prompt">Introduce tu contraseña de recuperación de Olive Branch para restaurar tus chats y archivos cifrados en este dispositivo.</string>
     <string name="password_recovery_unlock_confirm">Desbloquear</string>

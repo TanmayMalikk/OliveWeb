@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -108,6 +109,66 @@ class EncryptedAccessRecoveryControllerTest {
             assertEquals(1, unlocks)
             assertEquals(2, remembered)
             assertEquals(EncryptedAccessRecoveryNotice.PARTIAL, controller.state.notice)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun skipsPromptWhenRecoveryIsNotEnrolledOnAccount() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            var unlocks = 0
+            val recoveryKey = AccountRecoveryKey.generate()
+            val keyset = AccountKeysetEnvelope.create("owner", recoveryKey).unlock("owner", recoveryKey)
+            val controller = EncryptedAccessRecoveryController(
+                scope = scope,
+                deviceId = { "device" },
+                unlock = { unlocks++; keyset },
+                findChats = { items, _ -> items },
+                restoreMedia = { items, _, _ -> MediaAccessRecoveryResult(items, emptySet(), emptySet()) },
+                restoreChats = { _, _, _ -> ChatAccessRecoveryResult(emptyList(), emptySet()) },
+                rememberMedia = { _, _ -> },
+                rememberChat = { _, _, _, _ -> },
+                canRestore = { false },
+            )
+
+            controller.evaluate("owner", listOf(document("media")), listOf(conversation("chat")))
+            assertFalse(controller.state.promptVisible)
+
+            controller.restore()
+            assertEquals(0, unlocks)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun restoreFailureSurfacesSpecificNoticeMessageAndClearsIt() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val controller = EncryptedAccessRecoveryController(
+                scope = scope,
+                deviceId = { "device" },
+                unlock = { throw IllegalStateException("Not enrolled") },
+                findChats = { items, _ -> items },
+                restoreMedia = { items, _, _ -> MediaAccessRecoveryResult(items, emptySet(), emptySet()) },
+                restoreChats = { _, _, _ -> ChatAccessRecoveryResult(emptyList(), emptySet()) },
+                rememberMedia = { _, _ -> },
+                rememberChat = { _, _, _, _ -> },
+                failureMessage = { "Password recovery is not set up" },
+            )
+
+            controller.evaluate("owner", listOf(document("media")), listOf(conversation("chat")))
+            assertTrue(controller.state.promptVisible)
+
+            controller.restore()
+            assertEquals(EncryptedAccessRecoveryNotice.FAILED, controller.state.notice)
+            assertEquals("Password recovery is not set up", controller.state.noticeMessage)
+
+            controller.clearNotice()
+            assertNull(controller.state.notice)
+            assertNull(controller.state.noticeMessage)
         } finally {
             scope.cancel()
         }

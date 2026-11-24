@@ -91,6 +91,8 @@ internal class SessionViewModel @JvmOverloads constructor(
                 validatedAt = validatedAt,
             )
         },
+        canRestore = runtime.settings::canRecoverAccountKeyset,
+        failureMessage = runtime.passwordRecovery::encryptedAccessRestoreFailure,
     )
     internal val locationMap =
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)

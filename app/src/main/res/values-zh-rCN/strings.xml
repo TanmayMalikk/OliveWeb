@@ -529,6 +529,7 @@
     <string name="password_recovery_unlock_cancelled">账户恢复已取消，未进行任何更改。代码：OPK-09。</string>
     <string name="password_recovery_error_device_lock_required">请先开启设备屏幕锁定，然后再设置或恢复账户恢复。代码：OPK-10。</string>
     <string name="password_recovery_error_runtime_unavailable">无法在此设备上初始化安全加密运行环境。请重启应用并重试。</string>
+    <string name="password_recovery_error_not_enrolled">此帐户未设置密码恢复，因此无法在此设备上恢复加密访问权限。</string>
     <string name="password_recovery_unlock_title">解锁加密访问权限</string>
     <string name="password_recovery_unlock_prompt">输入您的 Olive Branch 恢复密码，以便在此设备上恢复加密聊天和文件。</string>
     <string name="password_recovery_unlock_confirm">解锁</string>
