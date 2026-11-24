@@ -565,7 +565,7 @@ internal fun FriendInviteControls(
             Button(
                 onClick = { opened = true },
                 enabled = !session.localMode,
-                modifier = Modifier.testTag("friend_invite")
+                modifier = Modifier.walkthroughTarget("friend_invite").testTag("friend_invite")
             ) {
                 Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))

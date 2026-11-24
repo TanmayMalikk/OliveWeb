@@ -276,7 +276,7 @@ private fun MessagingSidebar(
                     selected = !ticketChats,
                     onClick = { onChatTabChange(false) },
                     text = { ChatTabLabel(uiText(R.string.chat_dms_tab), session.messages.unreadCountForChatTab(false)) },
-                    modifier = Modifier.testTag("messages_dms_tab"),
+                    modifier = Modifier.walkthroughTarget("messages_dms_tab").testTag("messages_dms_tab"),
                 )
                 Tab(
                     selected = ticketChats,

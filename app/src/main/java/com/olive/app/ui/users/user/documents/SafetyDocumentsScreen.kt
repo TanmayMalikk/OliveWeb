@@ -113,7 +113,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         Button(
             onClick = { choosingUpload = true },
             enabled = !preparing && !session.localMode,
-            modifier = Modifier.fillMaxWidth().testTag("documents_upload")
+            modifier = Modifier.fillMaxWidth().walkthroughTarget("documents_upload").testTag("documents_upload")
         ) {
             Icon(
                 Icons.Outlined.UploadFile,

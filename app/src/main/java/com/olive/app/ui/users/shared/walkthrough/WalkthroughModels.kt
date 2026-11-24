@@ -1,4 +1,4 @@
-// Safe-app users and safe contacts: walkthrough topics, multi-step live tour catalog, and helpers.
+// Safe-app users and safe contacts: walkthrough topics, multi-step live tour catalog, and target bindings.
 package com.olive.app.ui.users.shared.walkthrough
 
 import androidx.annotation.StringRes
@@ -18,28 +18,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.ui.users.shared.navigation.SafePage
-
-/**
- * Placement of an in-app walkthrough coachmark card over the live target screen.
- */
-internal enum class WalkthroughAnchor {
-    BottomEnd,
-    BottomStart,
-    TopEnd,
-    TopCenter,
-    BottomCenter,
-}
-
-/**
- * Directional arrow displayed inside the coachmark card to point toward the target control.
- */
-internal enum class WalkthroughArrow {
-    SouthEast,
-    SouthWest,
-    NorthEast,
-    North,
-    South,
-}
 
 /**
  * Top-level Table of Contents groupings for walkthrough features.
@@ -79,15 +57,15 @@ internal data class WalkthroughTopic(
 )
 
 /**
- * Individual step rendered as a floating coachmark popup during the live in-app walkthrough.
+ * Individual step rendered as a non-overlapping coachmark popup paired with a red target highlight.
  *
  * @property id Stable step identifier.
  * @property topicId Parent [WalkthroughTopic.id] in the Table of Contents.
  * @property titleRes Localized popup heading resource ID.
  * @property bodyRes Localized popup instruction resource ID.
  * @property tourPage Live [SafePage] displayed behind this coachmark step.
- * @property anchor Placement alignment for the floating coachmark popup.
- * @property arrow Directional arrow inside the popup pointing to the highlighted feature.
+ * @property targetId Registered `walkthroughTarget` ID highlighted in red on screen.
+ * @property avoidId Optional larger `walkthroughTarget` bounds to stay clear of (e.g., open `+` menu).
  * @property openSupportMenu Whether the `+` Support menu must stay expanded during this step.
  * @property settingsTabTag Optional `SettingsCategory.tag` selected automatically when on Settings.
  * @property userOnly Whether this step is restricted to primary user accounts.
@@ -98,8 +76,8 @@ internal data class WalkthroughTourStep(
     @param:StringRes val titleRes: Int,
     @param:StringRes val bodyRes: Int,
     val tourPage: SafePage,
-    val anchor: WalkthroughAnchor = WalkthroughAnchor.BottomCenter,
-    val arrow: WalkthroughArrow = WalkthroughArrow.North,
+    val targetId: String? = null,
+    val avoidId: String? = null,
     val openSupportMenu: Boolean = false,
     val settingsTabTag: String? = null,
     val userOnly: Boolean = false,
@@ -286,8 +264,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_quick_exit_fab_title,
         bodyRes = R.string.wt_step_quick_exit_fab_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.BottomEnd,
-        arrow = WalkthroughArrow.SouthEast,
+        targetId = "quick_exit",
         userOnly = true,
     ),
     WalkthroughTourStep(
@@ -296,8 +273,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_home_header_shortcuts_title,
         bodyRes = R.string.wt_step_home_header_shortcuts_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopEnd,
-        arrow = WalkthroughArrow.NorthEast,
+        targetId = "home_camera_settings",
         userOnly = true,
     ),
     WalkthroughTourStep(
@@ -306,8 +282,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_home_profile_activity_title,
         bodyRes = R.string.wt_step_home_profile_activity_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.South,
+        targetId = "home_profile_activity",
         userOnly = true,
     ),
     WalkthroughTourStep(
@@ -316,8 +291,8 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_support_menu_staff_title,
         bodyRes = R.string.wt_step_support_menu_staff_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.SouthWest,
+        targetId = "support_staff_help",
+        avoidId = "support_action_list",
         openSupportMenu = true,
         userOnly = true,
     ),
@@ -327,8 +302,8 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_support_menu_staff_escalate_title,
         bodyRes = R.string.wt_step_support_menu_staff_escalate_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.SouthWest,
+        targetId = "support_staff_help",
+        avoidId = "support_action_list",
         openSupportMenu = true,
         userOnly = true,
     ),
@@ -338,8 +313,8 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_support_menu_emergency_title,
         bodyRes = R.string.wt_step_support_menu_emergency_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.SouthWest,
+        targetId = "support_emergency",
+        avoidId = "support_action_list",
         openSupportMenu = true,
         userOnly = true,
     ),
@@ -349,8 +324,8 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_support_menu_emergency_alert_title,
         bodyRes = R.string.wt_step_support_menu_emergency_alert_body,
         tourPage = SafePage.Home,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.SouthWest,
+        targetId = "support_emergency",
+        avoidId = "support_action_list",
         openSupportMenu = true,
         userOnly = true,
     ),
@@ -360,6 +335,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_plan_checklists_title,
         bodyRes = R.string.wt_step_plan_checklists_body,
         tourPage = SafePage.SafetyPlan,
+        targetId = "safety_plan_tabs",
     ),
     WalkthroughTourStep(
         id = "plan_share_consult",
@@ -367,6 +343,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_plan_share_consult_title,
         bodyRes = R.string.wt_step_plan_share_consult_body,
         tourPage = SafePage.SafetyPlan,
+        targetId = "safety_plan_tabs",
     ),
     WalkthroughTourStep(
         id = "notes_create",
@@ -374,6 +351,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_notes_create_title,
         bodyRes = R.string.wt_step_notes_create_body,
         tourPage = SafePage.Notes,
+        targetId = "new_private_entry",
     ),
     WalkthroughTourStep(
         id = "notes_pin_search",
@@ -381,6 +359,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_notes_pin_search_title,
         bodyRes = R.string.wt_step_notes_pin_search_body,
         tourPage = SafePage.Notes,
+        targetId = "private_filter_all",
     ),
     WalkthroughTourStep(
         id = "notes_history_trash",
@@ -388,6 +367,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_notes_history_trash_title,
         bodyRes = R.string.wt_step_notes_history_trash_body,
         tourPage = SafePage.Notes,
+        targetId = "new_private_entry",
     ),
     WalkthroughTourStep(
         id = "docs_encrypted_vault",
@@ -395,6 +375,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_docs_encrypted_vault_title,
         bodyRes = R.string.wt_step_docs_encrypted_vault_body,
         tourPage = SafePage.Documents,
+        targetId = "documents_upload",
     ),
     WalkthroughTourStep(
         id = "docs_private_camera",
@@ -402,6 +383,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_docs_private_camera_title,
         bodyRes = R.string.wt_step_docs_private_camera_body,
         tourPage = SafePage.Documents,
+        targetId = "documents_upload",
     ),
     WalkthroughTourStep(
         id = "docs_ocr_share",
@@ -409,6 +391,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_docs_ocr_share_title,
         bodyRes = R.string.wt_step_docs_ocr_share_body,
         tourPage = SafePage.Documents,
+        targetId = "documents_upload",
     ),
     WalkthroughTourStep(
         id = "chat_add_friends",
@@ -416,6 +399,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_chat_add_friends_title,
         bodyRes = R.string.wt_step_chat_add_friends_body,
         tourPage = SafePage.Messages,
+        targetId = "friend_invite",
     ),
     WalkthroughTourStep(
         id = "chat_voice_messages",
@@ -423,6 +407,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_chat_voice_messages_title,
         bodyRes = R.string.wt_step_chat_voice_messages_body,
         tourPage = SafePage.Messages,
+        targetId = "messages_dms_tab",
     ),
     WalkthroughTourStep(
         id = "chat_share_media",
@@ -430,6 +415,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_chat_share_media_title,
         bodyRes = R.string.wt_step_chat_share_media_body,
         tourPage = SafePage.Messages,
+        targetId = "messages_dms_tab",
     ),
     WalkthroughTourStep(
         id = "chat_calls_search_info",
@@ -437,6 +423,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_chat_calls_search_info_title,
         bodyRes = R.string.wt_step_chat_calls_search_info_body,
         tourPage = SafePage.Messages,
+        targetId = "messages_dms_tab",
     ),
     WalkthroughTourStep(
         id = "loc_map_places",
@@ -444,8 +431,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_loc_map_places_title,
         bodyRes = R.string.wt_step_loc_map_places_body,
         tourPage = SafePage.Location,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.South,
+        targetId = "location_map_view",
     ),
     WalkthroughTourStep(
         id = "loc_live_sharing",
@@ -453,8 +439,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_loc_live_sharing_title,
         bodyRes = R.string.wt_step_loc_live_sharing_body,
         tourPage = SafePage.Location,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.South,
+        targetId = "location_map_view",
     ),
     WalkthroughTourStep(
         id = "loc_navigation",
@@ -462,8 +447,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_loc_navigation_title,
         bodyRes = R.string.wt_step_loc_navigation_body,
         tourPage = SafePage.Location,
-        anchor = WalkthroughAnchor.TopCenter,
-        arrow = WalkthroughArrow.South,
+        targetId = "location_map_view",
     ),
     WalkthroughTourStep(
         id = "hotlines_directory",
@@ -471,6 +455,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_hotlines_directory_title,
         bodyRes = R.string.wt_step_hotlines_directory_body,
         tourPage = SafePage.Hotlines,
+        targetId = "hotline_tabs",
         userOnly = true,
     ),
     WalkthroughTourStep(
@@ -495,6 +480,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_settings_profile_cover_title,
         bodyRes = R.string.wt_step_settings_profile_cover_body,
         tourPage = SafePage.Settings,
+        targetId = "settings_tab_profile",
         settingsTabTag = "settings_tab_profile",
     ),
     WalkthroughTourStep(
@@ -503,6 +489,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_settings_password_trigger_title,
         bodyRes = R.string.wt_step_settings_password_trigger_body,
         tourPage = SafePage.Settings,
+        targetId = "settings_tab_password",
         settingsTabTag = "settings_tab_password",
     ),
     WalkthroughTourStep(
@@ -511,6 +498,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_settings_privacy_passkey_title,
         bodyRes = R.string.wt_step_settings_privacy_passkey_body,
         tourPage = SafePage.Settings,
+        targetId = "settings_tab_privacy",
         settingsTabTag = "settings_tab_privacy",
         userOnly = true,
     ),
@@ -520,6 +508,7 @@ internal val allWalkthroughTourSteps: List<WalkthroughTourStep> = listOf(
         titleRes = R.string.wt_step_settings_permissions_title,
         bodyRes = R.string.wt_step_settings_permissions_body,
         tourPage = SafePage.Settings,
+        targetId = "settings_tab_permissions",
         settingsTabTag = "settings_tab_permissions",
     ),
 )

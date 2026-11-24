@@ -4,6 +4,7 @@ package com.olive.app.ui.users.user.dashboard
 import com.olive.app.ui.shared.OliveCard as Card
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.walkthroughTarget
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -96,7 +97,7 @@ internal fun HotlineCategoryTabs(
     onSelect: (HotlineTab) -> Unit,
 ) {
     LazyRow(
-        modifier = Modifier.fillMaxWidth().testTag("hotline_tabs"),
+        modifier = Modifier.fillMaxWidth().walkthroughTarget("hotline_tabs").testTag("hotline_tabs"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 2.dp),
     ) {

@@ -273,6 +273,7 @@ internal fun SafeSupportControls(
             modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding()
                 .padding(start = 12.dp, end = 12.dp, bottom = 92.dp)
                 .widthIn(max = 360.dp).heightIn(max = (maxHeight - 116.dp).coerceAtLeast(0.dp))
+                .walkthroughTarget("support_action_list")
                 .testTag("support_action_list")
                 .accessibilityTraversal(AccessibilityTraversalOrder.OverlayContent),
             enter = fadeIn(tween(160)) + scaleIn(
@@ -424,7 +425,7 @@ private fun AnimatedVisibilityScope.SupportAction(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag)
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).walkthroughTarget(tag).testTag(tag)
             .animateEnterExit(
                 enter = fadeIn(tween(160, delayMillis)) + slideInVertically(
                     tween(
@@ -578,15 +579,20 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                 )
             }
             SafeAppUpdateReminder()
-            FilledTonalIconButton(
-                onClick = { session.navigation.openSafePage(SafePage.Camera) },
-                enabled = !session.localMode,
-                modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
-            ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
-            FilledTonalIconButton(
-                onClick = { session.navigation.openSafePage(SafePage.Settings) },
-                modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
-            ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
+            Row(
+                modifier = Modifier.walkthroughTarget("home_camera_settings"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilledTonalIconButton(
+                    onClick = { session.navigation.openSafePage(SafePage.Camera) },
+                    enabled = !session.localMode,
+                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
+                ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
+                FilledTonalIconButton(
+                    onClick = { session.navigation.openSafePage(SafePage.Settings) },
+                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
+                ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
+            }
         }
     }
 }
@@ -705,7 +711,7 @@ private fun SafeHomeShortcuts(session: SessionViewModel) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val sideBySide = maxWidth >= 280.dp && fontScale < 1.4f
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().walkthroughTarget("home_profile_activity"),
             maxItemsInEachRow = if (sideBySide) 2 else 1,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

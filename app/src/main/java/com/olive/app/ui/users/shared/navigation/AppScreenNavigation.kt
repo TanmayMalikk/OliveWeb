@@ -285,7 +285,9 @@ internal fun OliveRoot(
                     enabled = privateArea && !privacyHidden && !showPinAnimation && !supportExpanded,
                     bottomClearance = if (showQuickExit || showSupport) OlivePrivateLayout.FloatingActionClearance else 12.dp,
                 ) {
-                    Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
+                    val walkthroughTargets = remember { WalkthroughTargetRegistry() }
+                    CompositionLocalProvider(LocalWalkthroughTargets provides walkthroughTargets) {
+                        Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
                         Scaffold(
                             containerColor = screenBackground,
                             contentColor = MaterialTheme.colorScheme.onBackground,
@@ -481,6 +483,7 @@ internal fun OliveRoot(
                                 modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
                             )
                         }
+                    }
                     }
                 }
             }

@@ -607,7 +607,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 FilledTonalIconButton(
                     onClick = { openEditor(null) },
                     enabled = !session.busy,
-                    modifier = Modifier.testTag("new_private_entry")
+                    modifier = Modifier.walkthroughTarget("new_private_entry").testTag("new_private_entry")
                 ) { Icon(Icons.Outlined.Add, uiText(R.string.ui_new_note)) }
             }
         }
@@ -744,7 +744,9 @@ private fun NoteBoardControls(
                 selected = kind == option,
                 onClick = { onKindChange(option) },
                 label = { Text(stringResource(noteBoardKindLabel(option))) },
-                modifier = Modifier.testTag("private_filter_${option?.name?.lowercase() ?: "all"}"),
+                modifier = Modifier
+                    .then(if (option == null) Modifier.walkthroughTarget("private_filter_all") else Modifier)
+                    .testTag("private_filter_${option?.name?.lowercase() ?: "all"}"),
             )
         }
         Box {

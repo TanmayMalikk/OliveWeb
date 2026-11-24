@@ -267,7 +267,7 @@ internal fun SafetyPlanScreen(
                 if (organizationEditor || safeContact) Text(displayOwnerName, style = MaterialTheme.typography.labelLarge)
                 PrimaryTabRow(
                     selectedTabIndex = if (backup) 1 else 0,
-                    modifier = Modifier.fillMaxWidth().testTag("safety_plan_tabs"),
+                    modifier = Modifier.fillMaxWidth().walkthroughTarget("safety_plan_tabs").testTag("safety_plan_tabs"),
                 ) {
                     Tab(
                         selected = !backup,

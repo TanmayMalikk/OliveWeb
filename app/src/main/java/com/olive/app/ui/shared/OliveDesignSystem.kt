@@ -618,6 +618,7 @@ internal fun FloatingQuickExit(onClick: () -> Unit, modifier: Modifier = Modifie
     ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier.olivePress(source).border(1.dp, SageGreen, shape)
+            .walkthroughTarget("quick_exit")
             .testTag("quick_exit").semantics { contentDescription = label },
         expanded = !compact,
         shape = shape,

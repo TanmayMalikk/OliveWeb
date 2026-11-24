@@ -1,4 +1,4 @@
-// All safe-app roles: pure TypeScript walkthrough catalog, multi-step tour definitions, and helpers.
+// All safe-app roles: pure TypeScript walkthrough catalog, multi-step tour targets, and non-overlapping placement.
 import type { Page, Role } from "../../../domain/DomainModels";
 
 export type WebWalkthroughCategory =
@@ -6,9 +6,6 @@ export type WebWalkthroughCategory =
   | "tools"
   | "support"
   | "account";
-
-export type WebWalkthroughAnchor = "bottom-right" | "bottom-center";
-export type WebWalkthroughArrow = "down-right" | "up";
 
 export interface WebWalkthroughTopic {
   category: WebWalkthroughCategory;
@@ -19,8 +16,6 @@ export interface WebWalkthroughTopic {
   targetPage: Page;
   targetLabel: string;
   tourPage: Page;
-  anchor: WebWalkthroughAnchor;
-  arrow: WebWalkthroughArrow;
   userOnly?: boolean;
 }
 
@@ -30,9 +25,17 @@ export interface WebWalkthroughTourStep {
   title: string;
   body: string;
   tourPage: Page;
-  anchor: WebWalkthroughAnchor;
-  arrow: WebWalkthroughArrow;
+  targetSelector?: string;
   userOnly?: boolean;
+}
+
+export interface WebCoachmarkRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
 }
 
 export interface WebWalkthroughCategoryMeta {
@@ -62,8 +65,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Home",
     targetLabel: "Home",
     tourPage: "Home",
-    anchor: "bottom-right",
-    arrow: "down-right",
     userOnly: true,
   },
   {
@@ -80,8 +81,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "SafetyPlan",
     targetLabel: "Safety plan",
     tourPage: "SafetyPlan",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "tools",
@@ -97,8 +96,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Notes",
     targetLabel: "Notes & incidents",
     tourPage: "Notes",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "tools",
@@ -114,8 +111,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Documents",
     targetLabel: "Documents",
     tourPage: "Documents",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "tools",
@@ -131,8 +126,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Messages",
     targetLabel: "Friends & messages",
     tourPage: "Messages",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "tools",
@@ -148,8 +141,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Location",
     targetLabel: "Location",
     tourPage: "Location",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "support",
@@ -165,8 +156,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "StaffHelp",
     targetLabel: "Staff help",
     tourPage: "StaffHelp",
-    anchor: "bottom-center",
-    arrow: "up",
     userOnly: true,
   },
   {
@@ -183,8 +172,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Hotlines",
     targetLabel: "Hotlines",
     tourPage: "Hotlines",
-    anchor: "bottom-center",
-    arrow: "up",
     userOnly: true,
   },
   {
@@ -201,8 +188,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Activity",
     targetLabel: "Account activity",
     tourPage: "Activity",
-    anchor: "bottom-center",
-    arrow: "up",
   },
   {
     category: "privacy",
@@ -218,8 +203,6 @@ const ALL_TOPICS: WebWalkthroughTopic[] = [
     targetPage: "Settings",
     targetLabel: "Settings",
     tourPage: "Settings",
-    anchor: "bottom-center",
-    arrow: "up",
   },
 ];
 
@@ -230,8 +213,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Quick Exit button",
     body: "Click Quick Exit in the bottom-right corner anytime to immediately lock your workspace and return to your cover site.",
     tourPage: "Home",
-    anchor: "bottom-right",
-    arrow: "down-right",
+    targetSelector: ".floating-quick-exit",
     userOnly: true,
   },
   {
@@ -240,8 +222,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Workspace navigation & My profile",
     body: "Use the sidebar links or dashboard cards to switch between your private tools, My profile, and Account activity.",
     tourPage: "Home",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#safe-navigation",
     userOnly: true,
   },
   {
@@ -250,8 +231,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Primary, backup & emergency checklists",
     body: "Review and customize your primary safety plan, backup steps, and emergency grab-bag checklist here.",
     tourPage: "SafetyPlan",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main h2, #main .panel",
   },
   {
     id: "plan_share_consult",
@@ -259,8 +239,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Trusted contact sharing & consultations",
     body: "Choose which accepted trusted contacts can view your safety plan (revoke anytime) or request staff consultation.",
     tourPage: "SafetyPlan",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main button",
   },
   {
     id: "notes_create",
@@ -268,8 +247,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Notes & dated Incident records",
     body: "Log private reminders as Notes or dated/timed Incidents with locations and encrypted file attachments.",
     tourPage: "Notes",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main h2, #main .panel",
   },
   {
     id: "notes_pin_search",
@@ -277,8 +255,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Pin, filter & search entries",
     body: "Pin key records to the top, switch between Notes and Incidents, or search keywords in real time.",
     tourPage: "Notes",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main input, #main select",
   },
   {
     id: "notes_history_trash",
@@ -286,8 +263,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Edit history & trash restore",
     body: "Inspect per-entry edit history logs, share entries in chat, or restore deleted records from trash.",
     tourPage: "Notes",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "docs_vault",
@@ -295,8 +271,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Client-encrypted Document vault",
     body: "Upload PDFs, images, or files here; every file is encrypted in your browser before reaching cloud storage.",
     tourPage: "Documents",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main button, #main .panel",
   },
   {
     id: "docs_share",
@@ -304,8 +279,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Contact sharing & chat-only audio isolation",
     body: "Grant or revoke access for accepted contacts per document; chat voice recordings stay isolated inside conversations.",
     tourPage: "Documents",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "chat_add_friends",
@@ -313,8 +287,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Friends & 48-hour invite codes",
     body: "Search trusted people by username or generate a 48-hour single-use invite code or link to connect safely.",
     tourPage: "Messages",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel, #main button",
   },
   {
     id: "chat_voice_groups",
@@ -322,8 +295,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Direct chats, groups & chat-only voice",
     body: "Exchange end-to-end encrypted text in DMs or group chats and send voice notes stored strictly within chats.",
     tourPage: "Messages",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "chat_share_items",
@@ -331,8 +303,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Share media, notes, plans & location",
     body: "Use chat attachment controls to send encrypted Documents, Notes/Incidents, Safety plans, or location cards.",
     tourPage: "Messages",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "chat_search_unsend_info",
@@ -340,8 +311,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Search messages, unsend & Chat Info",
     body: "Search across messages, unsend anything you sent, or open Chat details to inspect participants and shared files.",
     tourPage: "Messages",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "location_map",
@@ -349,8 +319,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Interactive map & shared pins",
     body: "Inspect locations shared with you by trusted connections or run an explicit one-time position check here.",
     tourPage: "Location",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "location_mobile_note",
@@ -358,8 +327,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Continuous live sharing on Android",
     body: "Use the Olive Branch Android app whenever you need continuous background live sharing or turn-by-turn routes.",
     tourPage: "Location",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "staff_request",
@@ -367,8 +335,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Request organization staff help",
     body: "Open a private support ticket here; you can cancel a pending request anytime before a staff advocate claims it.",
     tourPage: "StaffHelp",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .safe-feature-page button, #main .panel",
     userOnly: true,
   },
   {
@@ -377,8 +344,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Collaborate in your support ticket",
     body: "Once assigned, continue in Friends & messages, share plans or notes, and optionally invite a friend into the ticket.",
     tourPage: "StaffHelp",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .safe-feature-page, #main .panel",
     userOnly: true,
   },
   {
@@ -387,8 +353,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Canadian crisis lines & shelters",
     body: "Filter 24/7 crisis lines, shelters, and legal aid across Canadian provinces and cities using your saved or current city.",
     tourPage: "Hotlines",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main select, #main .panel",
     userOnly: true,
   },
   {
@@ -397,8 +362,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Trusted safe-contact directory",
     body: "Store trusted friends' details, note who is safe to stay with in an emergency, and manage personal contacts.",
     tourPage: "Contacts",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
     userOnly: true,
   },
   {
@@ -407,8 +371,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Account activity security log",
     body: "Review timestamped Settings edits, cover trigger uses, and PIN attempts to verify account security.",
     tourPage: "Activity",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: "#main .panel",
   },
   {
     id: "settings_idle_entry",
@@ -416,8 +379,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Settings · Idle lock & personal entry link",
     body: "Choose how long before inactivity returns to your cover, copy or rotate your personal bookmark link, and update passwords.",
     tourPage: "Settings",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: ".settings-grid > section:nth-child(1)",
   },
   {
     id: "settings_trigger_pin",
@@ -425,8 +387,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Settings · Trigger phrase, cover & browser PIN",
     body: "Rotate your secret trigger phrase, cover preference, or 4-digit browser unlock PIN safely from Settings.",
     tourPage: "Settings",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: ".settings-grid > section:nth-child(2)",
   },
   {
     id: "settings_passkey",
@@ -434,10 +395,54 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     title: "Settings · Passkey Account Recovery Key",
     body: "Enroll a Passkey Account Recovery Key so encrypted documents and chats restore cleanly if you sign in on another browser.",
     tourPage: "Settings",
-    anchor: "bottom-center",
-    arrow: "up",
+    targetSelector: ".settings-grid > section:last-of-type",
   },
 ];
+
+export function computeWebCoachmarkPlacement({
+  targetRect,
+  viewportWidth,
+  viewportHeight,
+  cardWidth,
+  cardHeight,
+  safeTop = 16,
+  safeBottom = viewportHeight - 84,
+  margin = 16,
+  gap = 12,
+}: {
+  targetRect: WebCoachmarkRect;
+  viewportWidth: number;
+  viewportHeight: number;
+  cardWidth: number;
+  cardHeight: number;
+  safeTop?: number;
+  safeBottom?: number;
+  margin?: number;
+  gap?: number;
+}): { left: number; top: number } {
+  const minLeft = margin;
+  const maxLeft = Math.max(minLeft, viewportWidth - margin - cardWidth);
+  const centerX = targetRect.left + targetRect.width / 2;
+  const left = Math.min(maxLeft, Math.max(minLeft, centerX - cardWidth / 2));
+  const maxTop = Math.max(safeTop, safeBottom - cardHeight);
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+  const spaceBelow = safeBottom - targetRect.bottom;
+  const spaceAbove = targetRect.top - safeTop;
+  const preferBelow =
+    spaceBelow >= cardHeight + gap &&
+    (targetCenterY < viewportHeight * 0.55 || spaceBelow >= spaceAbove);
+  let top: number;
+  if (preferBelow) {
+    top = Math.min(maxTop, Math.max(safeTop, targetRect.bottom + gap));
+  } else if (spaceAbove >= cardHeight + gap) {
+    top = Math.min(maxTop, Math.max(safeTop, targetRect.top - gap - cardHeight));
+  } else if (spaceBelow >= spaceAbove) {
+    top = Math.min(maxTop, Math.max(safeTop, targetRect.bottom + gap));
+  } else {
+    top = Math.min(maxTop, Math.max(safeTop, targetRect.top - gap - cardHeight));
+  }
+  return { left, top };
+}
 
 export function walkthroughTopicsForRole(role: Role | undefined): WebWalkthroughTopic[] {
   if (role === "SAFE_CONTACT") {

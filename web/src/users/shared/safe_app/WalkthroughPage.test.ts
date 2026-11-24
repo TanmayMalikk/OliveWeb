@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampWalkthroughStep,
+  computeWebCoachmarkPlacement,
   firstWalkthroughStepForTopic,
   nextWalkthroughTopicIndex,
   nextWalkthroughTourStepId,
@@ -10,7 +11,7 @@ import {
   walkthroughTourStepsForRole,
 } from "./WalkthroughCatalog";
 
-describe("WalkthroughCatalog table of contents and multi-step live tour helpers", () => {
+describe("WalkthroughCatalog table of contents, highlight targeting, and placement", () => {
   it("lists all user features in the table of contents and filters user-only topics for safe contacts", () => {
     const userTopics = walkthroughTopicsForRole("USER");
     const contactTopics = walkthroughTopicsForRole("SAFE_CONTACT");
@@ -34,7 +35,7 @@ describe("WalkthroughCatalog table of contents and multi-step live tour helpers"
     ]);
   });
 
-  it("includes multi-step coverage for messaging, settings tabs, and hotlines/contacts", () => {
+  it("includes multi-step target coverage for quick exit, messaging, settings, and hotlines/contacts", () => {
     const userSteps = walkthroughTourStepsForRole("USER");
     const contactSteps = walkthroughTourStepsForRole("SAFE_CONTACT");
 
@@ -46,12 +47,32 @@ describe("WalkthroughCatalog table of contents and multi-step live tour helpers"
 
     const quickExit = userSteps.find((step) => step.id === "quick_exit_fab");
     expect(quickExit?.tourPage).toBe("Home");
-    expect(quickExit?.anchor).toBe("bottom-right");
-    expect(quickExit?.arrow).toBe("down-right");
+    expect(quickExit?.targetSelector).toBe(".floating-quick-exit");
 
     expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1)).toBe("home_sidebar_nav");
     expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1)).toBeNull();
     expect(nextWalkthroughTourStepId(userSteps, "settings_passkey", 1)).toBeNull();
+  });
+
+  it("positions popup strictly below upper targets and strictly above lower targets without overlap", () => {
+    const belowUpper = computeWebCoachmarkPlacement({
+      targetRect: { left: 280, top: 80, right: 620, bottom: 140, width: 340, height: 60 },
+      viewportWidth: 1280,
+      viewportHeight: 800,
+      cardWidth: 368,
+      cardHeight: 200,
+    });
+    expect(belowUpper.top).toBeGreaterThanOrEqual(140);
+
+    const aboveQuickExit = computeWebCoachmarkPlacement({
+      targetRect: { left: 1080, top: 720, right: 1250, bottom: 770, width: 170, height: 50 },
+      viewportWidth: 1280,
+      viewportHeight: 800,
+      cardWidth: 368,
+      cardHeight: 200,
+      safeBottom: 784,
+    });
+    expect(aboveQuickExit.top + 200).toBeLessThanOrEqual(720);
   });
 
   it("groups topics by category in display order and omits empty categories", () => {

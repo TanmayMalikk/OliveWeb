@@ -4,6 +4,7 @@ package com.olive.app.ui.users.user.location
 import com.olive.app.ui.shared.OliveSmallFloatingActionButton as SmallFloatingActionButton
 import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.walkthroughTarget
 import android.annotation.SuppressLint
 import android.graphics.Color
 import android.net.Uri
@@ -527,7 +528,7 @@ internal fun InteractiveLocationMap(
                     view.destroy()
                     if (webView[0] === view) webView[0] = null
                 },
-                modifier = Modifier.fillMaxSize().testTag("location_map_view"),
+                modifier = Modifier.fillMaxSize().walkthroughTarget("location_map_view").testTag("location_map_view"),
             )
         }
 

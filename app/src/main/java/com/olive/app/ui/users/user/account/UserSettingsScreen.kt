@@ -66,6 +66,7 @@ import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OlivePrivateLayout
 import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.FormColumn
 import com.olive.app.ui.users.shared.navigation.SafePermissionsSettings
@@ -167,7 +168,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             selectedTab = tab
                         }
                     },
-                    modifier = Modifier.testTag(tab.tag),
+                    modifier = Modifier.walkthroughTarget(tab.tag).testTag(tab.tag),
                     text = { Text(uiText(tab.label)) }
                 )
             }

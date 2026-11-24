@@ -294,7 +294,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         waitFor("walkthrough_active_feature")
         assertEquals(SafePage.Home, session.page)
         compose.onNodeWithTag("support_action_list").assertIsDisplayed()
-        compose.onNodeWithTag("walkthrough_tour_arrow").assertExists()
+        compose.onNodeWithTag("walkthrough_target_highlight").assertExists()
         compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
 
         compose.onNodeWithTag("walkthrough_tour_toc").performClick()
