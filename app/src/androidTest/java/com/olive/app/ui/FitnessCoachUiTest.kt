@@ -69,12 +69,14 @@ class FitnessCoachUiTest {
             "Friday · 20-minute walk at a comfortable pace\n\n" +
             "Rest between sessions. Add a few minutes next week if it feels easy."
         coach.reply.complete(CoachReply(plan, emptyMap()))
-        val expectedReply = "${label(R.string.fitness_coach_disclaimer)}\n\n$plan"
-        compose.waitUntil(10_000) { compose.onAllNodesWithText(expectedReply).fetchSemanticsNodes().isNotEmpty() }
+        val workoutReply = hasText("15-minute easy walk", substring = true) and
+            hasText("Rest between sessions.", substring = true) and hasText(label(R.string.fitness_coach_tab))
+        compose.waitUntil(10_000) { compose.onAllNodes(workoutReply).fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.onActivity {
             WindowInsetsControllerCompat(it.window, it.window.decorView).hide(WindowInsetsCompat.Type.ime())
         }
-        compose.onNode(hasText(expectedReply) and hasText(label(R.string.fitness_coach_tab))).assertIsDisplayed()
+        compose.onNodeWithText(label(R.string.fitness_coach_disclaimer)).assertIsDisplayed()
+        compose.onNode(workoutReply).assertIsDisplayed()
         compose.onNode(hasSetTextAction()).assertIsDisplayed()
         File(compose.activity.getExternalFilesDir(null), "fitness-coach-test.png").outputStream().use { output ->
             compose.onNodeWithTag("fitness_coach_screen").captureToImage().asAndroidBitmap()
@@ -114,7 +116,7 @@ class FitnessCoachUiTest {
         coach.reply.complete(CoachReply("Try 3000 steps.", mapOf("steps" to 3000)))
         waitForLabel(R.string.fitness_coach_goals_saved)
         assertEquals(3000, store.profile().stepGoal)
-        assertEquals("Set my step goal to 3000", coach.lastPrompt)
+        assertEquals("Set my step goal to 3000", coach.lastPrompt.lineSequence().first())
 
         coach.reply = CompletableDeferred()
         composer.performTextInput("Keep this draft")

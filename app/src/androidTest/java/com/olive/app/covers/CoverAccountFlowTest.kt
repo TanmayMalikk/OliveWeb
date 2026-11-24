@@ -121,9 +121,16 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         }
         unlock()
         waitFor("safe_profile")
-        click("safe_profile")
-        compose.onNodeWithText("Delivery Customer").assertExists()
-        org.junit.Assert.assertEquals(originalLanguage, session.profile?.language)
+        assertEquals("Cover edit must survive private entry", "Delivery Customer", session.profile?.fullName)
+        clickAccessibleAction("safe_profile")
+        try {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithText("Delivery Customer").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("Profile did not display the updated name; screen=${session.screen}, page=${session.page}", timeout)
+        }
+        assertEquals(originalLanguage, session.profile?.language)
         assertEquals("1999-01-02", session.profile?.dob)
         assertEquals("Calgary", session.profile?.address?.city)
         assertEquals("", session.profile?.address?.line1)

@@ -109,6 +109,10 @@ class AccessibilityReviewUiTest {
         compose.setContent { OliveTheme {
             com.olive.app.ui.users.shared.messaging.ChatPane(session, "owner", true, null)
         } }
-        compose.onNodeWithTag("open_chat_info").assertIsDisplayed().assertIsFocused()
+        val header = hasTestTag("open_chat_info")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(header and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(header).assertIsDisplayed().assertIsFocused()
     }
 }

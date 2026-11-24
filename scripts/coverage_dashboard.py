@@ -218,7 +218,7 @@ def main():
     suites = [('Web unit tests', 'web-unit'), ('Web browser tests', 'web-browser'),
               ('Cloud Functions tests', 'functions')]
     if not args.skip_rules:
-        suites.append(('Firebase Rules tests', 'firebase-rules'))
+        suites.append(('Firebase rules and callable integration tests', 'firebase-rules'))
     for label, filename in suites:
         get_lines = (lambda row: browser.get(row.key)) if filename == 'web-browser' else (lambda _: None)
         sections.append(render_tests(label, junit_reports([REPORTS / f'{filename}-tests.xml']), get_lines))
@@ -240,7 +240,7 @@ input{{font:inherit;padding:.6rem;width:min(100%,26rem);border:1px solid #52694c
 <main><h1>Project test coverage</h1>{f'<p>{escape(summary)}</p>' if summary else ''}<div class="cards">{''.join(cards)}</div>
 <p>Expand a test to see the source lines it hit when an individual coverage snapshot is available.
 “Suite only” means coverage was collected for the suite, or individual line data is unavailable.
-Firebase Rules reports test results because its runner does not produce code line coverage.</p>
+The Firebase emulator suite reports test results because its runner does not produce code line coverage.</p>
 <p><label for="filter">Filter tests</label><br><input id="filter" type="search" placeholder="Test name, class, or result"></p>
 {''.join(sections)}</main>
 <script>

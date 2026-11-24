@@ -559,8 +559,14 @@ test("public game and account screens meet core accessibility checks", async ({
 test("signed-in safe app pages meet core accessibility checks", async ({
   page,
 }) => {
+  test.slow();
   const link = await onboard(page);
   await unlock(page, link);
+  const navigation = page.getByRole("navigation", { name: "Safe Space navigation" });
+  // Axe scans can outlast the default idle delay. Use the real preference to keep this test session open.
+  await navigation.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByLabel("Idle lock delay").selectOption("450");
+  await navigation.getByRole("button", { name: "Home", exact: true }).click();
   for (const section of [
     "Home",
     "Notes & incidents",
@@ -572,7 +578,7 @@ test("signed-in safe app pages meet core accessibility checks", async ({
     "Account activity",
   ]) {
     if (section !== "Home") {
-      await page.getByRole("navigation", { name: "Safe Space navigation" }).getByRole("button", { name: section, exact: true }).click();
+      await navigation.getByRole("button", { name: section, exact: true }).click();
     }
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

@@ -51,7 +51,7 @@ internal class SessionViewModel @JvmOverloads constructor(
     val emergencyResponses = com.olive.app.ui.session.EmergencyResponseController(application)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)
-    val calls = SessionCalls(application, viewModelScope)
+    val calls = SessionCalls(application, viewModelScope, available = !localMode && isVoipApiConfigured())
     val navigation = SessionScreenNavigation(runtime)
 
     // Document and map screens keep their own feature controllers.
@@ -1080,7 +1080,7 @@ internal class SessionCalls(
     private val scope: CoroutineScope,
     private val manager: VoipManager = VoipManager(),
     private val controller: VoipSessionController = VoipSessionController.create(application, manager),
-    private val available: Boolean = isVoipApiConfigured(),
+    val available: Boolean = isVoipApiConfigured(),
 ) {
     private val invitationPreferences = application.getSharedPreferences(
         "dismissed-voip-invitations",
@@ -1144,13 +1144,17 @@ internal class SessionCalls(
      * @param role Account role determining workspace permissions.
      */
     fun observeInvitations(uid: String, role: AccountRole) {
-        if (configuredRole != role && uid.isNotBlank()) {
+        if (!available || uid.isBlank()) {
+            stopObserving()
+            return
+        }
+        if (configuredRole != role) {
             configuredRole = role
             scope.launch {
                 runCatching { VoipPushTokenRegistration.configureForRole(application, role) }
             }
         }
-        if (!canUseVoip(role) || !available || uid.isBlank()) {
+        if (!canUseVoip(role)) {
             stopObserving()
             return
         }

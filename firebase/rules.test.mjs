@@ -459,9 +459,13 @@ test('authorized users can query encrypted media without exposing other file rec
     await setDoc(doc(context.firestore(),`files/${mediaId}`),encrypted);
     await setDoc(doc(context.firestore(),'files/malformed-encrypted-media'),{
       ...encrypted,object_key:'users/media-alice/media/malformed-encrypted-media',unexpected:'forbidden'});
-    await setDoc(doc(context.firestore(),'files/mismatched-account-wrappers'),{
-      ...encrypted,object_key:'users/media-alice/media/mismatched-account-wrappers',
+    await setDoc(doc(context.firestore(),'files/partial-account-wrappers'),{
+      ...encrypted,object_key:'users/media-alice/media/partial-account-wrappers',
       account_wrapped_keys:{'media-alice':{wrappedKey:'opaque-owner'}},
+    });
+    await setDoc(doc(context.firestore(),'files/unauthorized-account-wrapper'),{
+      ...encrypted,object_key:'users/media-alice/media/unauthorized-account-wrapper',
+      account_wrapped_keys:{...encrypted.account_wrapped_keys,'media-charlie':{wrappedKey:'opaque-outsider'}},
     });
   });
 
@@ -478,7 +482,8 @@ test('authorized users can query encrypted media without exposing other file rec
   await assertSucceeds(getDoc(doc(bob,`files/${mediaId}`)));
   await assertFails(getDoc(doc(charlie,`files/${mediaId}`)));
   await assertFails(getDoc(doc(alice,'files/malformed-encrypted-media')));
-  await assertFails(getDoc(doc(alice,'files/mismatched-account-wrappers')));
+  await assertSucceeds(getDoc(doc(bob,'files/partial-account-wrappers')));
+  await assertFails(getDoc(doc(alice,'files/unauthorized-account-wrapper')));
 });
 
 test('users and safe contacts get encrypted private DMs and only the sender can unsend', async () => {

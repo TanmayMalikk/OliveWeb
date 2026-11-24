@@ -145,6 +145,7 @@ class SafeWalkthroughTest {
 
         val userSettingsSteps = userSteps.filter { it.settingsTabTag != null }
         assertEquals(11, userSettingsSteps.size)
+        assertFalse(userSettingsSteps.any { it.id == "settings_privacy_passkey" })
         assertEquals(
             listOf(
                 "settings_tab_profile",

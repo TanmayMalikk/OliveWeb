@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.ui.covers.fitness.FitnessCover
 import com.olive.app.ui.covers.fitness.FitnessStore
@@ -54,7 +55,7 @@ class FitnessCoverDiaryUiTest {
         val steps = hasText(label(R.string.daily_step_goal)) and hasSetTextAction()
         search.performScrollToNode(steps)
         compose.onNode(steps).performTextReplacement("12345")
-        Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         search.performScrollToNode(hasTestTag("save_fitness_goals"))
         compose.onNodeWithTag("save_fitness_goals").performClick()
         assertEquals(12345, fitness.snapshot().profile.stepGoal)
@@ -102,7 +103,7 @@ class FitnessCoverDiaryUiTest {
         LabelNutrient.entries.filter { it.required }.forEach { nutrient ->
             compose.onNodeWithTag("manual_${nutrient.name}").performTextInput(if (nutrient == LabelNutrient.CALORIES) "140" else "0")
         }
-        Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         proceed.assertIsEnabled().performClick()
         compose.onNodeWithText(label(R.string.add_food)).performClick()
         val initial = fitness.snapshot().foodsToday.single()
@@ -115,7 +116,7 @@ class FitnessCoverDiaryUiTest {
         compose.onNode(edit).performClick()
         val servings = hasText(label(R.string.servings)) and hasSetTextAction()
         compose.onNode(servings).performTextReplacement("2")
-        Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         compose.onNodeWithText(label(R.string.save)).performClick()
         assertEquals(2f, fitness.snapshot().foodsToday.single().servings, 0f)
         val remove = hasContentDescription(label(R.string.remove))

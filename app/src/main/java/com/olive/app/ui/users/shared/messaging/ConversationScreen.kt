@@ -96,7 +96,7 @@ internal fun ChatPane(
     val uiText = rememberResourceText()
     val active = session.messages.activeConversation ?: return
     val callState by session.calls.state.collectAsState()
-    val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
+    val callAllowed = canCallFromConversation(session.accountRole, active, currentUid, session.calls.available)
     val canAttachMedia = session.accountRole !in setOf(
         AccountRole.STAFF,
         AccountRole.ADMIN,

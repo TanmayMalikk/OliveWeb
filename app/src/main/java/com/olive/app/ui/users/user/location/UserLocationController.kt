@@ -188,8 +188,10 @@ internal class LocationMapController(
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: SecurityException) {
+                        // Location permission may have been revoked since the prompt.
                         null
-                    } catch (_: Exception) {
+                    } catch (failure: Exception) {
+                        Log.w("UserLocationController", "Continuous location updates unavailable", failure)
                         null
                     }
                     if (updates != null) {

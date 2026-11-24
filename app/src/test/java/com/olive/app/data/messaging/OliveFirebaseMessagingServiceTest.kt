@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import com.olive.app.OliveActivity
 import androidx.work.impl.WorkManagerImpl
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.messaging.RemoteMessage
@@ -82,9 +83,13 @@ class OliveFirebaseMessagingServiceTest {
         })
         WorkManagerImpl.setDelegate(work)
         try {
-            mockStatic(FirebaseAuth::class.java).use { firebase ->
-                firebase.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(auth)
-                test(service, auth, work)
+            val firebaseApp = mock(FirebaseApp::class.java)
+            mockStatic(FirebaseApp::class.java).use { firebaseApps ->
+                firebaseApps.`when`<List<FirebaseApp>> { FirebaseApp.getApps(service) }.thenReturn(listOf(firebaseApp))
+                mockStatic(FirebaseAuth::class.java).use { firebase ->
+                    firebase.`when`<FirebaseAuth> { FirebaseAuth.getInstance() }.thenReturn(auth)
+                    test(service, auth, work)
+                }
             }
         } finally {
             WorkManagerImpl.setDelegate(null)

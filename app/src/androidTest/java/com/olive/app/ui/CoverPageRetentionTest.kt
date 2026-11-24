@@ -20,7 +20,6 @@ import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Assert.*
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -94,8 +93,7 @@ class CoverPageRetentionTest {
 
     @Test fun removingFoodUpdatesTheDiaryImmediatelyAndUndoRestoresIt() {
         val session = session()
-        assumeTrue(session.coverAccountId == null)
-        val store = FitnessStore(context, "guest")
+        val store = FitnessStore(context, session.coverAccountId ?: "guest")
         val food = NutritionFood("undo-oats", "Undo test oats", "", "1 bowl", 150f, 5f, 27f, 3f, FoodDataSource.MANUAL)
         val entry = store.addFood(food, 1f, MealType.BREAKFAST).foodsToday.last()
         try {

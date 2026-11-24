@@ -31,7 +31,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         nextOnboarding()
         fill("address_city", "Edmonton")
         nextOnboarding()
-        fill("trigger", "moon garden")
+        fillOnboardingTrigger("moon garden")
         hideKeyboard()
     }
 
@@ -52,11 +52,11 @@ class OnboardingFlowTest : OliveUiTestBase() {
             session.runtime.navigation.openScreen(SessionScreen.TriggerSetup)
         }
         waitFor("trigger_setup_submit")
-        fill("trigger", "ab")
+        fillOnboardingTrigger("ab")
         hideKeyboard()
         click("trigger_setup_submit")
         compose.onNodeWithText(compose.activity.getString(R.string.ui_invalid_trigger)).assertExists()
-        fill("trigger", "quiet garden")
+        fillOnboardingTrigger("quiet garden")
         hideKeyboard()
         click("trigger_setup_submit")
         chooseAppPin()
@@ -164,7 +164,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("address_city", "Edmonton")
         advanceOnboarding("address_city", "profile_submit")
         compose.onNodeWithText("Step 4 of 4", useUnmergedTree = true).assertExists()
-        click("profile_submit")
+        clickAccessibleAction("profile_submit")
+        waitFor("walkthrough_tour_skip")
+        clickAccessibleAction("walkthrough_tour_skip")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitFor("safe_contact_settings")
         compose.onNodeWithTag("cover_root").assertDoesNotExist()
         compose.onNodeWithText("Safe Contact").assertExists()
@@ -177,7 +180,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
-        click("safe_contact_settings")
+        clickAccessibleAction("safe_contact_settings")
         waitFor("save_settings")
         compose.onNodeWithTag("sign_out").assertDoesNotExist()
     }
@@ -203,7 +206,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         nextOnboarding()
         fill("address_city", "Edmonton")
         nextOnboarding()
-        fill("trigger", "moon garden")
+        fillOnboardingTrigger("moon garden")
         hideKeyboard()
         compose.onNodeWithTag("cover_choice_fitness").performScrollTo().assertIsSelected()
         compose.onNodeWithTag("cover_choice_news").assertIsNotSelected().performClick()
@@ -251,7 +254,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     // Checks the onboarding contacts quick exit and returning user step with the test's sample data.
     @Test
     fun onboardingContactsQuickExitAndReturningUser() {
-        register(username = "returning_user_tester")
+        registerThroughUi(username = "returning_user_tester")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
         // The selected fitness tab stays alive through private screens and recreation.
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.activity)).performClick()

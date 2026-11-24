@@ -89,6 +89,19 @@ if ($firebaseJava -and -not (Test-Path -LiteralPath (Join-Path $firebaseJava "bi
     Write-Warning "OLIVE_FIREBASE_JAVA_HOME does not contain bin\java.exe; Firebase tests will use the current JDK."
     $firebaseJava = $null
 }
+if (-not $firebaseJava) {
+    $gradleHome = $env:GRADLE_USER_HOME
+    if (-not $gradleHome) { $gradleHome = Join-Path $env:USERPROFILE ".gradle" }
+    $cachedJdks = Get-ChildItem -LiteralPath (Join-Path $gradleHome "jdks") -Directory -ErrorAction SilentlyContinue
+    $firebaseJava = @($env:JAVA_HOME) + @($cachedJdks | Select-Object -ExpandProperty FullName) |
+        Where-Object {
+            if (-not $_ -or -not (Test-Path -LiteralPath (Join-Path $_ "bin/java.exe"))) { return $false }
+            $releaseFile = Join-Path $_ "release"
+            if (-not (Test-Path -LiteralPath $releaseFile)) { return $false }
+            $version = Select-String -LiteralPath $releaseFile -Pattern '^JAVA_VERSION="(\d+)' | Select-Object -First 1
+            $version -and [int]$version.Matches[0].Groups[1].Value -ge 21
+        } | Select-Object -First 1
+}
 
 function Invoke-Checked {
     param([string]$Label,[scriptblock]$Command)
@@ -100,6 +113,15 @@ function Invoke-Checked {
         throw "$Label failed with exit code $LASTEXITCODE."
     }
     $completedChecks.Add($Label)
+}
+
+function Initialize-TestDependencies {
+    param([string]$Label)
+    if (Test-Path -LiteralPath "node_modules") {
+        & npm.cmd ls --depth=0 --silent *> $null
+        if ($LASTEXITCODE -eq 0) { return }
+    }
+    Invoke-Checked $Label { & npm.cmd ci }
 }
 
 function Wait-ForAndroidPackageManager {
@@ -228,7 +250,7 @@ $completedChecks.Add("Required Android artifacts created")
 
 Push-Location -LiteralPath "$projectRoot\web"
 try {
-    if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install web dependencies" { & npm.cmd ci } }
+    Initialize-TestDependencies "Install web dependencies"
     if ($WithCoverage) { Invoke-Checked "Web unit tests and coverage" { & npm.cmd run test:coverage } }
     else { Invoke-Checked "Web unit tests" { & npm.cmd test } }
     Invoke-Checked "Web production build" { & npm.cmd run build }
@@ -238,7 +260,7 @@ try {
 
 Push-Location -LiteralPath "$projectRoot\functions"
 try {
-    if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install Cloud Functions dependencies" { & npm.cmd ci } }
+    Initialize-TestDependencies "Install Cloud Functions dependencies"
     if ($WithCoverage) { Invoke-Checked "Cloud Functions unit tests and coverage" { & npm.cmd run test:coverage } }
     else { Invoke-Checked "Cloud Functions unit tests" { & npm.cmd test } }
     Invoke-Checked "Cloud Functions dependency audit" { & npm.cmd audit --omit=dev }
@@ -254,15 +276,15 @@ if (-not $SkipFirebaseRules) {
         if ($firebaseJava) {
             $env:JAVA_HOME = $firebaseJava
             $env:Path = "$firebaseJava\bin;$previousPath"
-            Write-Host "Using Java 21 for Firebase emulator tests: $firebaseJava" -ForegroundColor Cyan
+            Write-Host "Using Java from $firebaseJava for Firebase emulator tests" -ForegroundColor Cyan
         }
         # Emulator tests are always local and must not probe cloud VM metadata endpoints.
         $env:NO_GCE_CHECK = "true"
         # The Admin SDK probes VM metadata as a fallback during intentionally offline emulator
         # tests. Keep that expected failed probe from surfacing as a Node process warning.
         $env:NODE_NO_WARNINGS = "1"
-        if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install Firebase test dependencies" { & npm.cmd ci } }
-        Invoke-Checked "Firestore and Storage rules tests" { & npm.cmd test }
+        Initialize-TestDependencies "Install Firebase test dependencies"
+        Invoke-Checked "Firebase rules and callable integration tests" { & npm.cmd run test:all }
     } finally {
         $env:JAVA_HOME = $previousJavaHome
         $env:Path = $previousPath

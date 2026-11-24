@@ -4,6 +4,7 @@ package com.olive.app
 import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.walkthrough.walkthroughTourStepsForRole
 import com.olive.app.ui.users.user.dashboard.*
 
 import android.graphics.Bitmap
@@ -102,7 +103,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         click("private_kind_incident")
         fill("private_entry_title", "Test incident")
         fill("private_entry_body", "Synthetic test details")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        hideKeyboard()
         click("incident_date")
         compose.onNodeWithTag("incident_calendar").assertIsDisplayed()
         click("incident_date_apply")
@@ -110,7 +111,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("incident_clock").assertIsDisplayed()
         click("incident_time_apply")
         fill("incident_location", "Edmonton")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        hideKeyboard()
         click("save_private_entry")
         compose.waitUntil(15_000) { session.privateEntries.any { it.title == "Test incident" } }
         compose.runOnIdle {
@@ -209,7 +210,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     }
 
     // Checks the setup step with the test's sample data.
-    private fun setup(): SessionViewModel {
+    private fun setup(showInitialWalkthrough: Boolean = false): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -246,6 +247,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         )
         click("pin_setup_submit")
         waitCover()
+        if (!showInitialWalkthrough) markInitialWalkthroughSeen(session)
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         unlock()
         return session
@@ -302,14 +304,17 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("walkthrough_toc_cover_entry").performScrollTo().performClick()
         waitFor("walkthrough_active_feature")
         assertEquals(SafePage.Settings, session.page)
-        compose.onNodeWithTag("settings_tab_profile").assertIsSelected()
-
-        compose.onNodeWithTag("walkthrough_tour_next").performClick()
-        compose.onNodeWithTag("settings_tab_password").assertIsSelected()
-        compose.onNodeWithTag("walkthrough_tour_next").performClick()
-        compose.onNodeWithTag("settings_tab_privacy").assertIsSelected()
-        compose.onNodeWithTag("walkthrough_tour_next").performClick()
-        compose.onNodeWithTag("settings_tab_permissions").assertIsSelected()
+        val settingsSteps = walkthroughTourStepsForRole(session.accountRole)
+            .filter { it.topicId == "cover_entry" && it.settingsTabTag != null }
+        assertEquals(
+            listOf("settings_tab_profile", "settings_tab_password", "settings_tab_privacy", "settings_tab_permissions"),
+            settingsSteps.mapNotNull { it.settingsTabTag }.distinct(),
+        )
+        settingsSteps.forEachIndexed { index, step ->
+            if (index > 0) clickAccessibleAction("walkthrough_tour_next")
+            compose.waitUntil(10_000) { session.runtime.state.walkthroughTourStepId == step.id }
+            compose.onNodeWithTag(requireNotNull(step.settingsTabTag)).assertIsSelected()
+        }
 
         compose.onNodeWithTag("walkthrough_tour_skip").performClick()
         compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
@@ -317,7 +322,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
 
     @Test
     fun firstLoginAutoOpensWalkthroughWithoutBlockingQuickExitAndNeverReopens() {
-        val session = setup()
+        val session = setup(showInitialWalkthrough = true)
         waitFor("walkthrough_active_feature")
         compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("walkthrough_tour_skip").assertIsDisplayed().performClick()

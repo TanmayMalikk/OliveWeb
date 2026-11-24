@@ -135,7 +135,8 @@ class DocumentIndexStoreTest {
         index.replace(ALICE, listOf(document("cached", ALICE)), 100)
         val repository = IndexedSafetyDocumentRepository(
             FakeRemote(getFailure = SecurityException("revoked")),
-            index
+            index,
+            deviceId = { "phone" },
         )
 
         assertEquals("cached", repository.cachedFor(ALICE, "cached")?.id)

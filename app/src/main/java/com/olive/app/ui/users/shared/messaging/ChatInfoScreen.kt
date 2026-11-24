@@ -35,8 +35,6 @@ import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import java.io.File
 import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
 import androidx.compose.foundation.rememberScrollState
@@ -46,6 +44,8 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -503,6 +503,7 @@ internal fun FriendInviteDialog(
 ) {
     val context = LocalContext.current
     val openSystem = LocalSafeSystemLauncher.current
+    val clipboard = LocalClipboard.current
     val inviteLabel = stringResource(R.string.friend_invite)
     val scope = rememberCoroutineScope()
     var invite by remember { mutableStateOf<FriendInvite?>(null) }
@@ -542,8 +543,7 @@ internal fun FriendInviteDialog(
      * @param value The invite code or link to copy.
      */
     fun copy(value: String) {
-        (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-            .setPrimaryClip(ClipData.newPlainText(inviteLabel, value))
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(inviteLabel, value))) }
     }
     val bodyContent: @Composable () -> Unit = {
         Column(
