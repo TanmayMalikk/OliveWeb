@@ -62,6 +62,7 @@ import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.SkeletonLayout
 import com.olive.app.ui.shared.oliveScrollbar
 import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.Heading
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -211,7 +212,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().walkthroughTarget("hotline_location_bar"),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

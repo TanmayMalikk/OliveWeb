@@ -114,6 +114,25 @@ internal fun MessagesScreen(
     }
     val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
     val listState = rememberLazyListState()
+    val wtDirective = LocalWalkthroughDirective.current
+    var wtInviteOpen by remember(currentUid) { mutableStateOf(false) }
+    LaunchedEffect(wtDirective?.stepId, wtDirective?.action) {
+        when (wtDirective?.action) {
+            "messages_tab_dms" -> {
+                changeChatTab(false)
+                wtInviteOpen = false
+            }
+            "messages_open_invite" -> {
+                changeChatTab(false)
+                wtInviteOpen = true
+            }
+            "messages_tab_tickets" -> {
+                changeChatTab(true)
+                wtInviteOpen = false
+            }
+            else -> wtInviteOpen = false
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         // Wide screens place the conversation list and open chat beside each other.
@@ -151,6 +170,17 @@ internal fun MessagesScreen(
             OliveRouteEntrance(active.id, back) {
                 ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
             }
+        }
+        if (wtInviteOpen) {
+            FriendInviteDialog(
+                uid = currentUid,
+                createInvite = { refresh -> session.messages.createFriendInvite(currentUid, refresh) },
+                observeUnavailable = { code, onUnavailable ->
+                    session.messages.observeFriendInviteUnavailable(currentUid, code, onUnavailable)
+                },
+                inWindow = true,
+                onDismiss = { wtInviteOpen = false },
+            )
         }
     }
 }
@@ -271,7 +301,10 @@ private fun MessagingSidebar(
             )
         }
         if (!organizationAccount) item("chat_tabs") {
-            PrimaryTabRow(selectedTabIndex = if (ticketChats) 1 else 0) {
+            PrimaryTabRow(
+                selectedTabIndex = if (ticketChats) 1 else 0,
+                modifier = Modifier.walkthroughTarget("messages_chat_tabs"),
+            ) {
                 Tab(
                     selected = !ticketChats,
                     onClick = { onChatTabChange(false) },
@@ -282,7 +315,7 @@ private fun MessagingSidebar(
                     selected = ticketChats,
                     onClick = { onChatTabChange(true) },
                     text = { ChatTabLabel(uiText(R.string.chat_tickets_tab), session.messages.unreadCountForChatTab(true)) },
-                    modifier = Modifier.testTag("messages_tickets_tab"),
+                    modifier = Modifier.walkthroughTarget("messages_tickets_tab").testTag("messages_tickets_tab"),
                 )
             }
         }

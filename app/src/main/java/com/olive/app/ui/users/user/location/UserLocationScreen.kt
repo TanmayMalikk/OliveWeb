@@ -89,6 +89,7 @@ import com.olive.app.data.safety.hotlineDialNumber
 import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.LoadingSkeleton
+import com.olive.app.ui.shared.LocalWalkthroughDirective
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OliveOutline
@@ -96,6 +97,7 @@ import com.olive.app.ui.shared.Paper
 import com.olive.app.ui.shared.SkeletonLayout
 import com.olive.app.ui.shared.SoftCardSurface
 import com.olive.app.ui.shared.oliveScrollbar
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
@@ -288,19 +290,15 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
 
     var selectedResource by remember(uid) { mutableStateOf<HotlineResource?>(null) }
     var showDirectoryList by remember(uid) { mutableStateOf(false) }
-
-    if (showDirectoryList) {
-        DirectoryPlacesListDialog(
-            places = visibleDirectoryPlaces,
-            savedIds = savedIds,
-            onToggleSave = { SavedHotlineStore.toggle(context, uid, it.id) },
-            onSelect = {
-                selectedResource = it
-                showDirectoryList = false
-            },
-            onDismiss = { showDirectoryList = false },
-        )
+    val wt = LocalWalkthroughDirective.current
+    var wtPopup by remember(uid) { mutableStateOf<String?>(null) }
+    LaunchedEffect(wt?.stepId, wt?.action) {
+        if (wt?.action == "location_open_directory") { showDirectoryList = true; durationDialog = false; wtPopup = "dir" }
+        else if (wt?.action == "location_open_duration") { durationDialog = true; showDirectoryList = false; wtPopup = "dur" }
+        else if (wtPopup != null) { showDirectoryList = false; durationDialog = false; wtPopup = null }
     }
+
+    if (wt?.action != null) { /* handled below after Column */ }
     selectedResource?.let { resource ->
         DirectoryPlaceDetailDialog(
             resource = resource,
@@ -399,7 +397,7 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
             routeFailed = routeFailed,
         )
         Surface(
-            Modifier.fillMaxWidth().height(if (profile.role == AccountRole.USER) 360.dp else 250.dp),
+            Modifier.fillMaxWidth().height(if (profile.role == AccountRole.USER) 360.dp else 250.dp).walkthroughTarget("location_map_card"),
             shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 2.dp,
@@ -503,9 +501,10 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
                 }
             }
             if (durationDialog) ShareDurationDialog(
-                onDismiss = { durationDialog = false },
+                inWindow = wtPopup == "dur",
+                onDismiss = { durationDialog = false; wtPopup = null },
                 onSelected = { durationMillis ->
-                    durationDialog = false
+                    durationDialog = false; wtPopup = null
                     controller.startSharing(configuration, durationMillis, requestPermission, permissionRequired, startFailed)
                 },
             )
@@ -661,6 +660,19 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
         }
         state.error?.let { AccessibleMessage(it) }
         state.routeError?.let { AccessibleMessage(it) }
+    }
+    if (showDirectoryList) {
+        DirectoryPlacesListDialog(
+            places = visibleDirectoryPlaces,
+            savedIds = savedIds,
+            onToggleSave = { SavedHotlineStore.toggle(context, uid, it.id) },
+            onSelect = {
+                selectedResource = it
+                showDirectoryList = false; wtPopup = null
+            },
+            inWindow = wtPopup == "dir",
+            onDismiss = { showDirectoryList = false; wtPopup = null },
+        )
     }
 }
 

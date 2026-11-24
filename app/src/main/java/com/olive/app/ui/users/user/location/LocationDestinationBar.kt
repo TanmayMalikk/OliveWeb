@@ -84,6 +84,7 @@ import com.olive.app.data.safety.HotlineResource
 import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.walkthroughTarget
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
@@ -214,7 +215,7 @@ internal fun FreeUseGpsDestinationCard(
     }
 
     Column(
-        Modifier.fillMaxWidth().testTag("map_gps_destination_card"),
+        Modifier.fillMaxWidth().walkthroughTarget("map_gps_destination_card").testTag("map_gps_destination_card"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Surface(

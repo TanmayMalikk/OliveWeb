@@ -177,7 +177,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
             FormColumn {
                 when (activeTab) {
                     SettingsCategory.Profile -> {
-                        if (userRole) SettingsSection(uiText(R.string.settings_category_cover_entry)) {
+                        if (userRole) SettingsSection(uiText(R.string.settings_category_cover_entry), targetId = "settings_card_cover_entry") {
                             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
                             CoverPicker(
                                 profile.coverType,
@@ -192,7 +192,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             HorizontalDivider()
                             SafeEntryMethodSettings(session)
                         }
-                        SettingsSection(uiText(R.string.settings_category_profile)) {
+                        SettingsSection(uiText(R.string.settings_category_profile), headerTargetId = "settings_card_profile_header") {
                             Field(
                                 uiText(R.string.full_name_required),
                                 fullName,
@@ -317,7 +317,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                         }
                     }
                     SettingsCategory.Password -> {
-                        SettingsSection(uiText(R.string.change_account_password)) {
+                        SettingsSection(uiText(R.string.change_account_password), targetId = "settings_card_password") {
                             Text(stringResource(R.string.your_username_cannot_be_changed))
                             val currentPasswordError = when {
                                 currentPasswordRejected -> uiText(R.string.ui_incorrect_password)
@@ -413,10 +413,10 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                             }
                         }
                         if (userRole) {
-                            SettingsSection(uiText(R.string.entry_pin_setup)) {
+                            SettingsSection(uiText(R.string.entry_pin_setup), targetId = "settings_card_entry_pin") {
                                 SafeEntryPinSettings(session, entryPinDraft)
                             }
-                            SettingsSection(uiText(R.string.change_trigger_word)) {
+                            SettingsSection(uiText(R.string.change_trigger_word), targetId = "settings_card_trigger") {
                                 val triggerError = if (triggerErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null
                                 val triggerPinError = when {
                                     triggerPinRejected -> uiText(R.string.enter_your_4_6_digit_pin)
@@ -485,14 +485,17 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     }
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
-                            Text(uiText(R.string.cover_emergency_help_title), style = MaterialTheme.typography.titleMedium)
-                            Text(uiText(R.string.cover_emergency_help), style = MaterialTheme.typography.bodySmall)
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_capture_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(uiText(R.string.cover_emergency_help_title), style = MaterialTheme.typography.titleMedium)
+                                Text(uiText(R.string.cover_emergency_help), style = MaterialTheme.typography.bodySmall)
+                                HorizontalDivider()
+                                ScreenCaptureSetting(session.coverAccountId)
+                            }
                             HorizontalDivider()
-                            ScreenCaptureSetting(session.coverAccountId)
-                            HorizontalDivider()
-                            IdleTimeoutSetting(session)
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_idle_group")) { IdleTimeoutSetting(session) }
                             if (userRole) {
                                 HorizontalDivider()
+                                Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_passkey_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
                                     stringResource(R.string.passkey_recovery_title),
                                     style = MaterialTheme.typography.titleLarge,
@@ -537,6 +540,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 ) {
                                     Text(stringResource(R.string.passkey_recovery_enable))
                                 }
+                                }
                                 recoveryCredentialToRemove?.let { credentialId ->
                                     val removingLastCredential = recoveryCredentials?.size == 1
                                     AlertDialog(
@@ -568,6 +572,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 }
                             }
                             HorizontalDivider()
+                            Column(Modifier.fillMaxWidth().walkthroughTarget("settings_privacy_cache_group"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 stringResource(R.string.documents_recent_cache_title),
                                 style = MaterialTheme.typography.titleLarge,
@@ -591,6 +596,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                     enabled = cacheUid != null,
                                     modifier = Modifier.testTag("recent_file_caching"),
                                 )
+                            }
                             }
                         }
                     SettingsCategory.Permissions -> SafePermissionsSettings()
@@ -633,9 +639,14 @@ internal fun SettingsHeading(modifier: Modifier = Modifier) {
  * @param content Composable content lambda rendered inside this container.
  */
 @Composable
-internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsSection(
+    title: String,
+    targetId: String? = null,
+    headerTargetId: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (targetId != null) Modifier.walkthroughTarget(targetId) else Modifier),
         shape = OlivePrivateLayout.GroupShape,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -648,7 +659,7 @@ internal fun SettingsSection(title: String, content: @Composable ColumnScope.() 
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() }
+                modifier = Modifier.then(if (headerTargetId != null) Modifier.walkthroughTarget(headerTargetId) else Modifier).semantics { heading() }
             )
             content()
         }

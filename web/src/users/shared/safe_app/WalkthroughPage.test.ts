@@ -35,15 +35,29 @@ describe("WalkthroughCatalog table of contents, highlight targeting, and placeme
     ]);
   });
 
-  it("includes multi-step target coverage for quick exit, messaging, settings, and hotlines/contacts", () => {
+  it("includes multi-step target, tab, popup, and settings card coverage for all roles", () => {
     const userSteps = walkthroughTourStepsForRole("USER");
     const contactSteps = walkthroughTourStepsForRole("SAFE_CONTACT");
 
-    expect(userSteps.length).toBeGreaterThanOrEqual(22);
+    expect(userSteps).toHaveLength(35);
+    expect(contactSteps).toHaveLength(21);
     expect(contactSteps.every((step) => !step.userOnly)).toBe(true);
-    expect(walkthroughStepCountForTopic("USER", "messaging_voice")).toBe(4);
-    expect(walkthroughStepCountForTopic("USER", "cover_entry")).toBe(3);
-    expect(firstWalkthroughStepForTopic("USER", "messaging_voice")?.id).toBe("chat_add_friends");
+    expect(walkthroughStepCountForTopic("USER", "safety_plan")).toBe(5);
+    expect(walkthroughStepCountForTopic("USER", "messaging_voice")).toBe(5);
+    expect(walkthroughStepCountForTopic("USER", "cover_entry")).toBe(7);
+    expect(firstWalkthroughStepForTopic("USER", "messaging_voice")?.id).toBe("chat_tabs_dms");
+
+    const popupSteps = userSteps.filter((step) => step.opensPopup);
+    expect(popupSteps.map((step) => step.id)).toEqual([
+      "notes_editor_modal",
+      "chat_invite_modal",
+      "contacts_add_modal",
+      "settings_entry_link_modal",
+    ]);
+
+    const planSteps = userSteps.filter((step) => step.topicId === "safety_plan");
+    expect(planSteps.some((step) => step.action === "plan_primary")).toBe(true);
+    expect(planSteps.some((step) => step.action === "plan_backup")).toBe(true);
 
     const quickExit = userSteps.find((step) => step.id === "quick_exit_fab");
     expect(quickExit?.tourPage).toBe("Home");
@@ -51,7 +65,7 @@ describe("WalkthroughCatalog table of contents, highlight targeting, and placeme
 
     expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1)).toBe("home_sidebar_nav");
     expect(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1)).toBeNull();
-    expect(nextWalkthroughTourStepId(userSteps, "settings_passkey", 1)).toBeNull();
+    expect(nextWalkthroughTourStepId(userSteps, "settings_account_sync", 1)).toBeNull();
   });
 
   it("positions popup strictly below upper targets and strictly above lower targets without overlap", () => {

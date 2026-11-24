@@ -89,6 +89,7 @@ import com.olive.app.ui.shared.OliveOutline
 import com.olive.app.ui.shared.OlivePrivateLayout
 import com.olive.app.ui.shared.PaleOlive
 import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
 import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import kotlin.math.ceil
 
@@ -547,57 +548,75 @@ internal fun formatRouteDuration(seconds: Double): String =
  * @param onSelected Callback invoked when selected changes or occurs.
  */
 @Composable
-internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) {
+internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) =
+    ShareDurationDialog(onDismiss = onDismiss, inWindow = false, onSelected = onSelected)
+
+@Composable
+internal fun ShareDurationDialog(onDismiss: () -> Unit, inWindow: Boolean, onSelected: (Long) -> Unit) {
     var custom by remember { mutableStateOf("") }
     val customDuration = ShareDurationPolicy.customDurationMilliseconds(custom)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.location_choose_duration)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { onSelected(ShareDurationPolicy.TEST_DURATION_MILLISECONDS) },
-                    modifier = Modifier.fillMaxWidth().testTag("location_duration_10_seconds"),
-                ) {
-                    Text(stringResource(R.string.location_ten_seconds_testing))
-                }
-                listOf(1L, 2L, 8L, 24L).forEach { hours ->
-                    OutlinedButton(
-                        onClick = {
-                            ShareDurationPolicy.millisecondsForHours(hours)?.let(onSelected)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (hours == 1L) stringResource(R.string.location_one_hour)
-                            else pluralStringResource(R.plurals.location_hours, hours.toInt(), hours)
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = custom,
-                    onValueChange = { custom = it.filter(Char::isDigit).take(2) },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.location_custom_hours)) },
-                    supportingText = { Text(stringResource(R.string.location_custom_range)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth().testTag("location_custom_hours"),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { customDuration?.let(onSelected) },
-                enabled = customDuration != null,
-                modifier = Modifier.testTag("location_custom_confirm"),
+    val bodyContent: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { onSelected(ShareDurationPolicy.TEST_DURATION_MILLISECONDS) },
+                modifier = Modifier.fillMaxWidth().testTag("location_duration_10_seconds"),
             ) {
-                Text(stringResource(R.string.location_share_for_custom))
+                Text(stringResource(R.string.location_ten_seconds_testing))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+            listOf(1L, 2L, 8L, 24L).forEach { hours ->
+                OutlinedButton(
+                    onClick = {
+                        ShareDurationPolicy.millisecondsForHours(hours)?.let(onSelected)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (hours == 1L) stringResource(R.string.location_one_hour)
+                        else pluralStringResource(R.plurals.location_hours, hours.toInt(), hours)
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = custom,
+                onValueChange = { custom = it.filter(Char::isDigit).take(2) },
+                singleLine = true,
+                label = { Text(stringResource(R.string.location_custom_hours)) },
+                supportingText = { Text(stringResource(R.string.location_custom_range)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().testTag("location_custom_hours"),
+            )
+        }
+    }
+    val confirmBtn: @Composable () -> Unit = {
+        TextButton(
+            onClick = { customDuration?.let(onSelected) },
+            enabled = customDuration != null,
+            modifier = Modifier.testTag("location_custom_confirm"),
+        ) {
+            Text(stringResource(R.string.location_share_for_custom))
+        }
+    }
+    val dismissBtn: @Composable () -> Unit = {
+        TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "location_duration_dialog",
+            title = { Text(stringResource(R.string.location_choose_duration)) },
+            onDismiss = onDismiss,
+            confirmButton = confirmBtn,
+            dismissButton = dismissBtn,
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.location_choose_duration)) },
+            text = bodyContent,
+            confirmButton = confirmBtn,
+            dismissButton = dismissBtn,
+        )
+    }
 }
 
 /**

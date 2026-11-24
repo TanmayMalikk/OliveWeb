@@ -250,6 +250,25 @@ internal fun PrivateNotes(session: SessionViewModel) {
             editorTitleFocus.requestFocus()
         }
     }
+    val directive = LocalWalkthroughDirective.current
+    var wtOpenedEditor by remember { mutableStateOf(false) }
+    var wtOpenedAttach by remember { mutableStateOf(false) }
+    LaunchedEffect(directive?.stepId, directive?.action) {
+        when (directive?.action) {
+            "notes_open_incident_editor" -> {
+                if (!editorOpen) { openEditor(null); wtOpenedEditor = true }
+                kind = PrivateEntryKind.Incident; attachmentMenuOpen = false; wtOpenedAttach = false
+            }
+            "notes_open_attachment_sheet" -> {
+                if (!editorOpen) { openEditor(null); wtOpenedEditor = true }
+                kind = PrivateEntryKind.Incident; attachmentMenuOpen = true; wtOpenedAttach = true
+            }
+            else -> {
+                if (wtOpenedAttach) { attachmentMenuOpen = false; wtOpenedAttach = false }
+                if (wtOpenedEditor) { editorOpen = false; wtOpenedEditor = false }
+            }
+        }
+    }
     // Announce the map panel only after the user opens it from the location field.
     LaunchedEffect(incidentMapOpen, editorVersion) {
         if (incidentMapOpen) {
@@ -366,14 +385,16 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             if (kind == PrivateEntryKind.Incident) {
                 item {
-                    Text(stringResource(R.string.incident_optional_fields), color = Muted)
-                    IncidentDateTimeFields(
-                        date = incidentDate,
-                        time = incidentTime,
-                        enabled = !session.busy,
-                        onDateChange = { incidentDate = it },
-                        onTimeChange = { incidentTime = it },
-                    )
+                    Column(Modifier.fillMaxWidth().walkthroughTarget("private_incident_fields")) {
+                        Text(stringResource(R.string.incident_optional_fields), color = Muted)
+                        IncidentDateTimeFields(
+                            date = incidentDate,
+                            time = incidentTime,
+                            enabled = !session.busy,
+                            onDateChange = { incidentDate = it },
+                            onTimeChange = { incidentTime = it },
+                        )
+                    }
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -521,7 +542,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         SafetyDocumentUploadFlow(
             session = session,
             visible = attachmentMenuOpen,
-            onDismiss = { attachmentMenuOpen = false },
+            inWindowSheet = wtOpenedAttach,
+            onDismiss = { attachmentMenuOpen = false; wtOpenedAttach = false },
             onSelectExisting = { document ->
                 selectedAttachments = selectedAttachments + document.id
             },
@@ -598,7 +620,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 IconButton(
                     onClick = { trashOpen = true },
                     enabled = !session.loadingHistory && !session.historyLoadFailed,
-                    modifier = Modifier.testTag("open_scratchpad")
+                    modifier = Modifier.walkthroughTarget("open_scratchpad").testTag("open_scratchpad")
                 ) {
                     BadgedBox(badge = { if (!session.loadingHistory && !session.historyLoadFailed && trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) } }) {
                         Icon(Icons.Outlined.DeleteOutline, uiText(R.string.ui_trash))
@@ -735,7 +757,7 @@ private fun NoteBoardControls(
 ) {
     var sortOpen by remember { mutableStateOf(false) }
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().walkthroughTarget("notes_board_controls"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {

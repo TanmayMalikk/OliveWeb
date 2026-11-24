@@ -34,7 +34,7 @@ import SettingsPage from "./AccountSettingsPage";
 import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
 import WalkthroughPage from "./WalkthroughPage";
-import { WalkthroughCoachmark } from "./WalkthroughCoachmark";
+import { WalkthroughActionContext, WalkthroughCoachmark } from "./WalkthroughCoachmark";
 import {
   firstWalkthroughStepForTopic,
   walkthroughTourStepsForRole,
@@ -160,12 +160,21 @@ export default function SafeApp() {
       }
     }
   }, [uid]);
+  const activeTourStep = activeTourStepId
+    ? walkthroughTourStepsForRole(p.role).find((step) => step.id === activeTourStepId)
+    : undefined;
   const triggerQuickExit = () => {
     setActiveTourStepId(null);
     s.quickExit();
   };
 
   return (
+    <WalkthroughActionContext.Provider
+      value={{
+        stepId: activeTourStep?.id ?? null,
+        action: activeTourStep?.action ?? null,
+      }}
+    >
     <div className="safe-shell private-shell">
       <aside className="safe-sidebar" data-menu-open={menuOpen}>
         <button className="safe-brand" type="button" onClick={() => navigate("Home")}>
@@ -280,5 +289,6 @@ export default function SafeApp() {
         </Modal>
       )}
     </div>
+    </WalkthroughActionContext.Provider>
   );
 }

@@ -164,14 +164,32 @@ internal fun WalkthroughCoachmarkOverlay(
     val rawAvoid = step.avoidId?.let { registry?.bounds?.get(it) } ?: rawTarget
     val localTarget = rawTarget
         ?.translate(-containerRootTopLeft.x, -containerRootTopLeft.y)
+        ?.let { rect ->
+            val h = containerSize.height.toFloat()
+            if (h <= 0f) rect else Rect(
+                left = rect.left,
+                top = rect.top.coerceIn(0f, h),
+                right = rect.right,
+                bottom = rect.bottom.coerceIn(0f, h),
+            )
+        }
         ?.takeIf { it.width > 0f && it.height > 0f }
     val localAvoid = rawAvoid
         ?.translate(-containerRootTopLeft.x, -containerRootTopLeft.y)
+        ?.let { rect ->
+            val h = containerSize.height.toFloat()
+            if (h <= 0f) rect else Rect(
+                left = rect.left,
+                top = rect.top.coerceIn(0f, h),
+                right = rect.right,
+                bottom = rect.bottom.coerceIn(0f, h),
+            )
+        }
         ?.takeIf { it.width > 0f && it.height > 0f }
 
     val marginPx = with(density) { 16.dp.toPx() }
     val gapPx = with(density) { 12.dp.toPx() }
-    val safeTopPx = with(density) { if (step.openSupportMenu) 8.dp.toPx() else 56.dp.toPx() }
+    val safeTopPx = with(density) { 8.dp.toPx() }
     val bottomClearancePx = with(density) {
         if (showBottomControls && step.targetId != "quick_exit") {
             (OlivePrivateLayout.FloatingActionClearance + 8.dp).toPx()

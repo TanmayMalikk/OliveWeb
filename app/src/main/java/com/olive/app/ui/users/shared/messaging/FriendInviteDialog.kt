@@ -34,6 +34,7 @@ import com.olive.app.data.messaging.FriendInvite
 import com.olive.app.ui.shared.OliveButton
 import com.olive.app.ui.shared.OliveOutlinedButton
 import com.olive.app.ui.shared.OliveTextButton
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
 import com.olive.app.ui.users.shared.navigation.LocalSafeSystemLauncher
 import java.util.Date
 import kotlinx.coroutines.CancellationException
@@ -54,6 +55,7 @@ internal fun FriendInviteDialog(
     createInvite: suspend (refresh: Boolean) -> FriendInvite,
     observeUnavailable: (String, () -> Unit) -> ChatSubscription,
     onDismiss: () -> Unit,
+    inWindow: Boolean = false,
 ) {
     val context = LocalContext.current
     val openSystem = LocalSafeSystemLauncher.current
@@ -99,106 +101,117 @@ internal fun FriendInviteDialog(
         (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
             .setPrimaryClip(ClipData.newPlainText(inviteLabel, value))
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(inviteLabel) },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                val message = if (unavailable) stringResource(R.string.friend_invite_unavailable) else error
-                message?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
+    val bodyContent: @Composable () -> Unit = {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            val message = if (unavailable) stringResource(R.string.friend_invite_unavailable) else error
+            message?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            invite?.takeUnless { unavailable }?.let { value ->
+                val expiry = Date(value.expiresAt)
+                val expiresAt = remember(context, value.expiresAt) {
+                    "${DateFormat.getMediumDateFormat(context).format(expiry)} · ${DateFormat.getTimeFormat(context).format(expiry)}"
                 }
-                invite?.takeUnless { unavailable }?.let { value ->
-                    val expiry = Date(value.expiresAt)
-                    val expiresAt = remember(context, value.expiresAt) {
-                        "${DateFormat.getMediumDateFormat(context).format(expiry)} · ${DateFormat.getTimeFormat(context).format(expiry)}"
-                    }
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Column(
+                        Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Column(
-                            Modifier.padding(16.dp).fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text(stringResource(R.string.friend_invite_code), style = MaterialTheme.typography.labelLarge)
-                            SelectionContainer {
-                                Text(
-                                    value.code,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center,
-                                )
-                            }
+                        Text(stringResource(R.string.friend_invite_code), style = MaterialTheme.typography.labelLarge)
+                        SelectionContainer {
                             Text(
-                                stringResource(R.string.friend_invite_expires, expiresAt),
-                                style = MaterialTheme.typography.bodySmall,
+                                value.code,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
                                 textAlign = TextAlign.Center,
                             )
                         }
-                    }
-                    OliveButton(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, value.link)
-                            }
-                            openSystem(Intent.createChooser(intent, inviteLabel))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.friend_invite_share))
-                    }
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        OliveOutlinedButton(onClick = { copy(value.code) }) {
-                            Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.friend_invite_copy_code))
-                        }
-                        OliveOutlinedButton(onClick = { copy(value.link) }) {
-                            Icon(Icons.Outlined.Link, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.friend_invite_copy_link))
-                        }
+                        Text(
+                            stringResource(R.string.friend_invite_expires, expiresAt),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
-                HorizontalDivider()
-                OliveTextButton(
-                    onClick = { scope.launch { generate(true) } },
-                    enabled = !busy,
+                OliveButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, value.link)
+                        }
+                        openSystem(Intent.createChooser(intent, inviteLabel))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Outlined.Refresh, null, Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.friend_invite_refresh))
+                    Text(stringResource(R.string.friend_invite_share))
                 }
-                if (invite != null && !unavailable) {
-                    Text(
-                        stringResource(R.string.friend_invite_once),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OliveOutlinedButton(onClick = { copy(value.code) }) {
+                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.friend_invite_copy_code))
+                    }
+                    OliveOutlinedButton(onClick = { copy(value.link) }) {
+                        Icon(Icons.Outlined.Link, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.friend_invite_copy_link))
+                    }
                 }
             }
-        },
-        confirmButton = {
-            OliveTextButton(onClick = onDismiss) { Text(stringResource(R.string.friend_invite_done)) }
-        },
-    )
+            HorizontalDivider()
+            OliveTextButton(
+                onClick = { scope.launch { generate(true) } },
+                enabled = !busy,
+            ) {
+                Icon(Icons.Outlined.Refresh, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.friend_invite_refresh))
+            }
+            if (invite != null && !unavailable) {
+                Text(
+                    stringResource(R.string.friend_invite_once),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "friend_invite_dialog",
+            title = { Text(inviteLabel) },
+            onDismiss = onDismiss,
+            confirmButton = { OliveTextButton(onClick = onDismiss) { Text(stringResource(R.string.friend_invite_done)) } },
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(inviteLabel) },
+            text = bodyContent,
+            confirmButton = {
+                OliveTextButton(onClick = onDismiss) { Text(stringResource(R.string.friend_invite_done)) }
+            },
+        )
+    }
 }

@@ -45,6 +45,7 @@ import com.olive.app.data.account.SafetyCircumstance
 import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.account.TransportSituation
 import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
 
 /**
  * Renders the onboarding and safety-plan tailoring questionnaire inside a vertical onboarding column or scrollable dialog.
@@ -206,38 +207,54 @@ internal fun SafetyPlanQuestionnaireDialog(
     enabled: Boolean,
     onDismiss: () -> Unit,
     onSave: (SafetyPlanIntake) -> Unit,
+    inWindow: Boolean = false,
 ) {
     var draft by remember(initialIntake) { mutableStateOf(initialIntake) }
-    AlertDialog(
-        onDismissRequest = { if (enabled) onDismiss() },
-        title = {
-            Text(
-                stringResource(R.string.onboarding_safety_questionnaire),
-                modifier = Modifier.semantics { heading() },
-            )
-        },
-        text = {
-            Column(
-                Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-            ) {
-                SafetyPlanQuestionnaireForm(draft, enabled) { draft = it }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(draft.copy(completed = true)) },
-                enabled = enabled,
-                modifier = Modifier.testTag("safety_intake_dialog_save"),
-            ) {
-                Text(stringResource(R.string.safety_intake_dialog_apply))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = enabled) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
+    val titleContent: @Composable () -> Unit = {
+        Text(
+            stringResource(R.string.onboarding_safety_questionnaire),
+            modifier = Modifier.semantics { heading() },
+        )
+    }
+    val bodyContent: @Composable () -> Unit = {
+        Column(
+            Modifier.heightIn(max = if (inWindow) 240.dp else 420.dp).verticalScroll(rememberScrollState()),
+        ) {
+            SafetyPlanQuestionnaireForm(draft, enabled) { draft = it }
+        }
+    }
+    val confirmContent: @Composable () -> Unit = {
+        Button(
+            onClick = { onSave(draft.copy(completed = true)) },
+            enabled = enabled,
+            modifier = Modifier.testTag("safety_intake_dialog_save"),
+        ) {
+            Text(stringResource(R.string.safety_intake_dialog_apply))
+        }
+    }
+    val dismissContent: @Composable () -> Unit = {
+        TextButton(onClick = onDismiss, enabled = enabled) {
+            Text(stringResource(R.string.cancel))
+        }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "safety_questionnaire_dialog",
+            title = titleContent,
+            onDismiss = { if (enabled) onDismiss() },
+            confirmButton = confirmContent,
+            dismissButton = dismissContent,
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = { if (enabled) onDismiss() },
+            title = titleContent,
+            text = bodyContent,
+            confirmButton = confirmContent,
+            dismissButton = dismissContent,
+        )
+    }
 }
 
 /** Renders a titled safety-plan onboarding question block with subtitle and option content. */

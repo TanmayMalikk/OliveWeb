@@ -206,6 +206,10 @@ internal fun ActivityHistory(session: SessionViewModel) {
 
     val listState = rememberLazyListState()
     var lastCategory by remember { mutableStateOf(selected) }
+    val wt = LocalWalkthroughDirective.current
+    LaunchedEffect(wt?.stepId, wt?.action) {
+        if (wt?.action == "activity_scroll_logs") listState.animateScrollToItem(3)
+    }
     LaunchedEffect(selected) {
         if (selected != lastCategory) {
             lastCategory = selected
@@ -249,7 +253,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
             return@LazyColumn
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.walkthroughTarget("activity_date_filters"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActivityDateTimePicker(uiText(R.string.from), from, "activity_from") { from = it }
                 ActivityDateTimePicker(uiText(R.string.to), to, "activity_to") { to = it }
             }
@@ -259,7 +263,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 Text(
                     stringResource(R.string.settings_history),
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() })
+                    modifier = Modifier.walkthroughTarget("activity_settings_section").semantics { heading() })
             }
             if (settings.isEmpty()) item { Text(stringResource(R.string.no_settings_activity_yet)) }
             items(visible(ActivityCategory.Settings, settings), key = { it.id }) { event ->

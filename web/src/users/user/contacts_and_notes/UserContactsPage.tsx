@@ -1,8 +1,9 @@
 // Safe-app users: shows the user safe contacts and friends.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
+import { useWalkthroughAction } from "../../shared/safe_app/WalkthroughCoachmark";
 export default function Contacts() {
   const s = useSession();
   const p = s.profile!;
@@ -11,6 +12,17 @@ export default function Contacts() {
     name: string;
     details: string;
   } | null>(null);
+  const [wtOpened, setWtOpened] = useState(false);
+  const wt = useWalkthroughAction();
+  useEffect(() => {
+    if (wt.action === "contacts_open_add_modal") {
+      setEditing((cur) => cur ?? { id: crypto.randomUUID(), name: "", details: "" });
+      setWtOpened(true);
+    } else if (wtOpened) {
+      setEditing(null);
+      setWtOpened(false);
+    }
+  }, [wt.stepId, wt.action]);
   return (
     <>
       <div className="page-toolbar">
@@ -60,7 +72,11 @@ export default function Contacts() {
         </Empty>
       )}
       {editing && (
-        <Modal title={editing.name ? "Edit contact" : "A person in your corner"} onClose={() => setEditing(null)}>
+        <Modal
+          title={editing.name ? "Edit contact" : "A person in your corner"}
+          nonModal={wtOpened}
+          onClose={() => { setEditing(null); setWtOpened(false); }}
+        >
           <Form
             onSubmit={async (data, form) => {
               await s.perform(async () => {

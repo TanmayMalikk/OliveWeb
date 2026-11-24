@@ -1,5 +1,5 @@
-// All safe-app roles: non-overlapping OliveGreen coachmark popup with red highlight on the live web target.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+// All safe-app roles: non-overlapping OliveGreen coachmark popup with red highlight and step action context.
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import type { Role } from "../../../domain/DomainModels";
 import {
@@ -8,6 +8,20 @@ import {
   walkthroughTourStepsForRole,
   type WebCoachmarkRect,
 } from "./WalkthroughCatalog";
+
+export interface WalkthroughActionState {
+  stepId: string | null;
+  action: string | null;
+}
+
+export const WalkthroughActionContext = createContext<WalkthroughActionState>({
+  stepId: null,
+  action: null,
+});
+
+export function useWalkthroughAction(): WalkthroughActionState {
+  return useContext(WalkthroughActionContext);
+}
 
 export function WalkthroughCoachmark({
   role,
@@ -46,14 +60,16 @@ export function WalkthroughCoachmark({
         : null;
       if (targetEl) {
         const r = targetEl.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
+        const top = Math.max(0, r.top);
+        const bottom = Math.min(window.innerHeight, r.bottom);
+        if (r.width > 0 && bottom > top) {
           setTargetRect({
             left: r.left,
-            top: r.top,
+            top,
             right: r.right,
-            bottom: r.bottom,
+            bottom,
             width: r.width,
-            height: r.height,
+            height: bottom - top,
           });
         } else {
           setTargetRect(null);
@@ -69,20 +85,27 @@ export function WalkthroughCoachmark({
       }
     };
     measure();
-    const timer = window.setTimeout(measure, 120);
+    const raf = window.requestAnimationFrame(measure);
+    const timer1 = window.setTimeout(measure, 120);
+    const timer2 = window.setTimeout(measure, 280);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
     return () => {
-      window.clearTimeout(timer);
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timer1);
+      window.clearTimeout(timer2);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
   }, [step?.id, step?.targetSelector]);
 
   useEffect(() => {
-    if (!step || !targetRect) return;
-    if (targetRect.top < 0 || targetRect.bottom > window.innerHeight) {
-      document.querySelector(step.targetSelector!)?.scrollIntoView({ block: "nearest" });
+    if (!step?.targetSelector) return;
+    const targetEl = document.querySelector(step.targetSelector);
+    if (!targetEl) return;
+    const r = targetEl.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) {
+      targetEl.scrollIntoView?.({ block: "center", behavior: "instant" as ScrollBehavior });
     }
   }, [step?.id]);
 
@@ -99,7 +122,7 @@ export function WalkthroughCoachmark({
           cardWidth: cardSize.width,
           cardHeight: cardSize.height,
           safeBottom:
-            step.targetSelector === ".floating-quick-exit"
+            step.targetSelector === ".floating-quick-exit" || step.opensPopup
               ? window.innerHeight - 16
               : window.innerHeight - 84,
         });
@@ -132,7 +155,7 @@ export function WalkthroughCoachmark({
             background: "rgba(220, 38, 38, 0.14)",
             borderRadius: "12px",
             pointerEvents: "none",
-            zIndex: 44,
+            zIndex: 1199,
           }}
         />
       )}
@@ -144,7 +167,7 @@ export function WalkthroughCoachmark({
         data-testid="walkthrough-active-feature"
         style={{
           ...placementStyle,
-          zIndex: 45,
+          zIndex: 1200,
           width: "min(368px, calc(100vw - 2rem))",
           background: "var(--olive, #284b3c)",
           color: "#ffffff",

@@ -241,7 +241,7 @@ internal fun SafePermissionsSettings() {
             else -> null
         }
     }
-    SettingsSection(stringResource(R.string.app_permissions_install)) {
+    SettingsSection(stringResource(R.string.app_permissions_install), targetId = "settings_perm_install_card") {
         Text(stringResource(R.string.app_permissions_install_why))
         Text(stringResource(permissionStatus(canInstall).label),
             style = MaterialTheme.typography.labelLarge)
@@ -255,7 +255,7 @@ internal fun SafePermissionsSettings() {
         onContinue = { backgroundPrompt = false; scope.launch { requestBackground?.invoke() } },
     )
     feedback?.let { AccessibleMessage(stringResource(it)) }
-    SettingsSection(stringResource(R.string.app_permissions_features)) {
+    SettingsSection(stringResource(R.string.app_permissions_features), headerTargetId = "settings_perm_features_header") {
         PermissionFeature.entries.filter { entry ->
             when (entry) {
                 PermissionFeature.BackgroundLocation, PermissionFeature.Activity -> Build.VERSION.SDK_INT >= 29
@@ -275,7 +275,7 @@ internal fun SafePermissionsSettings() {
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.app_permissions_open_android)) }
     }
-    SettingsSection(stringResource(R.string.app_permissions_automatic)) {
+    SettingsSection(stringResource(R.string.app_permissions_automatic), targetId = "settings_perm_automatic_card") {
         automaticPermissions.forEachIndexed { index, entry ->
             if (index > 0) HorizontalDivider()
             PermissionExplanation(entry.first, entry.second, PermissionStatus.Automatic)

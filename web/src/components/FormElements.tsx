@@ -94,30 +94,80 @@ export function Field({
     </div>
   );
 }
-// Opens an accessible dialog above the current web page.
+// Opens an accessible dialog above the current web page (or a non-modal layer during live walkthroughs).
 export function Modal({
   title,
   children,
   onClose,
   wide = false,
+  nonModal = false,
 }: {
   title: string;
   children: ReactNode;
   onClose?: () => void;
   wide?: boolean;
+  nonModal?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   // Give each dialog title a stable ID for its accessibility description.
   useEffect(() => {
+    if (nonModal) return;
     const dialog = ref.current;
     const previous = document.activeElement as HTMLElement | null;
-    dialog?.showModal();
+    dialog?.showModal?.();
     return () => {
-      dialog?.close();
+      dialog?.close?.();
       previous?.focus();
     };
-  }, []);
+  }, [nonModal]);
+  if (nonModal) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1100,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          padding: "1rem 1rem 5.25rem",
+          background: "rgba(0, 0, 0, 0.28)",
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onClose?.();
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={titleId}
+          data-walkthrough-id="active-modal"
+          className={`modal ${wide ? "wide" : ""}`}
+          style={{
+            position: "relative",
+            margin: 0,
+            maxHeight: "min(54vh, 400px)",
+            background: "#ffffff",
+            boxShadow: "0 18px 48px rgba(0, 0, 0, 0.24)",
+          }}
+        >
+          <div className="modal-top">
+            <h2 id={titleId}>{title}</h2>
+            {onClose && <button
+              type="button"
+              className="icon-button"
+              onClick={onClose}
+              aria-label="Close dialog"
+            >
+              <X />
+            </button>}
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }
   return (
     <dialog
       ref={ref}

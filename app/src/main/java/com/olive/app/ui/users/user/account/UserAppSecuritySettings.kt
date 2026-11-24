@@ -66,6 +66,7 @@ import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.localizedTitle
 import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.shared.walkthroughTarget
 import com.olive.app.ui.users.shared.auth.AppPinSetup
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.FormColumn
@@ -634,7 +635,8 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
         )
         Text(
             if (editing == null) uiText(R.string.add_a_contact) else uiText(R.string.edit_contact),
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.walkthroughTarget("contacts_add_form"),
         )
         Field(
             uiText(R.string.contact_name),
@@ -777,8 +779,8 @@ internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) 
                 )
             }
         }
-        rows.forEach { (label, value) ->
-            OutlinedCard(Modifier.fillMaxWidth()) {
+        rows.forEachIndexed { index, (label, value) ->
+            OutlinedCard(Modifier.fillMaxWidth().then(if (index == 0) Modifier.walkthroughTarget("profile_summary_cards") else Modifier)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(label, style = MaterialTheme.typography.labelLarge, color = OliveGreen)
                     Text(value.ifBlank { stringResource(R.string.not_provided) }, style = MaterialTheme.typography.bodyLarge)

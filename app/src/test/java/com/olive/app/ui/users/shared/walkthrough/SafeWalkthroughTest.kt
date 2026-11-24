@@ -61,29 +61,48 @@ class SafeWalkthroughTest {
     }
 
     @Test
-    fun multiStepTourCoversAllMessagingFeaturesAllSettingsTabsAndAutoOpensSupportMenu() {
+    fun multiStepTourCoversAllMessagingFeaturesAllSettingsCardsAndAutoOpensPopups() {
         val userSteps = walkthroughTourStepsForRole(AccountRole.USER)
         val contactSteps = walkthroughTourStepsForRole(AccountRole.SAFE_CONTACT)
 
-        assertEquals(29, userSteps.size)
-        assertEquals(18, contactSteps.size)
+        assertEquals(47, userSteps.size)
+        assertEquals(20, contactSteps.size)
 
         val supportMenuSteps = userSteps.filter { it.openSupportMenu }
         assertEquals(
             listOf(
                 "support_menu_staff",
-                "support_menu_staff_escalate",
                 "support_menu_emergency",
-                "support_menu_emergency_alert",
+                "support_menu_quick_links",
             ),
             supportMenuSteps.map { it.id },
         )
         assertTrue(supportMenuSteps.all { it.tourPage == SafePage.Home && it.avoidId == "support_action_list" })
 
-        val messagingSteps = userSteps.filter { it.topicId == "messaging_calls" }
-        assertEquals(4, messagingSteps.size)
+        val popupSteps = userSteps.filter { it.opensPopup }
+        assertEquals(
+            listOf(
+                "plan_tailor_questionnaire",
+                "notes_editor_attachments",
+                "docs_upload_popup",
+                "docs_private_camera",
+                "chat_invite_popup",
+                "loc_directory_places_popup",
+                "loc_live_sharing_duration",
+            ),
+            popupSteps.map { it.id },
+        )
 
-        val settingsTabs = userSteps.mapNotNull { it.settingsTabTag }
+        val planSteps = userSteps.filter { it.topicId == "safety_plan" }
+        assertEquals(6, planSteps.size)
+        assertTrue(planSteps.any { it.action == "plan_primary" })
+        assertTrue(planSteps.any { it.action == "plan_backup" })
+
+        val messagingSteps = userSteps.filter { it.topicId == "messaging_calls" }
+        assertEquals(5, messagingSteps.size)
+
+        val userSettingsSteps = userSteps.filter { it.settingsTabTag != null }
+        assertEquals(12, userSettingsSteps.size)
         assertEquals(
             listOf(
                 "settings_tab_profile",
@@ -91,19 +110,21 @@ class SafeWalkthroughTest {
                 "settings_tab_privacy",
                 "settings_tab_permissions",
             ),
-            settingsTabs,
+            userSettingsSteps.mapNotNull { it.settingsTabTag }.distinct(),
         )
+        val contactSettingsSteps = contactSteps.filter { it.settingsTabTag != null }
+        assertEquals(5, contactSettingsSteps.size)
         assertEquals(
             listOf("settings_tab_profile", "settings_tab_password", "settings_tab_permissions"),
-            contactSteps.mapNotNull { it.settingsTabTag },
+            contactSettingsSteps.mapNotNull { it.settingsTabTag }.distinct(),
         )
 
         assertEquals("home_header_shortcuts", nextWalkthroughTourStepId(userSteps, "quick_exit_fab", 1))
         assertNull(nextWalkthroughTourStepId(userSteps, "quick_exit_fab", -1))
-        assertNull(nextWalkthroughTourStepId(userSteps, "settings_permissions", 1))
-        assertEquals("settings_privacy_passkey", nextWalkthroughTourStepId(userSteps, "settings_permissions", -1))
-        assertEquals("chat_add_friends", firstWalkthroughStepForTopic(AccountRole.USER, "messaging_calls")?.id)
-        assertEquals(4, walkthroughStepCountForTopic(AccountRole.USER, "messaging_calls"))
+        assertNull(nextWalkthroughTourStepId(userSteps, "settings_permissions_automatic", 1))
+        assertEquals("settings_permissions_features", nextWalkthroughTourStepId(userSteps, "settings_permissions_automatic", -1))
+        assertEquals("chat_tabs_dms_tickets", firstWalkthroughStepForTopic(AccountRole.USER, "messaging_calls")?.id)
+        assertEquals(5, walkthroughStepCountForTopic(AccountRole.USER, "messaging_calls"))
     }
 
     @Test

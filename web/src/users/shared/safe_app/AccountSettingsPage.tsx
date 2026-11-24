@@ -7,13 +7,25 @@ import { Button, Field, Form, Modal, shakeNamedFields } from "../../../component
 import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { issueEntryLink, savedEntryLink } from "../../../services/PrivateEntryLinks";
+import { useWalkthroughAction } from "./WalkthroughCoachmark";
 export default function Settings() {
   const s = useSession();
   const p = s.profile!;
   const [link, setLink] = useState<string | null>(null);
   const [confirmRotation, setConfirmRotation] = useState(false);
+  const [wtOpened, setWtOpened] = useState(false);
+  const wt = useWalkthroughAction();
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (wt.action === "settings_open_replace_link") {
+      setConfirmRotation(true);
+      setWtOpened(true);
+    } else if (wtOpened) {
+      setConfirmRotation(false);
+      setWtOpened(false);
+    }
+  }, [wt.stepId, wt.action]);
   // Update the form when another device changes this account profile.
   useEffect(() => {
     let live = true;
@@ -40,7 +52,7 @@ export default function Settings() {
         </div>
       )}
       {p.role === "USER" && (
-        <section className="panel">
+        <section className="panel" data-walkthrough-id="settings-privacy">
           <h2>Privacy</h2>
           <label className="field">
             <span>Idle lock delay</span>
@@ -62,7 +74,7 @@ export default function Settings() {
           </label>
         </section>
       )}
-      <section className="panel">
+      <section className="panel" data-walkthrough-id="settings-entry-link">
         <h2>Personal entry link</h2>
         <p>
           Your link opens an entry gate. A password or enrolled-browser PIN is
@@ -89,7 +101,7 @@ export default function Settings() {
           <RefreshCw size={16} /> Create a replacement link
         </Button>
       </section>
-      <section className="panel">
+      <section className="panel" data-walkthrough-id="settings-password">
         <h2>Account password</h2>
         <Form
           onSubmit={async (data, form) => {
@@ -143,7 +155,7 @@ export default function Settings() {
       </section>
       {p.role === "USER" && (
         <>
-          <section className="panel">
+          <section className="panel" data-walkthrough-id="settings-browser-pin">
             <h2>Browser PIN</h2>
             <Form
               onSubmit={async (data, form) => {
@@ -199,7 +211,7 @@ export default function Settings() {
               </Button>
             </Form>
           </section>
-          <section className="panel">
+          <section className="panel" data-walkthrough-id="settings-android-trigger">
             <h2>Android cover trigger</h2>
             <p>
               Change the phrase that opens the private entry prompt on Android. The web uses your personal link.
@@ -241,7 +253,7 @@ export default function Settings() {
           </section>
         </>
       )}
-      <section className="panel">
+      <section className="panel" data-walkthrough-id="settings-account-sync">
         <h2>Account sync</h2>
         <p>
           {s.cloudMode
@@ -262,7 +274,8 @@ export default function Settings() {
       {confirmRotation && (
         <Modal
           title="Replace your personal link?"
-          onClose={() => setConfirmRotation(false)}
+          nonModal={wtOpened}
+          onClose={() => { setConfirmRotation(false); setWtOpened(false); }}
         >
           <p>
             Your previous link will stop working. Save the replacement before

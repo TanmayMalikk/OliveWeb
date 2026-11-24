@@ -615,7 +615,7 @@ internal fun InviteCodeEntry(
     var shakeAttempt by remember { mutableIntStateOf(0) }
     val effectiveShake = rememberFieldErrorShakeTrigger(error, shakeAttempt)
     OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().walkthroughTarget("friend_invite_code_card"),
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(

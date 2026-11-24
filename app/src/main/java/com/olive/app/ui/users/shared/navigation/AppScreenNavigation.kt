@@ -370,6 +370,9 @@ internal fun OliveRoot(
                                         LocalQuickExit provides if (userQuickExit) exit else null,
                                         LocalWalkthroughTour provides startTour,
                                         LocalWalkthroughSettingsTab provides activeTourStep?.settingsTabTag,
+                                        LocalWalkthroughDirective provides activeTourStep?.let {
+                                            WalkthroughDirective(it.id, it.targetId, it.action, it.settingsTabTag)
+                                        },
                                         LocalSafeSystemLauncher provides systemLaunchers.open,
                                         LocalSafePermissionActions provides systemLaunchers.permissions,
                                         LocalSafeUpdateReminder provides update.onDownload,

@@ -70,6 +70,7 @@ import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.OliveOutline
 import com.olive.app.ui.shared.PaleOlive
 import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
 import com.olive.app.ui.users.user.dashboard.hotlineKindLabel
 import com.olive.app.ui.users.user.dashboard.hotlineRegionName
 import kotlinx.coroutines.launch
@@ -205,82 +206,94 @@ internal fun DirectoryPlacesListDialog(
     onToggleSave: (HotlineResource) -> Unit,
     onSelect: (HotlineResource) -> Unit,
     onDismiss: () -> Unit,
+    inWindow: Boolean = false,
 ) {
     var selectedKind by remember { mutableStateOf<HotlineResourceKind?>(null) }
     val filteredPlaces = remember(places, selectedKind) {
         places.filter { selectedKind == null || it.kind == selectedKind }
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.support_map_directory_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(
-                        selected = selectedKind == null,
-                        onClick = { selectedKind = null },
-                        label = { Text(stringResource(R.string.support_tab_all)) },
-                        modifier = Modifier.testTag("map_directory_filter_all"),
-                    )
-                    HotlineResourceKind.entries.forEach { kind ->
-                        FilterChip(
-                            selected = selectedKind == kind,
-                            onClick = { selectedKind = kind },
-                            label = { Text(hotlineKindLabel(kind)) },
-                            modifier = Modifier.testTag("map_directory_filter_${kind.name.lowercase()}"),
-                        )
-                    }
-                }
-                Text(
-                    stringResource(R.string.support_directory_map_locations, filteredPlaces.size),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Muted,
+    val bodyContent: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = selectedKind == null,
+                    onClick = { selectedKind = null },
+                    label = { Text(stringResource(R.string.support_tab_all)) },
+                    modifier = Modifier.testTag("map_directory_filter_all"),
                 )
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                    items(filteredPlaces, key = { it.id }) { place ->
-                        val saved = place.id in savedIds
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                TextButton(
-                                    onClick = { onSelect(place) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Column(Modifier.fillMaxWidth()) {
-                                        Text(place.name, fontWeight = FontWeight.Medium)
-                                        Text(
-                                            "${hotlineKindLabel(place.kind)} · ${place.city}, ${place.region}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Muted,
-                                        )
-                                    }
-                                }
-                            }
-                            IconButton(onClick = { onToggleSave(place) }) {
-                                Icon(
-                                    imageVector = if (saved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = stringResource(
-                                        if (saved) R.string.support_unsave_resource else R.string.support_save_resource,
-                                        place.name,
-                                    ),
-                                    tint = if (saved) MaterialTheme.colorScheme.error else Muted,
-                                )
-                            }
-                        }
-                        HorizontalDivider()
-                    }
+                HotlineResourceKind.entries.forEach { kind ->
+                    FilterChip(
+                        selected = selectedKind == kind,
+                        onClick = { selectedKind = kind },
+                        label = { Text(hotlineKindLabel(kind)) },
+                        modifier = Modifier.testTag("map_directory_filter_${kind.name.lowercase()}"),
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        },
-    )
+            Text(
+                stringResource(R.string.support_directory_map_locations, filteredPlaces.size),
+                style = MaterialTheme.typography.labelMedium,
+                color = Muted,
+            )
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = if (inWindow) 190.dp else 320.dp)) {
+                items(filteredPlaces, key = { it.id }) { place ->
+                    val saved = place.id in savedIds
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            TextButton(
+                                onClick = { onSelect(place) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(place.name, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        "${hotlineKindLabel(place.kind)} · ${place.city}, ${place.region}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Muted,
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(onClick = { onToggleSave(place) }) {
+                            Icon(
+                                imageVector = if (saved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = stringResource(
+                                    if (saved) R.string.support_unsave_resource else R.string.support_save_resource,
+                                    place.name,
+                                ),
+                                tint = if (saved) MaterialTheme.colorScheme.error else Muted,
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "location_directory_dialog",
+            title = { Text(stringResource(R.string.support_map_directory_title)) },
+            onDismiss = onDismiss,
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.support_map_directory_title)) },
+            text = bodyContent,
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            },
+        )
+    }
 }
 
 /**

@@ -184,6 +184,18 @@ internal fun SafetyPlanScreen(
     }
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val wt = LocalWalkthroughDirective.current
+    var wtPopup by remember { mutableStateOf(false) }
+    LaunchedEffect(wt?.stepId, wt?.action) {
+        when (wt?.action) {
+            "plan_primary" -> backup = false
+            "plan_backup" -> backup = true
+            "plan_scroll_consult" -> { backup = false; state.animateScrollToItem(1 + SAFETY_CHECKLIST_SECTIONS.size) }
+            "plan_scroll_share" -> { backup = false; state.animateScrollToItem(2 + SAFETY_CHECKLIST_SECTIONS.size) }
+            "plan_open_questionnaire" -> { questionnaireOpen = true; wtPopup = true }
+        }
+        if (wt?.action != "plan_open_questionnaire" && wtPopup) { questionnaireOpen = false; wtPopup = false }
+    }
     val expandedDescription = stringResource(R.string.support_expanded)
     val collapsedDescription = stringResource(R.string.support_collapsed)
     val prefix = if (backup) "backup" else "primary"
@@ -278,7 +290,7 @@ internal fun SafetyPlanScreen(
                                 completionByPlan.getValue("primary").complete
                             )
                         },
-                        modifier = Modifier.testTag("safety_primary"),
+                        modifier = Modifier.walkthroughTarget("safety_primary").testTag("safety_primary"),
                     )
                     Tab(
                         selected = backup,
@@ -289,11 +301,11 @@ internal fun SafetyPlanScreen(
                                 completionByPlan.getValue("backup").complete
                             )
                         },
-                        modifier = Modifier.testTag("safety_backup"),
+                        modifier = Modifier.walkthroughTarget("safety_backup").testTag("safety_backup"),
                     )
                 }
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).walkthroughTarget("safety_section_jumps"),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SAFETY_CHECKLIST_SECTIONS.forEachIndexed { index, section ->
@@ -441,22 +453,10 @@ internal fun SafetyPlanScreen(
                                 )
                             }
                         }
-                        if (!organizationEditor && !safeContact) item {
-                            Box(Modifier.padding(16.dp)) {
-                                SafetyConsultationControls(
-                                    session,
-                                    plan
-                                )
-                            }
-                        }
-                        // Personal users can edit this section; safe contacts can only read it.
-                        if (!organizationEditor && !safeContact) item {
-                            Box(Modifier.padding(horizontal = 16.dp)) {
-                                SafetyContactSharingControls(
-                                    session,
-                                    plan
-                                )
-                            }
+                        // Personal users can edit consultation and sharing; safe contacts only read.
+                        if (!organizationEditor && !safeContact) {
+                            item { Box(Modifier.padding(16.dp).walkthroughTarget("safety_consultation_section")) { SafetyConsultationControls(session, plan) } }
+                            item { Box(Modifier.padding(horizontal = 16.dp).walkthroughTarget("safety_share_section")) { SafetyContactSharingControls(session, plan) } }
                         }
                     }
                     item {
@@ -512,11 +512,12 @@ internal fun SafetyPlanScreen(
         SafetyPlanQuestionnaireDialog(
             initialIntake = intake,
             enabled = !session.busy && controller.saving == 0,
-            onDismiss = { questionnaireOpen = false },
+            inWindow = wtPopup,
+            onDismiss = { questionnaireOpen = false; wtPopup = false },
             onSave = { updated ->
                 session.saveSafetyIntake(updated)
                 applySafetyIntakeToPlan(context, controller, updated, hasAffectedPeople)
-                questionnaireOpen = false
+                questionnaireOpen = false; wtPopup = false
             },
         )
     }
@@ -579,7 +580,7 @@ internal fun SharedSafetyPlanList(
         error?.let { AccessibleMessage(stringResource(it)) }
         val visiblePlans = if (loading) emptyList() else plans
         if (visiblePlans.isEmpty() && (!loading || localMode) && error == null) Surface(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().walkthroughTarget("safety_primary"),
             shape = MaterialTheme.shapes.large,
             color = LightSage
         ) {
@@ -595,10 +596,12 @@ internal fun SharedSafetyPlanList(
                 )
             }
         }
-        visiblePlans.forEach { shared ->
+        visiblePlans.forEachIndexed { index, shared ->
             OutlinedCard(
                 onClick = { onOpen(shared) },
-                modifier = Modifier.fillMaxWidth().testTag("shared_plan_${shared.ownerUid}")
+                modifier = Modifier.fillMaxWidth()
+                    .then(if (index == 0) Modifier.walkthroughTarget("safety_primary") else Modifier)
+                    .testTag("shared_plan_${shared.ownerUid}")
             ) {
                 Row(
                     Modifier.padding(16.dp),

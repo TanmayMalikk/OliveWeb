@@ -24,6 +24,7 @@ import { VoiceMessageBubble, VoiceMessageComposer } from "./VoiceMessages";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 import { sharedMessage } from "./SharedMessageContent";
 import { useChatDeviceKey, useChatTimeline, useMembershipHistory } from "../useChatTimeline";
+import { useWalkthroughAction } from "./WalkthroughCoachmark";
 import type {
   Friend,
   Request,
@@ -46,6 +47,16 @@ export default function Messages() {
   }>({ friends: [], incoming: [], outgoing: [] });
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [chatTab, setChatTab] = useState<ChatTab>("dms");
+  const wt = useWalkthroughAction();
+  useEffect(() => {
+    if (wt.action === "messages_tab_dms" || wt.action === "messages_open_invite") {
+      setConversation(null);
+      setChatTab("dms");
+    } else if (wt.action === "messages_tab_tickets") {
+      setConversation(null);
+      setChatTab("tickets");
+    }
+  }, [wt.stepId, wt.action]);
   const tabsId = useId();
   const tabButtons = useRef<Partial<Record<ChatTab, HTMLButtonElement>>>({});
   const [conversations, setConversations] = useState<Conversation[]>([]);

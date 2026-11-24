@@ -614,7 +614,7 @@ private fun SafeFeatureGrid(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val fontScale = LocalDensity.current.fontScale
     val cardGap = 12.dp
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth().walkthroughTarget("home_feature_grid")) {
         val columns = if (maxWidth >= 300.dp && fontScale < 1.4f) 2 else 1
         Column(verticalArrangement = Arrangement.spacedBy(cardGap)) {
             SafeHomeFeature.entries.chunked(columns).forEach { features ->
