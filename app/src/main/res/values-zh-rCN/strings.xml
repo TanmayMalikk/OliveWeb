@@ -514,6 +514,7 @@
     <string name="password_recovery_title">密码恢复备选方案</string>
     <string name="password_recovery_help">添加您的帐户密码作为备份恢复方案。通行密钥始终为首选。Olive Branch使用零知识OPAQUE密码学，服务器绝不会接收或存储您的密码或恢复密钥。</string>
     <string name="password_recovery_warning">警告：如果同时丢失密码恢复方案和所有已注册的通行密钥，将永久无法在新设备上恢复加密数据。</string>
+    <string name="password_recovery_dialog_prompt">输入您的Olive Branch帐户密码以启用备份恢复。</string>
     <string name="password_recovery_add">添加密码恢复</string>
     <string name="password_recovery_added">已添加密码恢复备用方案。</string>
     <string name="password_recovery_recover">使用密码恢复加密数据</string>
@@ -529,6 +530,7 @@
     <string name="password_recovery_error_corrupted">恢复包已损坏。请联系支持：OPK-04。</string>
     <string name="password_recovery_error_account_mismatch">帐户不匹配。该恢复记录属于其他用户。代码：OPK-05。</string>
     <string name="password_recovery_error_revoked">由于帐户访问权限已被撤销，恢复不可用。代码：OPK-06。</string>
+    <string name="password_recovery_error_runtime_unavailable">无法在此设备上初始化安全加密运行环境。请重启应用并重试。</string>
     <string name="restore_encrypted_access_title">恢复加密访问权限？</string>
     <string name="restore_encrypted_access_body">在此设备上恢复对加密聊天和文件的访问。系统可能会要求您确认恢复通行密钥。</string>
     <string name="restore_access">恢复访问权限</string>

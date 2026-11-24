@@ -520,6 +520,7 @@
     <string name="password_recovery_title">Secours de récupération par mot de passe</string>
     <string name="password_recovery_help">Ajoutez le mot de passe de votre compte comme solution de secours. Les clés d’accès sont toujours privilégiées. Olive Branch utilise la cryptographie OPAQUE à divulgation nulle de connaissance, de sorte que le serveur ne reçoit ni ne stocke jamais votre mot de passe ou clé de récupération.</string>
     <string name="password_recovery_warning">Avertissement : La perte à la fois de la récupération par mot de passe et de toutes les clés d’accès peut empêcher définitivement la récupération des données chiffrées sur un nouvel appareil.</string>
+    <string name="password_recovery_dialog_prompt">Entrez le mot de passe de votre compte Olive Branch pour activer la récupération de secours.</string>
     <string name="password_recovery_add">Ajouter la récupération par mot de passe</string>
     <string name="password_recovery_added">Secours de récupération par mot de passe ajouté.</string>
     <string name="password_recovery_recover">Récupérer les données chiffrées avec le mot de passe</string>
@@ -535,6 +536,7 @@
     <string name="password_recovery_error_corrupted">Paquet de récupération corrompu. Signalez au support : OPK-04.</string>
     <string name="password_recovery_error_account_mismatch">Non-concordance de compte. L’enregistrement appartient à un autre utilisateur. Code : OPK-05.</string>
     <string name="password_recovery_error_revoked">Récupération indisponible en raison d’un accès au compte révoqué. Code : OPK-06.</string>
+    <string name="password_recovery_error_runtime_unavailable">Impossible d’initialiser l’environnement cryptographique sécurisé sur cet appareil. Veuillez redémarrer l’application et réessayer.</string>
     <string name="restore_encrypted_access_title">Restaurer l’accès chiffré ?</string>
     <string name="restore_encrypted_access_body">Restaurez l’accès à vos discussions et fichiers chiffrés sur cet appareil. Une confirmation de votre clé d’accès de récupération peut être demandée.</string>
     <string name="restore_access">Restaurer l’accès</string>

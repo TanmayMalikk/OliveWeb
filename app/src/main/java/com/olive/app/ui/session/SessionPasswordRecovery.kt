@@ -1,6 +1,8 @@
 package com.olive.app.ui.session
 
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
@@ -114,13 +116,27 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         }
     }
 
+    /**
+     * Resolves a user-friendly error message for password recovery failures based on root causes.
+     *
+     * @param failure Throwable thrown during a password recovery operation.
+     * @return Human-readable string suitable for display in the UI.
+     */
     private fun passwordRecoveryFailure(failure: Throwable): String {
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
         val functions = causes.filterIsInstance<FirebaseFunctionsException>().firstOrNull()
         val firestore = causes.filterIsInstance<FirebaseFirestoreException>().firstOrNull()
         val badCredentials = causes.filterIsInstance<FirebaseAuthInvalidCredentialsException>().firstOrNull()
+        val invalidUser = causes.filterIsInstance<FirebaseAuthInvalidUserException>().firstOrNull()
+        val networkEx = causes.filterIsInstance<FirebaseNetworkException>().firstOrNull()
 
         val stringRes = when {
+            badCredentials != null ->
+                R.string.password_recovery_error_incorrect
+            invalidUser != null ->
+                R.string.passkey_recovery_reauth_session_expired
+            networkEx != null ->
+                R.string.password_recovery_error_connection
             causes.any { it is IllegalArgumentException && it.message?.contains("Incorrect recovery password", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_incorrect
             causes.any { it is AEADBadTagException || it is AccountKeysetException } ->
@@ -129,8 +145,10 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 R.string.password_recovery_error_account_mismatch
             causes.any { it.message?.contains("active passkey", ignoreCase = true) == true } ->
                 R.string.password_recovery_remove_blocked_last
-            badCredentials != null ->
-                R.string.password_recovery_error_incorrect
+            causes.any { it is IllegalStateException && it.message?.contains("OPAQUE WebAssembly", ignoreCase = true) == true } ->
+                R.string.password_recovery_error_runtime_unavailable
+            causes.any { it.message?.contains("Account recovery key", ignoreCase = true) == true } ->
+                R.string.password_recovery_error_runtime_unavailable
             functions != null -> when (functions.code) {
                 FirebaseFunctionsException.Code.PERMISSION_DENIED ->
                     if (functions.message?.contains("revoked", ignoreCase = true) == true) R.string.password_recovery_error_revoked
@@ -143,6 +161,8 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                     R.string.password_recovery_error_connection
                 FirebaseFunctionsException.Code.NOT_FOUND ->
                     R.string.password_recovery_error_corrupted
+                FirebaseFunctionsException.Code.UNAUTHENTICATED ->
+                    R.string.passkey_recovery_reauth_session_expired
                 else -> R.string.password_recovery_error_unsupported
             }
             firestore != null -> when (firestore.code) {

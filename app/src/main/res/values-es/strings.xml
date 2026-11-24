@@ -520,6 +520,7 @@
     <string name="password_recovery_title">Copia de seguridad con contraseña</string>
     <string name="password_recovery_help">Agrega la contraseña de tu cuenta como respaldo de recuperación. Las llaves de acceso siempre son la opción preferida. Olive Branch usa criptografía OPAQUE de conocimiento cero, por lo que el servidor nunca recibe ni guarda tu contraseña ni la clave de recuperación.</string>
     <string name="password_recovery_warning">Advertencia: Si pierdes tanto la recuperación con contraseña como todas las llaves de acceso registradas, podrías perder permanentemente el acceso a los datos cifrados en un dispositivo nuevo.</string>
+    <string name="password_recovery_dialog_prompt">Introduce la contraseña de tu cuenta de Olive Branch para activar la recuperación de respaldo.</string>
     <string name="password_recovery_add">Agregar recuperación con contraseña</string>
     <string name="password_recovery_added">Se agregó la recuperación con contraseña.</string>
     <string name="password_recovery_recover">Recuperar datos cifrados con contraseña</string>
@@ -535,6 +536,7 @@
     <string name="password_recovery_error_corrupted">Paquete de recuperación dañado. Informa a soporte: OPK-04.</string>
     <string name="password_recovery_error_account_mismatch">Cuenta no coincidente. El registro de recuperación pertenece a otro usuario. Código: OPK-05.</string>
     <string name="password_recovery_error_revoked">Recuperación no disponible debido al acceso revocado de la cuenta. Código: OPK-06.</string>
+    <string name="password_recovery_error_runtime_unavailable">No se pudo inicializar el entorno criptográfico seguro en este dispositivo. Reinicia la aplicación e inténtalo de nuevo.</string>
     <string name="restore_encrypted_access_title">¿Restaurar el acceso cifrado?</string>
     <string name="restore_encrypted_access_body">Restaura el acceso a tus chats y archivos cifrados en este dispositivo. Es posible que debas confirmar tu llave de acceso de recuperación.</string>
     <string name="restore_access">Restaurar acceso</string>

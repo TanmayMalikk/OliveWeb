@@ -99,9 +99,12 @@ internal fun PasswordRecoverySection(session: SessionViewModel) {
             title = { Text(stringResource(R.string.password_recovery_add)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.password_recovery_help))
+                    Text(
+                        stringResource(R.string.password_recovery_dialog_prompt),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                     Field(
-                        label = stringResource(R.string.password),
+                        label = stringResource(R.string.passkey_recovery_reauth_password),
                         value = passwordInput,
                         tag = "password_recovery_enroll_input",
                         secret = true,

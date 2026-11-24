@@ -163,10 +163,10 @@ internal class AndroidOpaqueClient(
             view.loadUrl("file:///android_asset/opaque/opaque.html")
         }
 
-        // Wait until bridge confirms wasm readiness
+        // Wait until bridge confirms wasm readiness (up to 5 seconds for cold start)
         var ready = false
         var attempts = 0
-        while (!ready && attempts < 50) {
+        while (!ready && attempts < 100) {
             val eval = evalJs(view, "window.opaqueBridge && window.opaqueBridge.isReady")
             if (eval == "true") {
                 ready = true
