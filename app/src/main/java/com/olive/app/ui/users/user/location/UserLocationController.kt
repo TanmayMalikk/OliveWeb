@@ -177,7 +177,7 @@ internal class LocationMapController(
                         applyLocationFix(token, uid, configuration.youLabel, fix)
                     }
                     if (token == generation && state.locating) state = state.copy(locating = false)
-                    val updates = runCatching {
+                    val updates = try {
                         DeviceLocation.startUpdates(
                             applicationContext,
                             intervalMillis = 1_500L,
@@ -185,7 +185,13 @@ internal class LocationMapController(
                         ) { fix ->
                             applyLocationFix(token, uid, configuration.youLabel, fix)
                         }
-                    }.getOrNull()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: SecurityException) {
+                        null
+                    } catch (_: Exception) {
+                        null
+                    }
                     if (updates != null) {
                         liveLocationUpdates = updates
                         awaitCancellation()
