@@ -42,6 +42,7 @@ import com.olive.app.ui.users.safecontact.SafeContactArea
 import com.olive.app.ui.users.shared.auth.*
 import com.olive.app.ui.users.shared.onboarding.ProfileSetup
 import com.olive.app.ui.users.shared.organization.OrganizationProfileSetup
+import com.olive.app.ui.users.shared.walkthrough.FirstVisitWalkthrough
 import com.olive.app.ui.users.staff.StaffPortal
 import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
@@ -199,6 +200,12 @@ internal fun OliveRoot(
         navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
+    var guideTopicId by remember(callAccountId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(navigation.screen, navigation.page) {
+        if (navigation.screen != SessionScreen.Safe || navigation.page != SafePage.Walkthrough) {
+            guideTopicId = null
+        }
+    }
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
@@ -370,8 +377,8 @@ internal fun OliveRoot(
                                                 SessionScreen.DevicePin -> DevicePin(session)
                                                 SessionScreen.Pin -> PinPrompt(session)
                                                 SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT) {
-                                                    key(session.coverReset) { SafeContactArea(session, exit) }
-                                                } else SafeArea(session, exit)
+                                                    key(session.coverReset) { SafeContactArea(session, exit, guideTopicId) }
+                                                } else SafeArea(session, exit, guideTopicId)
 
                                                 SessionScreen.Portal -> key(session.coverReset) {
                                                     when (session.accountRole) {
@@ -395,6 +402,26 @@ internal fun OliveRoot(
                                             }
                                         }
                                     }
+                                }
+                                if (navigation.screen == SessionScreen.Safe && session.profile != null &&
+                                    !privacyHidden && !showPinAnimation && !supportExpanded &&
+                                    !callOverlayVisible && navigation.idleCountdownSeconds == null
+                                ) {
+                                    FirstVisitWalkthrough(
+                                        accountId = callAccountId,
+                                        role = session.accountRole,
+                                        page = navigation.page,
+                                        onOpenGuide = { topicId ->
+                                            guideTopicId = topicId
+                                            session.navigation.openSafePage(SafePage.Walkthrough)
+                                        },
+                                        modifier = Modifier.align(Alignment.BottomCenter)
+                                            .padding(horizontal = 16.dp)
+                                            .padding(bottom = if (showQuickExit || showSupport)
+                                                OlivePrivateLayout.FloatingActionClearance else 12.dp)
+                                            .widthIn(max = 440.dp)
+                                            .heightIn(max = 240.dp),
+                                    )
                                 }
                             }
                         }

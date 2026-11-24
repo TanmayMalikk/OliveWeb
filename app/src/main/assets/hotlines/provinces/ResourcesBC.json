@@ -1,4 +1,836 @@
 {
+  "100 Mile House": {
+    "Shelters": {
+      "CMHA - South Cariboo Branch Shelter (555B South Cedar Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-395-4883",
+        "hours": "Call to confirm intake hours",
+        "address": "555B South Cedar Avenue, 100 Mile House, BC V0K 2E0",
+        "lat": 51.647,
+        "lng": -121.295,
+        "url": "https://southcariboo.cmha.bc.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Abbotsford": {
+    "Shelters": {
+      "Cyrus Centre Ministries Shelter (2616 Ware Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: youth 19-25. Call to confirm intake hours and space.",
+        "Phone": "604-859-5773",
+        "hours": "Call to confirm intake hours",
+        "address": "2616 Ware Street, Abbotsford, BC V2S 3E1",
+        "lat": 49.049,
+        "lng": -122.304,
+        "url": "https://cyruscentre.com/programs/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lookout Housing and Health Society Shelter (1821 Sumas Way)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-334-4911",
+        "hours": "Call to confirm intake hours",
+        "address": "1821 Sumas Way, Abbotsford, BC V2S 4L5",
+        "lat": 49.035101,
+        "lng": -122.268407,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Sara for Women Society Shelter (2317 McKenzie Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women only. Call to confirm intake hours and space.",
+        "Phone": "604-746-0918",
+        "hours": "Call to confirm intake hours",
+        "address": "2317 McKenzie Road, Abbotsford, BC V2S 4A1",
+        "lat": 49.044,
+        "lng": -122.286,
+        "url": "https://www.saraforwomen.ca/housing-shelter",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Sparrow Community Care Society Shelter (1661 McCallum Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: seniors 55+. Call to confirm intake hours and space.",
+        "Phone": "604-991-6937",
+        "hours": "Call to confirm intake hours",
+        "address": "1661 McCallum Road, Abbotsford, BC V2S 3M4",
+        "lat": 49.032705,
+        "lng": -122.293905,
+        "url": "https://sparrowccs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (34081 Gladys Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-852-9305",
+        "hours": "Call to confirm intake hours",
+        "address": "34081 Gladys Avenue, Abbotsford, BC V2S 2E8",
+        "lat": 49.044,
+        "lng": -122.278,
+        "url": "https://www.salvationarmyabbotsford.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Burnaby": {
+    "Shelters": {
+      "The Progressive Housing Society Shelter (2294 Douglas Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-318-9876",
+        "hours": "Call to confirm intake hours",
+        "address": "2294 Douglas Road, Burnaby, BC V5C 5A7",
+        "lat": 49.264,
+        "lng": -122.989,
+        "url": "https://progressivehousing.net/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Campbell River": {
+    "Shelters": {
+      "The Salvation Army Shelter (690 Evergreen Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-287-3791",
+        "hours": "Call to confirm intake hours",
+        "address": "690 Evergreen Road, Campbell River, BC V9W 3R8",
+        "lat": 50.008,
+        "lng": -125.249,
+        "url": "https://www.oceancrestchurch.org/contact-us/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Vancouver Island Mental Health Society Shelter (1221 Cedar Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-914-0311",
+        "hours": "Call to confirm intake hours",
+        "address": "1221 Cedar Street, Campbell River, BC V9W 2W4",
+        "lat": 50.027,
+        "lng": -125.247,
+        "url": "https://vancouverislandmentalhealthsociety.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Chilliwack": {
+    "Shelters": {
+      "Cyrus Centre Ministries Shelter (45845 Wellington Ave)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: youth (19-25). Call to confirm intake hours and space.",
+        "Phone": "604-795-5773",
+        "hours": "Call to confirm intake hours",
+        "address": "45845 Wellington Ave, Chilliwack, BC V2P 2E1",
+        "lat": 49.172,
+        "lng": -121.956,
+        "url": "https://cyruscentre.com/programs/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Phoenix Drug & Alcohol Recovery and Education Society Shelter (45855 Rowat Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "236-992-2106",
+        "hours": "Call to confirm intake hours",
+        "address": "45855 Rowat Avenue, Chilliwack, BC V2P 1J2",
+        "lat": 49.162412,
+        "lng": -121.955828,
+        "url": "https://phoenixsociety.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (45746 Yale Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-792-4486",
+        "hours": "Call to confirm intake hours",
+        "address": "45746 Yale Road, Chilliwack, BC V2P 2N4",
+        "lat": 49.16,
+        "lng": -121.958,
+        "url": "https://www.chilliwack.com/main/page.cfm?id=1192",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Coquitlam": {
+    "Shelters": {
+      "Raincity Housing and Support Society Shelter (3030 Gordon Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-474-0435",
+        "hours": "Call to confirm intake hours",
+        "address": "3030 Gordon Avenue, Coquitlam, BC V3C 0E7",
+        "lat": 49.27,
+        "lng": -122.792,
+        "url": "https://www.raincityhousing.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Courtenay": {
+    "Shelters": {
+      "Comox Valley Transition Society Shelter (685 Cliff Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-218-3975",
+        "hours": "Call to confirm intake hours",
+        "address": "685 Cliff Avenue, Courtenay, BC V9N 2J6",
+        "lat": 49.69,
+        "lng": -124.996,
+        "url": "https://cvts.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (632 Pidcock Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-338-5133",
+        "hours": "Call to confirm intake hours",
+        "address": "632 Pidcock Avenue, Courtenay, BC V9N 3E3",
+        "lat": 49.686,
+        "lng": -125.007,
+        "url": "https://comoxvalleysa.ca/contact-us",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Cranbrook": {
+    "Shelters": {
+      "Community Connections Society of Southeast BC Shelter (209b 16th Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-687-1979",
+        "hours": "Call to confirm intake hours",
+        "address": "209b 16th Avenue, Cranbrook, BC V1C 5S8",
+        "lat": 49.514509,
+        "lng": -115.760207,
+        "url": "https://www.ccscranbrook.ca/programs/housing-poverty-reduction/step-beyond-shelter/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Dawson Creek": {
+    "Shelters": {
+      "Nawican Friendship Centre Shelter (1401 102 Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-843-1722",
+        "hours": "Call to confirm intake hours",
+        "address": "1401 102 Avenue, Dawson Creek, BC V1G 2E2",
+        "lat": 55.759226,
+        "lng": -120.2414,
+        "url": "https://nawican.ca/contact-us/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Duncan": {
+    "Shelters": {
+      "Cowichan Women Against Violence Society Shelter (1081 Canada Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women only. Call to confirm intake hours and space.",
+        "Phone": "250-466-9492",
+        "hours": "Call to confirm intake hours",
+        "address": "1081 Canada Avenue, Duncan, BC V9L 1V2",
+        "lat": 48.785,
+        "lng": -123.717,
+        "url": "https://www.cwav.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Fort St. John": {
+    "Shelters": {
+      "The Salvation Army Shelter (9824 99 Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-785-0372",
+        "hours": "Call to confirm intake hours",
+        "address": "9824 99 Avenue, Fort St. John, BC V1J 5A5",
+        "lat": 56.246,
+        "lng": -120.846,
+        "url": "https://www.safsj.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Kamloops": {
+    "Shelters": {
+      "Ask Wellness Society Shelter (142 Tranquille Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-312-3881",
+        "hours": "Call to confirm intake hours",
+        "address": "142 Tranquille Road, Kamloops, BC V2B 3G1",
+        "lat": 50.684793,
+        "lng": -120.353249,
+        "url": "https://askwellness.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Canadian Mental Health Association, Kamloops Branch Shelter (600 Kingston Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-312-2954",
+        "hours": "Call to confirm intake hours",
+        "address": "600 Kingston Avenue, Kamloops, BC V2C 5K2",
+        "lat": 50.71217,
+        "lng": -120.35679,
+        "url": "https://kamloops.cmha.bc.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Canadian Mental Health Association, Kamloops Branch Shelter (715/725 Notre Dame Drive)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "236-425-0341",
+        "hours": "Call to confirm intake hours",
+        "address": "715/725 Notre Dame Drive, Kamloops, BC V2C 5N8",
+        "lat": 50.663292,
+        "lng": -120.356889,
+        "url": "https://kamloops.cmha.bc.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Mustard Seed Society Shelter (1055 Glenfair Drive)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: seniors 55+. Call to confirm intake hours and space.",
+        "Phone": "778-765-4578",
+        "hours": "Call to confirm intake hours",
+        "address": "1055 Glenfair Drive, Kamloops, BC V2C 6J1",
+        "lat": 50.66712,
+        "lng": -120.32956,
+        "url": "https://theseed.ca/emergency-shelter",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Ladysmith": {
+    "Shelters": {
+      "Ladysmith Resource Centre Association Shelter (631 1st Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-924-7224",
+        "hours": "Call to confirm intake hours",
+        "address": "631 1st Avenue, Ladysmith, BC V9G 1B9",
+        "lat": 48.995,
+        "lng": -123.819,
+        "url": "https://www.lrca.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Langley": {
+    "Shelters": {
+      "The Salvation Army Shelter (5787 Langley Bypass)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-514-7375",
+        "hours": "Call to confirm intake hours",
+        "address": "5787 Langley Bypass, Langley, BC V3A 0A9",
+        "lat": 49.108,
+        "lng": -122.643,
+        "url": "https://gatewayofhope.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Maple Ridge": {
+    "Shelters": {
+      "The Salvation Army Shelter (22188 Lougheed Highway)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-463-8296",
+        "hours": "Call to confirm intake hours",
+        "address": "22188 Lougheed Highway, Maple Ridge, BC V2X 2S8",
+        "lat": 49.217,
+        "lng": -122.608,
+        "url": "https://ridgemeadowssa.ca/contact-us",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Merritt": {
+    "Shelters": {
+      "Nicola Valley Shelter and Support Society Shelter (2702 Nicola Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-378-9244",
+        "hours": "Call to confirm intake hours",
+        "address": "2702 Nicola Avenue, Merritt, BC V1K 1M8",
+        "lat": 50.107054,
+        "lng": -120.770936,
+        "url": "https://www.nvsss.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Nanaimo": {
+    "Shelters": {
+      "Island Crisis Care Society Shelter (702 Nicol Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women only. Call to confirm intake hours and space.",
+        "Phone": "250-753-1474",
+        "hours": "Call to confirm intake hours",
+        "address": "702 Nicol Street, Nanaimo, BC V9R 4V1",
+        "lat": 49.156,
+        "lng": -123.934,
+        "url": "https://bc.211.ca/agency-details/island-crisis-care-society-iccs-9491203/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Nanaimo Family Life Association Shelter (595 Townsite Rd)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-754-3720",
+        "hours": "Call to confirm intake hours",
+        "address": "595 Townsite Rd, Nanaimo, BC V9S 1K9",
+        "lat": 49.177,
+        "lng": -123.955,
+        "url": "https://nflabc.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (19 Nicol Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "250-714-1142",
+        "hours": "Call to confirm intake hours",
+        "address": "19 Nicol Street, Nanaimo, BC V9R 4S6",
+        "lat": 49.163,
+        "lng": -123.934,
+        "url": "https://nanaimonewhope.ca/programs/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Nelson": {
+    "Shelters": {
+      "Nelson CARES Society Shelter (816 Vernon Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-352-9876",
+        "hours": "Call to confirm intake hours",
+        "address": "816 Vernon Street, Nelson, BC V1L 4G4",
+        "lat": 49.495,
+        "lng": -117.289,
+        "url": "https://nelsoncares.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "New Westminster": {
+    "Shelters": {
+      "Elizabeth Fry Society of Greater Vancouver Shelter (402 East Columbia Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "604-524-0710",
+        "hours": "Call to confirm intake hours",
+        "address": "402 East Columbia Street, New Westminster, BC V3L 3X1",
+        "lat": 49.228,
+        "lng": -122.892,
+        "url": "https://efry.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Fraserside Community Services Society Shelter (1206 8th Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "604-525-3929",
+        "hours": "Call to confirm intake hours",
+        "address": "1206 8th Avenue, New Westminster, BC V3M 2R9",
+        "lat": 49.21,
+        "lng": -122.935,
+        "url": "https://fraserside.bc.ca/social-housing/emergency-family-shelter/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lookout Housing and Health Society Shelter (740 Carnarvon Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "604-529-9126",
+        "hours": "Call to confirm intake hours",
+        "address": "740 Carnarvon Street, New Westminster, BC V3M 1E7",
+        "lat": 49.202,
+        "lng": -122.912,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (32 Elliot Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "604-526-4783",
+        "hours": "Call to confirm intake hours",
+        "address": "32 Elliot Street, New Westminster, BC V3L 2K1",
+        "lat": 49.207,
+        "lng": -122.903,
+        "url": "https://bc.211.ca/result/stevenson-house-9506461/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "North Cowichan": {
+    "Shelters": {
+      "Canadian Mental Health Association - Cowichan Valley Branch 1992 Shelter (2579 Lewis Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-715-1132",
+        "hours": "Call to confirm intake hours",
+        "address": "2579 Lewis Street, North Cowichan, BC V9L 2Z2",
+        "lat": 48.784,
+        "lng": -123.698,
+        "url": "https://cowichanvalley.cmha.bc.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "North Vancouver": {
+    "Shelters": {
+      "Lookout Housing and Health Society Shelter (705 2nd Street West)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-982-9126",
+        "hours": "Call to confirm intake hours",
+        "address": "705 2nd Street West, North Vancouver, BC V7M 1E6",
+        "lat": 49.319,
+        "lng": -123.092,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Penticton": {
+    "Shelters": {
+      "Penticton and District Society for Community Living Shelter (1706 Main Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "236-422-2449",
+        "hours": "Call to confirm intake hours",
+        "address": "1706 Main Street, Penticton, BC V2A 5G8",
+        "lat": 49.48,
+        "lng": -119.584,
+        "url": "https://pdscl.org/housing-services/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Port Alberni": {
+    "Shelters": {
+      "Port Alberni Friendship Center Shelter (3939 8th Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-723-8281",
+        "hours": "Call to confirm intake hours",
+        "address": "3939 8th Avenue, Port Alberni, BC V9Y 4S2",
+        "lat": 49.248,
+        "lng": -124.8,
+        "url": "https://www.pafriendshipcenter.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (3130 3rd Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-723-4049",
+        "hours": "Call to confirm intake hours",
+        "address": "3130 3rd Avenue, Port Alberni, BC V9Y 4C8",
+        "lat": 49.235341,
+        "lng": -124.808045,
+        "url": "https://albernivalleysa.ca/programs/bread-of-life-centre",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Port Hardy": {
+    "Shelters": {
+      "The Salvation Army Shelter (Unit A - 7305 Market Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-949-8125",
+        "hours": "Call to confirm intake hours",
+        "address": "Unit A - 7305 Market Street, Port Hardy, BC V0N 2P0",
+        "lat": 50.723824,
+        "lng": -127.492595,
+        "url": "https://waddingtonhope.ca/programs/emergency-shelter",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Powell River": {
+    "Shelters": {
+      "Lift Community Services of Qathet Society Shelter (7104 Barnet Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-485-2706",
+        "hours": "Call to confirm intake hours",
+        "address": "7104 Barnet Street, Powell River, BC V8A 2A1",
+        "lat": 49.840295,
+        "lng": -124.515704,
+        "url": "https://liftcommunityservices.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Prince George": {
+    "Shelters": {
+      "Active Support Against Poverty Housing Society Shelter (1188 6th Ave)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-563-6112",
+        "hours": "Call to confirm intake hours",
+        "address": "1188 6th Ave, Prince George, BC V2L 3M6",
+        "lat": 53.914,
+        "lng": -122.746,
+        "url": "https://bc.211.ca/result/bridget-moran-place-shelter-41404566/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Association Advocating for Women and Community Shelter (144 George St)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "250-562-6262",
+        "hours": "Call to confirm intake hours",
+        "address": "144 George St, Prince George, BC V2L 1P9",
+        "lat": 53.917,
+        "lng": -122.741,
+        "url": "https://www.awacshelter.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Prince George Native Friendship Centre Society Shelter (1151 2nd Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-563-0895",
+        "hours": "Call to confirm intake hours",
+        "address": "1151 2nd Avenue, Prince George, BC V2L 3B1",
+        "lat": 53.917,
+        "lng": -122.743,
+        "url": "https://www.pgnfc.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Prince George Native Friendship Centre Society Shelter (140 Quebec St)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "250-563-1982",
+        "hours": "Call to confirm intake hours",
+        "address": "140 Quebec St, Prince George, BC V2L 1W2",
+        "lat": 53.919,
+        "lng": -122.745,
+        "url": "https://www.pgnfc.com/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Prince Rupert": {
+    "Shelters": {
+      "North Coast Transition Society Shelter (1080 3rd Avenue West)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-622-2472",
+        "hours": "Call to confirm intake hours",
+        "address": "1080 3rd Avenue West, Prince Rupert, BC V8J 1N1",
+        "lat": 54.309,
+        "lng": -130.33,
+        "url": "https://www.ncts.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Quesnel": {
+    "Shelters": {
+      "Quesnel Shelter & Support Society Shelter (146 Carson Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-991-0222",
+        "hours": "Call to confirm intake hours",
+        "address": "146 Carson Avenue, Quesnel, BC V2J 2A8",
+        "lat": 52.976,
+        "lng": -122.497,
+        "url": "https://www.qsss.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Richmond": {
+    "Shelters": {
+      "The Salvation Army Shelter (12040 Horseshoe Way)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-276-2490",
+        "hours": "Call to confirm intake hours",
+        "address": "12040 Horseshoe Way, Richmond, BC V7A 4V5",
+        "lat": 49.191,
+        "lng": -123.103,
+        "url": "https://tsasites.salvationarmy.ca/web/belkin-communities-of-hope/services/richmond-house-shelter",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Saanich": {
+    "Shelters": {
+      "Victoria Native Friendship Centre Shelter (231 Regina Ave)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-380-8355",
+        "hours": "Call to confirm intake hours",
+        "address": "231 Regina Ave, Saanich, BC V8Z 1J6",
+        "lat": 48.455,
+        "lng": -123.389,
+        "url": "https://vnfc.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Sechelt": {
+    "Shelters": {
+      "Raincity Housing and Support Society Shelter (5653 Wharf Ave)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-740-8160",
+        "hours": "Call to confirm intake hours",
+        "address": "5653 Wharf Ave, Sechelt, BC V0N 3A0",
+        "lat": 49.477,
+        "lng": -123.755,
+        "url": "https://www.raincityhousing.org/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Smithers": {
+    "Shelters": {
+      "Smithers Community Services Association Shelter (3896 Railway Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-847-4660",
+        "hours": "Call to confirm intake hours",
+        "address": "3896 Railway Avenue, Smithers, BC",
+        "lat": 54.779361,
+        "lng": -127.177237,
+        "url": "https://bc.211.ca/agency-details/smithers-community-services-association-scsa-9489124/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Squamish": {
+    "Shelters": {
+      "Squamish Helping Hands Society Shelter (37871 Third Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-815-4984",
+        "hours": "Call to confirm intake hours",
+        "address": "37871 Third Avenue, Squamish, BC V8B 1B8",
+        "lat": 49.698,
+        "lng": -123.157,
+        "url": "https://www.squamishhelpinghands.ca/how-we-help/shelter-transitional-housing/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Surrey": {
+    "Shelters": {
+      "Lookout Housing and Health Society Shelter (10667 135A St)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-589-7777",
+        "hours": "Call to confirm intake hours",
+        "address": "10667 135A St, Surrey, BC V3T 4E3",
+        "lat": 49.196,
+        "lng": -122.849,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lookout Housing and Health Society Shelter (14716 104 Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-293-0889",
+        "hours": "Call to confirm intake hours",
+        "address": "14716 104 Avenue, Surrey, BC V3R 1M3",
+        "lat": 49.191,
+        "lng": -122.814,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Options Community Services Society Shelter (17910 Colebrook Road)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-574-4341",
+        "hours": "Call to confirm intake hours",
+        "address": "17910 Colebrook Road, Surrey, BC V3S 0L5",
+        "lat": 49.099,
+        "lng": -122.727,
+        "url": "https://www.options.bc.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Options Community Services Society Shelter (6595 King George Blvd)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-599-8900",
+        "hours": "Call to confirm intake hours",
+        "address": "6595 King George Blvd, Surrey, BC V3W 4Z4",
+        "lat": 49.123,
+        "lng": -122.846,
+        "url": "https://www.options.bc.ca/housing-homelessness/shelters-shelter-services",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Raincity Housing and Support Society Shelter (9810 Foxglove Drive)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-589-0496",
+        "hours": "Call to confirm intake hours",
+        "address": "9810 Foxglove Drive, Surrey, BC V3T 4W3",
+        "lat": 49.18064,
+        "lng": -122.83259,
+        "url": "https://www.raincityhousing.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Sums Place Society Shelter (10607 King George Blvd.)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-368-2458",
+        "hours": "Call to confirm intake hours",
+        "address": "10607 King George Blvd., Surrey, BC V3T 2X6",
+        "lat": 49.195,
+        "lng": -122.846,
+        "url": "https://sumsplace.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Sums Place Society Shelter (10731 City Parkway)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-585-0259",
+        "hours": "Call to confirm intake hours",
+        "address": "10731 City Parkway, Surrey, BC V3T 4C8",
+        "lat": 49.198,
+        "lng": -122.849,
+        "url": "https://sumsplace.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Sums Place Society Shelter (10776 King George Blvd)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-581-5172",
+        "hours": "Call to confirm intake hours",
+        "address": "10776 King George Blvd, Surrey, BC V3T 2X7",
+        "lat": 49.198,
+        "lng": -122.845,
+        "url": "https://sumsplace.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Elizabeth Fry Society of Greater Vancouver Shelter (9683 137 Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "604-589-5337",
+        "hours": "Call to confirm intake hours",
+        "address": "9683 137 Street, Surrey, BC V3T 4G8",
+        "lat": 49.17859,
+        "lng": -122.843632,
+        "url": "https://efry.com/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Terrace": {
+    "Shelters": {
+      "'Ksan House Society Shelter (2812 Hall Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-635-5890",
+        "hours": "Call to confirm intake hours",
+        "address": "2812 Hall Street, Terrace, BC V8G 2R7",
+        "lat": 54.511,
+        "lng": -128.59,
+        "url": "https://ksansociety.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Ksan House Society Shelter (2822 Tetrault Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-634-2454",
+        "hours": "Call to confirm intake hours",
+        "address": "2822 Tetrault Street, Terrace, BC V8G 1P2",
+        "lat": 54.516281,
+        "lng": -128.579956,
+        "url": "https://ksansociety.com/contact",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Trail": {
+    "Shelters": {
+      "Trail Association for Community Living Shelter (2039 Riverside Ave)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-368-7390",
+        "hours": "Call to confirm intake hours",
+        "address": "2039 Riverside Ave, Trail, BC V1R 3Z3",
+        "lat": 49.093118,
+        "lng": -117.700499,
+        "url": "https://cdskootenays.com/cds-programs/la-nina-shelter/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Vernon": {
+    "Shelters": {
+      "Turning Points Collaborative Society Shelter (2307 43 Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-241-0888",
+        "hours": "Call to confirm intake hours",
+        "address": "2307 43 Street, Vernon, BC V1T 6K7",
+        "lat": 50.258,
+        "lng": -119.296,
+        "url": "https://turningpoints.ngo/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Turning Points Collaborative Society Shelter (2506 37th Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-241-2217",
+        "hours": "Call to confirm intake hours",
+        "address": "2506 37th Street, Vernon, BC V1T 6G4",
+        "lat": 50.260975,
+        "lng": -119.284988,
+        "url": "https://turningpoints.ngo/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
+  "Williams Lake": {
+    "Shelters": {
+      "Cariboo Friendship Society Shelter (99 Third Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "250-398-6831",
+        "hours": "Call to confirm intake hours",
+        "address": "99 Third Avenue, Williams Lake, BC V2G 1J1",
+        "lat": 52.127,
+        "lng": -122.143,
+        "url": "https://cariboofriendshipsociety.ca/",
+        "source": "https://smap.bchousing.org/"
+      }
+    }
+  },
   "Vancouver": {
     "Hotlines": {
       "VictimLinkBC": {
@@ -22,6 +854,216 @@
       }
     },
     "Shelters": {
+      "Catholic Charities of the Archdiocese of Vancouver Shelter (1056 Comox St)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "604-443-3292",
+        "hours": "Call to confirm intake hours",
+        "address": "1056 Comox St, Vancouver, BC V6Z 1Y6",
+        "lat": 49.278,
+        "lng": -123.115,
+        "url": "https://rcav.org/ministries-offices/mens-shelter",
+        "source": "https://smap.bchousing.org/"
+      },
+      "City of Vancouver Shelter (609 Helmcken Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-665-2391",
+        "hours": "Call to confirm intake hours",
+        "address": "609 Helmcken Street, Vancouver, BC V6B 5R1",
+        "lat": 49.278,
+        "lng": -123.123,
+        "url": "https://vancouver.ca/parks-recreation-culture/gathering-place-community-centre.aspx",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Community Builders Benevolence Group Shelter (1060 Howe Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-428-3686",
+        "hours": "Call to confirm intake hours",
+        "address": "1060 Howe Street, Vancouver, BC V6Z 1P5",
+        "lat": 49.279,
+        "lng": -123.125,
+        "url": "https://communitybuilders.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Community Builders Benevolence Group Shelter (1401 Hornby Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-620-9253",
+        "hours": "Call to confirm intake hours",
+        "address": "1401 Hornby Street, Vancouver, BC V6Z 1W8",
+        "lat": 49.276,
+        "lng": -123.132,
+        "url": "https://www.raincityhousing.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Covenant House Vancouver Shelter (1280 Seymour Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: youth 16-24. Call to confirm intake hours and space.",
+        "Phone": "604-685-7474",
+        "hours": "Call to confirm intake hours",
+        "address": "1280 Seymour Street, Vancouver, BC V6B 3P9",
+        "lat": 49.275,
+        "lng": -123.127,
+        "url": "https://www.covenanthousebc.org/contact-us/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "First United Church Community Ministry Society Shelter (467 Alexander Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-681-8365",
+        "hours": "Call to confirm intake hours",
+        "address": "467 Alexander Street, Vancouver, BC V6A 1C6",
+        "lat": 49.281,
+        "lng": -123.097,
+        "url": "https://firstunited.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lookout Housing and Health Society Shelter (2088 Yukon Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-264-1680",
+        "hours": "Call to confirm intake hours",
+        "address": "2088 Yukon Street, Vancouver, BC V6Y 4B1",
+        "lat": 49.267,
+        "lng": -123.112,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lookout Housing and Health Society Shelter (346 Alexander Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-681-9126",
+        "hours": "Call to confirm intake hours",
+        "address": "346 Alexander Street, Vancouver, BC V6A 1C3",
+        "lat": 49.284,
+        "lng": -123.096,
+        "url": "https://lookoutsociety.ca/what-we-do/shelters/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Lu'ma Native BCH Housing Society Shelter (875 Terminal Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "236-484-0544",
+        "hours": "Call to confirm intake hours",
+        "address": "875 Terminal Avenue, Vancouver, BC V6A 2M9",
+        "lat": 49.270459,
+        "lng": -123.0836,
+        "url": "https://www.lnhs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "PHS Community Services Society Shelter (103 Hastings Street E)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-558-2070",
+        "hours": "Call to confirm intake hours",
+        "address": "103 Hastings Street E, Vancouver, BC V6A 1N5",
+        "lat": 49.281534,
+        "lng": -123.101839,
+        "url": "https://www.phs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "PHS Community Services Society Shelter (27 W Hastings)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-681-2806",
+        "hours": "Call to confirm intake hours",
+        "address": "27 W Hastings, Vancouver, BC V6B 1G4",
+        "lat": 49.282,
+        "lng": -123.105,
+        "url": "https://www.phs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Raincity Housing and Support Society Shelter (707 Powell Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-254-3700",
+        "hours": "Call to confirm intake hours",
+        "address": "707 Powell Street, Vancouver, BC V6A 1H5",
+        "lat": 49.283,
+        "lng": -123.089,
+        "url": "https://www.raincityhousing.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Aboriginal Front Door Society Shelter (201 Central Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-682-5556",
+        "hours": "Call to confirm intake hours",
+        "address": "201 Central Street, Vancouver, BC V6A 4A9",
+        "lat": 49.272,
+        "lng": -123.099,
+        "url": "https://www.abfrontdoor.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Bloom Group Community Services Society Shelter (329 Powell Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women 19+ only. Call to confirm intake hours and space.",
+        "Phone": "604-606-0403",
+        "hours": "Call to confirm intake hours",
+        "address": "329 Powell Street, Vancouver, BC V6A 1G5",
+        "lat": 49.283,
+        "lng": -123.097,
+        "url": "https://thebloomgroup.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Bloom Group Community Services Society Shelter (333 E.16th Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "604-606-0412",
+        "hours": "Call to confirm intake hours",
+        "address": "333 E.16th Avenue, Vancouver, BC V6A 2T7",
+        "lat": 49.25676,
+        "lng": -123.097511,
+        "url": "https://thebloomgroup.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Downtown Eastside Women's Centre Association Shelter (265 Hastings Street E)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women only. Call to confirm intake hours and space.",
+        "Phone": "604-564-9331",
+        "hours": "Call to confirm intake hours",
+        "address": "265 Hastings Street E, Vancouver, BC V6A 1P2",
+        "lat": 49.282959,
+        "lng": -123.109817,
+        "url": "https://dewc.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Downtown Eastside Women's Centre Association Shelter (412 East Cordova Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women 19+ only. Call to confirm intake hours and space.",
+        "Phone": "604-715-8480",
+        "hours": "Call to confirm intake hours",
+        "address": "412 East Cordova Street, Vancouver, BC V6A 1L8",
+        "lat": 49.282,
+        "lng": -123.095,
+        "url": "https://dewc.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (108 East Hastings Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-669-4349",
+        "hours": "Call to confirm intake hours",
+        "address": "108 East Hastings Street, Vancouver, BC V6A 1N4",
+        "lat": 49.282,
+        "lng": -123.101,
+        "url": "https://belkintsa.ca/services/overview",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (555 Homer Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-681-3405",
+        "hours": "Call to confirm intake hours",
+        "address": "555 Homer Street, Vancouver, BC V6B 1K8",
+        "lat": 49.282,
+        "lng": -123.113,
+        "url": "https://tsasites.salvationarmy.ca/web/belkin-communities-of-hope/services/belkin-house-shelter",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Vi Fineday Family Shelter Society Shelter (1906 15th Avenue West)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients. Call to confirm intake hours and space.",
+        "Phone": "604-736-2423",
+        "hours": "Call to confirm intake hours",
+        "address": "1906 15th Avenue West, Vancouver, BC V6J 2L3",
+        "lat": 49.258,
+        "lng": -123.149,
+        "url": "https://www.iwtscanada.org/vancouver/vi-fineday-family-shelter",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Vancouver Aboriginal Friendship Centre Society Shelter (1015 E Hastings Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "604-200-2253",
+        "hours": "Call to confirm intake hours",
+        "address": "1015 E Hastings Street, Vancouver, BC V6A 4J3",
+        "lat": 49.281112,
+        "lng": -123.081718,
+        "url": "https://vafcs.org/",
+        "source": "https://smap.bchousing.org/"
+      },
       "Atira Women's Resource Society": {
         "Desc": "Emergency housing, crisis intervention, and supportive services for women and children in crisis.",
         "Phone": "604-681-4437",
@@ -90,6 +1132,86 @@
       }
     },
     "Shelters": {
+      "Beacon Community Association Shelter (1450 Elford Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: youth (15-25). Call to confirm intake hours and space.",
+        "Phone": "250-415-3856",
+        "hours": "Call to confirm intake hours",
+        "address": "1450 Elford Street, Victoria, BC V8S 3S8",
+        "lat": 48.426,
+        "lng": -123.342,
+        "url": "https://beaconcs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Our Place Society Shelter (1240 Yates St)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-265-0809",
+        "hours": "Call to confirm intake hours",
+        "address": "1240 Yates St, Victoria, BC V8V 3N3",
+        "lat": 48.424845,
+        "lng": -123.346839,
+        "url": "https://www.ourplacesociety.com/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "PHS Community Services Society Shelter (2915 Douglas Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-360-0093",
+        "hours": "Call to confirm intake hours",
+        "address": "2915 Douglas Street, Victoria, BC V8T 4M8",
+        "lat": 48.442,
+        "lng": -123.368,
+        "url": "https://www.phs.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "SOLID Outreach Society Shelter (1611 Quadra Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-891-9299",
+        "hours": "Call to confirm intake hours",
+        "address": "1611 Quadra Street, Victoria, BC V8W 2L5",
+        "lat": 48.428284,
+        "lng": -123.358529,
+        "url": "https://www.solid-outreach.org/about",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Salvation Army Shelter (525 Johnson Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "250-384-3396",
+        "hours": "Call to confirm intake hours",
+        "address": "525 Johnson Street, Victoria, BC V8W 1M2",
+        "lat": 48.428,
+        "lng": -123.37,
+        "url": "https://www.victoriaarc.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Victoria Cool Aid Society Shelter (2317 Dowler Place)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-381-2159",
+        "hours": "Call to confirm intake hours",
+        "address": "2317 Dowler Place, Victoria, BC V8T 4H5",
+        "lat": 48.435,
+        "lng": -123.361,
+        "url": "https://www.coolaid.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Victoria Cool Aid Society Shelter (535 Ellice Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "250-383-1951",
+        "hours": "Call to confirm intake hours",
+        "address": "535 Ellice Street, Victoria, BC V8T 2G8",
+        "lat": 48.439,
+        "lng": -123.372,
+        "url": "https://www.coolaid.org/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "The Victoria Cool Aid Society Shelter (809 Burdett Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women 19+ only. Call to confirm intake hours and space.",
+        "Phone": "250-480-1408",
+        "hours": "Call to confirm intake hours",
+        "address": "809 Burdett Avenue, Victoria, BC V8W 1B3",
+        "lat": 48.422,
+        "lng": -123.363,
+        "url": "https://www.coolaid.org/",
+        "source": "https://smap.bchousing.org/"
+      },
       "Victoria Women's Transition House": {
         "Desc": "24/7 emergency shelter, safety planning, and counselling for women and children fleeing domestic abuse.",
         "Phone": "250-385-6611",
@@ -135,6 +1257,46 @@
       }
     },
     "Shelters": {
+      "Kelowna Gospel Mission Society Shelter (251 Leon Avenue)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men 19+ only. Call to confirm intake hours and space.",
+        "Phone": "250-763-3737",
+        "hours": "Call to confirm intake hours",
+        "address": "251 Leon Avenue, Kelowna, BC V1Y 6J1",
+        "lat": 49.884,
+        "lng": -119.498,
+        "url": "https://kelownagospelmission.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "New Opportunities for Women (NOW) Canada Society Shelter (1069 Gordon Drive)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "778-484-9927",
+        "hours": "Call to confirm intake hours",
+        "address": "1069 Gordon Drive, Kelowna, BC V1Y 3E3",
+        "lat": 49.867,
+        "lng": -119.488,
+        "url": "https://www.nowcanada.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "New Opportunities for Women (NOW) Canada Society Shelter (2609 Richter Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women and children. Call to confirm intake hours and space.",
+        "Phone": "250-763-2262",
+        "hours": "Call to confirm intake hours",
+        "address": "2609 Richter Street, Kelowna, BC V1Y 2R3",
+        "lat": 49.866993,
+        "lng": -119.487853,
+        "url": "https://www.nowcanada.ca/",
+        "source": "https://smap.bchousing.org/"
+      },
+      "Turning Points Collaborative Society Shelter (1083 Richter Street)": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: all clients 19+. Call to confirm intake hours and space.",
+        "Phone": "778-212-1401",
+        "hours": "Call to confirm intake hours",
+        "address": "1083 Richter Street, Kelowna, BC V1Y 2K6",
+        "lat": 49.896,
+        "lng": -119.488,
+        "url": "https://turningpoints.ngo/",
+        "source": "https://smap.bchousing.org/"
+      },
       "Kelowna Women's Shelter": {
         "Desc": "24/7 emergency safe shelter, safety planning, and confidential support for women and children.",
         "Phone": "250-763-1040",

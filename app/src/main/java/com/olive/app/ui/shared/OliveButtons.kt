@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -14,6 +15,7 @@ import androidx.compose.material3.FloatingActionButtonElevation
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -457,7 +459,11 @@ internal fun LoadingSkeleton(
                 SkeletonLines(.28f, height = 10.dp)
                 SkeletonBlock(Modifier.fillMaxWidth().height(44.dp))
             }
-            SkeletonLayout.Action -> SkeletonBlock(Modifier.fillMaxWidth().height(5.dp), CircleShape)
+            SkeletonLayout.Action -> LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                color = OliveGreen,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = .22f),
+            )
             SkeletonLayout.Image, SkeletonLayout.Video -> {
                 val image = layout == SkeletonLayout.Image
                 SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(if (image) 1.25f else 16f / 9f))

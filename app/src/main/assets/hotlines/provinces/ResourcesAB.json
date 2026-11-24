@@ -47,6 +47,116 @@
       }
     },
     "Shelters": {
+      "CarePoint Wellness Centre": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "825-394-3537",
+        "hours": "Call to confirm intake hours",
+        "address": "14830 124 Avenue NW, Edmonton, AB",
+        "lat": 53.579274,
+        "lng": -113.577055,
+        "url": "https://hopemission.com/shelter/carepoint/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Hope Mission – Bruce Reith Centre": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-422-2018",
+        "hours": "Call to confirm intake hours",
+        "address": "9908 106 Avenue NW, Edmonton, AB",
+        "lat": 53.55024,
+        "lng": -113.491445,
+        "url": "https://hopemission.com/locations/edmonton/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Hope Mission – Herb Jamieson Centre": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-422-2018",
+        "hours": "Call to confirm intake hours",
+        "address": "10014 105A Avenue NW, Edmonton, AB",
+        "lat": 53.54908,
+        "lng": -113.492394,
+        "url": "https://hopemission.com/locations/edmonton/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Hope Mission – Karis Centre": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-229-3475",
+        "hours": "Call to confirm intake hours",
+        "address": "10302 107 Street NW, Edmonton, AB",
+        "lat": 53.545056,
+        "lng": -113.505274,
+        "url": "https://hopemission.com/locations/edmonton/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "NiGiNan Housing Ventures – Pimatisiwin": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "587-686-8100",
+        "hours": "Call to confirm intake hours",
+        "address": "12340 Fort Road NW, Edmonton, AB",
+        "lat": 53.580224,
+        "lng": -113.454991,
+        "url": "https://www.niginan.ca/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Operation Friendship Seniors Society – McCauley Lodge": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: older adults. Call to confirm intake and space.",
+        "Phone": "780-429-2626",
+        "hours": "Call to confirm intake hours",
+        "address": "9520 108 Avenue NW, Edmonton, AB",
+        "lat": 53.554833,
+        "lng": -113.485299,
+        "url": "https://www.ofss.org/programs/housing-facilities/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Operation Friendship Seniors Society – Sparling Lodge": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: older adults. Call to confirm intake and space.",
+        "Phone": "780-429-2626",
+        "hours": "Call to confirm intake hours",
+        "address": "9540 110A Avenue NW, Edmonton, AB",
+        "lat": 53.558994,
+        "lng": -113.488207,
+        "url": "https://www.ofss.org/programs/housing-facilities/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "The Mustard Seed – Central Seed": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-919-1735",
+        "hours": "Call to confirm intake hours",
+        "address": "9526 106 Avenue NW, Edmonton, AB",
+        "lat": 53.551345,
+        "lng": -113.483536,
+        "url": "https://theseed.ca/emergency-shelter",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "The Mustard Seed – Strathcona Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-619-9885",
+        "hours": "Call to confirm intake hours",
+        "address": "10050 81 Avenue NW, Edmonton, AB",
+        "lat": 53.517338,
+        "lng": -113.490611,
+        "url": "https://theseed.ca/emergency-shelter",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "The Salvation Army – Downtown Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-635-4486",
+        "hours": "Call to confirm intake hours",
+        "address": "9304 103A Avenue NW, Edmonton, AB",
+        "lat": 53.548776,
+        "lng": -113.477608,
+        "url": "https://www.salvationarmyedmonton.org/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Urban Manor": {
+        "Desc": "Emergency and transitional shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "780-425-5901",
+        "hours": "Call to confirm intake hours",
+        "address": "9524 104 Avenue NW, Edmonton, AB",
+        "lat": 53.548812,
+        "lng": -113.481835,
+        "url": "https://urbanmanoryeg.ca/residents/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
       "WIN House": {
         "Desc": "24/7 emergency shelter, safety planning, and outreach support for women, non-binary individuals, and children fleeing domestic violence.",
         "Phone": "780-479-0058",
@@ -169,6 +279,85 @@
       }
     },
     "Shelters": {
+      "Alpha House Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "403-234-7388",
+        "hours": "Call to confirm intake hours",
+        "address": "203 15 Avenue SE, Calgary, AB",
+        "lat": 51.03839,
+        "lng": -114.060606,
+        "url": "https://alphahousecalgary.com/how-we-help/shelter/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Calgary Drop-In & Rehab Centre": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "403-266-3600",
+        "hours": "Call to confirm intake hours",
+        "address": "1 Dermot Baldwin Way SE, Calgary, AB",
+        "lat": 51.048883,
+        "lng": -114.053023,
+        "url": "https://calgarydropin.ca/emergency-shelter/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Calgary Dream Centre": {
+        "Desc": "Transitional housing program. Contact the provider for application and eligibility requirements.",
+        "Phone": "403-243-5598",
+        "hours": "Walk-in intake Tuesday and Thursday, 8:00 AM to noon",
+        "address": "4510 Macleod Trail South, Calgary, AB T2G 0A4",
+        "lat": 51.01325,
+        "lng": -114.065393,
+        "url": "https://calgarydreamcentre.com/contact-us/"
+      },
+      "Inn From the Cold": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: families. Call to confirm intake and space.",
+        "Phone": "403-263-8384",
+        "hours": "Call to confirm intake hours",
+        "address": "110, 706 7 Avenue SW, Calgary, AB",
+        "lat": 51.047005,
+        "lng": -114.076682,
+        "url": "https://innfromthecold.org/contact/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Mustard Seed Foothills Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Call to confirm intake and space.",
+        "Phone": "403-723-9422",
+        "hours": "Call to confirm intake hours",
+        "address": "7025 44 Street SE, Calgary, AB",
+        "lat": 50.993189,
+        "lng": -113.970287,
+        "url": "https://theseed.ca/emergency-shelter",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Salvation Army Centre of Hope": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: men. Call to confirm intake and space.",
+        "Phone": "403-410-1111",
+        "hours": "Call to confirm intake hours",
+        "address": "420 9 Avenue SE, Calgary, AB",
+        "lat": 51.044478,
+        "lng": -114.054221,
+        "url": "https://salvationarmycalgary.ca/serving-the-unhoused/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "Salvation Army Women’s Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women. Call to confirm intake and space.",
+        "Phone": "403-930-2711",
+        "hours": "Call to confirm intake hours",
+        "address": "1731 29 Street SW, Calgary, AB",
+        "lat": 51.03817,
+        "lng": -114.12974,
+        "url": "https://salvationarmycalgary.ca/serving-the-unhoused/",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
+      "The Mustard Seed Women’s Shelter": {
+        "Desc": "Year-round shelter for people experiencing homelessness. Listed eligibility: women. Call to confirm intake and space.",
+        "Phone": "587-447-1345",
+        "hours": "Call to confirm intake hours",
+        "address": "110 11 Avenue SE, Calgary, AB",
+        "lat": 51.042476,
+        "lng": -114.06275,
+        "url": "https://theseed.ca/emergency-shelter",
+        "source": "https://www.alberta.ca/find-shelters"
+      },
       "FearIsNotLove Shelter": {
         "Desc": "Safe 24/7 emergency shelter and supportive housing programs for individuals and children fleeing domestic violence.",
         "Phone": "403-234-7233",

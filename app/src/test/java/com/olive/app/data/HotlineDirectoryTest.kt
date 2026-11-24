@@ -138,6 +138,24 @@ class HotlineDirectoryTest {
     }
 
     @Test
+    fun mapLocationsStayInsideTheRequestedProvinceAndCategory() {
+        val catalog = directory()
+        val albertaShelters = catalog.mapLocations(
+            region = "AB",
+            kind = HotlineResourceKind.Shelter,
+        )
+        val dropIn = albertaShelters.single { it.name == "Calgary Drop-In & Rehab Centre" }
+        assertEquals("https://calgarydropin.ca/emergency-shelter/", dropIn.website)
+        assertEquals("https://www.alberta.ca/find-shelters", dropIn.source)
+        assertTrue(albertaShelters.all {
+            it.region == "AB" && it.kind == HotlineResourceKind.Shelter && it.hasMapLocation
+        })
+        val winHouse = catalog.matching("AB", "Edmonton", kind = HotlineResourceKind.Shelter)
+            .single { it.name == "WIN House" }
+        assertFalse(winHouse.hasMapLocation)
+    }
+
+    @Test
     fun searchesIncludeNamesDescriptionsCategoriesAddressesAndPhoneNumbers() {
         val catalog = directory()
         assertTrue(catalog.matching("QC", "Montreal", "violence conjugale").isNotEmpty())

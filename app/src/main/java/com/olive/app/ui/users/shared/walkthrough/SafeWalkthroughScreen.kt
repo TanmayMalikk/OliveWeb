@@ -291,10 +291,10 @@ internal fun nextWalkthroughTopicIndex(currentIndex: Int, totalTopics: Int, delt
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SafeWalkthroughScreen(session: SessionViewModel) {
+internal fun SafeWalkthroughScreen(session: SessionViewModel, initialTopicId: String? = null) {
     val topics = remember(session.accountRole) { walkthroughTopicsForRole(session.accountRole) }
     var selectedTopicId by rememberSaveable(session.accountRole) {
-        mutableStateOfSafeTopicId(topics.first().id)
+        mutableStateOfSafeTopicId(topics.firstOrNull { it.id == initialTopicId }?.id ?: topics.first().id)
     }
     val selectedIndex = topics.indexOfFirst { it.id == selectedTopicId }.takeIf { it >= 0 } ?: 0
     val activeTopic = topics[selectedIndex]

@@ -255,8 +255,11 @@ internal fun LocationMapScreen(session: SessionViewModel, controller: LocationMa
     val savedIds = remember(directory, uid, savedVersion) {
         SavedHotlineStore.savedIds(context, uid, directory?.resources.orEmpty())
     }
-    val directoryPlaces = remember(directory, origin?.latitude, origin?.longitude) {
-        val mapped = directory?.mapLocations().orEmpty()
+    val directoryRegion = remember(directory, profile.address) {
+        directory?.regionFor(profile.address)
+    }
+    val directoryPlaces = remember(directory, directoryRegion, origin?.latitude, origin?.longitude) {
+        val mapped = directoryRegion?.let { directory?.mapLocations(region = it) }.orEmpty()
         if (origin == null) mapped
         else mapped.sortedBy {
             supportDistanceMeters(origin.latitude, origin.longitude, it.latitude!!, it.longitude!!)

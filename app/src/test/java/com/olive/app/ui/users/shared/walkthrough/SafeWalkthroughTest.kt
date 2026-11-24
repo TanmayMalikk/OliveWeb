@@ -39,6 +39,29 @@ class SafeWalkthroughTest {
     }
 
     @Test
+    fun firstVisitTopicsMatchThePageAndAccountRole() {
+        assertEquals(
+            listOf("cover_entry", "quick_exit"),
+            walkthroughTopicsForPage(AccountRole.USER, SafePage.Settings).map { it.id },
+        )
+        assertEquals(
+            listOf("documents_ocr", "emergency_report"),
+            walkthroughTopicsForPage(AccountRole.USER, SafePage.Documents).map { it.id },
+        )
+        assertEquals(
+            listOf("documents_ocr"),
+            walkthroughTopicsForPage(AccountRole.SAFE_CONTACT, SafePage.Documents).map { it.id },
+        )
+        assertEquals(
+            listOf("hotlines_contacts"),
+            walkthroughTopicsForPage(AccountRole.USER, SafePage.Contacts).map { it.id },
+        )
+        assertTrue(walkthroughTopicsForPage(AccountRole.SAFE_CONTACT, SafePage.Hotlines).isEmpty())
+        assertTrue(walkthroughTopicsForPage(AccountRole.USER, SafePage.Home).isEmpty())
+        assertTrue(walkthroughTopicsForPage(AccountRole.ADMIN, SafePage.Documents).isEmpty())
+    }
+
+    @Test
     fun stepAndTopicNavigationClampWithinValidBounds() {
         assertEquals(0, clampWalkthroughStep(-3, 3))
         assertEquals(1, clampWalkthroughStep(1, 3))

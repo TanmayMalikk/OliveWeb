@@ -172,11 +172,21 @@ class HotlineDirectory private constructor(
     /**
      * Returns directory resources that have a validated public address and coordinates for map display.
      *
+     * @param region Optional province or territory code filter.
+     * @param kind Optional service category filter.
      * @param savedIds Optional saved resource ID filter.
      * @return List of mappable directory resources.
      */
-    fun mapLocations(savedIds: Set<String>? = null): List<HotlineResource> =
-        resources.filter { it.hasMapLocation && (savedIds == null || it.id in savedIds) }
+    fun mapLocations(
+        region: String? = null,
+        kind: HotlineResourceKind? = null,
+        savedIds: Set<String>? = null,
+    ): List<HotlineResource> = resources.filter {
+        it.hasMapLocation &&
+            (region == null || it.region == region) &&
+            (kind == null || it.kind == kind) &&
+            (savedIds == null || it.id in savedIds)
+    }
 
     companion object {
         private const val DATASET_DATE = "2026-11-22"
@@ -271,6 +281,8 @@ class HotlineDirectory private constructor(
                                 }
                             }
                             val website = secureWebsite(row.getString("url"))
+                            val source = row.optString("source").trim().takeIf { it.isNotEmpty() }
+                                ?.let(::secureWebsite) ?: website
                             HotlineResource(
                                 id = listOf(
                                     region,
@@ -285,7 +297,7 @@ class HotlineDirectory private constructor(
                                 kind = kind,
                                 phone = phone,
                                 website = website,
-                                source = website,
+                                source = source,
                                 phoneUri = "tel:" + phone.filter { it.isDigit() || it == '+' },
                                 hours = hours,
                                 address = address,

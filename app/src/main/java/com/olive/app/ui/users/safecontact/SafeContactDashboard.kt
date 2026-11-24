@@ -62,7 +62,7 @@ import com.olive.app.data.account.PrivateEntryKind
  * @param exit Action or callback executed for exit.
  */
 @Composable
-internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
+internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
     val profile = session.profile ?: return
     LaunchedEffect(session.coverAccountId, session.coverUsername, session.localMode) {
         session.messages.ensureMessagingObservation()
@@ -87,7 +87,7 @@ internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
-            SafePage.Walkthrough -> SafeWalkthroughScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session, guideTopicId)
             else -> SafeContactHome(session)
         }
     }

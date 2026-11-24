@@ -296,6 +296,33 @@ class SafeSupportUiTest : OliveUiTestBase() {
         assertEquals(SafePage.SafetyPlan, session.page)
     }
 
+    @Test
+    fun firstVisitPopupCanBeDismissedOrOpenItsGuideWithoutBlockingQuickExit() {
+        val session = setup()
+        click("safe_notes")
+        waitFor("first_visit_walkthrough")
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("first_visit_dismiss").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+
+        compose.runOnIdle { session.navigation.back() }
+        waitFor("safe_notes")
+        click("safe_notes")
+        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Documents) }
+        waitFor("first_visit_open_walkthrough")
+        compose.onNodeWithTag("first_visit_open_walkthrough").assertIsDisplayed().performClick()
+        waitFor("walkthrough_active_feature")
+        val title = compose.activity.getString(R.string.walkthrough_topic_docs_title)
+        compose.onNodeWithTag("walkthrough_active_feature")
+            .assert(hasAnyDescendant(hasText(title)))
+
+        compose.runOnIdle { session.navigation.back() }
+        compose.runOnIdle { assertEquals(SafePage.Documents, session.page) }
+        compose.onNodeWithTag("first_visit_walkthrough").assertDoesNotExist()
+    }
+
     // Checks the trusted contacts open from the support menu instead of settings step with the test's sample data.
     @Test
     fun trustedContactsOpenFromTheSupportMenuInsteadOfSettings() {

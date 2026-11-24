@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
  * @param exit Action or callback executed for exit.
  */
 @Composable
-internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
+internal fun SafeArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
     val profile = session.profile ?: return
     val uid = session.coverAccountId ?: return
     val context = LocalContext.current
@@ -101,7 +101,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
             SafePage.Location -> LocationMapScreen(session)
-            SafePage.Walkthrough -> SafeWalkthroughScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session, guideTopicId)
         }
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
