@@ -14,6 +14,8 @@ import com.olive.app.ui.users.shared.safetyplan.SafeContactSafetyPlansScreen
 import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.SettingsEditor
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
+import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
+import com.olive.app.ui.users.user.documents.SharedEntryAttachmentsSection
 import com.olive.app.ui.users.user.location.LocationMapScreen
 import com.olive.app.ui.users.user.notes.PrivateNotes
 import androidx.activity.compose.BackHandler
@@ -33,6 +35,10 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -53,6 +59,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.safety.SafetyDocument
+import java.io.File
 
 
 /**
@@ -292,14 +300,32 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
 internal fun SharedEntryViewer(session: SessionViewModel) {
     val entry = session.viewedSharedEntry ?: return
     val quickExit = LocalQuickExit.current
+    val uid = session.coverAccountId
+    var openedAttachment by remember(entry.id) { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
 
-    // Immediately clear the state if the user uses the system back swipe
+    LaunchedEffect(uid, entry.id) {
+        if (uid != null && !session.localMode && entry.attachmentIds.isNotEmpty()) {
+            session.documents.load(uid, session.coverUsername, false)
+        }
+    }
+
+    // Immediately clear the opened viewer or entry state when using system back
     BackHandler {
-        session.messages.closeSharedPrivateEntry()
+        val current = openedAttachment
+        if (current != null) {
+            current.second.delete()
+            openedAttachment = null
+        } else {
+            session.messages.closeSharedPrivateEntry()
+        }
     }
 
     Dialog(
-        onDismissRequest = { session.messages.closeSharedPrivateEntry() },
+        onDismissRequest = {
+            openedAttachment?.second?.delete()
+            openedAttachment = null
+            session.messages.closeSharedPrivateEntry()
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false) // Allows full-screen
     ) {
         Surface(
@@ -307,59 +333,75 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
             color = MaterialTheme.colorScheme.background
         ) {
             Box(Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Header Toolbar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = stringResource(R.string.secure_shared_entry),
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(start = 12.dp).semantics { heading() },
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.close_shared_entry)
-                                )
+                val activeAttachment = openedAttachment
+                if (activeAttachment != null) {
+                    SafetyDocumentViewer(activeAttachment.first, activeAttachment.second) {
+                        activeAttachment.second.delete()
+                        openedAttachment = null
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Header Toolbar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.secure_shared_entry),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(start = 12.dp).semantics { heading() },
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = stringResource(R.string.close_shared_entry)
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    HorizontalDivider()
+                        HorizontalDivider()
 
-                    // Decrypted Content Payload
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = if (quickExit != null) 92.dp else 24.dp)
-                    ) {
-                        if (entry.kind == PrivateEntryKind.Incident) {
-                            SharedIncidentField(stringResource(R.string.title), entry.title)
-                            SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
-                            SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
-                            SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
-                            SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
-                        } else {
-                            Text(
-                                text = entry.title,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = entry.body,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-                            )
+                        // Decrypted Content Payload
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = if (quickExit != null) 92.dp else 24.dp)
+                        ) {
+                            if (entry.kind == PrivateEntryKind.Incident) {
+                                SharedIncidentField(stringResource(R.string.title), entry.title)
+                                SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
+                                SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
+                                SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
+                                SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
+                            } else {
+                                Text(
+                                    text = entry.title,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = entry.body,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                                )
+                            }
+                            if (entry.attachmentIds.isNotEmpty()) {
+                                SharedEntryAttachmentsSection(
+                                    attachmentIds = entry.attachmentIds,
+                                    viewerUid = uid,
+                                    controller = session.documents,
+                                    onOpenMedia = { document, file -> openedAttachment = document to file },
+                                )
+                            }
                         }
                     }
                 }

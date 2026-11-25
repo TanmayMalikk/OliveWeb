@@ -179,6 +179,10 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             device.uid,
                             recipients
                         )
+                        val recipientNames = peers.associate {
+                            it.uid to (prepared.participantUsernames[it.uid] ?: it.username)
+                        }
+                        shareEntryAttachments(entry, device.uid, recipientNames)
                         val prefix =
                             if (entry.kind == PrivateEntryKind.Incident) "SHARED_INCIDENT" else "SHARED_NOTE"
                         chat.send(
@@ -529,6 +533,10 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             withContext(Dispatchers.IO) {
                                 documents.updateMultiRecipientEntry(entry, device.uid, recipients)
                             }
+                            val recipientNames = selectedFriends
+                                .filter { it.uid != device.uid && it.username.isNotBlank() }
+                                .associate { it.uid to it.username }
+                            shareEntryAttachments(entry, device.uid, recipientNames)
                         }
                         if (epoch == token) {
                             sharedEntryRecipients = if (selectedFriends.isEmpty()) {
@@ -561,6 +569,78 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
      */
     fun invalidateConversationSharedSync() {
         lastSyncedSharedSignature = null
+    }
+
+    private suspend fun shareEntryAttachments(
+        entry: PrivateEntry,
+        callerUid: String,
+        recipientUsernames: Map<String, String>,
+    ) {
+        val attachmentIds = entry.attachmentIds.filter(String::isNotBlank).distinct()
+        if (attachmentIds.isEmpty() || recipientUsernames.isEmpty()) return
+        val docs = runtime.safetyDocumentRepository ?: return
+        withContext(Dispatchers.IO) {
+            for (attachmentId in attachmentIds) {
+                try {
+                    docs.ensureChatMediaAccess(attachmentId, callerUid, recipientUsernames)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    /**
+     * Re-syncs content and newly attached documents when a previously shared note is edited.
+     */
+    internal fun syncEditedSharedEntry(entry: PrivateEntry) {
+        with(runtime) {
+            if (localMode || entry.deletedAt != null) return
+            val device = enrollment ?: return
+            val documents = secureDocumentRepository ?: return
+            val repository = messagingRepository ?: return
+            val recipientUids = state.sharedEntryRecipients[entry.id].orEmpty()
+                .filter { it != device.uid }
+                .distinct()
+            if (recipientUids.isEmpty()) return
+            val token = epoch
+            scope.launch {
+                try {
+                    val matchedFriends = state.friends.filter { it.uid in recipientUids }
+                    if (matchedFriends.isEmpty() || epoch != token) return@launch
+                    val peers = coroutineScope {
+                        matchedFriends.map { friend ->
+                            async {
+                                repository.searchUsers(friend.username, device.uid)
+                                    .firstOrNull { it.uid == friend.uid }
+                            }
+                        }.awaitAll().filterNotNull()
+                    }
+                    val recipients = withContext(Dispatchers.Default) {
+                        buildMap {
+                            put(device.uid, KeyManager.getOrCreatePublicKey())
+                            peers.filter { it.publicKey.isNotBlank() }.forEach {
+                                put(it.uid, KeyManager.decodePublicKey(it.publicKey))
+                            }
+                        }
+                    }
+                    if (recipients.size > 1) {
+                        withContext(Dispatchers.IO) {
+                            documents.updateMultiRecipientEntry(entry, device.uid, recipients)
+                        }
+                        shareEntryAttachments(
+                            entry,
+                            device.uid,
+                            matchedFriends.associate { it.uid to it.username },
+                        )
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                }
+            }
+        }
     }
 
     /**
@@ -609,9 +689,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     val noteIds = shares
                         .filter { it.first in setOf("SHARED_NOTE", "SHARED_INCIDENT") }
                         .map { it.second }.distinct()
-                    val mediaIds = shares
-                        .filter { it.first in setOf("SHARED_MEDIA", "SHARED_VOICE") }
-                        .map { it.second }.distinct()
+                    val noteAttachmentIds = mutableListOf<String>()
                     var allParticipantsResolved = true
                     if (noteIds.isNotEmpty() && secureDocumentRepository != null) {
                         val resolvedKeys = mutableMapOf<String, PublicKey>()
@@ -635,10 +713,21 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                                             entryId, device.uid, resolvedKeys,
                                         )
                                     }
+                                    val entry = state.privateEntries.firstOrNull { it.id == entryId }
+                                        ?: state.sharedPrivateEntries.firstOrNull { it.entry.id == entryId }?.entry
+                                        ?: runCatching {
+                                            secureDocumentRepository?.loadAndDecryptEntry(entryId, device.uid)
+                                        }.getOrNull()
+                                    if (entry != null) {
+                                        noteAttachmentIds += entry.attachmentIds.filter(String::isNotBlank)
+                                    }
                                 }
                             }
                         }
                     }
+                    val mediaIds = (shares
+                        .filter { it.first in setOf("SHARED_MEDIA", "SHARED_VOICE") }
+                        .map { it.second } + noteAttachmentIds).distinct()
                     if (mediaIds.isNotEmpty() && safetyDocumentRepository != null) {
                         val recipientNames = buildMap {
                             for (uid in otherUids) {

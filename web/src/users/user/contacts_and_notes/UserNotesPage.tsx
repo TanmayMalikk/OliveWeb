@@ -9,10 +9,16 @@ import { useWalkthroughAction } from "../../shared/safe_app/WalkthroughCoachmark
 import { accounts } from "../../../services/AccountService";
 import {
   listBrowserDocuments,
+  openBrowserDocument,
   setBrowserDocumentEvidence,
   uploadBrowserDocument,
   type BrowserDocument,
 } from "../../../services/MediaService";
+import {
+  BlurredDocumentPreview,
+  NoteAttachmentPreviewGrid,
+} from "../../../components/BlurredDocumentPreview";
+import { SafeMediaViewer } from "../../shared/safe_app/SafeMediaViewer";
 import { IncidentLocationPicker } from "./IncidentLocationPicker";
 export default function Notes() {
   const s = useSession();
@@ -58,8 +64,22 @@ export default function Notes() {
   const [revisions, setRevisions] = useState<Entry | null>(null);
   const [now, setNow] = useState(Date.now());
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
+  const [viewerDocument, setViewerDocument] = useState<BrowserDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState("");
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
   const [attachmentError, setAttachmentError] = useState("");
+  useEffect(() => {
+    if (!viewerUrl) return;
+    return () => URL.revokeObjectURL(viewerUrl);
+  }, [viewerUrl]);
+  const openAttachedDocument = (mediaId: string, resolvedDoc?: BrowserDocument) =>
+    void s.perform(async () => {
+      const target = resolvedDoc ?? documents.find((item) => item.id === mediaId);
+      if (!target) throw new Error("This attachment is not available yet.");
+      const url = await openBrowserDocument(target);
+      setViewerDocument(target);
+      setViewerUrl(url);
+    });
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -172,7 +192,15 @@ export default function Notes() {
               <h2>{entry.title || "Untitled thought"}</h2>
               <p>{entry.body}</p>
               {(entry.attachmentIds?.length ?? 0) > 0 && (
-                <small>{entry.attachmentIds!.length} attached file{entry.attachmentIds!.length === 1 ? "" : "s"}</small>
+                <>
+                  <NoteAttachmentPreviewGrid
+                    attachmentIds={entry.attachmentIds}
+                    documents={documents}
+                    identity={accounts.identity}
+                    compact
+                  />
+                  <small>{entry.attachmentIds!.length} attached file{entry.attachmentIds!.length === 1 ? "" : "s"}</small>
+                </>
               )}
             </button>
             <div className="note-actions">
@@ -411,6 +439,14 @@ export default function Notes() {
                 autoFocus
               />
             </label>
+            {(editing.attachmentIds?.length ?? 0) > 0 && (
+              <NoteAttachmentPreviewGrid
+                attachmentIds={editing.attachmentIds}
+                documents={documents}
+                identity={accounts.identity}
+                onOpen={openAttachedDocument}
+              />
+            )}
             <details>
               <summary className="button outline">Add attachment</summary>
               <div className="attachment-picker">
@@ -458,17 +494,38 @@ export default function Notes() {
                   />
                 )}
                 {attachmentError && <small className="error" role="alert">{attachmentError}</small>}
-                {documents.map((document) => (
-                  <label key={document.id}>
-                    <input
-                      type="checkbox"
-                      name="attachments"
-                      value={document.id}
-                      defaultChecked={(editing.attachmentIds ?? []).includes(document.id)}
-                    />
-                    {document.name}{document.evidence ? " · Evidence" : ""}
-                  </label>
-                ))}
+                <div className="attachment-storage-grid">
+                  {documents.map((document) => {
+                    const checked = (editing.attachmentIds ?? []).includes(document.id);
+                    return (
+                      <label className={`attachment-storage-card ${checked ? "selected" : ""}`} key={document.id}>
+                        <BlurredDocumentPreview
+                          document={document}
+                          identity={accounts.identity}
+                          showEvidenceBadge
+                        />
+                        <span className="attachment-storage-meta">
+                          <input
+                            type="checkbox"
+                            name="attachments"
+                            value={document.id}
+                            checked={checked}
+                            onChange={(event) => {
+                              const nextChecked = event.target.checked;
+                              setEditing((current) => current && ({
+                                ...current,
+                                attachmentIds: nextChecked
+                                  ? [...new Set([...(current.attachmentIds ?? []), document.id])]
+                                  : (current.attachmentIds ?? []).filter((id) => id !== document.id),
+                              }));
+                            }}
+                          />
+                          <span>{document.name}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </details>
             {editing.kind === "Incident" && (
@@ -504,6 +561,16 @@ export default function Notes() {
             <p>No edits have been recorded.</p>
           )}
         </Modal>
+      )}
+      {viewerDocument && viewerUrl && (
+        <SafeMediaViewer
+          document={viewerDocument}
+          url={viewerUrl}
+          onClose={() => {
+            setViewerDocument(null);
+            setViewerUrl("");
+          }}
+        />
       )}
     </>
   );

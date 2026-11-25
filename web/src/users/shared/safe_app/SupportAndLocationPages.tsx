@@ -2,7 +2,6 @@
 import { FadedMap } from "../FadedMap";
 import { useEffect, useState } from "react";
 import {
-  FileLock2,
   LocateFixed,
   MapPin,
   RefreshCw,
@@ -28,6 +27,7 @@ import {
   subscribeConversations,
 } from "../../../services/MessagingService";
 import { SafeMediaViewer } from "./SafeMediaViewer";
+import { BlurredDocumentPreview } from "../../../components/BlurredDocumentPreview";
 
 // Sends a signed-in support request to the protected Cloud Function.
 async function callable<T>(name: string, data: unknown): Promise<T> {
@@ -367,8 +367,20 @@ export function DocumentsPage() {
         <div className="document-grid">
           {documents.map((document) => (
             <article className="panel browser-document" key={document.id}>
-              <FileLock2 size={22} />
-              <div>
+              <button
+                type="button"
+                className="browser-document-preview-button"
+                disabled={!document.approved || session.busy}
+                onClick={() => open(document)}
+                aria-label={`Preview ${document.name}`}
+              >
+                <BlurredDocumentPreview
+                  document={document}
+                  identity={accounts.identity}
+                  showEvidenceBadge
+                />
+              </button>
+              <div className="browser-document-info">
                 <h3>{document.name}</h3>
                 <p>
                   {document.approved

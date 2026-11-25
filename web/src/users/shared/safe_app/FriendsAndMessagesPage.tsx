@@ -16,12 +16,18 @@ import { accounts, cloudMode } from "../../../services/AccountService";
 import * as messaging from "../../../services/MessagingService";
 import {
   listBrowserDocuments,
+  loadBrowserDocumentById,
   openBrowserDocument,
   type BrowserDocument,
 } from "../../../services/MediaService";
+import { loadSharedPrivateEntry } from "../../../services/SharedPrivateEntryService";
 import type { Entry } from "../../../domain/DomainModels";
 import { VoiceMessageBubble, VoiceMessageComposer } from "./VoiceMessages";
 import { SafeMediaViewer } from "./SafeMediaViewer";
+import {
+  BlurredDocumentPreview,
+  NoteAttachmentPreviewGrid,
+} from "../../../components/BlurredDocumentPreview";
 import { sharedMessage } from "./SharedMessageContent";
 import { useChatDeviceKey, useChatTimeline, useMembershipHistory } from "../useChatTimeline";
 import { useWalkthroughAction } from "./WalkthroughCoachmark";
@@ -208,23 +214,33 @@ export default function Messages() {
   // Runs a messaging request through the shared busy and error handling.
   const action = (work: () => Promise<void>) => session.perform(work);
   // Opens a shared encrypted file with the same in-app viewer used by the Documents page.
-  const openMedia = (id: string) =>
+  const openMedia = (id: string, preloaded?: BrowserDocument) =>
     void action(async () => {
-      const document = (await listBrowserDocuments(identity)).find((item) => item.id === id);
+      const document =
+        preloaded ??
+        await loadBrowserDocumentById(identity, id).catch(() => null) ??
+        (await listBrowserDocuments(identity)).find((item) => item.id === id);
       if (!document)
         throw new Error("This shared file is not available to this account.");
       const url = await openBrowserDocument(document);
       setViewerDocument(document);
       setViewerUrl(url);
     });
-  // Opens an incident or note saved in this account instead of exposing its internal message code.
+  // Opens an incident or note owned by this account or shared through Firestore `privateEntries`.
   const openEntry = (id: string) => {
-    const entry = session.history.private_entries.find((item) => item.id === id);
-    if (entry) setViewerEntry(entry);
-    else
-      setFeedback(
-        "This protected record is not stored on this web account yet. Open it once in the updated Android app.",
-      );
+    const localEntry = session.history.private_entries.find((item) => item.id === id);
+    if (localEntry) {
+      setViewerEntry(localEntry);
+      return;
+    }
+    void action(async () => {
+      const sharedEntry = await loadSharedPrivateEntry(id, identity);
+      if (sharedEntry) setViewerEntry(sharedEntry);
+      else
+        setFeedback(
+          "This protected record could not be opened on this device yet.",
+        );
+    });
   };
   const tabConversations = conversations.filter((item) => (item.type === "SUPPORT") === (chatTab === "tickets"));
   const activeConversations = tabConversations.filter((item) => !item.closedAt);
@@ -412,7 +428,7 @@ export default function Messages() {
                     ) : shared ? (
                       <button
                         type="button"
-                        className="shared-message-card"
+                        className={`shared-message-card ${shared.kind === "media" ? "with-preview" : ""}`}
                         onClick={() => {
                           if (shared.kind === "media") openMedia(shared.id);
                           else if (shared.kind === "incident" || shared.kind === "note") openEntry(shared.id);
@@ -420,12 +436,31 @@ export default function Messages() {
                           else session.setPage("Location");
                         }}
                       >
-                        {icon}
-                        <span>
-                          <small>{shared.kind.replace("-", " ")}</small>
-                          <strong>{shared.title}</strong>
-                          <span>Open securely</span>
-                        </span>
+                        {shared.kind === "media" && (
+                          <BlurredDocumentPreview
+                            documentId={shared.id}
+                            identity={identity}
+                            className="shared-message-preview"
+                          />
+                        )}
+                        <div className="shared-message-row">
+                          {icon}
+                          <span>
+                            <small>{shared.kind.replace("-", " ")}</small>
+                            <strong>{shared.title}</strong>
+                            <span>Open securely</span>
+                          </span>
+                        </div>
+                        {(shared.kind === "note" || shared.kind === "incident") && (() => {
+                          const linked = session.history.private_entries.find((e) => e.id === shared.id);
+                          return linked?.attachmentIds?.length ? (
+                            <NoteAttachmentPreviewGrid
+                              attachmentIds={linked.attachmentIds}
+                              identity={identity}
+                              compact
+                            />
+                          ) : null;
+                        })()}
                       </button>
                     ) : (
                       <p>{message.deleted ? "Message unsent" : message.body}</p>
@@ -536,11 +571,16 @@ export default function Messages() {
             {viewerEntry.incidentTime && <p><strong>Approximate time:</strong> {viewerEntry.incidentTime}</p>}
             {viewerEntry.incidentLocation && <p><strong>Location:</strong> {viewerEntry.incidentLocation}</p>}
             <p className="shared-entry-body">{viewerEntry.body}</p>
-            {viewerEntry.attachmentIds?.map((id) => (
-              <Button key={id} variant="outline" onClick={() => openMedia(id)}>
-                <FileLock2 size={16} /> Open attached evidence
-              </Button>
-            ))}
+            {(viewerEntry.attachmentIds?.length ?? 0) > 0 && (
+              <>
+                <h3>Attachments ({viewerEntry.attachmentIds!.length})</h3>
+                <NoteAttachmentPreviewGrid
+                  attachmentIds={viewerEntry.attachmentIds}
+                  identity={identity}
+                  onOpen={(id, doc) => openMedia(id, doc)}
+                />
+              </>
+            )}
           </article>
         </Modal>
       )}

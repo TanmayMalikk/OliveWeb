@@ -349,6 +349,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                             )
                     }
                     history.queueHistorySync()
+                    secureSharing.syncEditedSharedEntry(entry)
                 }
             }
         }
@@ -470,6 +471,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                         onSaved?.invoke()
                     }
                     history.queueHistorySync()
+                    if (entry.deletedAt == null) secureSharing.syncEditedSharedEntry(entry)
                 }
             }
         }

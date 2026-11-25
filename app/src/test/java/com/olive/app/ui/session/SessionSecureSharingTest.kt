@@ -309,4 +309,34 @@ class SessionSecureSharingTest {
         }
     }
 
+    @Test
+    fun sharingNoteAlsoGrantsRecipientAccessToAttachedDocuments() = runBlocking<Unit> {
+        val documents = mock(SafetyDocumentDataSource::class.java)
+        SessionRuntimeFixture(documents = documents).use { f ->
+            prepare(f)
+            val entry = PrivateEntry(
+                id = "note-with-media",
+                kind = PrivateEntryKind.Note,
+                title = "Evidence note",
+                body = "Notes with attachments",
+                attachmentIds = listOf("media-1", "media-2"),
+            )
+            f.runtime.secureSharing.share(entry)
+            f.await { !f.runtime.state.messagingBusy }
+            verify(documents).ensureChatMediaAccess("media-1", "owner", mapOf("friend" to "friend_fixture"))
+            verify(documents).ensureChatMediaAccess("media-2", "owner", mapOf("friend" to "friend_fixture"))
+
+            clearInvocations(documents)
+            val secondFriend = Friend("friendship-2", "ally", "ally_user")
+            val allyPeer = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+            `when`(f.messaging.searchUsers("ally_user", "owner")).thenReturn(
+                listOf(DirectoryUser("ally", "ally_user", Base64.getEncoder().encodeToString(allyPeer.public.encoded))),
+            )
+            f.runtime.secureSharing.shareWithFriends(entry, listOf(secondFriend))
+            f.await { !f.runtime.state.busy }
+            verify(documents).ensureChatMediaAccess("media-1", "owner", mapOf("ally" to "ally_user"))
+            verify(documents).ensureChatMediaAccess("media-2", "owner", mapOf("ally" to "ally_user"))
+        }
+    }
+
 }

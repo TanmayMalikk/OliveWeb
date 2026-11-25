@@ -4,7 +4,7 @@ import {
   roleConversationsForInbox,
   visibleCategoriesForRole,
 } from "./OrganizationSupportModel";
-import { filterAndSortLocations } from "./OrganizationLiveMapModel";
+import { filterAndSortLocations, toLocationFeatureCollection } from "./OrganizationLiveMapModel";
 import type { AdminLiveLocation } from "../../services/EmergencyResponseService";
 
 describe("OrganizationSupportModel", () => {
@@ -55,5 +55,29 @@ describe("OrganizationLiveMapModel", () => {
   it("filters by search text and live status", () => {
     expect(filterAndSortLocations(sampleLocations, "jor", "live").map((p) => p.uid)).toEqual(["u2"]);
     expect(filterAndSortLocations(sampleLocations, "", "last-known").map((p) => p.uid)).toEqual(["u1"]);
+  });
+
+  it("builds GeoJSON Point features with [longitude, latitude] and selected flags", () => {
+    const invalid: AdminLiveLocation = {
+      uid: "u4",
+      name: "Broken",
+      latitude: Number.NaN,
+      longitude: -113.5,
+      accuracy: null,
+      updatedAt: 500,
+      active: false,
+    };
+    const collection = toLocationFeatureCollection(
+      [sampleLocations.u2, sampleLocations.u1, invalid],
+      "u2",
+    );
+    expect(collection.type).toBe("FeatureCollection");
+    expect(collection.features).toHaveLength(2);
+    expect(collection.features[0]).toEqual({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-113.5, 53.55] },
+      properties: { uid: "u2", name: "Jordan", active: true, selected: true, updatedAt: 900 },
+    });
+    expect(collection.features[1].properties.selected).toBe(false);
   });
 });

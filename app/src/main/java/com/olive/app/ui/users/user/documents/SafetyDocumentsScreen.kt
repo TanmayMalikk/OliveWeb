@@ -12,9 +12,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -43,7 +46,6 @@ import com.olive.app.data.safety.SafetyDocument
 import java.io.File
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
-import com.olive.app.data.account.SafeContact
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.messaging.Friend
@@ -79,7 +81,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             wtUploadOpen = false
         }
     }
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     var lastFilter by remember { mutableStateOf(filter) }
     LaunchedEffect(filter) {
         if (filter != lastFilter) {
@@ -213,15 +215,21 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 )
             }
         }
-        LazyColumn(
-            Modifier.weight(1f).fillMaxWidth().oliveScrollbar(listState),
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.weight(1f).fillMaxWidth().oliveScrollbar(listState),
             state = listState,
             contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (state.loading) item(key = "loading_documents") { LoadingSkeleton(SkeletonLayout.Documents) }
-            if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
-            items(uploads, key = { "upload_${it.jobId}" }) { upload ->
+            if (state.loading) item(key = "loading_documents", span = { GridItemSpan(maxLineSpan) }) {
+                LoadingSkeleton(SkeletonLayout.Documents)
+            }
+            if (preparing) item(key = "preparing_upload", span = { GridItemSpan(maxLineSpan) }) {
+                PreparingUploadCard()
+            }
+            gridItems(uploads, key = { "upload_${it.jobId}" }, span = { GridItemSpan(maxLineSpan) }) { upload ->
                 PendingUploadCard(
                     upload = upload,
                     onOpen = {
@@ -232,20 +240,29 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                     onRetry = { mediaController?.retryUpload(upload.jobId) }
                 )
             }
-            items(shown, key = { it.id }) { file ->
-                SafetyDocumentCard(file, uid, session.messages.friends,
+            gridItems(shown, key = { it.id }) { file ->
+                LaunchedEffect(file.id, file.objectKey) { controller.requestPreview(file) }
+                SafetyDocumentCard(
+                    file = file,
+                    currentUid = uid,
+                    friends = session.messages.friends,
+                    onOpen = {
+                        controller.download(file) { resolved, local ->
+                            opened = resolved to local
+                        }
+                    },
                     offline = mediaController?.offlineCopies?.get(file.id)
                         ?: OfflineMediaAvailability.NOT_CACHED,
-                    onOpen = {
-                    controller.download(file) { resolved, local ->
-                        opened = resolved to local
-                    }
-                }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
+                    onShare = { sharing = file },
+                    onDelete = { controller.delete(file, uid) },
                     onMakeOffline = { controller.makeAvailableOffline(file) },
                     onRemoveOffline = { controller.removeOfflineCopy(file) },
                     opening = file.id in state.openingDocumentIds,
                     evidenceUpdating = file.id in state.evidenceUpdates,
-                    onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) })
+                    onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) },
+                    preview = controller.previewFor(file.id),
+                    previewLoading = controller.isPreviewLoading(file.id),
+                )
             }
         }
     }
@@ -362,6 +379,11 @@ internal fun SafetyDocumentUploadFlow(
                 )
                 if (showOliveStorage) {
                     val ownerUid = session.coverAccountId
+                    LaunchedEffect(showOliveStorage, ownerUid) {
+                        if (ownerUid != null && !session.localMode && controller.state.files.isEmpty()) {
+                            controller.load(ownerUid, session.coverUsername, false)
+                        }
+                    }
                     val available = controller.state.files.filter { it.ownerUid == ownerUid }
                     if (available.isEmpty()) {
                         Text(
@@ -370,25 +392,14 @@ internal fun SafetyDocumentUploadFlow(
                             modifier = Modifier.padding(vertical = 16.dp),
                         )
                     } else {
-                        LazyColumn(
-                            Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(available, key = SafetyDocument::id) { document ->
-                                OutlinedButton(
-                                    onClick = {
-                                        onSelectExisting?.invoke(document)
-                                        onDismiss()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                        .testTag("olive_storage_${document.id}"),
-                                ) {
-                                    Icon(Icons.Outlined.Attachment, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(document.name, modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
+                        OliveStoragePreviewGrid(
+                            documents = available,
+                            controller = controller,
+                            onSelect = { document ->
+                                onSelectExisting?.invoke(document)
+                                onDismiss()
+                            },
+                        )
                     }
                     TextButton(
                         onClick = { showOliveStorage = false },
@@ -598,53 +609,66 @@ internal fun SafetyDocumentCard(
     opening: Boolean,
     evidenceUpdating: Boolean,
     onEvidenceChange: (Boolean) -> Unit,
+    preview: DocumentPreview? = null,
+    previewLoading: Boolean = false,
 ) {
     val own = file.ownerUid == currentUid
     val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
+    val isAudio = pickerMediaKind(file.mimeType) == MediaKind.AUDIO
+    val cached = offline in setOf(
+        OfflineMediaAvailability.AVAILABLE,
+        OfflineMediaAvailability.REVALIDATION_REQUIRED,
+    )
     OutlinedCard(Modifier.fillMaxWidth().testTag("document_${file.id}")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    when {
-                        file.mimeType.startsWith("image/") -> Icons.Outlined.Image
-                        file.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
-                        else -> Icons.Outlined.Description
-                    }, null,
-                    Modifier.size(30.dp), tint = OliveGreen
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BlurredDocumentPreviewSurface(
+                document = file,
+                preview = preview,
+                loading = previewLoading,
+                offlineCached = cached,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.15f)
+                    .then(if (!isAudio && !opening) Modifier.clickable(onClick = onOpen) else Modifier),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    file.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Column(Modifier.weight(1f)) {
-                    Text(file.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                Text(
+                    if (own) stringResource(R.string.documents_yours) else stringResource(
+                        R.string.documents_shared_by,
+                        owner ?: stringResource(R.string.safe_contact_shared_user)
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Muted,
+                )
+                file.ocrConfidence?.let { confidence ->
                     Text(
-                        if (own) stringResource(R.string.documents_yours) else stringResource(
-                            R.string.documents_shared_by,
-                            owner ?: stringResource(R.string.safe_contact_shared_user)
+                        stringResource(
+                            R.string.camera_ocr_confidence,
+                            (confidence * 100).toInt()
                         ),
-                        style = MaterialTheme.typography.bodySmall, color = Muted
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Muted,
                     )
-                    file.ocrConfidence?.let { confidence ->
-                        Text(
-                            stringResource(
-                                R.string.camera_ocr_confidence,
-                                (confidence * 100).toInt()
-                            ),
-                            style = MaterialTheme.typography.bodySmall, color = Muted
-                        )
-                    }
                 }
             }
             file.ocrText?.takeIf { it.isNotBlank() }?.let { text ->
                 Text(
-                    text, style = MaterialTheme.typography.bodySmall, maxLines = 3,
-                    modifier = Modifier.testTag("document_ocr_${file.id}")
+                    text,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("document_ocr_${file.id}"),
                 )
             }
             // Only the owner may change evidence status; shared viewers do not see this action.
             if (own) Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("document_evidence_${file.id}")
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("document_evidence_${file.id}")
                     .toggleable(
                         value = file.evidence,
                         enabled = !evidenceUpdating,
@@ -657,82 +681,85 @@ internal fun SafetyDocumentCard(
                     checked = file.evidence,
                     onCheckedChange = null,
                     enabled = !evidenceUpdating,
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(40.dp),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.labelLarge)
                     Text(
                         stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         color = Muted,
                     )
                 }
-                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (pickerMediaKind(file.mimeType) != MediaKind.AUDIO) Button(
-                    onClick = onOpen,
-                    enabled = !opening,
-                    modifier = Modifier.weight(1f).testTag("document_open_${file.id}"),
-                ) {
-                    if (opening) SecureFileOpeningIndicator()
-                    else {
-                        Icon(Icons.Outlined.Visibility, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.open))
-                    }
-                }
-                // Owners can share the document; recipients only get the open action.
-                if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Outlined.Share,
-                        null
-                    )
+            if (!isAudio) Button(
+                onClick = onOpen,
+                enabled = !opening,
+                modifier = Modifier.fillMaxWidth().testTag("document_open_${file.id}"),
+            ) {
+                if (opening) SecureFileOpeningIndicator()
+                else {
+                    Icon(Icons.Outlined.Visibility, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.share))
+                    Text(stringResource(R.string.open), maxLines = 1)
                 }
-                if (own) IconButton(onClick = onDelete) {
+            }
+            // Owners can share the document; recipients only get the open action.
+            if (own) Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.Share, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.share), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Outlined.Delete,
-                        stringResource(R.string.remove)
+                        stringResource(R.string.remove),
                     )
                 }
             }
             if (file.objectKey.isNotBlank()) {
-                val cached = offline in setOf(
-                    OfflineMediaAvailability.AVAILABLE,
-                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
-                )
                 OutlinedButton(
                     onClick = if (cached) onRemoveOffline else onMakeOffline,
                     enabled = offline != OfflineMediaAvailability.SAVING,
                     modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
                 ) {
-                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(when {
-                        offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
-                        cached -> R.string.documents_remove_offline_copy
-                        else -> R.string.documents_make_available_offline
-                    }))
+                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        stringResource(when {
+                            offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                            cached -> R.string.documents_remove_offline_copy
+                            else -> R.string.documents_make_available_offline
+                        }),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 when (offline) {
                     OfflineMediaAvailability.REVALIDATION_REQUIRED,
                     OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> Text(
                         stringResource(R.string.documents_offline_revalidation_required),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                     OfflineMediaAvailability.AVAILABLE -> Text(
                         stringResource(R.string.documents_available_offline),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = OliveGreen,
                     )
                     OfflineMediaAvailability.RECENT_AVAILABLE -> Text(
                         stringResource(R.string.documents_recently_cached),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = Muted,
                     )
                     else -> Unit
@@ -740,73 +767,4 @@ internal fun SafetyDocumentCard(
             }
         }
     }
-}
-/**
- * Lets the user choose which trusted contacts may open a document.
- *
- * @param file Local file to read, hash, process, or write.
- * @param currentUid Current user ID supplied to [DocumentSharingDialog].
- * @param friends List of friend records.
- * @param contacts Collection of contact records.
- * @param onDismiss Callback invoked when the dialog or sheet is dismissed.
- * @param onSave Callback invoked when save changes or occurs.
- */
-@Composable
-internal fun DocumentSharingDialog(
-    file: SafetyDocument,
-    currentUid: String,
-    friends: List<Friend>,
-    contacts: List<SafeContact>,
-    onDismiss: () -> Unit,
-    onSave: (Map<String, String>) -> Unit
-) {
-    var selected by remember(file.id) {
-        mutableStateOf(file.allowedUsers.filterNot { it == currentUid }.toSet())
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.documents_share_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.documents_share_help),
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (friends.isEmpty()) Text(
-                    stringResource(R.string.location_no_friends),
-                    color = Muted
-                )
-                friends.forEach { friend ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val trusted = contacts.firstOrNull { it.linkedUid == friend.uid }
-                        Checkbox(
-                            friend.uid in selected,
-                            { checked ->
-                                selected =
-                                    if (checked) selected + friend.uid else selected - friend.uid
-                            },
-                            enabled = friend.uid in selected || selected.size < 10
-                        )
-                        Column {
-                            Text(trusted?.name ?: friend.username)
-                            if (trusted != null) Text(
-                                "@${friend.username}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Muted
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val namedRecipients = friends.filter { it.uid in selected }.associate { it.uid to it.username }
-                val existingHiddenRecipients = selected
-                    .filter { it in file.allowedUsers && it !in namedRecipients }
-                    .associateWith { "" }
-                onSave(existingHiddenRecipients + namedRecipients)
-            }) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }
