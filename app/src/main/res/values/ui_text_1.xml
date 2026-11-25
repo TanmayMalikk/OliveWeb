@@ -24,7 +24,7 @@
     <string name="ui_profile_information">Profile information</string>
     <string name="ui_email">Email</string>
     <string name="ui_login_email_optional">Login email (optional)</string>
-    <string name="ui_login_email_creation_help">If left blank, the login is username@yourolivebranch.ca. It cannot be changed after the account is created.</string>
+    <string name="ui_login_email_creation_help">Use any valid email address, or leave this blank for username sign-in. The login email is set when the account is created.</string>
     <string name="ui_phone_optional">Phone (optional)</string>
     <string name="ui_users">Users</string>
     <string name="ui_safe_contacts">Safe Contacts</string>

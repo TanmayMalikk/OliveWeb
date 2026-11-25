@@ -32,6 +32,27 @@ test("admins create organization accounts with aliases and roll back failed prof
   f.setCaller({uid: "user", role: "USER"});
   await assert.rejects(api.adminCreateAccount({data}), {code: "permission-denied"});
 });
+test("managed accounts accept external login emails or a username-only login", async () => {
+  const f = fixture(), api = f.load("adminAccounts");
+  f.setCaller({uid: "admin", role: "ADMIN"});
+  const custom = await api.adminCreateAccount({
+    data: {...data, username: "external_admin", role: "ADMIN", email: " Team+Olive@Example.com "},
+  });
+  assert.equal(custom.email, "team+olive@example.com");
+  assert.equal(f.users.get(custom.uid).customClaims.role, "ADMIN");
+
+  const usernameOnly = await api.adminCreateAccount({
+    data: {...data, username: "username_staff", role: "STAFF"},
+  });
+  assert.equal(usernameOnly.email, "username_staff@staff.olive.invalid");
+  assert.equal(f.profiles.get(usernameOnly.uid).email, "");
+  assert.equal(f.records.get("accountDirectory/username_staff").loginAlias, usernameOnly.email);
+
+  await assert.rejects(api.adminCreateAccount({
+    data: {...data, username: "invalid_admin", role: "ADMIN", email: "without-a-domain"},
+  }), {code: "invalid-argument"});
+});
+
 test("admin summaries and workloads count active and completed tickets without downloading profile files", async () => {
   const f = fixture(), api = f.load("adminAccounts"); f.setCaller({uid: "admin", role: "ADMIN"});
   for (const [uid, role] of [["admin", "ADMIN"], ["staff", "STAFF"], ["user", "USER"]]) {

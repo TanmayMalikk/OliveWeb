@@ -1,7 +1,7 @@
 // Admins: lets admins list and manage organization accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
-const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, isTemporaryEmail, profileComplete, defaultProfile, roleFromUser} = require("./accountPolicy");
+const {text, normalizedUsername, normalizedRole, validEmail, validPassword, signInEmail, isTemporaryEmail, profileComplete, defaultProfile, roleFromUser} = require("./accountPolicy");
 const {writeProfile, saveOrganizationLogin, requireAdmin, usernameExistsGlobally, listEveryUser} = require("./accountStorage");
 
 // Reads a Firestore aggregate so dashboard totals never download the matching documents.
@@ -74,7 +74,7 @@ exports.adminListAccounts = onCall(async (request) => {
       username: text(value.username, 24).toLowerCase(),
       role,
       fullName: text(value.fullName, 120),
-      email: text(value.contactEmail || value.loginAlias, 254),
+      email: text(value.contactEmail || (isTemporaryEmail(value.loginAlias) ? "" : value.loginAlias), 254),
       phone: text(value.phone, 40),
       profileComplete: value.profileComplete === true,
       protected: value.uid === request.auth.uid || value.protected === true,
@@ -98,6 +98,9 @@ exports.adminCreateAccount = onCall(async (request) => {
   if (!validPassword(password, username)) throw new HttpsError("invalid-argument", "Temporary password must use 8–24 characters with a letter, number, and special character and must not contain the username.");
   // An admin may choose an organization login alias only while creating the account.
   const requestedAlias = role === "STAFF" || role === "ADMIN" ? text(input.email, 254) : "";
+  if (requestedAlias && !validEmail(requestedAlias)) {
+    throw new HttpsError("invalid-argument", "Enter a valid email address.");
+  }
   const authEmail = signInEmail(username, role, requestedAlias);
   const profileEmail = requestedAlias ? authEmail : "";
   const directory = db.collection("accountDirectory").doc(username);

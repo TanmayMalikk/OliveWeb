@@ -24,7 +24,7 @@
     <string name="ui_profile_information">معلومات الملف الشخصي</string>
     <string name="ui_email">البريد الإلكتروني</string>
     <string name="ui_login_email_optional">بريد تسجيل الدخول (اختياري)</string>
-    <string name="ui_login_email_creation_help">إذا تُرك فارغًا، فسيكون تسجيل الدخول username@yourolivebranch.ca. لا يمكن تغييره بعد إنشاء الحساب.</string>
+    <string name="ui_login_email_creation_help">استخدم أي عنوان بريد إلكتروني صالح، أو اترك الحقل فارغًا لتسجيل الدخول باسم المستخدم. يُحدد بريد تسجيل الدخول عند إنشاء الحساب.</string>
     <string name="ui_phone_optional">الهاتف (اختياري)</string>
     <string name="ui_users">المستخدمين</string>
     <string name="ui_safe_contacts">اتصالات آمنة</string>

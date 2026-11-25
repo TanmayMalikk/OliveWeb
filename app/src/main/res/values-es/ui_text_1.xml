@@ -24,7 +24,7 @@
     <string name="ui_profile_information">Información de perfil</string>
     <string name="ui_email">Correo electrónico</string>
     <string name="ui_login_email_optional">Correo de inicio de sesión (opcional)</string>
-    <string name="ui_login_email_creation_help">Si se deja vacío, el inicio de sesión será usuario@yourolivebranch.ca. No se puede cambiar después de crear la cuenta.</string>
+    <string name="ui_login_email_creation_help">Usa cualquier dirección de correo válida o deja este campo vacío para iniciar sesión con el nombre de usuario. El correo de inicio de sesión se establece al crear la cuenta.</string>
     <string name="ui_phone_optional">Teléfono (opcional)</string>
     <string name="ui_users">Usuarios</string>
     <string name="ui_safe_contacts">Contactos seguros</string>

@@ -1,7 +1,7 @@
 // Admins: creates and updates staff and admin accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db} = require("./firebaseAdminClient");
-const {text, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, defaultProfile, profileComplete} = require("./accountPolicy");
+const {text, normalizedExistingUsername, normalizedRole, validEmail, organizationEmailKey, roleFromUser, defaultProfile, profileComplete} = require("./accountPolicy");
 const {readProfile, writeProfile, saveOrganizationLogin, lockedOrganizationAlias, deleteOrganizationLogin} = require("./accountStorage");
 
 exports.completeOrganizationProfile = onCall(async (request) => {
@@ -14,7 +14,7 @@ exports.completeOrganizationProfile = onCall(async (request) => {
   const dob = text(request.data?.dob, 10);
   const phone = text(request.data?.phone, 40);
   const email = text(request.data?.email, 254).toLowerCase();
-  if (!fullName || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isTemporaryEmail(email)) throw new HttpsError("invalid-argument", "Full name, date of birth, and a real contact email are required.");
+  if (!fullName || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || !validEmail(email)) throw new HttpsError("invalid-argument", "Full name, date of birth, and a real contact email are required.");
   // Profile setup may change contact details, but it never changes the protected login alias.
   await auth.updateUser(user.uid, {displayName: current?.username || user.displayName});
   await auth.setCustomUserClaims(user.uid, {...user.customClaims, role});
@@ -47,7 +47,7 @@ exports.resolveOrganizationLogin = onCall(async (request) => {
     return {authEmail: await lockedOrganizationAlias(value.uid, username, role)};
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
-    throw new HttpsError("invalid-argument", "Enter a valid organization email or username.");
+    throw new HttpsError("invalid-argument", "Enter a valid email address or username.");
   }
   const snapshot = await db.collection("organizationLoginAliases").doc(organizationEmailKey(identifier)).get();
   const value = snapshot.data();

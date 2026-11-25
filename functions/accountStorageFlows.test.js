@@ -43,14 +43,18 @@ test("organization contact aliases cannot be claimed by a different account", as
   await f.api.saveOrganizationLogin("owner", "owner_name", "USER", "contact@example.invalid");
   assert.equal(f.records.size, 0);
 });
-test("protected login aliases migrate once and cannot be read for the wrong role or UID", async () => {
+test("legacy accounts keep their original Auth address and protected aliases stay role-scoped", async () => {
   const f = prepared();
-  f.users.set("staff", {uid: "staff", email: "old@example.invalid"});
+  f.users.set("staff", {uid: "staff", email: "staff_name@yourolivebranch.ca"});
   f.records.set("accountDirectory/staff_name", {uid: "staff", role: "STAFF"});
   const alias = await f.api.lockedOrganizationAlias("staff", "staff_name", "STAFF");
+  assert.equal(alias, "staff_name@yourolivebranch.ca");
   assert.equal(f.records.get("accountDirectory/staff_name").loginAlias, alias);
   assert.equal(f.users.get("staff").email, alias);
   assert.equal(await f.api.lockedOrganizationAlias("staff", "staff_name", "STAFF"), alias);
+  f.users.get("staff").email = "changed@example.com";
+  assert.equal(await f.api.lockedOrganizationAlias("staff", "staff_name", "STAFF"), alias);
+  assert.equal(f.users.get("staff").email, alias);
   await assert.rejects(f.api.lockedOrganizationAlias("other", "staff_name", "STAFF"), {code: "not-found"});
   await assert.rejects(f.api.lockedOrganizationAlias("staff", "staff_name", "USER"), {code: "invalid-argument"});
 });

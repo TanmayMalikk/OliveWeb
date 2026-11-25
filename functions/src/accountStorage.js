@@ -14,7 +14,7 @@ async function saveOrganizationLogin(uid, username, role, email, authEmail = sig
   });
 }
 
-// Reads the protected login alias chosen at account creation and adds the standard alias to older accounts.
+// Reads the protected login alias and records the current Auth address for older accounts.
 async function lockedOrganizationAlias(uid, username, role) {
   if (role !== "STAFF" && role !== "ADMIN") {
     throw new HttpsError("invalid-argument", "Only staff and admin accounts have organization aliases.");
@@ -25,11 +25,11 @@ async function lockedOrganizationAlias(uid, username, role) {
   if (!snapshot.exists || value?.uid !== uid || value?.role !== role) {
     throw new HttpsError("not-found", "The protected account directory entry is missing.");
   }
-  const stored = text(value.loginAlias, 254).toLowerCase();
-  const alias = stored ? signInEmail(username, role, stored) : signInEmail(username, role);
-  if (!stored) await reference.set({loginAlias: alias}, {merge: true});
-  // Older accounts are moved to the protected alias before the client retries sign-in.
   const user = await auth.getUser(uid);
+  const stored = text(value.loginAlias, 254).toLowerCase();
+  const alias = signInEmail(username, role, stored || user.email);
+  if (!stored) await reference.set({loginAlias: alias}, {merge: true});
+  // Keep the protected sign-in address if the Auth address has changed.
   if (user.email?.toLowerCase() !== alias) {
     await auth.updateUser(uid, {email: alias, emailVerified: true, displayName: username});
   }
