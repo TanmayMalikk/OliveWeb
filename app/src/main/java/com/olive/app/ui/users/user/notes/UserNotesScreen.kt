@@ -46,8 +46,12 @@ import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.ui.users.user.documents.NoteEditorAttachmentsSection
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
+import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import java.io.File
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.LocalTime
@@ -118,6 +122,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
     var sharingEntry by remember { mutableStateOf<PrivateEntry?>(null) }
+    var openedAttachment by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     val notesGridState = rememberLazyGridState()
     var lastBoardFilter by remember { mutableStateOf(shownKind to newestFirst) }
     LaunchedEffect(shownKind, newestFirst) {
@@ -130,10 +135,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val editorTitleFocus = remember { FocusRequester() }
     val mapTitleFocus = remember { FocusRequester() }
     val formatter = remember {
-        DateTimeFormatter.ofPattern(
-            "MMM d, yyyy · HH:mm z",
-            Locale.getDefault()
-        ).withZone(ZoneId.systemDefault())
+        DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm z", Locale.getDefault()).withZone(ZoneId.systemDefault())
     }
 
     /**
@@ -147,8 +149,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         editingId = entry?.id
         kind = entry?.kind ?: PrivateEntryKind.Note
         title = entry?.title.orEmpty()
-        body =
-            entry?.body.orEmpty()
+        body = entry?.body.orEmpty()
         incidentDate = entry?.incidentDate.orEmpty()
         incidentTime = entry?.incidentTime.orEmpty()
         incidentLocation = entry?.incidentLocation.orEmpty()
@@ -293,6 +294,10 @@ internal fun PrivateNotes(session: SessionViewModel) {
         PrivateEntryEditLog(logEntry, formatter) { logEntryId = null }
         return
     }
+    openedAttachment?.let { (doc, localFile) ->
+        SafetyDocumentViewer(doc, localFile) { localFile.delete(); openedAttachment = null }
+        return
+    }
     // Show the note editor when the user is creating or changing a note.
     if (editorOpen) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
@@ -310,10 +315,9 @@ internal fun PrivateNotes(session: SessionViewModel) {
         ) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { editorOpen = false },
-                        modifier = Modifier.testTag("private_notes_back")
-                    ) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.all_notes)) }
+                    IconButton(onClick = { editorOpen = false }, modifier = Modifier.testTag("private_notes_back")) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.all_notes))
+                    }
                     Text(
                         if (editingId == null) uiText(R.string.new_private_entry) else uiText(R.string.edit_private_entry),
                         style = MaterialTheme.typography.titleLarge,
@@ -327,35 +331,25 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     if (entry != null && !session.localMode) IconButton(
                         onClick = { sharingEntry = entry },
                         enabled = !session.busy,
-                        modifier = Modifier.size(48.dp).testTag("private_share_editor")
+                        modifier = Modifier.size(48.dp).testTag("private_share_editor"),
                     ) {
                         val sharedCount = session.sharedEntryRecipients[entry.id].orEmpty().size
-                        Icon(
-                            Icons.Outlined.Share,
-                            uiText(R.string.notes_manage_sharing),
-                            tint = if (sharedCount > 0) OliveGreen else Muted
-                        )
+                        Icon(Icons.Outlined.Share, uiText(R.string.notes_manage_sharing), tint = if (sharedCount > 0) OliveGreen else Muted)
                     }
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
-                        modifier = Modifier.size(48.dp).testTag("private_pin_editor")
+                        modifier = Modifier.size(48.dp).testTag("private_pin_editor"),
                     ) {
-                        Icon(
-                            Icons.Outlined.PushPin,
-                            if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
-                            tint = if (entry.pinned) OliveGreen else Muted
-                        )
+                        Icon(Icons.Outlined.PushPin, if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry), tint = if (entry.pinned) OliveGreen else Muted)
                     }
                     if (entry != null) IconButton(
                         onClick = {
-                            session.trashPrivateEntry(entry.id) {
-                                offerUndo(noteTrashed) { session.restorePrivateEntry(entry.id) }
-                            }
+                            session.trashPrivateEntry(entry.id) { offerUndo(noteTrashed) { session.restorePrivateEntry(entry.id) } }
                             editorOpen = false
                         },
                         enabled = !session.busy,
-                        modifier = Modifier.testTag("delete_private_entry")
+                        modifier = Modifier.testTag("delete_private_entry"),
                     ) { Icon(Icons.Outlined.DeleteOutline, uiText(R.string.ui_move_to_trash)) }
                 }
             }
@@ -502,13 +496,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Text(stringResource(R.string.add_attachment), modifier = Modifier.padding(start = 8.dp))
                 }
                 if (kind == PrivateEntryKind.Incident) Text(stringResource(R.string.incident_attachments_help), color = Muted)
-                session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
-                    Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = true, onCheckedChange = { selectedAttachments = selectedAttachments - document.id })
-                        Text(document.name, modifier = Modifier.weight(1f))
-                        if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
-                    }
-                }
+                NoteEditorAttachmentsSection(
+                    selectedAttachments = selectedAttachments,
+                    documents = session.documents.state.files,
+                    controller = session.documents,
+                    onOpenDocument = { doc -> session.documents.download(doc) { resolved, local -> openedAttachment = resolved to local } },
+                    onRemoveAttachment = { selectedAttachments = selectedAttachments - it },
+                )
             }
             item {
                 Button(
@@ -573,7 +567,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         Trash(trashed, formatter, { id ->
             session.restorePrivateEntry(id)
             trashOpen = false
-        }) { trashOpen = false }
+        }, { trashOpen = false }, viewerUid = uid, documentsController = session.documents)
         return
     }
     val hasFilters = search.isNotBlank() || shownKind != null
@@ -604,23 +598,14 @@ internal fun PrivateNotes(session: SessionViewModel) {
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = session.navigation::back,
-                    modifier = Modifier.testTag("safe_home")
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        uiText(R.string.ui_previous_safe_page)
-                    )
+                IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("safe_home")) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_previous_safe_page))
                 }
-                Text(
-                    stringResource(R.string.notes_incidents),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = (Modifier.weight(1f)).semantics { heading() })
+                Text(stringResource(R.string.notes_incidents), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() })
                 IconButton(
                     onClick = { trashOpen = true },
                     enabled = !session.loadingHistory && !session.historyLoadFailed,
-                    modifier = Modifier.walkthroughTarget("open_scratchpad").testTag("open_scratchpad")
+                    modifier = Modifier.walkthroughTarget("open_scratchpad").testTag("open_scratchpad"),
                 ) {
                     BadgedBox(badge = { if (!session.loadingHistory && !session.historyLoadFailed && trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) } }) {
                         Icon(Icons.Outlined.DeleteOutline, uiText(R.string.ui_trash))
@@ -629,7 +614,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 FilledTonalIconButton(
                     onClick = { openEditor(null) },
                     enabled = !session.busy,
-                    modifier = Modifier.walkthroughTarget("new_private_entry").testTag("new_private_entry")
+                    modifier = Modifier.walkthroughTarget("new_private_entry").testTag("new_private_entry"),
                 ) { Icon(Icons.Outlined.Add, uiText(R.string.ui_new_note)) }
             }
         }
@@ -691,7 +676,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         gridItems(pinned, key = { it.id }) { entry ->
             PrivateNoteCard(
                 entry, formatter, { openEditor(entry) },
-                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
+                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id },
+                Modifier.animateItem(), uid, session.documents,
             )
         }
         if (others.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -703,7 +689,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         gridItems(others, key = { it.id }) { entry ->
             PrivateNoteCard(
                 entry, formatter, { openEditor(entry) },
-                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
+                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id },
+                Modifier.animateItem(), uid, session.documents,
             )
         }
         if (filteredShared.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -723,6 +710,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 formatter = formatter,
                 onOpen = { session.messages.openSharedPrivateEntry(shared.entry.id) },
                 modifier = Modifier.animateItem(),
+                viewerUid = uid,
+                documentsController = session.documents,
             )
         }
     }

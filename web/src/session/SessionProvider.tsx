@@ -18,6 +18,7 @@ import {
 import { SessionContext, useSession, type SessionValue } from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
 import { accountKeysetSession } from "../services/AccountService";
+import { clearDocumentPreviewCache } from "../services/DocumentPreviewCache";
 import {
   enrollBrowserAccountRecovery,
   getBrowserPasswordRecoveryStatus,
@@ -138,6 +139,10 @@ export function SessionProvider({
       // Keep status null/unchanged when offline or blocked; Settings lets users retry.
     }
   }, [accounts.identity?.uid]);
+
+  useEffect(() => {
+    if (phase === "public") clearDocumentPreviewCache();
+  }, [phase]);
 
   useEffect(() => {
     if (!cloudMode || !accounts.identity?.uid || (phase !== "safe" && phase !== "portal")) {

@@ -37,7 +37,9 @@ import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
@@ -46,6 +48,8 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.documents.BlurredDocumentPreviewSurface
+import com.olive.app.ui.users.user.documents.NoteAttachmentPreviewStrip
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -395,28 +399,39 @@ internal fun ChatMessageBody(
     }
     val incident = parts[0] == "SHARED_INCIDENT"
     val title = parts.getOrNull(2).orEmpty().ifBlank { stringResource(R.string.encrypted_document) }
+    val matchingEntry = session.privateEntries.firstOrNull { it.id == parts[1] }
+        ?: session.sharedPrivateEntries.firstOrNull { it.entry.id == parts[1] }?.entry
     Surface(
         onClick = { session.messages.openSharedPrivateEntry(parts[1]) }, shape = MaterialTheme.shapes.medium,
         color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             .semantics { stateDescription = senderDescription }
     ) {
-        Row(
-            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                if (incident) Icons.Outlined.Warning else Icons.Outlined.Lock,
-                stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note)
-            )
-            Column {
-                Text(
-                    stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note),
-                    style = MaterialTheme.typography.labelSmall
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    if (incident) Icons.Outlined.Warning else Icons.Outlined.Lock,
+                    stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note)
                 )
-                Text(
-                    title, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                Column {
+                    Text(
+                        stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        title, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                }
+            }
+            if (matchingEntry?.attachmentIds?.isNotEmpty() == true) {
+                NoteAttachmentPreviewStrip(
+                    attachmentIds = matchingEntry.attachmentIds,
+                    viewerUid = session.coverAccountId,
+                    controller = session.documents,
                 )
             }
         }
@@ -442,10 +457,14 @@ internal fun SharedMediaMessage(
     onLightSurface: Boolean = false,
 ) {
     val opening = id in session.documents.state.openingDocumentIds
-    val document = session.documents.state.files.firstOrNull { it.id == id }
+    val document = session.documents.documentById(id)
     val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
     val error = session.documents.state.attachmentErrors[id]
     val senderDescription = sender?.let { stringResource(R.string.chat_attachment_sender, it) }
+    LaunchedEffect(session.coverAccountId, id, document?.id) {
+        val uid = session.coverAccountId ?: return@LaunchedEffect
+        session.documents.requestPreviewById(uid, id)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Surface(
         onClick = {
@@ -466,24 +485,41 @@ internal fun SharedMediaMessage(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
             .semantics { if (senderDescription != null) stateDescription = senderDescription }
     ) {
-        Row(
-            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (opening) SecureFileOpeningIndicator()
-            else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
-            Column {
-                Text(
-                    stringResource(R.string.shared_secure_file),
-                    style = MaterialTheme.typography.labelSmall
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val resolvedMime = document?.mimeType.orEmpty()
+            if (pickerMediaKind(resolvedMime) != MediaKind.AUDIO) {
+                BlurredDocumentPreviewSurface(
+                    document = document,
+                    preview = session.documents.previewFor(id),
+                    loading = session.documents.isPreviewLoading(id),
+                    fallbackMimeType = resolvedMime,
+                    fallbackName = document?.name ?: name,
+                    offlineCached = offline in setOf(
+                        OfflineMediaAvailability.AVAILABLE,
+                        OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(132.dp),
                 )
-                Text(
-                    document?.name?.takeIf { it.isNotBlank() }
-                        ?: name.ifBlank { stringResource(R.string.encrypted_document) },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    maxLines = 2
-                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (opening) SecureFileOpeningIndicator()
+                else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
+                Column {
+                    Text(
+                        stringResource(R.string.shared_secure_file),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        document?.name?.takeIf { it.isNotBlank() }
+                            ?: name.ifBlank { stringResource(R.string.encrypted_document) },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        maxLines = 2
+                    )
+                }
             }
         }
     }

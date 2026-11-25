@@ -1,10 +1,27 @@
 // Staff and admins: reads assigned support chats and sends encrypted replies.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive, ArrowLeft, MessageCircle, Send, ShieldAlert } from "lucide-react";
-import { Button, Empty, Form } from "../../components/SharedComponents";
+import {
+  Archive,
+  ArrowLeft,
+  FileLock2,
+  FileText,
+  MapPin,
+  MessageCircle,
+  Send,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
+import { Button, Empty, Form, Modal } from "../../components/SharedComponents";
 import { accounts, cloudMode } from "../../services/AccountService";
 import * as messaging from "../../services/MessagingService";
 import type { Conversation, Message } from "../../services/MessagingService";
+import {
+  loadBrowserDocumentById,
+  openBrowserDocument,
+  type BrowserDocument,
+} from "../../services/MediaService";
+import { loadSharedPrivateEntry } from "../../services/SharedPrivateEntryService";
+import type { Entry } from "../../domain/DomainModels";
 import {
   closeSupportTicket,
   requestAdministratorHelp,
@@ -13,7 +30,12 @@ import { useSession } from "../../session/SessionProvider";
 import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
 
 import { sharedMessage } from "./safe_app/SharedMessageContent";
+import { SafeMediaViewer } from "./safe_app/SafeMediaViewer";
 import { VoiceMessageBubble, VoiceMessageComposer } from "./safe_app/VoiceMessages";
+import {
+  BlurredDocumentPreview,
+  NoteAttachmentPreviewGrid,
+} from "../../components/BlurredDocumentPreview";
 import {
   allTicketCategories as categories,
   categoryOfTicket as categoryOf,
@@ -43,6 +65,9 @@ export default function OrganizationSupportInbox() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
+  const [viewerDocument, setViewerDocument] = useState<BrowserDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [viewerEntry, setViewerEntry] = useState<Entry | null>(null);
   const [category, setCategory] = useState<TicketCategory>(() =>
     identity?.role === "ADMIN" ? "NEEDS_ADMIN" : "SUPPORT",
   );
@@ -50,6 +75,11 @@ export default function OrganizationSupportInbox() {
   const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
   const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!viewerUrl) return;
+    return () => URL.revokeObjectURL(viewerUrl);
+  }, [viewerUrl]);
 
   useEffect(() => {
     if (isAdmin && category !== "NEEDS_ADMIN") {
@@ -144,6 +174,28 @@ export default function OrganizationSupportInbox() {
   const openTicket = (ticket: Conversation | null) => {
     setSelected(ticket);
     setFeedback("");
+    setViewerDocument(null);
+    setViewerUrl("");
+    setViewerEntry(null);
+  };
+
+  const openMedia = (id: string, preloaded?: BrowserDocument) => {
+    if (!identity) return;
+    void session.perform(async () => {
+      const document = preloaded ?? await loadBrowserDocumentById(identity, id);
+      const url = await openBrowserDocument(document);
+      setViewerDocument(document);
+      setViewerUrl(url);
+    });
+  };
+
+  const openEntry = (id: string) => {
+    if (!identity) return;
+    void session.perform(async () => {
+      const entry = await loadSharedPrivateEntry(id, identity);
+      if (!entry) throw new Error("This shared entry could not be opened on this device.");
+      setViewerEntry(entry);
+    });
   };
 
   if (!identity) return null;
@@ -333,6 +385,37 @@ export default function OrganizationSupportInbox() {
                       <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
                       {shared?.kind === "voice" ? (
                         <VoiceMessageBubble key={identity.uid + shared.id} mediaId={shared.id} identity={identity} />
+                      ) : shared ? (
+                        <button
+                          type="button"
+                          className={`shared-message-card ${shared.kind === "media" ? "with-preview" : ""}`}
+                          onClick={() => {
+                            if (shared.kind === "media") openMedia(shared.id);
+                            else if (shared.kind === "note" || shared.kind === "incident") openEntry(shared.id);
+                          }}
+                        >
+                          {shared.kind === "media" && (
+                            <BlurredDocumentPreview
+                              documentId={shared.id}
+                              identity={identity}
+                              className="shared-message-preview"
+                            />
+                          )}
+                          <div className="shared-message-row">
+                            {shared.kind === "media" ? <FileLock2 />
+                              : shared.kind === "incident" ? <ShieldCheck />
+                                : shared.kind === "location" ? <MapPin /> : <FileText />}
+                            <span>
+                              <small>{shared.kind.replace("-", " ")}</small>
+                              <strong>{shared.title}</strong>
+                              <span>
+                                {shared.kind === "media" || shared.kind === "note" || shared.kind === "incident"
+                                  ? "Open securely"
+                                  : "Shared item"}
+                              </span>
+                            </span>
+                          </div>
+                        </button>
                       ) : <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>}
                       <time>
                         {new Date(item.message.clientSentAt).toLocaleString()}
@@ -394,6 +477,38 @@ export default function OrganizationSupportInbox() {
           </>
         )}
       </section>
+      {viewerDocument && viewerUrl && (
+        <SafeMediaViewer
+          document={viewerDocument}
+          url={viewerUrl}
+          allowAudioPlayback
+          onClose={() => {
+            setViewerDocument(null);
+            setViewerUrl("");
+          }}
+        />
+      )}
+      {viewerEntry && (
+        <Modal title={viewerEntry.title || "Shared entry"} wide onClose={() => setViewerEntry(null)}>
+          <article className="shared-entry-viewer">
+            <span className="mode-pill">{viewerEntry.kind}</span>
+            {viewerEntry.incidentDate && <p><strong>Date:</strong> {viewerEntry.incidentDate}</p>}
+            {viewerEntry.incidentTime && <p><strong>Approximate time:</strong> {viewerEntry.incidentTime}</p>}
+            {viewerEntry.incidentLocation && <p><strong>Location:</strong> {viewerEntry.incidentLocation}</p>}
+            <p className="shared-entry-body">{viewerEntry.body}</p>
+            {(viewerEntry.attachmentIds?.length ?? 0) > 0 && (
+              <>
+                <h3>Attachments ({viewerEntry.attachmentIds!.length})</h3>
+                <NoteAttachmentPreviewGrid
+                  attachmentIds={viewerEntry.attachmentIds}
+                  identity={identity}
+                  onOpen={(id, doc) => openMedia(id, doc)}
+                />
+              </>
+            )}
+          </article>
+        </Modal>
+      )}
     </section>
   );
 }

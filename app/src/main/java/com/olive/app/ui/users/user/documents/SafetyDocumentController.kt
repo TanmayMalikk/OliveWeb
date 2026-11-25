@@ -5,6 +5,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.olive.app.data.account.AccountIdentity
@@ -81,6 +82,8 @@ internal class SafetyDocumentsController(
     private var initialLoadTimeout: Job? = null
     private var allSnapshotDocuments: List<SafetyDocument> = emptyList()
     private val evidenceWrites = mutableMapOf<String, CompletableDeferred<Unit>>()
+    private val previewCache = DocumentPreviewCache(scope)
+    private val resolvedDocuments = mutableStateMapOf<String, SafetyDocument>()
     private val stateMutableFlow = MutableStateFlow(SafetyDocumentsState())
     val stateFlow: StateFlow<SafetyDocumentsState> = stateMutableFlow.asStateFlow()
     private var stateSnapshot by mutableStateOf(stateMutableFlow.value)
@@ -103,7 +106,71 @@ internal class SafetyDocumentsController(
         generation++
         allSnapshotDocuments = emptyList()
         evidenceWrites.clear()
+        previewCache.clear()
+        resolvedDocuments.clear()
         state = SafetyDocumentsState(ownerUid = ownerUid)
+    }
+
+    /**
+     * Returns the in-memory blurred preview for [documentId] owned by the active viewer, or `null`.
+     */
+    fun previewFor(documentId: String): DocumentPreview? =
+        state.ownerUid?.let { previewCache.preview(it, documentId) }
+
+    /**
+     * Reports whether a compact blurred preview is currently being generated for [documentId].
+     */
+    fun isPreviewLoading(documentId: String): Boolean =
+        state.ownerUid?.let { previewCache.isLoading(it, documentId) } == true
+
+    /**
+     * Finds resolved metadata for [documentId] from either the synced storage list or direct shared lookups.
+     */
+    fun documentById(documentId: String): SafetyDocument? =
+        state.files.firstOrNull { it.id == documentId } ?: resolvedDocuments[documentId]
+
+    /**
+     * Queues background generation of a 50%-blurred live preview for [document].
+     */
+    fun requestPreview(document: SafetyDocument) {
+        val viewerUid = state.ownerUid ?: return
+        previewCache.request(viewerUid, document) {
+            if (document.objectKey.isNotBlank()) {
+                media?.downloadPreviewFile(document, viewerUid)
+            } else {
+                val repo = repository ?: return@request null
+                runCatching {
+                    val downloaded = repo.download(applicationContext, document)
+                    val copy = File.createTempFile("legacy-thumb-", ".part", File(applicationContext.cacheDir, "opened-documents").apply { mkdirs() })
+                    downloaded.inputStream().use { input -> copy.outputStream().use(input::copyTo) }
+                    copy
+                }.getOrNull()
+            }
+        }
+    }
+
+    /**
+     * Resolves shared or attached document metadata by [documentId] and requests its blurred preview.
+     */
+    fun requestPreviewById(viewerUid: String, documentId: String) {
+        if (viewerUid.isBlank() || documentId.isBlank()) return
+        if (state.ownerUid != viewerUid) prepare(viewerUid)
+        documentById(documentId)?.let { doc ->
+            requestPreview(doc)
+            return
+        }
+        val source = repository ?: return
+        val token = generation
+        scope.launch {
+            val doc = runCatching {
+                if (hasValidatedInternetConnection(applicationContext)) source.getFor(viewerUid, documentId)
+                else source.cachedFor(viewerUid, documentId)
+            }.getOrNull() ?: return@launch
+            if (token == generation && state.ownerUid == viewerUid) {
+                resolvedDocuments[documentId] = doc
+                requestPreview(doc)
+            }
+        }
     }
 
     /**
@@ -590,6 +657,8 @@ internal class SafetyDocumentsController(
         subscription = null
         generation++
         allSnapshotDocuments = emptyList()
+        previewCache.clear()
+        resolvedDocuments.clear()
         media?.clearState()
         File(applicationContext.cacheDir, "opened-documents").listFiles()?.forEach(File::delete)
         state = SafetyDocumentsState()

@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.safety.SharedPrivateEntry
+import com.olive.app.ui.users.user.documents.NoteAttachmentPreviewStrip
+import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 
 private data class EntryCardPalette(val container: Color, val accent: Color)
 
@@ -80,7 +82,9 @@ private val PrivateEntryKind.cardPalette: EntryCardPalette
 @Composable
 internal fun Trash(
     entries: List<PrivateEntry>, formatter: DateTimeFormatter,
-    restore: (String) -> Unit, close: () -> Unit
+    restore: (String) -> Unit, close: () -> Unit,
+    viewerUid: String? = null,
+    documentsController: SafetyDocumentsController? = null,
 ) {
     val uiText = rememberResourceText()
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
@@ -158,6 +162,13 @@ internal fun Trash(
                         maxLines = 5,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
+                    if (entry.attachmentIds.isNotEmpty() && documentsController != null) {
+                        NoteAttachmentPreviewStrip(
+                            attachmentIds = entry.attachmentIds,
+                            viewerUid = viewerUid,
+                            controller = documentsController,
+                        )
+                    }
                     Text(
                         if (PRIVATE_ENTRY_TRASH_RETENTION_MS < 60_000L)
                             uiText(
@@ -321,7 +332,9 @@ internal fun PrivateEntryEditLog(
 @Composable
 internal fun PrivateNoteCard(
     entry: PrivateEntry, formatter: DateTimeFormatter,
-    open: () -> Unit, pin: () -> Unit, openLog: () -> Unit, modifier: Modifier = Modifier
+    open: () -> Unit, pin: () -> Unit, openLog: () -> Unit, modifier: Modifier = Modifier,
+    viewerUid: String? = null,
+    documentsController: SafetyDocumentsController? = null,
 ) {
     val uiText = rememberResourceText()
     val palette = entry.kind.cardPalette
@@ -383,6 +396,13 @@ internal fun PrivateNoteCard(
                 maxLines = 8,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
+            if (entry.attachmentIds.isNotEmpty() && documentsController != null) {
+                NoteAttachmentPreviewStrip(
+                    attachmentIds = entry.attachmentIds,
+                    viewerUid = viewerUid,
+                    controller = documentsController,
+                )
+            }
             Text(
                 (if (entry.edits.isNotEmpty()) "${stringResource(R.string.edited)} · " else "") + formatter.format(
                     Instant.ofEpochMilli(entry.updatedAt)
@@ -627,6 +647,8 @@ internal fun SharedPrivateNoteCard(
     formatter: DateTimeFormatter,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    viewerUid: String? = null,
+    documentsController: SafetyDocumentsController? = null,
 ) {
     val entry = item.entry
     val isIncident = entry.kind == PrivateEntryKind.Incident
@@ -678,6 +700,13 @@ internal fun SharedPrivateNoteCard(
                 maxLines = 8,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (entry.attachmentIds.isNotEmpty() && documentsController != null) {
+                NoteAttachmentPreviewStrip(
+                    attachmentIds = entry.attachmentIds,
+                    viewerUid = viewerUid,
+                    controller = documentsController,
+                )
+            }
             Text(
                 sharedByLabel,
                 style = MaterialTheme.typography.labelMedium,

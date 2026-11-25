@@ -24,7 +24,6 @@ import com.olive.app.data.media.PendingVoiceMessage
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.copyAndVerifyEncryptedDownload
 import com.olive.app.data.media.MediaPreprocessor
-import com.olive.app.data.media.MediaPreparationMemoryException
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.data.media.MediaTransferState
 import com.olive.app.data.media.MediaTransferStatus
@@ -60,8 +59,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
-
-internal data class OpenedMedia(val document: SafetyDocument, val file: File)
 
 internal interface MediaTransferOperations {
     /**
@@ -123,6 +120,15 @@ internal interface MediaTransferOperations {
     suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia
 
     /**
+     * Silently decrypts a temporary file for compact blurred previews using only local device keys.
+     *
+     * @param document Safety document metadata record.
+     * @param viewerUid Firebase UID of the viewing account.
+     * @return Temporary plaintext file owned by the caller, or `null` if unavailable offline/without prompt.
+     */
+    suspend fun downloadPreviewFile(document: SafetyDocument, viewerUid: String): File? = null
+
+    /**
      * Restores recoverable media metadata and device wrappers with one unlocked account keyset.
      *
      * @param documents Authorized encrypted media records visible to the account.
@@ -178,13 +184,6 @@ internal interface MediaTransferOperations {
      */
     fun clearState()
 }
-
-internal data class MediaTransferUiState(
-    val state: MediaTransferState = MediaTransferState.Idle,
-    val uploads: List<MediaUploadPresentation> = emptyList(),
-    val offlineCopies: Map<String, OfflineMediaAvailability> = emptyMap(),
-    val recentCachingEnabled: Boolean = false,
-)
 
 // Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
 internal class MediaTransferController(
@@ -455,6 +454,35 @@ internal class MediaTransferController(
     }
 
     /**
+     * Decrypts a temporary copy for background thumbnail generation without changing UI state
+     * or prompting for interactive account recovery.
+     */
+    override suspend fun downloadPreviewFile(document: SafetyDocument, viewerUid: String): File? {
+        if (document.objectKey.isBlank()) return null
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                downloadGate.withDocumentLock(document.id) {
+                    val cached = offlineCache.verifiedCiphertext(viewerUid, document)
+                        ?: speculativeCiphertextFiles[document.id]?.takeIf { it.isFile && it.length() == document.ciphertextSize }
+                        ?: if (offlineCache.promoteUploadCandidateAsRecent(viewerUid, document)) offlineCache.verifiedCiphertext(viewerUid, document) else null
+                    val downloaded = if (cached == null && hasValidatedInternetConnection(applicationContext)) {
+                        runCatching { downloadRemoteCiphertext(document) }.getOrNull()
+                    } else null
+                    val source = cached ?: downloaded ?: return@withDocumentLock null
+                    try {
+                        decryptCiphertextForPreview(source, document, viewerUid, applicationContext.cacheDir)
+                    } finally {
+                        if (downloaded != null) {
+                            runCatching { offlineCache.retainRecentDownloaded(viewerUid, document, downloaded) }
+                            downloaded.delete()
+                        }
+                    }
+                }
+            }
+        }.getOrNull()
+    }
+
+    /**
      * Opens a decrypted local preview file immediately for an upload still queued or running.
      *
      * @param jobId The queued upload job's ID.
@@ -609,6 +637,8 @@ internal class MediaTransferController(
         recentCachingEnabled = false
         speculativeCiphertextFiles.values.forEach(File::delete)
         speculativeCiphertextFiles.clear()
+        sessionOpenedCache.clear()
+        sessionDecryptedCache.clear()
         state = MediaTransferState.Idle
     }
 
@@ -1058,36 +1088,4 @@ internal class MediaTransferController(
         fun sizeMismatch(expected:Long,received:Long)=
             "Encrypted download size does not match (expected $expected bytes, received $received bytes)"
     }
-}
-
-/**
- * Computes preparation failure resource.
- *
- * @param failure Exception or failure reason encountered during execution.
- * @param kind Kind supplied to [preparationFailureResource].
- * @return The computed preparation failure resource number, or `null` if unavailable.
- */
-internal fun preparationFailureResource(failure:Throwable,kind:MediaKind):Int?=
-    if(failure is OutOfMemoryError || failure is MediaPreparationMemoryException) {
-        if(kind==MediaKind.VIDEO) R.string.documents_video_memory_failed
-        else R.string.documents_media_memory_failed
-    } else null
-
-/**
- * Computes preparation failure message.
- *
- * @param context Android context used to access system services, resources, or storage.
- * @param failure Exception or failure reason encountered during execution.
- * @param kind Kind supplied to [preparationFailureMessage].
- * @return The resulting preparation failure message string.
- */
-private fun preparationFailureMessage(
-    context:Context,
-    failure:Throwable,
-    kind:MediaKind,
-):String {
-    val resource=preparationFailureResource(failure,kind)
-    return resource?.let(context::getString)
-        ?: failure.localizedMessage
-        ?: context.getString(R.string.documents_upload_failed)
 }

@@ -2,12 +2,18 @@
 package com.olive.app.ui.users.shared.camera
 
 import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
 import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -29,6 +35,8 @@ import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.messaging.isDurableChatAttachment
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import com.olive.app.ui.users.user.documents.BlurredDocumentPreviewSurface
+import com.olive.app.ui.users.user.documents.NoteAttachmentPreviewStrip
 import com.olive.app.ui.users.user.location.ShareDurationDialog
 
 
@@ -81,7 +89,12 @@ internal fun AttachmentPicker(
         titleFocus.requestFocus()
     }
     LaunchedEffect(selectedCategory, uid) {
-        if (selectedCategory != AttachmentCategory.Media || uid == null || session.localMode) return@LaunchedEffect
+        if (selectedCategory !in setOf(
+                AttachmentCategory.Media,
+                AttachmentCategory.Notes,
+                AttachmentCategory.Incidents,
+            ) || uid == null || session.localMode
+        ) return@LaunchedEffect
         session.documents.load(uid, session.coverUsername, false)
     }
 
@@ -144,69 +157,146 @@ internal fun AttachmentPicker(
                     leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
                     modifier = Modifier.clickable { locationDuration = true }
                 )
+            } else if (selectedCategory == AttachmentCategory.Media) {
+                val media = (if (documentState.loading) emptyList() else documentState.files).filter {
+                    isDurableChatAttachment(it, uid)
+                }
+                if (documentState.loading) {
+                    com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Documents)
+                } else if (documentState.error != null) {
+                    Text(
+                        stringResource(R.string.documents_load_failed),
+                        Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else if (media.isEmpty()) {
+                    Text(
+                        stringResource(if (session.localMode) R.string.documents_account_required else R.string.documents_empty),
+                        Modifier.padding(16.dp),
+                    )
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        gridItems(media, key = { it.id }) { document ->
+                            LaunchedEffect(document.id, document.objectKey) {
+                                session.documents.requestPreview(document)
+                            }
+                            OutlinedCard(
+                                Modifier.fillMaxWidth().testTag("chat_picker_media_${document.id}")
+                                    .clickable {
+                                        session.messages.shareSafetyDocumentInChat(document)
+                                        onDismiss()
+                                    },
+                            ) {
+                                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    BlurredDocumentPreviewSurface(
+                                        document = document,
+                                        preview = session.documents.previewFor(document.id),
+                                        loading = session.documents.isPreviewLoading(document.id),
+                                        showEvidenceBadge = true,
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(1.1f),
+                                    )
+                                    Text(
+                                        text = document.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
-                LazyColumn {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     // Opens the selected photo, video, document, or camera source.
                     when (selectedCategory) {
                         AttachmentCategory.Notes -> {
                             val notes = session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Note }
                             if (notes.isEmpty()) item {
-                                Text(stringResource(R.string.no_private_notes_found), Modifier.padding(16.dp))
+                                Text(stringResource(R.string.no_private_notes_found), Modifier.padding(8.dp))
                             }
-                            items(notes) { note ->
-                                ListItem(
-                                    headlineContent = { Text(note.title.ifBlank { stringResource(R.string.untitled_note) }) },
-                                    modifier = Modifier.clickable { session.messages.sharePrivateEntryInChat(note); onDismiss() }
-                                )
+                            items(notes, key = { it.id }) { note ->
+                                OutlinedCard(
+                                    Modifier.fillMaxWidth().clickable {
+                                        session.messages.sharePrivateEntryInChat(note)
+                                        onDismiss()
+                                    },
+                                ) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            note.title.ifBlank { stringResource(R.string.untitled_note) },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        if (note.body.isNotBlank()) {
+                                            Text(
+                                                note.body,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (note.attachmentIds.isNotEmpty()) {
+                                            NoteAttachmentPreviewStrip(
+                                                attachmentIds = note.attachmentIds,
+                                                viewerUid = uid,
+                                                controller = session.documents,
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
                         AttachmentCategory.Incidents -> {
                             val incidents = session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Incident }
                             if (incidents.isEmpty()) item {
-                                Text(stringResource(R.string.no_incident_reports_found), Modifier.padding(16.dp))
+                                Text(stringResource(R.string.no_incident_reports_found), Modifier.padding(8.dp))
                             }
-                            items(incidents) { incident ->
-                                ListItem(
-                                    headlineContent = { Text(incident.title) },
-                                    modifier = Modifier.clickable { session.messages.sharePrivateEntryInChat(incident); onDismiss() }
-                                )
-                            }
-                        }
-
-                        AttachmentCategory.Media -> {
-                            val media = (if (documentState.loading) emptyList() else documentState.files).filter {
-                                isDurableChatAttachment(it, uid)
-                            }
-                            if (documentState.loading) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Documents) }
-                            if (documentState.error != null) item {
-                                Text(stringResource(R.string.documents_load_failed), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
-                            }
-                            if (!documentState.loading && documentState.error == null && media.isEmpty()) item {
-                                Text(
-                                    stringResource(if (session.localMode) R.string.documents_account_required else R.string.documents_empty),
-                                    Modifier.padding(16.dp)
-                                )
-                            }
-                            items(media, key = { it.id }) { document ->
-                                ListItem(
-                                    headlineContent = { Text(document.name, maxLines = 2) },
-                                    supportingContent = { Text(document.mimeType) },
-                                    leadingContent = {
-                                        Icon(
-                                            when {
-                                                document.mimeType.startsWith("image/") -> Icons.Outlined.Image
-                                                document.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
-                                                else -> Icons.Outlined.Description
-                                            }, null
-                                        )
+                            items(incidents, key = { it.id }) { incident ->
+                                OutlinedCard(
+                                    Modifier.fillMaxWidth().clickable {
+                                        session.messages.sharePrivateEntryInChat(incident)
+                                        onDismiss()
                                     },
-                                    modifier = Modifier.clickable { session.messages.shareSafetyDocumentInChat(document); onDismiss() }
-                                )
+                                ) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            incident.title.ifBlank { stringResource(R.string.incident) },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        if (incident.body.isNotBlank()) {
+                                            Text(
+                                                incident.body,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (incident.attachmentIds.isNotEmpty()) {
+                                            NoteAttachmentPreviewStrip(
+                                                attachmentIds = incident.attachmentIds,
+                                                viewerUid = uid,
+                                                controller = session.documents,
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        AttachmentCategory.Location, AttachmentCategory.SafetyPlan, null -> Unit
+                        AttachmentCategory.Media, AttachmentCategory.Location, AttachmentCategory.SafetyPlan, null -> Unit
                     }
                 }
             }

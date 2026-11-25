@@ -1,6 +1,6 @@
 // Staff and admins: displays tracked user live and last-known locations on an interactive Mapbox map.
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Map as MapboxMap, Marker } from "mapbox-gl";
+import type { GeoJSONSource, Map as MapboxMap, Popup } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Crosshair, ExternalLink, LocateFixed, MapPin, Search } from "lucide-react";
 import { Button, Empty } from "../../components/SharedComponents";
@@ -8,11 +8,23 @@ import type { AdminLiveLocation } from "../../services/EmergencyResponseService"
 import {
   filterAndSortLocations,
   openStreetMapUrl,
+  toLocationFeatureCollection,
   type LocationStatusFilter,
 } from "./OrganizationLiveMapModel";
 
 const DEFAULT_CENTER: [number, number] = [-113.4938, 53.5461];
 const STYLE = "mapbox://styles/tanmaymalik/cmwn3afx4002m01sr80u4bzdl";
+const SOURCE_ID = "org-locations";
+const LAYER_LAST_KNOWN = "org-locations-last-known";
+const LAYER_LIVE = "org-locations-live";
+const LAYER_SELECTED_HALO = "org-locations-selected-halo";
+const LAYER_SELECTED = "org-locations-selected";
+const INTERACTIVE_LAYERS = [LAYER_SELECTED, LAYER_LIVE, LAYER_LAST_KNOWN];
+
+type RenderedLocationFeature = {
+  properties?: Record<string, unknown>;
+  geometry?: { type?: string; coordinates?: unknown };
+};
 
 export function OrganizationLiveMap({
   locations,
@@ -30,8 +42,9 @@ export function OrganizationLiveMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const mapboxRef = useRef<typeof import("mapbox-gl").default | null>(null);
-  const markersRef = useRef<globalThis.Map<string, Marker>>(new globalThis.Map());
+  const hoverPopupRef = useRef<Popup | null>(null);
   const fittedOnceRef = useRef(false);
+  const lastFollowedRef = useRef<{ uid: string; lat: number; lng: number } | null>(null);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<LocationStatusFilter>("all");
@@ -49,12 +62,20 @@ export function OrganizationLiveMap({
   const lastKnownCount = allPoints.length - liveCount;
   const selectedPoint = selectedUid ? locations[selectedUid] ?? null : null;
 
+  const locationsRef = useRef(locations);
+  locationsRef.current = locations;
+  const visiblePointsRef = useRef(visiblePoints);
+  visiblePointsRef.current = visiblePoints;
+  const selectedUidRef = useRef(selectedUid);
+  selectedUidRef.current = selectedUid;
+
   useEffect(() => {
     if (!initialFollowUid) return;
     setSelectedUid(initialFollowUid);
     setFollowing(true);
     const point = locations[initialFollowUid];
     if (point && mapRef.current) {
+      lastFollowedRef.current = { uid: point.uid, lat: point.latitude, lng: point.longitude };
       mapRef.current.flyTo({ center: [point.longitude, point.latitude], zoom: 15, essential: true });
       onClearInitialFollow?.();
     } else if (point) {
@@ -80,8 +101,8 @@ export function OrganizationLiveMap({
     let instance: MapboxMap | undefined;
     const dispose = () => {
       window.clearTimeout(timeout);
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current.clear();
+      hoverPopupRef.current?.remove();
+      hoverPopupRef.current = null;
       instance?.remove();
       mapRef.current = null;
       mapboxRef.current = null;
@@ -93,6 +114,109 @@ export function OrganizationLiveMap({
       setMapStatus("error");
     };
     const timeout = window.setTimeout(unavailable, 15000);
+
+    const ensureLayers = (map: MapboxMap, mapbox: typeof import("mapbox-gl").default) => {
+      if (map.getSource(SOURCE_ID)) return;
+      map.addSource(SOURCE_ID, {
+        type: "geojson",
+        data: toLocationFeatureCollection(visiblePointsRef.current, selectedUidRef.current),
+      });
+      map.addLayer({
+        id: LAYER_LAST_KNOWN,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["all", ["!", ["get", "active"]], ["!", ["get", "selected"]]],
+        paint: {
+          "circle-color": "#5b675f",
+          "circle-radius": 7,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+        },
+      });
+      map.addLayer({
+        id: LAYER_LIVE,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["all", ["get", "active"], ["!", ["get", "selected"]]],
+        paint: {
+          "circle-color": "#c53929",
+          "circle-radius": 7.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+        },
+      });
+      map.addLayer({
+        id: LAYER_SELECTED_HALO,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["get", "selected"],
+        paint: {
+          "circle-color": "rgba(56, 83, 47, 0.25)",
+          "circle-radius": 14,
+          "circle-stroke-color": "#38532f",
+          "circle-stroke-width": 2.5,
+        },
+      });
+      map.addLayer({
+        id: LAYER_SELECTED,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["get", "selected"],
+        paint: {
+          "circle-color": ["case", ["get", "active"], "#c53929", "#5b675f"],
+          "circle-radius": 9.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+        },
+      });
+
+      const popup = new mapbox.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 12,
+      });
+      hoverPopupRef.current = popup;
+
+      map.on("click", INTERACTIVE_LAYERS, (event) => {
+        const feature = event.features?.[0] as RenderedLocationFeature | undefined;
+        const uid = typeof feature?.properties?.uid === "string" ? feature.properties.uid : "";
+        const fresh = uid ? locationsRef.current[uid] : undefined;
+        if (!fresh) return;
+        lastFollowedRef.current = { uid: fresh.uid, lat: fresh.latitude, lng: fresh.longitude };
+        setSelectedUid(fresh.uid);
+        setFollowing(true);
+        map.flyTo({
+          center: [fresh.longitude, fresh.latitude],
+          zoom: Math.max(map.getZoom(), 14),
+          essential: true,
+        });
+      });
+
+      map.on("mousemove", INTERACTIVE_LAYERS, (event) => {
+        const feature = event.features?.[0] as RenderedLocationFeature | undefined;
+        const name = typeof feature?.properties?.name === "string" ? feature.properties.name : "";
+        const isLive = feature?.properties?.active === true;
+        const rawCoords =
+          feature?.geometry?.type === "Point" && Array.isArray(feature.geometry.coordinates)
+            ? feature.geometry.coordinates
+            : null;
+        const coords =
+          rawCoords && rawCoords.length >= 2 &&
+          typeof rawCoords[0] === "number" && typeof rawCoords[1] === "number"
+            ? ([rawCoords[0], rawCoords[1]] as [number, number])
+            : null;
+        if (!name || !coords) return;
+        map.getCanvas().style.cursor = "pointer";
+        const label = document.createElement("span");
+        label.textContent = `${name} (${isLive ? "Live" : "Last known"})`;
+        popup.setLngLat(coords).setDOMContent(label).addTo(map);
+      });
+
+      map.on("mouseleave", INTERACTIVE_LAYERS, () => {
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+      });
+    };
 
     void import("mapbox-gl")
       .then(({ default: mapbox }) => {
@@ -114,11 +238,20 @@ export function OrganizationLiveMap({
         }));
         mapRef.current = map;
         map.addControl(new mapbox.NavigationControl({ showCompass: false }), "top-right");
-        map.once("idle", () => {
+        const markReady = () => {
+          if (!active) return;
+          ensureLayers(map, mapbox);
           window.clearTimeout(timeout);
           setMapStatus("ready");
-        });
+        };
+        map.once("load", markReady);
+        map.once("idle", markReady);
         map.on("dragstart", () => setFollowing(false));
+        map.on("zoomstart", (event) => {
+          if ((event as { originalEvent?: unknown }).originalEvent) {
+            setFollowing(false);
+          }
+        });
         map.on("webglcontextlost", unavailable);
       })
       .catch(() => {
@@ -136,42 +269,8 @@ export function OrganizationLiveMap({
     const mapbox = mapboxRef.current;
     if (!map || !mapbox || mapStatus !== "ready") return;
 
-    const visibleIds = new Set(visiblePoints.map((point) => point.uid));
-    markersRef.current.forEach((marker, uid) => {
-      if (!visibleIds.has(uid)) {
-        marker.remove();
-        markersRef.current.delete(uid);
-      }
-    });
-
-    for (const point of visiblePoints) {
-      const isSelected = point.uid === selectedUid;
-      let marker = markersRef.current.get(point.uid);
-      if (!marker) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "org-map-marker";
-        button.addEventListener("click", (event) => {
-          event.stopPropagation();
-          setSelectedUid(point.uid);
-          setFollowing(true);
-          map.flyTo({ center: [point.longitude, point.latitude], zoom: Math.max(map.getZoom(), 14), essential: true });
-        });
-        marker = new mapbox.Marker({ element: button, anchor: "center" })
-          .setLngLat([point.longitude, point.latitude])
-          .addTo(map);
-        markersRef.current.set(point.uid, marker);
-      } else {
-        marker.setLngLat([point.longitude, point.latitude]);
-      }
-      const el = marker.getElement();
-      el.className = `org-map-marker ${point.active ? "live" : "last-known"}${isSelected ? " selected" : ""}`;
-      el.setAttribute(
-        "aria-label",
-        `${point.name}, ${point.active ? "live sharing" : "last known location"}`,
-      );
-      el.title = `${point.name} (${point.active ? "Live" : "Last known"})`;
-    }
+    const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+    source?.setData(toLocationFeatureCollection(visiblePoints, selectedUid));
 
     if (!fittedOnceRef.current && allPoints.length > 0 && !initialFollowUid) {
       fittedOnceRef.current = true;
@@ -182,9 +281,22 @@ export function OrganizationLiveMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapStatus !== "ready" || !following || !selectedPoint) return;
+    const prev = lastFollowedRef.current;
+    if (
+      prev &&
+      prev.uid === selectedPoint.uid &&
+      prev.lat === selectedPoint.latitude &&
+      prev.lng === selectedPoint.longitude
+    ) {
+      return;
+    }
+    lastFollowedRef.current = {
+      uid: selectedPoint.uid,
+      lat: selectedPoint.latitude,
+      lng: selectedPoint.longitude,
+    };
     map.easeTo({
       center: [selectedPoint.longitude, selectedPoint.latitude],
-      zoom: Math.max(map.getZoom(), 14),
       duration: 450,
     });
   }, [following, selectedPoint?.latitude, selectedPoint?.longitude, selectedPoint?.uid, mapStatus]);
@@ -194,22 +306,24 @@ export function OrganizationLiveMap({
     mapbox: typeof import("mapbox-gl").default,
     points: AdminLiveLocation[],
   ) {
-    if (points.length === 0) return;
-    if (points.length === 1) {
-      map.flyTo({ center: [points[0].longitude, points[0].latitude], zoom: 14, essential: true });
+    const valid = points.filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+    if (valid.length === 0) return;
+    if (valid.length === 1) {
+      map.flyTo({ center: [valid[0].longitude, valid[0].latitude], zoom: 14, essential: true });
       return;
     }
     const bounds = new mapbox.LngLatBounds(
-      [points[0].longitude, points[0].latitude],
-      [points[0].longitude, points[0].latitude],
+      [valid[0].longitude, valid[0].latitude],
+      [valid[0].longitude, valid[0].latitude],
     );
-    for (const point of points.slice(1)) {
+    for (const point of valid.slice(1)) {
       bounds.extend([point.longitude, point.latitude]);
     }
     map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 500 });
   }
 
   function selectUser(point: AdminLiveLocation) {
+    lastFollowedRef.current = { uid: point.uid, lat: point.latitude, lng: point.longitude };
     setSelectedUid(point.uid);
     setFollowing(true);
     if (mapRef.current) {
