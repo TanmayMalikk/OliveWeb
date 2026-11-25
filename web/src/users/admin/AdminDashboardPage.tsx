@@ -680,8 +680,8 @@ export default function AdminPortal() {
                   maxLength={254}
                 />
                 <p className="field-help">
-                  If left blank, the login is username@yourolivebranch.ca. The
-                  login email cannot be changed after this account is created.
+                  Use any valid email address, or leave this blank for username
+                  sign-in. The login email is set when the account is created.
                 </p>
                 <Field label="Phone (optional)" name="phone" maxLength={40} />
               </>

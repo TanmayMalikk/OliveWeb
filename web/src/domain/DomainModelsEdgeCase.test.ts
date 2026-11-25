@@ -75,7 +75,8 @@ describe("recent web domain boundaries", () => {
     expect(signInEmail(" Olive_User ", "SAFE_CONTACT")).toBe("olive_user@safe.olive.invalid");
     expect(signInEmail(" Staff@Example.CA ", "STAFF")).toBe("staff@example.ca");
     expect(signInEmail(" Admin@Example.CA ", "ADMIN")).toBe("admin@example.ca");
-    expect(signInEmail(" Demo_Staff ", "STAFF")).toBe("demo_staff@yourolivebranch.ca");
+    expect(signInEmail(" Demo_Staff ", "STAFF")).toBe("demo_staff@staff.olive.invalid");
+    expect(signInEmail(" Demo_Admin ", "ADMIN")).toBe("demo_admin@admin.olive.invalid");
   });
 
   // Input: two new histories and profiles. Expected: mutable arrays and nested objects are never shared between accounts.

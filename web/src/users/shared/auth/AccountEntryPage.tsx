@@ -113,7 +113,7 @@ export function AuthPage({
         <Field
           label={
             role === "STAFF" || role === "ADMIN"
-              ? "Username or organization email"
+              ? "Username or email"
               : "Username"
           }
           name="username"

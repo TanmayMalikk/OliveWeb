@@ -85,7 +85,7 @@ function normalizedRole(value) {
   return role;
 }
 
-// Uses the alias chosen by an admin, or gives staff and admins the standard Olive Branch alias.
+// Uses the configured organization login email or an internal username-based address.
 function signInEmail(username, role, suppliedEmail = "") {
   const email = text(suppliedEmail, 254).toLowerCase();
   if ((role === "STAFF" || role === "ADMIN") && email) {
@@ -97,12 +97,9 @@ function signInEmail(username, role, suppliedEmail = "") {
   const domain = {
     USER: "users",
     SAFE_CONTACT: "safe",
-    STAFF: null,
-    ADMIN: null,
+    STAFF: "staff",
+    ADMIN: "admin",
   }[role];
-  if (role === "STAFF" || role === "ADMIN") {
-    return `${username}@yourolivebranch.ca`;
-  }
   return `${username}@${domain}.olive.invalid`;
 }
 

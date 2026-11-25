@@ -14,7 +14,6 @@ import {
   emptyHistory,
   emptyProfile,
   normalizeCover,
-  normalizeUsername,
   signInEmail,
   purgeEntry,
   validPin,
@@ -166,33 +165,22 @@ export class Accounts {
           ).user;
         } catch (error) {
           if (role === "STAFF" || role === "ADMIN") {
-            // Older staff and admin accounts used a role-specific Olive address before the current alias was introduced.
             try {
+              const result = await httpsCallable(
+                functions,
+                "resolveOrganizationLogin",
+              )({ identifier: username.trim().toLowerCase(), role });
               user = (
                 await sdk.signInWithEmailAndPassword(
                   auth,
-                  `${normalizeUsername(username)}@${role.toLowerCase()}.olive.invalid`,
+                  String((result.data as { authEmail: string }).authEmail),
                   password,
                 )
               ).user;
             } catch {
-              try {
-                const result = await httpsCallable(
-                  functions,
-                  "resolveOrganizationLogin",
-                )({ identifier: username.trim().toLowerCase(), role });
-                user = (
-                  await sdk.signInWithEmailAndPassword(
-                    auth,
-                    String((result.data as { authEmail: string }).authEmail),
-                    password,
-                  )
-                ).user;
-              } catch {
-                throw new Error(
-                  "This organization account could not be found. Check the selected role and username, then ask an administrator to confirm the account alias.",
-                );
-              }
+              throw new Error(
+                "This organization account could not be found. Check the selected role and username or email.",
+              );
             }
           } else if (role !== "USER")
             user = (
