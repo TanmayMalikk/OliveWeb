@@ -202,10 +202,10 @@ internal class SessionViewModel @JvmOverloads constructor(
      */
     fun resumeIdleTimerAfterCall() = runtime.privacy.resumeIdleTimerAfterCall()
 
-    /** Evaluates encrypted access only inside an authenticated personal-account session. */
+    /** Evaluates encrypted access inside an authenticated Safe or Portal session. */
     fun evaluateEncryptedAccess() {
         val uid = coverAccountId ?: return
-        if (accountRole != AccountRole.USER || screen != SessionScreen.Safe || privacyBlackout) return
+        if (screen !in setOf(SessionScreen.Safe, SessionScreen.Portal) || privacyBlackout) return
         encryptedAccessRecovery.evaluate(
             ownerUid = uid,
             media = recoverableMediaDocuments(documents.state.files, uid, KeyManager.deviceId()),

@@ -18,7 +18,11 @@ import {
 import { SessionContext, useSession, type SessionValue } from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
 import { accountKeysetSession } from "../services/AccountService";
-import { recoverBrowserAccountKeyset } from "../services/BrowserAccountKeysetRecovery";
+import {
+  enrollBrowserAccountRecovery,
+  getBrowserPasswordRecoveryStatus,
+  recoverBrowserAccountKeyset,
+} from "../services/BrowserAccountKeysetRecovery";
 export { useSession };
 
 // Converts Firestore permission errors into a clear user-facing explanation.
@@ -69,6 +73,8 @@ export function SessionProvider({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
+  const [passwordRecoveryEnrolled, setPasswordRecoveryEnrolled] = useState<boolean | null>(null);
+  const [passwordRecoveryKeysetExists, setPasswordRecoveryKeysetExists] = useState(false);
   const epoch = useRef(0);
   const working = useRef(false);
 
@@ -113,6 +119,34 @@ export function SessionProvider({
       stop?.();
     };
   }, [phase, accounts.identity?.uid]);
+
+  const refreshPasswordRecoveryStatus = useCallback(async () => {
+    const uid = accounts.identity?.uid;
+    if (!cloudMode || !uid) {
+      setPasswordRecoveryEnrolled(false);
+      setPasswordRecoveryKeysetExists(false);
+      return;
+    }
+    const token = epoch.current;
+    try {
+      const status = await getBrowserPasswordRecoveryStatus(uid);
+      if (token === epoch.current && accounts.identity?.uid === uid) {
+        setPasswordRecoveryKeysetExists(status.hasKeyset);
+        setPasswordRecoveryEnrolled(status.enrolled);
+      }
+    } catch {
+      // Keep status null/unchanged when offline or blocked; Settings lets users retry.
+    }
+  }, [accounts.identity?.uid]);
+
+  useEffect(() => {
+    if (!cloudMode || !accounts.identity?.uid || (phase !== "safe" && phase !== "portal")) {
+      setPasswordRecoveryEnrolled(null);
+      setPasswordRecoveryKeysetExists(false);
+      return;
+    }
+    void refreshPasswordRecoveryStatus();
+  }, [phase, accounts.identity?.uid, refreshPasswordRecoveryStatus]);
 
   const go = useCallback(
     (to: string) => {
@@ -213,6 +247,8 @@ export function SessionProvider({
     setRequestedConversation(null);
     setMessage("");
     setIdleSeconds(null);
+    setPasswordRecoveryEnrolled(null);
+    setPasswordRecoveryKeysetExists(false);
     setBusy(false);
     setPhase("public");
     window.history.replaceState(
@@ -424,7 +460,19 @@ export function SessionProvider({
     const uid = accounts.identity?.uid;
     if (!cloudMode || !uid) throw new Error("Sign in before recovering encrypted access.");
     await recoverBrowserAccountKeyset(uid, password);
+    setPasswordRecoveryKeysetExists(true);
+    setPasswordRecoveryEnrolled(true);
     setMessage("Encrypted documents and messages are unlocked for this browser tab.");
+  }
+
+  // Enrolls ARK + zero-knowledge OPAQUE password recovery for all roles on Web.
+  async function enablePasswordRecovery(password: string) {
+    const uid = accounts.identity?.uid;
+    if (!cloudMode || !uid) throw new Error("Sign in before enabling password recovery.");
+    await enrollBrowserAccountRecovery(uid, password);
+    setPasswordRecoveryKeysetExists(true);
+    setPasswordRecoveryEnrolled(true);
+    setMessage("Password recovery enabled.");
   }
 
   // Saves a note or history entry, then refreshes the screen with the new record.
@@ -481,6 +529,8 @@ export function SessionProvider({
     setProfile(null);
     setHistory(emptyHistory());
     setEnrollment(null);
+    setPasswordRecoveryEnrolled(null);
+    setPasswordRecoveryKeysetExists(false);
     await (await database).delete("device", "current");
     setPhase("public");
     go(returnPath);
@@ -492,8 +542,9 @@ export function SessionProvider({
         path, go, phase, personalLink, hasEntryToken: Boolean(pendingEntry.current),
         profile, history, enrollment, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
-        beginEntry, quickExit, unlock, recoverEncryptedAccess,
-        hasEncryptedAccess: Boolean(accounts.identity && accountKeysetSession.current(accounts.identity.uid)), saveProfile, saveEntry,
+        beginEntry, quickExit, unlock, recoverEncryptedAccess, enablePasswordRecovery, refreshPasswordRecoveryStatus,
+        hasEncryptedAccess: Boolean(accounts.identity && accountKeysetSession.current(accounts.identity.uid)),
+        passwordRecoveryEnrolled, passwordRecoveryKeysetExists, saveProfile, saveEntry,
         record, refresh, signOut, idleSeconds, idleTimeoutSeconds, setIdleTimeoutSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >

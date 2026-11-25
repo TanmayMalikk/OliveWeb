@@ -23,9 +23,9 @@ export default function Contacts() {
   return (
     <>
       <div className="page-toolbar">
-        <p>A name. A number. Someone you trust. ({p.contacts.length} of 25)</p>
+        <p>A name. A number. Someone you trust. ({p.contacts.length} of 100)</p>
         <Button
-          disabled={p.contacts.length >= 25}
+          disabled={p.contacts.length >= 100}
           onClick={() =>
             setEditing({ id: crypto.randomUUID(), name: "", details: "" })
           }
@@ -66,7 +66,7 @@ export default function Contacts() {
       </div>
       {!p.contacts.length && (
         <Empty title="You don’t have to hold every detail in your head.">
-          Add up to 25 trusted contacts. Their details stay inside this space.
+          Add up to 100 trusted contacts. Their details stay inside this space.
         </Empty>
       )}
       {editing && (

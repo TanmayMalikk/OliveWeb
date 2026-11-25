@@ -427,7 +427,7 @@ const ALL_TOUR_STEPS: WebWalkthroughTourStep[] = [
     id: "contacts_add_modal",
     topicId: "hotlines_contacts",
     title: "Trusted contacts · Add contact popup",
-    body: "We opened the Add contact popup: store up to 25 trusted contacts’ names and details securely inside Olive Branch.",
+    body: "We opened the Add contact popup: store up to 100 trusted contacts’ names and details securely inside Olive Branch.",
     tourPage: "Contacts",
     targetSelector: "[data-walkthrough-id='active-modal']",
     action: "contacts_open_add_modal",

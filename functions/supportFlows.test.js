@@ -166,3 +166,33 @@ test("replaying a support request reuses its ticket and never reopens a canceled
   assert.notEqual(next.conversationId, first.conversationId);
   assert.equal(next.ticketNumber, first.ticketNumber + 1);
 });
+
+test("support, consultation, group escalation, and admin requests prefer key-ready staff and admins", async () => {
+  const f = prepared();
+  f.users.set("staff2", {uid: "staff2", customClaims: {role: "STAFF"}});
+  f.profiles.set("staff", {username: "staff_name", role: "STAFF", fullName: "Unready Staff", email: "s1@example.invalid", dob: "1990-01-01"});
+  f.profiles.set("staff2", {username: "staff2_name", role: "STAFF", fullName: "Ready Staff", email: "s2@example.invalid", dob: "1990-01-01"});
+  f.users.set("admin2", {uid: "admin2", customClaims: {role: "ADMIN"}});
+  f.profiles.set("admin", {username: "admin_name", role: "ADMIN", fullName: "Unready Admin"});
+  f.profiles.set("admin2", {username: "admin2_name", role: "ADMIN", fullName: "Ready Admin"});
+  f.records.set("safetyStaff/staff", {available: true, activeCount: 0});
+  f.records.set("safetyStaff/staff2", {available: true, activeCount: 5});
+  f.records.set("messageDirectory/staff2_name", {uid: "staff2", username: "staff2_name", publicKey: "pk-staff2"});
+  f.records.set("messageDirectory/admin2_name", {uid: "admin2", username: "admin2_name", publicKey: "pk-admin2"});
+
+  const ticket = (await f.load("supportTickets").staffSupportRequest({data: {action: "request"}})).ticket;
+  assert.equal(ticket.staffUid, "staff2");
+
+  f.records.set("safetyPlans/owner", {ownerUid: "owner", fields: {}, consultationRequested: false});
+  const consult = (await f.load("safetyConsultations").safetyPlanConsult({data: {action: "request"}})).plan;
+  assert.equal(consult.staffUid, "staff2");
+
+  f.records.set("conversations/direct", {type: "DIRECT", participantIds: ["owner", "friend"], participantUsernames: {owner: "owner_name", friend: "friend_name"}});
+  const groupTicket = await f.api.conversationRequestStaff({data: {conversationId: "direct"}});
+  assert.equal(groupTicket.staffUid, "staff2");
+
+  f.records.set("conversations/escalate", {type: "SUPPORT", ownerUid: "owner", staffUid: "staff2", adminUid: "", participantIds: ["owner", "staff2"], participantUsernames: {owner: "owner_name", staff2: "staff2_name"}});
+  f.setCaller({uid: "staff2", role: "STAFF"});
+  const escalated = await f.api.safetySupportAdmin({data: {conversationId: "escalate"}});
+  assert.equal(escalated.adminUid, "admin2");
+});

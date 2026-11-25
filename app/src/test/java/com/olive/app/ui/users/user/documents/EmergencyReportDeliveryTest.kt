@@ -21,6 +21,9 @@ import kotlinx.coroutines.runBlocking
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.media.MediaDeviceVerificationException
+import com.olive.app.data.media.MediaRecipientAccountKeyset
+import com.olive.app.data.media.MediaRecipientDeviceKey
+import com.olive.app.data.media.MediaUploadRecipient
 import com.olive.app.support.SessionRuntimeFixture
 import org.junit.Assert.*
 import org.junit.Test
@@ -95,7 +98,31 @@ class EmergencyReportDeliveryTest {
             `when`(appCheck.getAppCheckToken(false)).thenReturn(Tasks.forResult(proof))
             val functions = mock(FirebaseFunctions::class.java)
             val start = mock(HttpsCallableReference::class.java)
-            val startResult = mock(HttpsCallableResult::class.java)
+            val startResult = HttpsCallableResult::class.java
+                .getConstructor(Any::class.java)
+                .newInstance(
+                    mapOf(
+                        "recipients" to listOf(
+                            mapOf(
+                                "uid" to "admin1",
+                                "accountKeyset" to mapOf(
+                                    "keyId" to "123e4567-e89b-42d3-a456-426614174000",
+                                    "epoch" to 1,
+                                    "algorithm" to "RSA-OAEP-256",
+                                    "publicKey" to "admin-keyset-pub",
+                                ),
+                                "publicKey" to "admin-primary-pub",
+                                "devices" to listOf(
+                                    mapOf(
+                                        "deviceId" to "admin-dev-1",
+                                        "publicKey" to "admin-dev-pub",
+                                        "mgf1Digest" to "SHA-256",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
             `when`(functions.getHttpsCallable("emergencyStart")).thenReturn(start)
             `when`(start.call(anyMap<String, Any>())).thenReturn(Tasks.forResult(startResult))
             val documents = mock(SafetyDocumentDataSource::class.java)
@@ -139,6 +166,24 @@ class EmergencyReportDeliveryTest {
                             assertEquals("emergency-report-${request["id"]}.pdf", queue.arguments[1])
                             assertEquals("application/pdf", queue.arguments[2])
                             assertEquals(identity, queue.arguments[3])
+                            assertEquals(
+                                listOf(
+                                    MediaUploadRecipient(
+                                        uid = "admin1",
+                                        accountKeyset = MediaRecipientAccountKeyset(
+                                            keyId = "123e4567-e89b-42d3-a456-426614174000",
+                                            epoch = 1L,
+                                            algorithm = "RSA-OAEP-256",
+                                            publicKey = "admin-keyset-pub",
+                                        ),
+                                        publicKey = "admin-primary-pub",
+                                        devices = listOf(
+                                            MediaRecipientDeviceKey("admin-dev-1", "admin-dev-pub", "SHA-256"),
+                                        ),
+                                    ),
+                                ),
+                                queue.arguments[10],
+                            )
                             @Suppress("UNCHECKED_CAST")
                             (queue.arguments[9] as (String) -> Unit)("Synthetic upload rejected")
                             assertEquals("Synthetic upload rejected", done.get().exceptionOrNull()?.message)

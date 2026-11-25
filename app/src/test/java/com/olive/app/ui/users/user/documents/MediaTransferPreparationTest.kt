@@ -245,4 +245,73 @@ class MediaTransferPreparationTest {
         )
         assertEquals(job, MediaUploadJob.fromJson(job.toJson()))
     }
+
+    @Test
+    fun queueFileWrapsMediaKeyForExtraAdminRecipientsUsingAccountAndDeviceKeys() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val adminRecovery = AccountRecoveryKey.generate()
+            val adminKeyset = AccountKeysetEnvelope.create("admin", adminRecovery)
+            val devicePair = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+            val devicePubBase64 = java.util.Base64.getEncoder().encodeToString(devicePair.public.encoded)
+            val recipient = MediaUploadRecipient(
+                uid = "admin",
+                accountKeyset = MediaRecipientAccountKeyset(
+                    keyId = adminKeyset.keyId,
+                    epoch = adminKeyset.epoch,
+                    algorithm = "RSA-OAEP-256",
+                    publicKey = adminKeyset.publicKeyBase64,
+                ),
+                publicKey = devicePubBase64,
+                devices = listOf(MediaRecipientDeviceKey("admin-dev-1", devicePubBase64, "SHA-256")),
+            )
+
+            val source = f.source()
+            var jobId = ""
+            f.controller.queueFile(
+                source,
+                "emergency-report-1111.pdf",
+                "application/pdf",
+                AccountIdentity("owner", "fixture_owner"),
+                MediaKind.DOCUMENT,
+                OcrReview.NOT_APPLICABLE,
+                null,
+                emptySet(),
+                { jobId = it },
+                { fail(it) },
+                listOf(recipient),
+            )
+            f.session.await { jobId.isNotEmpty() }
+            val job = f.store.get(jobId)!!
+            try {
+                assertEquals(listOf("owner", "admin"), job.source.allowedUsers)
+                assertTrue(job.source.deviceWrappedKeys.containsKey("admin--admin-dev-1"))
+                assertTrue(job.source.accountWrappedKeys.containsKey("owner"))
+                assertTrue(job.source.accountWrappedKeys.containsKey("admin"))
+
+                val ownerKey = KeyManager.unwrapKey(job.source.wrappedKeys.getValue("owner"), job.source.encryptionVersion)
+                val unlockedAdmin = adminKeyset.unlock("admin", adminRecovery)
+                val adminRecoveredKey = job.source.accountWrappedKeys.getValue("admin").unwrap(unlockedAdmin)
+                assertArrayEquals(ownerKey.encoded, adminRecoveredKey.encoded)
+
+                val cipher = javax.crypto.Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
+                cipher.init(
+                    javax.crypto.Cipher.DECRYPT_MODE,
+                    devicePair.private,
+                    javax.crypto.spec.OAEPParameterSpec(
+                        "SHA-256",
+                        "MGF1",
+                        java.security.spec.MGF1ParameterSpec.SHA256,
+                        javax.crypto.spec.PSource.PSpecified.DEFAULT,
+                    ),
+                )
+                val deviceRecoveredBytes = cipher.doFinal(
+                    java.util.Base64.getDecoder().decode(job.source.deviceWrappedKeys.getValue("admin--admin-dev-1")),
+                )
+                assertArrayEquals(ownerKey.encoded, deviceRecoveredBytes)
+            } finally {
+                source.delete()
+                File(job.source.filePath).delete()
+            }
+        }
+    }
 }

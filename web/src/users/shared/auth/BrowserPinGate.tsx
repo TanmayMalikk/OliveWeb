@@ -1,6 +1,7 @@
+// All app roles: unlocks the saved browser enrollment with the user's numeric PIN.
 import { useState } from "react";
 import { ArrowRight, Delete, Leaf, LockKeyhole, LogOut } from "lucide-react";
-import { Button } from "../../../components/SharedComponents";
+import { Button, shakeFormElement } from "../../../components/SharedComponents";
 import { validPin } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
 
@@ -40,9 +41,13 @@ export default function BrowserPinGate() {
           onSubmit={(event) => {
             event.preventDefault();
             if (!canUnlock || session.busy) return;
+            const form = event.currentTarget;
             void session.perform(async () => {
               try {
                 await session.unlock(pin);
+              } catch (failure) {
+                shakeFormElement(form.querySelector(".pin-entry"));
+                throw failure;
               } finally {
                 setPin("");
               }

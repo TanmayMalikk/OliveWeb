@@ -3,6 +3,7 @@ import * as opaque from "@serenity-kit/opaque";
 import {
   createOpaqueRecoveryFlow,
   decryptOpaqueRecoveryEnvelope,
+  encryptOpaqueRecoveryEnvelope,
   type OpaqueRecoveryEnvelope,
 } from "./OpaqueRecoveryFlow";
 import { AccountRecoveryError } from "./AccountKeysetCrypto";
@@ -197,5 +198,97 @@ describe("OPAQUE password recovery flow", () => {
     ));
 
     await expect(flow.unlock("user-a", "SomePassword1!")).rejects.toThrow("15 minutes");
+  });
+
+  it("encrypts and decrypts an OPAQUE envelope and rejects tampered/mismatched metadata", async () => {
+    const accountId = "staff-member-1";
+    const opaqueRecordId = "rec_abcdef0123456789";
+    const originalArk = crypto.getRandomValues(new Uint8Array(32));
+    const exportBytes = crypto.getRandomValues(new Uint8Array(64));
+    const exportKeyBase64Url = toBase64(exportBytes)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const envelope = await encryptOpaqueRecoveryEnvelope({
+      accountId,
+      opaqueRecordId,
+      exportKeyBase64Url,
+      recoveryKey: originalArk,
+    });
+    const decrypted = await decryptOpaqueRecoveryEnvelope({
+      accountId,
+      exportKeyBase64Url,
+      envelope,
+    });
+    expect(decrypted).toEqual(originalArk);
+
+    await expect(decryptOpaqueRecoveryEnvelope({
+      accountId: "other-user",
+      exportKeyBase64Url,
+      envelope,
+    })).rejects.toThrow(AccountRecoveryError);
+    await expect(decryptOpaqueRecoveryEnvelope({
+      accountId,
+      exportKeyBase64Url,
+      envelope: { ...envelope, ciphertext: toBase64(crypto.getRandomValues(new Uint8Array(48))) },
+    })).rejects.toThrow(AccountRecoveryError);
+    decrypted.fill(0);
+  });
+
+  it("completes OPAQUE register and rotate flows end-to-end", async () => {
+    await opaque.ready;
+    const accountId = "admin-user-1";
+    const serverSetup = opaque.server.createSetup();
+    const originalArk = crypto.getRandomValues(new Uint8Array(32));
+    let storedRecord = "";
+    let storedEnvelope: OpaqueRecoveryEnvelope | null = null;
+    let serverLoginState = "";
+
+    const flow = createOpaqueRecoveryFlow(async (name, data) => {
+      const payload = data as Record<string, unknown>;
+      if (name === "opaqueRecoveryBeginRegistration") {
+        const reg = opaque.server.createRegistrationResponse({
+          serverSetup,
+          userIdentifier: accountId,
+          registrationRequest: payload.registrationRequest as string,
+        });
+        return { registrationResponse: reg.registrationResponse };
+      }
+      if (name === "opaqueRecoveryFinishRegistration" || name === "opaqueRecoveryRotate") {
+        storedRecord = payload.registrationRecord as string;
+        storedEnvelope = payload.envelope as OpaqueRecoveryEnvelope;
+        return { success: true };
+      }
+      if (name === "opaqueRecoveryBeginUnlock") {
+        const started = opaque.server.startLogin({
+          serverSetup,
+          userIdentifier: accountId,
+          registrationRecord: storedRecord,
+          startLoginRequest: payload.startLoginRequest as string,
+        });
+        serverLoginState = started.serverLoginState;
+        return { sessionId: "sess-1", loginResponse: started.loginResponse };
+      }
+      if (name === "opaqueRecoveryFinishUnlock") {
+        opaque.server.finishLogin({
+          serverLoginState,
+          finishLoginRequest: payload.finishLoginRequest as string,
+        });
+        return { envelope: storedEnvelope };
+      }
+      throw new Error(`Unexpected callable ${name}`);
+    });
+
+    await flow.register(accountId, "InitialPassword1!", originalArk);
+    const firstUnlock = await flow.unlock(accountId, "InitialPassword1!");
+    expect(firstUnlock).toEqual(originalArk);
+
+    await flow.rotate(accountId, "RotatedPassword2!", firstUnlock);
+    const secondUnlock = await flow.unlock(accountId, "RotatedPassword2!");
+    expect(secondUnlock).toEqual(originalArk);
+    await expect(flow.unlock(accountId, "InitialPassword1!")).rejects.toThrow(AccountRecoveryError);
+    firstUnlock.fill(0);
+    secondUnlock.fill(0);
   });
 });

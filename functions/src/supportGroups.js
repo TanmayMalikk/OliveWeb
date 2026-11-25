@@ -25,15 +25,45 @@ async function participantNames(participantIds) {
   ]));
 }
 
+// Checks whether a staff or admin account has published its messaging encryption key.
+async function hasRegisteredMessagingKey(uid, username) {
+  const cleanUsername = String(username || "").trim().toLowerCase();
+  if (!uid || !/^[a-z0-9_]{4,24}$/.test(cleanUsername)) return false;
+  const row = await db.collection("messageDirectory").doc(cleanUsername).get();
+  const publicKey = row.get("publicKey");
+  return row.exists &&
+    row.get("uid") === uid &&
+    typeof publicKey === "string" &&
+    publicKey.trim().length > 0;
+}
+
+// Prefers candidates that have published a messaging public key so chats encrypt immediately.
+async function filterKeyReadyCandidates(candidates, {strict = false} = {}) {
+  if (!candidates.length) return [];
+  const readiness = await Promise.all(candidates.map(async candidate => ({
+    candidate,
+    ready: await hasRegisteredMessagingKey(candidate.uid, candidate.username),
+  })));
+  const ready = readiness.filter(entry => entry.ready).map(entry => entry.candidate);
+  if (strict) return ready;
+  return ready.length ? ready : candidates;
+}
+
 // Finds active staff accounts that are ready to receive another support chat.
-async function eligibleStaffCandidates() {
+async function eligibleStaffCandidates({strictKeyReady = false} = {}) {
   const result = [];
   for (const user of await listEveryUser()) {
     if (user.disabled || user.customClaims?.role !== "STAFF") continue;
     const profile = await readProfile(user.uid);
-    if (staffEligible(user, profile)) result.push({uid: user.uid, name: profile.fullName});
+    if (staffEligible(user, profile)) {
+      result.push({
+        uid: user.uid,
+        name: profile.fullName,
+        username: String(profile.username || user.displayName || "").trim().toLowerCase(),
+      });
+    }
   }
-  return result;
+  return filterKeyReadyCandidates(result, {strict: strictKeyReady});
 }
 
 // Checks group ownership, membership, and the two-person minimum before a removal.
@@ -164,21 +194,26 @@ exports.safetySupportAdmin = onCall({invoker: "public"}, async (request) => {
   if (!conversationSnapshot.exists || conversationSnapshot.get("staffUid") !== caller.uid) {
     throw new HttpsError("permission-denied", "Only the assigned staff member can request admin help.");
   }
-  const candidates = [];
+  const rawCandidates = [];
   // Builds the list from trusted admin claims and completed profiles.
   for (const user of await listEveryUser()) {
     if (user.disabled || user.customClaims?.role !== "ADMIN") continue;
     const profile = await readProfile(user.uid);
-    candidates.push({uid: user.uid, name: profile?.fullName || user.displayName || "Administrator"});
+    rawCandidates.push({
+      uid: user.uid,
+      name: profile?.fullName || user.displayName || "Administrator",
+      username: String(profile?.username || user.displayName || "").trim().toLowerCase(),
+    });
   }
-  if (!candidates.length) throw new HttpsError("failed-precondition", "No administrator is available.");
+  if (!rawCandidates.length) throw new HttpsError("failed-precondition", "No administrator is available.");
+  const candidates = await filterKeyReadyCandidates(rawCandidates);
   return db.runTransaction(async transaction => {
     const snapshot = await transaction.get(conversationReference);
     const conversation = snapshot.data();
     if (conversation?.staffUid !== caller.uid) {
       throw new HttpsError("permission-denied", "Only the assigned staff member can request admin help.");
     }
-    const selected = candidates.find(admin => admin.uid === conversation.adminUid) ||
+    const selected = rawCandidates.find(admin => admin.uid === conversation.adminUid) ||
       candidates[Math.floor(Math.random() * candidates.length)];
     const origin = conversation.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
     const personalParticipantUids = (conversation.participantIds || []).filter(uid =>
@@ -509,5 +544,7 @@ module.exports.supportConversationId = supportConversationId;
 module.exports.PLAN_CONSULT = PLAN_CONSULT;
 module.exports.SUPPORT = SUPPORT;
 module.exports.eligibleStaffCandidates = eligibleStaffCandidates;
+module.exports.hasRegisteredMessagingKey = hasRegisteredMessagingKey;
+module.exports.filterKeyReadyCandidates = filterKeyReadyCandidates;
 module.exports.validateGroupRemoval = validateGroupRemoval;
 module.exports.canCloseSupportConversation = canCloseSupportConversation;

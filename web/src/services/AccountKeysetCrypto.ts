@@ -110,6 +110,81 @@ export const accountKeysetWrappers = {
   },
 };
 
+export async function createAccountKeysetEnvelope(
+  accountId: string,
+  recoveryKey: Uint8Array,
+): Promise<{ envelope: AccountKeysetEnvelope; keyset: UnlockedAccountKeyset }> {
+  if (!validAccountId(accountId)) {
+    throw new AccountRecoveryError("Invalid account ID.");
+  }
+  validateLength(recoveryKey, RECOVERY_KEY_BYTES, "Invalid recovery key.");
+  const pair = await crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: 3072,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["encrypt", "decrypt"],
+  );
+  const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
+  let pkcs8: Uint8Array | undefined;
+  try {
+    pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+    const keyId = crypto.randomUUID();
+    const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+    const envelopeHeader: AccountKeysetEnvelope = {
+      version: 1,
+      accountId,
+      keyId,
+      epoch: 1,
+      algorithm: "RSA-OAEP-256",
+      publicKey: toBase64(spki),
+      iv: toBase64(iv),
+      ciphertext: "",
+    };
+    const aes = await crypto.subtle.importKey(
+      "raw",
+      recoveryKey as BufferSource,
+      "AES-GCM",
+      false,
+      ["encrypt"],
+    );
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv as BufferSource,
+        additionalData: accountKeysetAad(envelopeHeader),
+      },
+      aes,
+      pkcs8 as BufferSource,
+    ));
+    const [publicKey, privateKey] = await Promise.all([
+      crypto.subtle.importKey(
+        "spki",
+        spki as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["encrypt"],
+      ),
+      crypto.subtle.importKey(
+        "pkcs8",
+        pkcs8 as BufferSource,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["decrypt"],
+      ),
+    ]);
+    return {
+      envelope: { ...envelopeHeader, ciphertext: toBase64(ciphertext) },
+      keyset: { accountId, keyId, epoch: 1, publicKey, privateKey },
+    };
+  } finally {
+    pkcs8?.fill(0);
+  }
+}
+
 export async function unlockAccountKeyset(
   accountId: string,
   recoveryKey: Uint8Array,
@@ -220,7 +295,11 @@ function parseAccountKeyDirectory(value: unknown): AccountKeyDirectory {
 }
 
 export function toBase64(value: Uint8Array): string {
-  return btoa(String.fromCharCode(...value));
+  const chunks: string[] = [];
+  for (let offset = 0; offset < value.byteLength; offset += 0x8000) {
+    chunks.push(String.fromCharCode(...value.subarray(offset, offset + 0x8000)));
+  }
+  return btoa(chunks.join(""));
 }
 
 export function fromBase64(value: string): Uint8Array {

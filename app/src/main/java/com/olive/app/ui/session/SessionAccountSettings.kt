@@ -435,7 +435,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         try {
                             val ark = accountRecoveryKey(device.uid, token)
                             opaqueRecoveryRepository?.rotate(
-                                device.uid, currentPassword, newPassword, ark, firebasePassword = newPassword,
+                                device.uid,
+                                currentPassword,
+                                newPassword,
+                                ark,
+                                firebasePassword = newPassword,
                             )
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -616,16 +620,16 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Verifies that the setup or unlocked Safe session still belongs to the same user.
+     * Verifies that the setup or unlocked Safe/Portal session still belongs to the same account.
      *
      * @param uid The account UID used to scope this operation.
      * @param token The session epoch captured when the operation started.
      * @return True while the same user and session may complete recovery setup or unlock.
      */
     internal fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
-        if (epoch != token || state.accountRole != AccountRole.USER || state.privacyBlackout) return@with false
+        if (epoch != token || state.privacyBlackout) return@with false
         when (state.screen) {
-            SessionScreen.Safe -> enrollment?.uid == uid
+            SessionScreen.Safe, SessionScreen.Portal -> enrollment?.uid == uid
             SessionScreen.NewCredentials, SessionScreen.ReturningCredentials ->
                 enrollment == null && pendingIdentity?.uid == uid && accounts.authenticatedUid() == uid
             else -> false

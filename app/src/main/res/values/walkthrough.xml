@@ -153,7 +153,7 @@
     <string name="wt_step_hotlines_directory_title">Hotlines · Categories, search &amp; favorites</string>
     <string name="wt_step_hotlines_directory_body">Filter 24/7 crisis lines, shelters, legal aid, and counseling; heart favorites to Save, dial directly, or view on the map.</string>
     <string name="wt_step_contacts_directory_title">Trusted contacts · Safe directory</string>
-    <string name="wt_step_contacts_directory_body">Add up to 25 trusted contacts, mark who is safe to stay with in an emergency, and link entries to chat friends.</string>
+    <string name="wt_step_contacts_directory_body">Add up to 100 trusted contacts, mark who is safe to stay with in an emergency, and link entries to chat friends.</string>
 
     <string name="wt_step_profile_overview_title">My profile · Account summary cards</string>
     <string name="wt_step_profile_overview_body">Review your account role, username, email consent status, cover disguise, and saved delivery/city details in one view.</string>

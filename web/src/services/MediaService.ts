@@ -104,6 +104,22 @@ async function wrapForPublicKey(
 }
 
 // Sends encrypted bytes to R2 using one short-lived ticket per upload part.
+async function callProtectedMedia(name: string, payload: Record<string, unknown>) {
+  const { auth, functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  try {
+    return (await httpsCallable(functions, name)(payload))?.data;
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    if (code === "functions/unauthenticated" && auth?.currentUser) {
+      throw new Error(
+        "App Check verification failed (401). Confirm Firebase App Check is enabled for this domain and reload.",
+      );
+    }
+    throw error;
+  }
+}
+
 async function uploadCiphertext(
   jobId: string,
   ciphertext: Uint8Array,
@@ -114,26 +130,19 @@ async function uploadCiphertext(
   uid: string,
   report: (fraction: number) => void,
 ) {
-  const { functions } = await firebase();
-  const { httpsCallable } = await import("firebase/functions");
   let mediaId = "";
   try {
-    const created = (
-      await httpsCallable(
-        functions,
-        "mediaCreateUpload",
-      )({
-        jobId,
-        ciphertextSize: ciphertext.byteLength,
-        ciphertextSha256: await checksum(ciphertext),
-        encryptedMetadata,
-        wrappedKeys,
-        deviceWrappedKeys,
-        accountWrappedKeys,
-        allowedUsers: [uid],
-        encryptionVersion: 2,
-      })
-    ).data as {
+    const created = (await callProtectedMedia("mediaCreateUpload", {
+      jobId,
+      ciphertextSize: ciphertext.byteLength,
+      ciphertextSha256: await checksum(ciphertext),
+      encryptedMetadata,
+      wrappedKeys,
+      deviceWrappedKeys,
+      accountWrappedKeys,
+      allowedUsers: [uid],
+      encryptionVersion: 2,
+    })) as {
       mediaId: string;
       mode: "SINGLE" | "MULTIPART";
       partSize: number;
@@ -145,12 +154,10 @@ async function uploadCiphertext(
     const count = Math.ceil(ciphertext.byteLength / partSize);
     for (let index = 0; index < count; index++) {
       const partNumber = index + 1;
-      const ticket = (
-        await httpsCallable(
-          functions,
-          "mediaUploadPartTicket",
-        )({ jobId, partNumber })
-      ).data as {
+      const ticket = (await callProtectedMedia("mediaUploadPartTicket", {
+        jobId,
+        partNumber,
+      })) as {
         url: string;
         headers?: Record<string, string>;
       };
@@ -183,14 +190,11 @@ async function uploadCiphertext(
       }
       report((index + 1) / count);
     }
-    await httpsCallable(functions, "mediaCompleteUpload")({ jobId, parts });
+    await callProtectedMedia("mediaCompleteUpload", { jobId, parts });
     return mediaId;
   } catch (error) {
     if (mediaId)
-      await httpsCallable(
-        functions,
-        "mediaAbortUpload",
-      )({ jobId }).catch(() => undefined);
+      await callProtectedMedia("mediaAbortUpload", { jobId }).catch(() => undefined);
     throw error;
   }
 }
@@ -607,11 +611,24 @@ async function resolveBrowserDocuments(
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));
 }
 
+// Documents: loads a single authorized document (such as an emergency report PDF) directly by ID.
+export async function loadBrowserDocumentById(
+  identity: Identity,
+  mediaId: string,
+): Promise<BrowserDocument> {
+  const cleanId = mediaId.trim();
+  if (!cleanId) throw new Error("Emergency report file was not found.");
+  await register(identity);
+  const { db } = await firebase();
+  const snapshot = await getDocFromServer(doc(db, "files", cleanId));
+  if (!snapshot.exists()) throw new Error("Emergency report file was not found.");
+  const [resolved] = await resolveBrowserDocuments(identity, [snapshot]);
+  return resolved;
+}
+
 // Documents: saves the Evidence toggle for the owner without opening the encrypted file.
 export async function setBrowserDocumentEvidence(mediaId: string, evidence: boolean) {
-  const { functions } = await firebase();
-  const { httpsCallable } = await import("firebase/functions");
-  await httpsCallable(functions, "mediaUpdateEvidence")({ mediaId, evidence });
+  await callProtectedMedia("mediaUpdateEvidence", { mediaId, evidence });
 }
 
 // Formats a checksum as lowercase hexadecimal for integrity checks.
@@ -624,14 +641,9 @@ function hexadecimal(bytes: Uint8Array) {
 /** Downloads ciphertext directly from R2, verifies it, and decrypts only inside this browser. */
 export async function openBrowserDocument(document: BrowserDocument) {
   if (!document.key) throw new Error(document.approvalMessage);
-  const { functions } = await firebase();
-  const { httpsCallable } = await import("firebase/functions");
-  const ticket = (
-    await httpsCallable(
-      functions,
-      "mediaDownloadTicket",
-    )({ mediaId: document.id })
-  ).data as {
+  const ticket = (await callProtectedMedia("mediaDownloadTicket", {
+    mediaId: document.id,
+  })) as {
     url?: unknown;
     headers?: unknown;
   };

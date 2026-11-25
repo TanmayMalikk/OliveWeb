@@ -490,6 +490,12 @@ export class Accounts {
       EmailAuthProvider.credential(auth.currentUser.email!, current),
     );
     await updatePassword(auth.currentUser, next);
+    try {
+      const { rotateBrowserPasswordRecovery } = await import("./BrowserAccountKeysetRecovery");
+      await rotateBrowserPasswordRecovery(identity.uid, current, next);
+    } catch (error) {
+      console.warn("Failed to rotate password recovery", error);
+    }
     await (
       await database
     ).put("accounts", {

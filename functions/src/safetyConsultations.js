@@ -4,7 +4,7 @@ const {db, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseConsultStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
-const {saveSupportConversation, supportConversationId, PLAN_CONSULT} = require("./supportGroups");
+const {saveSupportConversation, supportConversationId, PLAN_CONSULT, filterKeyReadyCandidates} = require("./supportGroups");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
@@ -14,14 +14,21 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   }
   const reference = planReference(caller.uid);
   const newConversationId = supportConversationId(caller.uid, PLAN_CONSULT);
-  const candidates = [];
+  const rawCandidates = [];
   if (action === "request") {
     for (const user of await listEveryUser()) {
       if (user.disabled || user.customClaims?.role !== "STAFF") continue;
       const profile = await readProfile(user.uid);
-      if (staffEligible(user, profile)) candidates.push({uid: user.uid, name: profile.fullName});
+      if (staffEligible(user, profile)) {
+        rawCandidates.push({
+          uid: user.uid,
+          name: profile.fullName,
+          username: String(profile.username || user.displayName || "").trim().toLowerCase(),
+        });
+      }
     }
   }
+  const candidates = action === "request" ? await filterKeyReadyCandidates(rawCandidates) : [];
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("failed-precondition", "Sync the plan before sharing.");

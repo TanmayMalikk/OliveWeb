@@ -73,13 +73,13 @@ class SessionSecureSharingTest {
     fun sharedEntryPreviewClearsOnCloseAndOpeningErrorsKeepPrivateContentHidden() = runBlocking<Unit> {
         SessionRuntimeFixture().use { f ->
             val entry = PrivateEntry(id = "entry", title = "Shared", body = "Synthetic private body")
-            `when`(f.secureDocuments.loadAndDecryptEntry("entry", "owner")).thenReturn(entry)
+            `when`(f.secureDocuments.loadAndDecryptEntry(eq("entry") ?: "entry", eq("owner") ?: "owner", any())).thenReturn(entry)
             f.runtime.secureSharing.open("entry")
             f.await { !f.runtime.state.busy }
             assertEquals(entry, f.runtime.state.viewedSharedEntry)
             f.runtime.secureSharing.close()
             assertNull(f.runtime.state.viewedSharedEntry)
-            `when`(f.secureDocuments.loadAndDecryptEntry("entry", "owner")).thenAnswer { error("Revoked") }
+            `when`(f.secureDocuments.loadAndDecryptEntry(eq("entry") ?: "entry", eq("owner") ?: "owner", any())).thenAnswer { error("Revoked") }
             f.runtime.secureSharing.open("entry")
             f.await { !f.runtime.state.busy }
             assertNull(f.runtime.state.viewedSharedEntry)
@@ -273,6 +273,39 @@ class SessionSecureSharingTest {
             } finally {
                 WorkManagerImpl.setDelegate(null)
             }
+        }
+    }
+
+    @Test
+    fun supportTicketRoomKeyAdoptsReassignedStaffParticipantsFromPrepareKeys() = runBlocking<Unit> {
+        SessionRuntimeFixture().use { f ->
+            val replacementPeer = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+            val encodedReplacement = Base64.getEncoder().encodeToString(replacementPeer.public.encoded)
+            val key = EncryptionUtils.generateSymmetricKey()
+            val staleTicket = ChatConversation(
+                id = "support-owner-545",
+                friendshipId = "support-owner-545",
+                type = "SUPPORT",
+                participantIds = listOf("owner", "old_staff"),
+                participantUsernames = mapOf("owner" to "fixture_owner", "old_staff" to "old_staff_name"),
+                staffUid = "old_staff",
+            )
+            `when`(f.messaging.prepareTicketParticipantNames("support-owner-545")).thenReturn(
+                mapOf("owner" to "fixture_owner", "new_staff" to "new_staff_name"),
+            )
+            `when`(f.messaging.searchUsers("new_staff_name", "owner")).thenReturn(
+                listOf(DirectoryUser("new_staff", "new_staff_name", encodedReplacement)),
+            )
+            val expectedConversation = staleTicket.copy(
+                participantIds = listOf("owner", "new_staff"),
+                participantUsernames = mapOf("owner" to "fixture_owner", "new_staff" to "new_staff_name"),
+            )
+            `when`(f.secureChat.ensureRoomKey(eq(expectedConversation) ?: expectedConversation, eq("owner") ?: "owner", anyMap()))
+                .thenReturn(key)
+
+            val opened = f.runtime.secureSharing.roomKey(staleTicket)
+            assertArrayEquals(key.encoded, opened.encoded)
+            verify(f.messaging, never()).searchUsers("old_staff_name", "owner")
         }
     }
 

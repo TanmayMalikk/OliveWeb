@@ -128,14 +128,27 @@ internal fun Trash(
                 colors = CardDefaults.cardColors(containerColor = palette.container, contentColor = Ink)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
-                            R.string.note
-                        ),
-                        color = palette.accent,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
+                                R.string.note
+                            ),
+                            color = palette.accent,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (entry.attachmentIds.isNotEmpty()) {
+                            Icon(
+                                Icons.Outlined.AttachFile,
+                                contentDescription = uiText(R.string.note_attachment_count, entry.attachmentIds.size),
+                                tint = palette.accent,
+                                modifier = Modifier.size(16.dp).testTag("trash_entry_attachment_icon"),
+                            )
+                        }
+                    }
                     if (entry.title.isNotBlank()) Text(
                         entry.title,
                         style = MaterialTheme.typography.titleMedium
@@ -326,15 +339,28 @@ internal fun PrivateNoteCard(
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
-                        R.string.note
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = palette.accent,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
+                            R.string.note
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = palette.accent,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (entry.attachmentIds.isNotEmpty()) {
+                        Icon(
+                            Icons.Outlined.AttachFile,
+                            contentDescription = null,
+                            tint = palette.accent,
+                            modifier = Modifier.size(16.dp).testTag("private_entry_attachment_icon"),
+                        )
+                    }
+                }
                 IconButton(
                     onClick = pin,
                     modifier = Modifier.size(48.dp).testTag("private_pin")
@@ -629,8 +655,15 @@ internal fun SharedPrivateNoteCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = accent,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
                 )
+                if (entry.attachmentIds.isNotEmpty()) {
+                    Icon(
+                        Icons.Outlined.AttachFile,
+                        contentDescription = stringResource(R.string.note_attachment_count, entry.attachmentIds.size),
+                        tint = accent,
+                        modifier = Modifier.size(16.dp).testTag("shared_private_entry_attachment_icon"),
+                    )
+                }
             }
             if (entry.title.isNotBlank()) {
                 Text(

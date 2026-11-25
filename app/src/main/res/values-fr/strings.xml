@@ -140,7 +140,7 @@
     <string name="edit_contact">Modifier le contact</string>
     <string name="phone_or_email">Téléphone ou courriel</string>
     <string name="enter_a_name_and_a_phone_number_or_email">Saisissez un nom et un téléphone ou courriel.</string>
-    <string name="you_can_save_up_to_25_contacts">Vous pouvez enregistrer jusqu’à 25 contacts.</string>
+    <string name="you_can_save_up_to_25_contacts">Vous pouvez enregistrer jusqu’à 100 contacts.</string>
     <string name="save_contact">Enregistrer le contact</string>
 <string name="save_settings">Enregistrer les paramètres</string>
     <string name="change_account_password">Changer le mot de passe du compte</string>

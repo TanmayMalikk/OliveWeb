@@ -79,6 +79,11 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
     }
     var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
     val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+    LaunchedEffect(session.coverAccountId, session.localMode) {
+        if (!session.localMode && session.coverAccountId != null) {
+            session.refreshPasswordRecovery()
+        }
+    }
     OlivePrivateDesign {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

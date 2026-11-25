@@ -171,7 +171,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     private fun startConversationLoadingTimeout(conversationId: String, token: Long) {
         loadingConversation = true
         messageLoadTimeout = runtime.scope.launch {
-            delay(12_000.milliseconds)
+            delay(20_000.milliseconds)
             if (isCurrentConversation(conversationId, token) && loadingConversation) {
                 loadingConversation = false
                 if (runtime.state.chatMessages.isEmpty()) {
@@ -215,7 +215,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     publishMessages(conversation.id, uid, key, null, token)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
+                    Log.w("OliveMessaging", "Unable to open encrypted conversation ${conversation.id}", failure)
                     if (isCurrentConversation(conversation.id, token)) {
                         finishLoadingConversation()
                         activeRoomKey = null
@@ -259,7 +260,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         hasCachedAccess: Boolean,
     ): SecretKey = with(runtime) {
         try {
-            withTimeoutOrNull(if (hasCachedAccess) 3_000.milliseconds else 8_000.milliseconds) {
+            withTimeoutOrNull(if (hasCachedAccess) 3_000.milliseconds else 15_000.milliseconds) {
                 val onlineKey = secureSharing.roomKey(conversation)
                 val wrapped = secure.wrappedRoomKey(conversation.id, uid)
                     ?: error("Wrapped room key unavailable")

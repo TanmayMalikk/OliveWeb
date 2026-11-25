@@ -15,6 +15,9 @@ import android.media.MediaMetadataRetriever
 import android.os.ParcelFileDescriptor
 import androidx.core.graphics.createBitmap
 import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.media.MediaRecipientAccountKeyset
+import com.olive.app.data.media.MediaRecipientDeviceKey
+import com.olive.app.data.media.MediaUploadRecipient
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.PrivateEntryKind
@@ -39,6 +42,47 @@ internal data class EmergencyReportMedia(
     val document: SafetyDocument,
     val file: File?,
 )
+
+/**
+ * Parses authorized admin recipient key metadata returned by the `emergencyStart` callable.
+ *
+ * @param raw Raw callable response payload returned by `emergencyStart`.
+ * @return Parsed list of [MediaUploadRecipient] entries ready for media key wrapping.
+ */
+internal fun parseEmergencyRecipients(raw: Any?): List<MediaUploadRecipient> {
+    val entries = (raw as? Map<*, *>)?.get("recipients") as? List<*> ?: return emptyList()
+    return entries.mapNotNull { item ->
+        val map = item as? Map<*, *> ?: return@mapNotNull null
+        val uid = (map["uid"] as? String)?.trim()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        val keysetMap = map["accountKeyset"] as? Map<*, *>
+        val accountKeyset = keysetMap?.let {
+            val keyId = (it["keyId"] as? String)?.trim().orEmpty()
+            val epoch = (it["epoch"] as? Number)?.toLong() ?: 0L
+            val algorithm = (it["algorithm"] as? String)?.trim().orEmpty()
+            val publicKey = (it["publicKey"] as? String)?.trim().orEmpty()
+            if (keyId.isNotBlank() && epoch > 0L && algorithm.isNotBlank() && publicKey.isNotBlank()) {
+                MediaRecipientAccountKeyset(keyId, epoch, algorithm, publicKey)
+            } else {
+                null
+            }
+        }
+        val publicKey = (map["publicKey"] as? String)?.trim().orEmpty()
+        val devices = ((map["devices"] as? List<*>) ?: emptyList<Any?>()).mapNotNull { dev ->
+            val devMap = dev as? Map<*, *> ?: return@mapNotNull null
+            val deviceId = (devMap["deviceId"] as? String)?.trim()?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            val devKey = (devMap["publicKey"] as? String)?.trim()?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            val digest = if (devMap["mgf1Digest"] == "SHA-256") "SHA-256" else "SHA-1"
+            MediaRecipientDeviceKey(deviceId, devKey, digest)
+        }
+        if (accountKeyset != null || publicKey.isNotBlank() || devices.isNotEmpty()) {
+            MediaUploadRecipient(uid, accountKeyset, publicKey, devices)
+        } else {
+            null
+        }
+    }
+}
 
 /**
  * Computes emergency incident date.

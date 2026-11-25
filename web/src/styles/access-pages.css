@@ -90,7 +90,7 @@
 .access-sign-in .access-card { border-radius: 0 1rem 1rem 0; }
 .access-sign-in .access-card h1 { margin-bottom: 1.25rem; }
 .access-card :is(input:not([type='radio']), select) { border-radius: 0.6rem; font-size: 1rem; }
-.access-sign-in form > .button,
+.access-sign-in form > .button { width: 100%; }
 .access-sign-in .auth-switch { margin: 0.75rem 0 0; }
 .access-sign-in .account-utility-links { margin-top: 0.35rem; }
 .access-sign-in .storage-note { margin-top: 0.8rem; }
@@ -204,12 +204,16 @@
 .pin-dot.filled {
   background: var(--olive);
   border-color: var(--olive);
+  transform: scale(1.08);
 }
 .pin-keypad-options > summary {
-  padding: 0.7rem;
+  padding: 0.65rem;
   color: var(--olive);
+  font-weight: 600;
+  font-size: 0.92rem;
   cursor: pointer;
   min-height: 2.75rem;
+  list-style-position: inside;
 }
 .pin-keypad {
   display: grid;
@@ -232,9 +236,9 @@
 .pin-keypad > button:nth-child(10) { grid-column: 2; }
 .pin-keypad > button:hover:not(:disabled) { background: var(--soft); }
 .pin-keypad > button:active:not(:disabled) { transform: scale(0.96); }
-.pin-form > .button { min-height: 3rem; border-radius: 0.9rem; }
+.pin-form > .button { width: 100%; min-height: 3rem; border-radius: 0.9rem; }
 .pin-card .form-error { margin: 0; text-align: left; }
-.pin-card > .text-link { min-height: 2.75rem; }
+.pin-card > .text-link { margin-top: 0.5rem; min-height: 2.75rem; }
 
 @media (forced-colors: active) {
   .pin-card .pin-entry input, .pin-entry input::selection { forced-color-adjust: none; }

@@ -7,7 +7,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.account.AccountRecoveryDeviceVerificationException
-import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.OpaqueRecoveryRepository
 import com.olive.app.security.AccountKeysetEnvelope
 import com.olive.app.security.AccountKeysetException
@@ -100,7 +99,7 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
         with(state) {
             val uid = enrollment?.uid ?: return@with
             val recovery = opaqueRecoveryRepository ?: return@with
-            if (screen != SessionScreen.Safe || busy || accountRole != AccountRole.USER) return@with
+            if (screen !in setOf(SessionScreen.Safe, SessionScreen.Portal) || busy) return@with
             operations.runOperation(
                 application.getString(R.string.password_recovery_error_unsupported),
                 failureFor = ::passwordRecoveryFailure,

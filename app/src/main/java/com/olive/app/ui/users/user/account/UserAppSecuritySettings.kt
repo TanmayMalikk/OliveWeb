@@ -686,7 +686,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                     showErrors = true
                     shakeAttempt += 1
                     session.account.showError(uiText(R.string.enter_a_name_and_a_phone_number_or_email))
-                } else if (editing == null && profile.contacts.size >= 25) {
+                } else if (editing == null && profile.contacts.size >= 100) {
                     session.account.showError(uiText(R.string.you_can_save_up_to_25_contacts))
                 } else {
                     val contact = SafeContact(

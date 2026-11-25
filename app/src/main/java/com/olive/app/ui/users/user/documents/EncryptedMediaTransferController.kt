@@ -31,7 +31,9 @@ import com.olive.app.data.media.MediaTransferStatus
 import com.olive.app.data.media.MediaTransferStore
 import com.olive.app.data.media.MediaUploadJob
 import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.MediaUploadRecipient
 import com.olive.app.data.media.MediaUploadWorker
+import com.olive.app.data.media.wrapMediaKeyForRecipients
 import com.olive.app.data.media.OcrReview
 import com.olive.app.data.media.pickerMediaKind
 import com.olive.app.data.media.OfflineMediaAvailability
@@ -102,12 +104,14 @@ internal interface MediaTransferOperations {
      * @param tags Collection of tags values to process.
      * @param onQueued Callback invoked when queued changes or occurs.
      * @param onFailure Callback invoked when failure changes or occurs.
+     * @param extraRecipients Optional additional recipients whose public keys also receive wrapped AES keys.
      */
     fun queueFile(
         file: File, name: String, mimeType: String, owner: AccountIdentity, kind: MediaKind,
         ocrReview: OcrReview, ocr: DocumentOcrMetadata?,
         tags: Set<String> = emptySet(),
         onQueued: (String) -> Unit, onFailure: (String) -> Unit,
+        extraRecipients: List<MediaUploadRecipient> = emptyList(),
     )
     /**
      * Downloads, checks, and decrypts one allowed media file.
@@ -342,12 +346,14 @@ internal class MediaTransferController(
      * @param tags Collection of tags values to process.
      * @param onQueued Callback invoked when queued changes or occurs.
      * @param onFailure Callback invoked when failure changes or occurs.
+     * @param extraRecipients Optional additional recipients whose public keys also receive wrapped AES keys.
      */
     override fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
         ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
         tags:Set<String>,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
+        extraRecipients: List<MediaUploadRecipient>,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             val message="Document quality review recommends another capture"
@@ -359,7 +365,7 @@ internal class MediaTransferController(
             state=MediaTransferState.Preparing("encrypting")
             runCatching { withContext(Dispatchers.IO) {
                 require(file.isFile && file.length()>0) { "Media source is empty" }
-                prepare(file.inputStream(),name,mimeType,owner,kind,ocrReview,ocr,tags)
+                prepare(file.inputStream(),name,mimeType,owner,kind,ocrReview,ocr,tags,extraRecipients=extraRecipients)
             } }.onSuccess { job ->
                 store.write(job)
                 MediaUploadWorker.enqueue(applicationContext,job.id)
@@ -775,6 +781,7 @@ internal class MediaTransferController(
      * @param ocr Optional OCR supplied to [prepare].
      * @param tags Collection of tags values to process.
      * @param chatOnly Whether this upload belongs only in chat timelines and not in document storage.
+     * @param extraRecipients Optional additional recipients whose public keys also receive wrapped AES keys.
      * @return The resulting [MediaUploadJob] instance.
      */
     private suspend fun prepare(
@@ -782,6 +789,7 @@ internal class MediaTransferController(
         ocr:DocumentOcrMetadata?=null,
         tags:Set<String> = emptySet(),
         chatOnly:Boolean = false,
+        extraRecipients:List<MediaUploadRecipient> = emptyList(),
     ):MediaUploadJob {
         val accountKeyset=accountKeysetProvider(owner.uid)
             ?: error("Set up account recovery before uploading encrypted media")
@@ -821,19 +829,10 @@ internal class MediaTransferController(
             }.toString()
             // Device and account wrappers are parallel encrypted copies of this AES key. Firebase
             // receives neither the raw key nor a wrapper it can decrypt.
-            val publicKey=KeyManager.getOrCreatePublicKey()
-            val ownerWrapped=KeyManager.wrapKey(key,publicKey)
-            val wrapped=mapOf(owner.uid to ownerWrapped)
-            val deviceWrapped=mapOf("${owner.uid}--${KeyManager.deviceId(publicKey)}" to ownerWrapped)
-            val accountWrapped=mapOf(owner.uid to AccountKeysetWrappedKey(
-                accountKeyset.keyId,accountKeyset.epoch,"RSA-OAEP-256",
-                KeyManager.wrapForAccountKeyset(
-                    key,KeyManager.decodePublicKey(accountKeyset.publicKeyBase64),
-                ),
-            ))
+            val envelopes=wrapMediaKeyForRecipients(key,owner.uid,accountKeyset,extraRecipients)
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),offlineCache.sha256(target),
-                EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
-                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped,accountWrapped)
+                EncryptionUtils.encryptText(metadata,key),envelopes.wrappedKeys,envelopes.allowedUsers,
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,envelopes.deviceWrappedKeys,envelopes.accountWrappedKeys)
             return MediaUploadJob(jobId,owner.uid,prepared,
                 attachToSafetyPlan = tags.any { it.startsWith("safety-plan:") })
         } catch (failure: Throwable) {

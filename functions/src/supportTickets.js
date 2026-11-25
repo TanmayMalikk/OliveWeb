@@ -5,7 +5,7 @@ const {db, messaging, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");
-const {saveSupportConversation, supportConversationId, SUPPORT} =
+const {saveSupportConversation, supportConversationId, SUPPORT, eligibleStaffCandidates} =
   require("./supportGroups");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 
@@ -53,15 +53,9 @@ function fcmTargetsForConversationUpdate(before, after, conversationId) {
   };
 }
 
-// Finds staff accounts that are active and ready to receive support tickets.
+// Finds staff accounts that are active, have completed their profile, and prefer key-ready accounts.
 async function candidates() {
-  const result = [];
-  for (const user of await listEveryUser()) {
-    if (user.disabled || user.customClaims?.role !== "STAFF") continue;
-    const profile = await readProfile(user.uid);
-    if (staffEligible(user, profile)) result.push({uid: user.uid, name: profile.fullName});
-  }
-  return result;
+  return eligibleStaffCandidates();
 }
 
 // Starts or cancels a user's regular support ticket independently of consultations.

@@ -140,7 +140,7 @@
     <string name="edit_contact">تحرير جهة الاتصال</string>
     <string name="phone_or_email">الهاتف أو البريد الإلكتروني</string>
     <string name="enter_a_name_and_a_phone_number_or_email">أدخل اسمًا ورقم هاتف أو بريدًا إلكترونيًا.</string>
-    <string name="you_can_save_up_to_25_contacts">يمكنك حفظ ما يصل إلى 25 جهة اتصال.</string>
+    <string name="you_can_save_up_to_25_contacts">يمكنك حفظ ما يصل إلى 100 جهة اتصال.</string>
     <string name="save_contact">حفظ جهة الاتصال</string>
 <string name="save_settings">حفظ الإعدادات</string>
     <string name="change_account_password">تغيير كلمة مرور الحساب</string>

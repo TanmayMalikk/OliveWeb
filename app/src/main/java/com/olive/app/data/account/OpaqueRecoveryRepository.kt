@@ -201,7 +201,7 @@ internal class OpaqueRecoveryRepository(
      * Rotates the recovery password and updates the recovery envelope atomically.
      *
      * @param accountId Firebase UID of the signed-in account.
-     * @param oldPassword Current recovery password to reauthenticate and unlock with if needed.
+     * @param oldPassword Current recovery password used to unlock ARK if [currentRecoveryKey] is null.
      * @param newPassword New recovery password to enroll.
      * @param currentRecoveryKey Already unlocked recovery key, or `null` to unlock via [oldPassword].
      * @param firebasePassword Current Firebase credential, which may already have changed.

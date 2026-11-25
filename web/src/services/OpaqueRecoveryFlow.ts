@@ -2,6 +2,7 @@ import * as opaque from "@serenity-kit/opaque";
 import {
   AccountRecoveryError,
   fromBase64,
+  toBase64,
   validAccountId,
   validateLength,
 } from "./AccountKeysetCrypto";
@@ -83,6 +84,16 @@ function mapCallableFailure(error: unknown): never {
   if (code.includes("not-found")) {
     throw new AccountRecoveryError("Password recovery is not configured for this account.", error);
   }
+  if (code.includes("unauthenticated")) {
+    throw new AccountRecoveryError("Sign in again before managing account recovery.", error);
+  }
+  if (code.includes("failed-precondition")) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg.toLowerCase().includes("sign in again")) {
+      throw new AccountRecoveryError("Sign in again before managing account recovery.", error);
+    }
+    throw new AccountRecoveryError(msg || "Password recovery is currently unavailable.", error);
+  }
   if (code.includes("unavailable") || code.includes("deadline-exceeded")) {
     throw new AccountRecoveryError("Connection interrupted. Check your network and try again.", error);
   }
@@ -161,9 +172,157 @@ export async function decryptOpaqueRecoveryEnvelope({
   }
 }
 
-/** Coordinates the client-side OPAQUE password unlock flow with Cloud Functions. */
+/**
+ * Encrypts a client Account Recovery Key under an OPAQUE export key using HKDF-SHA-256
+ * and AES-256-GCM parameters matching Android.
+ */
+export async function encryptOpaqueRecoveryEnvelope({
+  accountId,
+  opaqueRecordId,
+  exportKeyBase64Url,
+  recoveryKey,
+}: {
+  accountId: string;
+  opaqueRecordId: string;
+  exportKeyBase64Url: string;
+  recoveryKey: Uint8Array;
+}): Promise<OpaqueRecoveryEnvelope> {
+  if (!validAccountId(accountId)) {
+    throw new AccountRecoveryError("Invalid account ID.");
+  }
+  if (!RECORD_ID_PATTERN.test(opaqueRecordId)) {
+    throw new AccountRecoveryError("Invalid OPAQUE record ID.");
+  }
+  validateLength(recoveryKey, RECOVERY_KEY_BYTES, "Invalid recovery key.");
+  const exportKey = decodeBase64Url(exportKeyBase64Url);
+  if (exportKey.byteLength !== 32 && exportKey.byteLength !== 64) {
+    exportKey.fill(0);
+    throw new AccountRecoveryError("Invalid OPAQUE export key.");
+  }
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  try {
+    const material = await crypto.subtle.importKey(
+      "raw",
+      exportKey as BufferSource,
+      "HKDF",
+      false,
+      ["deriveKey"],
+    );
+    const kek = await crypto.subtle.deriveKey(
+      {
+        name: "HKDF",
+        hash: "SHA-256",
+        salt: salt as BufferSource,
+        info: encoder.encode(`${HKDF_PREFIX}${accountId}`) as BufferSource,
+      },
+      material,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt"],
+    );
+    const aad = encoder.encode(
+      `${ENVELOPE_VERSION}|${accountId}|${opaqueRecordId}|${ENVELOPE_ALGORITHM}`,
+    );
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: iv as BufferSource, additionalData: aad as BufferSource },
+      kek,
+      recoveryKey as BufferSource,
+    ));
+    return {
+      version: ENVELOPE_VERSION,
+      accountId,
+      opaqueRecordId,
+      algorithm: ENVELOPE_ALGORITHM,
+      salt: toBase64(salt),
+      iv: toBase64(iv),
+      ciphertext: toBase64(ciphertext),
+    };
+  } finally {
+    exportKey.fill(0);
+  }
+}
+
+/** Coordinates the client-side OPAQUE password recovery flows with Cloud Functions. */
 export function createOpaqueRecoveryFlow(call: Callable) {
+  async function submitRegistration(
+    finishCallableName: "opaqueRecoveryFinishRegistration" | "opaqueRecoveryRotate",
+    accountId: string,
+    password: string,
+    recoveryKey: Uint8Array,
+  ): Promise<OpaqueRecoveryEnvelope> {
+    if (!validAccountId(accountId)) {
+      throw new AccountRecoveryError("Missing account identity.");
+    }
+    if (!password) {
+      throw new AccountRecoveryError("Enter your account password.");
+    }
+    validateLength(recoveryKey, RECOVERY_KEY_BYTES, "Invalid recovery key.");
+    await opaque.ready;
+    const regStart = opaque.client.startRegistration({ password });
+
+    let beginRaw: unknown;
+    try {
+      beginRaw = await call("opaqueRecoveryBeginRegistration", {
+        registrationRequest: regStart.registrationRequest,
+      });
+    } catch (error) {
+      mapCallableFailure(error);
+    }
+    if (!beginRaw || typeof beginRaw !== "object") {
+      throw new AccountRecoveryError("Invalid server registration response.");
+    }
+    const begin = beginRaw as { registrationResponse?: unknown };
+    if (!nonEmpty(begin.registrationResponse)) {
+      throw new AccountRecoveryError("Invalid server registration response.");
+    }
+
+    const regFinish = opaque.client.finishRegistration({
+      clientRegistrationState: regStart.clientRegistrationState,
+      registrationResponse: begin.registrationResponse,
+      password,
+    });
+    const opaqueRecordId = `rec_${crypto.randomUUID().replace(/-/g, "")}`;
+    const envelope = await encryptOpaqueRecoveryEnvelope({
+      accountId,
+      opaqueRecordId,
+      exportKeyBase64Url: regFinish.exportKey,
+      recoveryKey,
+    });
+
+    let finishRaw: unknown;
+    try {
+      finishRaw = await call(finishCallableName, {
+        opaqueRecordId,
+        registrationRecord: regFinish.registrationRecord,
+        envelope,
+      });
+    } catch (error) {
+      mapCallableFailure(error);
+    }
+    if (!finishRaw || typeof finishRaw !== "object" || (finishRaw as { success?: unknown }).success !== true) {
+      throw new AccountRecoveryError("Failed to save password recovery.");
+    }
+    return envelope;
+  }
+
   return {
+    async register(
+      accountId: string,
+      password: string,
+      recoveryKey: Uint8Array,
+    ): Promise<OpaqueRecoveryEnvelope> {
+      return submitRegistration("opaqueRecoveryFinishRegistration", accountId, password, recoveryKey);
+    },
+
+    async rotate(
+      accountId: string,
+      newPassword: string,
+      recoveryKey: Uint8Array,
+    ): Promise<OpaqueRecoveryEnvelope> {
+      return submitRegistration("opaqueRecoveryRotate", accountId, newPassword, recoveryKey);
+    },
+
     async unlock(accountId: string, password: string): Promise<Uint8Array> {
       if (!validAccountId(accountId)) {
         throw new AccountRecoveryError("Missing account identity.");

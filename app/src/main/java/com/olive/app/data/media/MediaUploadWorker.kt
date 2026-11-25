@@ -46,11 +46,14 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
+import com.olive.app.security.AccountKeysetEnvelope
 import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.KeyManager
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
+import java.security.spec.MGF1ParameterSpec
+import javax.crypto.SecretKey
 import kotlinx.coroutines.tasks.await
 
 
@@ -546,14 +549,149 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
 }
 
 /**
+ * Public account-keyset descriptor for an authorized recipient of an encrypted upload.
+ *
+ * @property keyId Unique identifier of the recipient's account keyset.
+ * @property epoch Keyset rotation epoch expected when unwrapping the key.
+ * @property algorithm Asymmetric key-wrapping algorithm identifier.
+ * @property publicKey Base64-encoded RSA public key for the account keyset.
+ */
+data class MediaRecipientAccountKeyset(
+    val keyId: String,
+    val epoch: Long,
+    val algorithm: String,
+    val publicKey: String,
+)
+
+/**
+ * Public device encryption key descriptor for an authorized upload recipient.
+ *
+ * @property deviceId Recipient device identifier registered in Firestore.
+ * @property publicKey Base64-encoded RSA public key for that device.
+ * @property mgf1Digest OAEP mask-generation digest declared by the recipient device.
+ */
+data class MediaRecipientDeviceKey(
+    val deviceId: String,
+    val publicKey: String,
+    val mgf1Digest: String = "SHA-1",
+)
+
+/**
+ * Public encryption keys for an additional recipient authorized on initial media upload.
+ *
+ * @property uid Firebase UID of the recipient account.
+ * @property accountKeyset Optional enrolled account keyset public key descriptor.
+ * @property publicKey Primary directory public key for the recipient, if published.
+ * @property devices Registered device public keys for immediate device decryption.
+ */
+data class MediaUploadRecipient(
+    val uid: String,
+    val accountKeyset: MediaRecipientAccountKeyset? = null,
+    val publicKey: String = "",
+    val devices: List<MediaRecipientDeviceKey> = emptyList(),
+)
+
+/**
+ * Combined zero-knowledge key envelopes produced during encrypted media preparation.
+ *
+ * @property allowedUsers Ordered list of authorized Firebase UIDs.
+ * @property wrappedKeys Per-account primary public key wrappers.
+ * @property deviceWrappedKeys Per-device RSA-OAEP wrappers keyed by `uid--deviceId`.
+ * @property accountWrappedKeys Account-keyset wrappers used for cross-device recovery.
+ */
+internal data class MediaUploadKeyEnvelopes(
+    val allowedUsers: List<String>,
+    val wrappedKeys: Map<String, String>,
+    val deviceWrappedKeys: Map<String, String>,
+    val accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
+)
+
+/**
+ * Wraps the symmetric media AES key for the owner and any additional authorized recipients.
+ *
+ * @param key Newly generated symmetric AES key encrypting the media payload.
+ * @param ownerUid Firebase UID of the uploading owner.
+ * @param ownerAccountKeyset Owner's enrolled account keyset public metadata.
+ * @param extraRecipients Optional authorized recipients whose public keys should also receive wrapped copies.
+ * @return Combined [MediaUploadKeyEnvelopes] ready for [PreparedEncryptedMedia].
+ */
+internal fun wrapMediaKeyForRecipients(
+    key: SecretKey,
+    ownerUid: String,
+    ownerAccountKeyset: AccountKeysetEnvelope,
+    extraRecipients: List<MediaUploadRecipient> = emptyList(),
+): MediaUploadKeyEnvelopes {
+    val ownerPublicKey = KeyManager.getOrCreatePublicKey()
+    val ownerWrapped = KeyManager.wrapKey(key, ownerPublicKey)
+    val allowedUsers = mutableListOf(ownerUid)
+    val wrappedKeys = linkedMapOf(ownerUid to ownerWrapped)
+    val deviceWrappedKeys = linkedMapOf("${ownerUid}--${KeyManager.deviceId(ownerPublicKey)}" to ownerWrapped)
+    val accountWrappedKeys = linkedMapOf(
+        ownerUid to AccountKeysetWrappedKey(
+            ownerAccountKeyset.keyId,
+            ownerAccountKeyset.epoch,
+            "RSA-OAEP-256",
+            KeyManager.wrapForAccountKeyset(key, KeyManager.decodePublicKey(ownerAccountKeyset.publicKeyBase64)),
+        ),
+    )
+    for (recipient in extraRecipients.distinctBy(MediaUploadRecipient::uid)) {
+        if (recipient.uid.isBlank() || recipient.uid == ownerUid) continue
+        if (allowedUsers.size >= 25) break
+        val accountWrapper = recipient.accountKeyset
+            ?.takeIf {
+                it.keyId.isNotBlank() && it.epoch > 0L &&
+                    it.algorithm == "RSA-OAEP-256" && it.publicKey.isNotBlank()
+            }
+            ?.let { keyset ->
+                runCatching {
+                    AccountKeysetWrappedKey(
+                        keyset.keyId,
+                        keyset.epoch,
+                        keyset.algorithm,
+                        KeyManager.wrapForAccountKeyset(key, KeyManager.decodePublicKey(keyset.publicKey)),
+                    )
+                }.getOrNull()
+            }
+        val wrappedDevices = linkedMapOf<String, String>()
+        for (device in recipient.devices) {
+            if (device.deviceId.isBlank() || device.publicKey.isBlank()) continue
+            val digest = if (device.mgf1Digest == "SHA-256") MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
+            val encoded = runCatching {
+                KeyManager.wrapKey(key, KeyManager.decodePublicKey(device.publicKey), digest)
+            }.getOrNull() ?: continue
+            wrappedDevices["${recipient.uid}--${device.deviceId}"] = encoded
+        }
+        val primaryWrapped = recipient.publicKey.takeIf(String::isNotBlank)?.let { encodedPrimary ->
+            val primaryDigest = recipient.devices.firstOrNull { it.publicKey == encodedPrimary }
+                ?.let { if (it.mgf1Digest == "SHA-256") MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1 }
+                ?: MGF1ParameterSpec.SHA1
+            runCatching {
+                KeyManager.wrapKey(key, KeyManager.decodePublicKey(encodedPrimary), primaryDigest)
+            }.getOrNull()
+        } ?: wrappedDevices.values.firstOrNull() ?: accountWrapper?.wrappedKey ?: continue
+
+        allowedUsers += recipient.uid
+        wrappedKeys[recipient.uid] = primaryWrapped
+        for ((deviceKey, wrappedDeviceKey) in wrappedDevices) {
+            if (deviceWrappedKeys.size >= 250) break
+            deviceWrappedKeys[deviceKey] = wrappedDeviceKey
+        }
+        if (accountWrapper != null) {
+            accountWrappedKeys[recipient.uid] = accountWrapper
+        }
+    }
+    return MediaUploadKeyEnvelopes(allowedUsers, wrappedKeys, deviceWrappedKeys, accountWrappedKeys)
+}
+
+/**
  * Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key.
  *
  * @param job The upload job whose state or request data is being read.
  * @return The upload request fields, including the ciphertext metadata and wrapped media keys.
  */
 internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
-    require(source.allowedUsers.toSet()==source.accountWrappedKeys.keys) {
-        "Every authorized account requires an account-keyset wrapper"
+    require(job.ownerUid in source.accountWrappedKeys && source.allowedUsers.containsAll(source.accountWrappedKeys.keys)) {
+        "Owner account-keyset wrapper is required and extra wrappers must belong to authorized users"
     }
     mapOf(
         "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,

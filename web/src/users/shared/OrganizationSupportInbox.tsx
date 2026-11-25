@@ -14,27 +14,25 @@ import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
 
 import { sharedMessage } from "./safe_app/SharedMessageContent";
 import { VoiceMessageBubble, VoiceMessageComposer } from "./safe_app/VoiceMessages";
+import {
+  allTicketCategories as categories,
+  categoryOfTicket as categoryOf,
+  filterSupportTickets,
+  roleConversationsForInbox,
+  visibleCategoriesForRole,
+  type TicketCategory,
+} from "./OrganizationSupportModel";
 
 const noMessages: Message[] = [];
-
-type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
-const categories: { id: TicketCategory; label: string }[] = [
-  { id: "PLAN_CONSULT", label: "Plan Consults" },
-  { id: "SUPPORT", label: "Support" },
-  { id: "NEEDS_ADMIN", label: "Need Admins" },
-];
-
-// Gives old support records a safe category based on their original request.
-function categoryOf(conversation: Conversation): TicketCategory {
-  if (conversation.supportTag === "NEEDS_ADMIN") return "NEEDS_ADMIN";
-  return conversation.supportOrigin === "PLAN_CONSULT"
-    ? "PLAN_CONSULT"
-    : "SUPPORT";
-}
 
 export default function OrganizationSupportInbox() {
   const session = useSession();
   const identity = accounts.identity;
+  const isAdmin = identity?.role === "ADMIN";
+  const visibleCategories = useMemo(
+    () => visibleCategoriesForRole(identity?.role),
+    [identity?.role],
+  );
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [history, setHistory] = useState<{ ticketId: string; messages: Message[] } | null>(null);
@@ -45,11 +43,19 @@ export default function OrganizationSupportInbox() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
-  const [category, setCategory] = useState<TicketCategory>("SUPPORT");
+  const [category, setCategory] = useState<TicketCategory>(() =>
+    identity?.role === "ADMIN" ? "NEEDS_ADMIN" : "SUPPORT",
+  );
   const [showArchived, setShowArchived] = useState(false);
   const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
   const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isAdmin && category !== "NEEDS_ADMIN") {
+      setCategory("NEEDS_ADMIN");
+    }
+  }, [isAdmin, category]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -123,12 +129,17 @@ export default function OrganizationSupportInbox() {
 
   const visible = useMemo(
     () =>
-      conversations
-        .filter((item) =>
-          showArchived ? Boolean(item.closedAt) : !item.closedAt,
-        )
-        .filter((item) => showArchived || categoryOf(item) === category),
-    [conversations, category, showArchived],
+      filterSupportTickets(
+        conversations,
+        identity?.role,
+        category,
+        showArchived,
+      ),
+    [conversations, identity?.role, category, showArchived],
+  );
+  const roleTickets = useMemo(
+    () => roleConversationsForInbox(conversations, identity?.role),
+    [conversations, identity?.role],
   );
   const openTicket = (ticket: Conversation | null) => {
     setSelected(ticket);
@@ -168,16 +179,20 @@ export default function OrganizationSupportInbox() {
           <div
             className="organization-ticket-tabs"
             role="group"
-            aria-label="Ticket categories"
+            aria-label={isAdmin ? "Escalated ticket category" : "Ticket categories"}
           >
-            {categories.map((item) => {
-              const count = conversations.filter((c) => !c.closedAt && categoryOf(c) === item.id).length;
+            {visibleCategories.map((item) => {
+              const count = roleTickets.filter(
+                (c) => !c.closedAt && categoryOf(c) === item.id,
+              ).length;
+              const pressed = isAdmin ? true : category === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  aria-pressed={category === item.id}
+                  aria-pressed={pressed}
                   onClick={() => {
+                    if (isAdmin) return;
                     if (category !== item.id) openTicket(null);
                     setCategory(item.id);
                   }}
@@ -192,11 +207,17 @@ export default function OrganizationSupportInbox() {
           <Empty
             title={
               showArchived
-                ? "No archived tickets."
-                : "No tickets in this category."
+                ? isAdmin
+                  ? "No archived escalated tickets."
+                  : "No archived tickets."
+                : isAdmin
+                  ? "No escalated tickets."
+                  : "No tickets in this category."
             }
           >
-            New conversations will appear here when assigned to your account.
+            {isAdmin
+              ? "Conversations appear here when staff request administrator help."
+              : "New conversations will appear here when assigned to your account."}
           </Empty>
         ) : (
           visible.map((item) => (
@@ -256,22 +277,22 @@ export default function OrganizationSupportInbox() {
               </div>
               <span>{selected.closedAt ? "Archived" : "Active"}</span>
             </header>
-            {identity.role === "STAFF" &&
-              !selected.closedAt &&
-              categoryOf(selected) !== "NEEDS_ADMIN" && (
+            {identity.role === "STAFF" && !selected.closedAt && (
                 <div className="organization-ticket-actions">
-                  <Button
-                    variant="outline"
-                    disabled={session.busy}
-                    onClick={() =>
-                      void session.perform(async () => {
-                        await requestAdministratorHelp(selected.id);
-                        setCategory("NEEDS_ADMIN");
-                      })
-                    }
-                  >
-                    <ShieldAlert size={16} /> Request admin help
-                  </Button>
+                  {categoryOf(selected) !== "NEEDS_ADMIN" && (
+                    <Button
+                      variant="outline"
+                      disabled={session.busy}
+                      onClick={() =>
+                        void session.perform(async () => {
+                          await requestAdministratorHelp(selected.id);
+                          setCategory("NEEDS_ADMIN");
+                        })
+                      }
+                    >
+                      <ShieldAlert size={16} /> Request admin help
+                    </Button>
+                  )}
                   <Button
                     variant="quiet"
                     disabled={session.busy}

@@ -31,7 +31,12 @@ function Cover() {
 function EncryptedAccessRecovery() {
   const s = useSession();
   const [password, setPassword] = useState("");
-  if (!s.cloudMode || (s.phase !== "safe" && s.phase !== "portal") || s.hasEncryptedAccess) return null;
+  if (
+    !s.cloudMode ||
+    (s.phase !== "safe" && s.phase !== "portal") ||
+    s.hasEncryptedAccess ||
+    s.passwordRecoveryEnrolled !== true
+  ) return null;
   return (
     <section className="account-recovery-notice" aria-labelledby="encrypted-access-heading">
       <div>

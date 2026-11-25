@@ -210,7 +210,7 @@
     <string name="edit_contact">Edit contact</string>
     <string name="phone_or_email">Phone or email</string>
     <string name="enter_a_name_and_a_phone_number_or_email">Enter a name and a phone number or email.</string>
-    <string name="you_can_save_up_to_25_contacts">You can save up to 25 contacts.</string>
+    <string name="you_can_save_up_to_25_contacts">You can save up to 100 contacts.</string>
     <string name="save_contact">Save contact</string>
 <string name="save_settings">Save settings</string>
     <string name="change_account_password">Change account password</string>

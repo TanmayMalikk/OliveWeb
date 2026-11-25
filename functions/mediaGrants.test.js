@@ -191,3 +191,33 @@ test("chat and direct sharing allow recipients without an enrolled account keyse
     accountWrappedKeys: wrappers("owner"),
   })), {code: "permission-denied"});
 });
+test("initial uploads support multi-recipient device and optional non-owner account keyset wrappers", async () => {
+  const f = prepared(async command => command.constructor.name === "HeadObjectCommand" ? {ContentLength: 100} : {});
+  const emergencyUpload = {
+    ...upload(),
+    allowedUsers: ["owner", "admin", "admin_no_keyset"],
+    wrappedKeys: {owner: "owner-key", admin: "admin-key", admin_no_keyset: "admin2-key"},
+    deviceWrappedKeys: {"owner--phone": "owner-dev", "admin--phone": "admin-dev"},
+    accountWrappedKeys: wrappers("owner", "admin"),
+  };
+  const session = await f.api.mediaCreateUpload(request("owner", emergencyUpload));
+  const record = await f.api.mediaCompleteUpload(request("owner", {jobId}));
+  assert.equal(record.mediaId, session.mediaId);
+  assert.deepEqual(record.allowedUsers, ["owner", "admin", "admin_no_keyset"]);
+  assert.equal(record.deviceWrappedKeys["admin--phone"], "admin-dev");
+  assert.equal(Object.hasOwn(record.accountWrappedKeys, "admin"), true);
+  assert.equal(Object.hasOwn(record.accountWrappedKeys, "admin_no_keyset"), false);
+
+  await assert.rejects(
+    f.api.mediaCreateUpload(request("owner", {...emergencyUpload, jobId: "33333333-3333-4333-8333-333333333333", accountWrappedKeys: wrappers("admin")})),
+    {code: "invalid-argument"},
+  );
+  await assert.rejects(
+    f.api.mediaCreateUpload(request("owner", {...emergencyUpload, jobId: "44444444-4444-4444-8444-444444444444", deviceWrappedKeys: {"admin--phone": "admin-dev"}})),
+    {code: "invalid-argument"},
+  );
+  await assert.rejects(
+    f.api.mediaCreateUpload(request("owner", {...emergencyUpload, jobId: "55555555-5555-4555-8555-555555555555", deviceWrappedKeys: {"owner--phone": "owner-dev", "stranger--phone": "bad"}})),
+    {code: "invalid-argument"},
+  );
+});

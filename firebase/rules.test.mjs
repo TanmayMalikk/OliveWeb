@@ -828,6 +828,10 @@ test('organization locations are written by users and readable only by admins', 
   await assertFails(set(ref(admin,path),point));
   await assertFails(set(ref(user,path),{...point,latitude:91}));
   await assertFails(set(ref(user,path),{...point,extra:'not allowed'}));
+  const legacyUser=env.authenticatedContext('legacy-map-user',{email:'legacy_user@users.olive.invalid'}).database();
+  const legacySafe=env.authenticatedContext('legacy-map-safe',{email:'legacy_safe@safe.olive.invalid'}).database();
+  await assertSucceeds(set(ref(legacyUser,'adminLiveLocations/legacy-map-user'),point));
+  await assertFails(set(ref(legacySafe,'adminLiveLocations/legacy-map-safe'),point));
 });
 
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {
