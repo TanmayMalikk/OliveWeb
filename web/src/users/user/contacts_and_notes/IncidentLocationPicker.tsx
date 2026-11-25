@@ -45,7 +45,10 @@ function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPic
   );
 }
 
-// The address field waits briefly after typing so it does not send a request for every key press.
+const MAX_CACHE_ENTRIES = 64;
+const addressCache = new Map<string, LocationResult[]>();
+
+// Keep requests responsive at 50ms while cancelling stale in-flight lookups on rapid typing.
 export function IncidentLocationPicker({
   label,
   latitude,
@@ -62,25 +65,39 @@ export function IncidentLocationPicker({
 
   useEffect(() => setQuery(label), [label]);
   useEffect(() => {
-    if (query.trim().length < 2 || query === label) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || query === label) {
       setResults([]);
+      return;
+    }
+    const cacheKey = trimmed.toLowerCase().replace(/\s+/g, " ");
+    const cached = addressCache.get(cacheKey);
+    if (cached) {
+      setResults(cached);
+      setMessage("");
       return;
     }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetch(`/api/locations?q=${encodeURIComponent(query.trim())}`, {
+      fetch(`/api/locations?q=${encodeURIComponent(trimmed)}`, {
         signal: controller.signal,
       })
         .then(async (response) => {
           const body = await response.json();
           if (!response.ok) throw new Error(body.error ?? "Address search failed.");
-          setResults(body.locations ?? []);
+          const locations: LocationResult[] = body.locations ?? [];
+          if (addressCache.size >= MAX_CACHE_ENTRIES) {
+            const oldestKey = addressCache.keys().next().value;
+            if (oldestKey !== undefined) addressCache.delete(oldestKey);
+          }
+          addressCache.set(cacheKey, locations);
+          setResults(locations);
           setMessage("");
         })
         .catch((failure) => {
           if (failure.name !== "AbortError") setMessage(failure.message);
         });
-    }, 350);
+    }, 50);
     return () => {
       window.clearTimeout(timer);
       controller.abort();

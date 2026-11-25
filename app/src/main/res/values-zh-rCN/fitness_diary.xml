@@ -12,4 +12,6 @@
     <string name="fitness_diary_water_total">今日饮水总量</string>
     <string name="fitness_diary_custom_water">自定义饮水量</string>
     <string name="fitness_diary_add_volume">添加 %1$d 毫升饮水</string>
+    <string name="fitness_diary_food_removed">已移除食物</string>
+    <string name="fitness_diary_undo">撤销</string>
 </resources>

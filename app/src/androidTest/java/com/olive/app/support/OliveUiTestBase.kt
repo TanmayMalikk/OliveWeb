@@ -1,7 +1,10 @@
 // Starts and resets the app for Android UI tests across user roles.
 package com.olive.app
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
+import androidx.compose.ui.text.AnnotatedString
 import androidx.activity.ComponentActivity
 import android.content.Intent
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule
@@ -9,7 +12,13 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.SafetyPlanIntake
+import com.olive.app.data.account.UserProfile
+import com.olive.app.security.InputPolicy
+import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughVisits
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
@@ -112,7 +121,8 @@ abstract class OliveUiTestBase {
             val session =
                 ViewModelProvider(compose.activity)[SessionViewModel::class.java]
             throw AssertionError(
-                "Waiting for $tag; screen=${session.screen}, busy=${session.busy}, message=${session.message}",
+                "Waiting for $tag; screen=${session.screen}, page=${session.page}, role=${session.accountRole}, " +
+                    "profileLoaded=${session.profile != null}, busy=${session.busy}, message=${session.message}",
                 e
             )
         }
@@ -154,9 +164,25 @@ abstract class OliveUiTestBase {
         }
     }
 
+    // Set the trigger through its edit action after the previous IME session has ended.
+    protected fun fillOnboardingTrigger(trigger: String) {
+        hideKeyboard()
+        val field = visibleNode("trigger")
+        val input = AnnotatedString(trigger)
+        field.performSemanticsAction(SemanticsActions.SetText) { setText -> check(setText(input)) }
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.InputText, input))
+    }
+
     // Scrolls to a tagged control and clicks it.
     protected fun click(tag: String) {
         visibleNode(tag).performClick()
+    }
+
+    // Triggers a control's accessibility action when a test is about the destination state.
+    protected fun clickAccessibleAction(tag: String) {
+        visibleNode(tag).assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick) { action ->
+            check(action())
+        }
     }
 
     // Hides the emulator keyboard before a UI test presses controls located below a text field.
@@ -199,8 +225,42 @@ abstract class OliveUiTestBase {
         click("dob_day_2")
     }
 
-    // Completes registration with a unique local test account.
+    // Seed a local account through the real setup actions so feature tests can start at the cover.
     protected fun register(pin: String = "123456", username: String = "olive_tester") {
+        openOnboarding()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle {
+            session.account.chooseNew()
+            session.account.authenticate(username, "test-password-123", create = true)
+        }
+        compose.waitUntil(30_000) { session.screen == SessionScreen.ProfileSetup }
+        val address = DeliveryAddress(city = "Edmonton")
+        val profile = UserProfile(
+            username = username,
+            fullName = "Test Person",
+            abuserName = "Test Person Causing Harm",
+            dob = "2000-01-02",
+            language = "English",
+            region = address.generalLocation,
+            triggerHash = InputPolicy.triggerHash("moon garden"),
+            address = address,
+            safetyIntake = SafetyPlanIntake(completed = true),
+        )
+        compose.runOnIdle { session.account.saveSetupProfile(profile) }
+        compose.waitUntil(30_000) { session.screen == SessionScreen.DevicePin }
+        compose.runOnIdle { session.account.createDevicePin(pin, pin) }
+        waitCover()
+        check(session.account.configured)
+        markInitialWalkthroughSeen(session)
+    }
+
+    // Feature fixtures represent a returning account. First-login tests exercise the actual tour.
+    internal fun markInitialWalkthroughSeen(session: SessionViewModel) {
+        WalkthroughVisits(compose.activity, requireNotNull(session.coverAccountId)).markInitialTourSeen()
+    }
+
+    // Exercises the onboarding UI when registration itself is part of the test.
+    protected fun registerThroughUi(pin: String = "123456", username: String = "olive_tester") {
         openOnboarding()
         click("new_user")
         fill("username", username)
@@ -220,12 +280,13 @@ abstract class OliveUiTestBase {
         advanceOnboarding("full_name", "address_city")
         fill("address_city", "Edmonton")
         advanceOnboarding("address_city", "trigger")
-        fill("trigger", "moon garden")
-        advanceOnboarding("trigger", "profile_submit")
-        compose.onNodeWithText("Step 5 of 5", useUnmergedTree = true).assertExists()
+        fillOnboardingTrigger("moon garden")
+        advanceOnboarding("trigger", "friend_invite_code")
+        advanceOnboarding("friend_invite_code", "profile_submit")
+        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
         submitProfile()
         chooseAppPin()
-        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Step 7 of 7", useUnmergedTree = true).assertExists()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
         submitPinSetup()
@@ -361,5 +422,9 @@ abstract class OliveUiTestBase {
         trigger()
         enterPin(pin)
         waitFor("safe_settings")
+        // Dashboard controls are composed before the private reveal stops intercepting touches.
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("pin_safe_animation").fetchSemanticsNodes().isEmpty()
+        }
     }
 }

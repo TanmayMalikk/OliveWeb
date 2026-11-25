@@ -18,7 +18,7 @@ class StaffSupportControllerTest {
         SessionRuntimeFixture().use { f ->
             val repo = mock(SupportRepository::class.java)
             val controller = StaffSupportController(f.runtime) { repo }
-            `when`(repo.requestHelp()).thenReturn(StaffSupportTicket(true, "staff", "ticket"))
+            `when`(repo.requestHelp(anyString())).thenReturn(StaffSupportTicket(true, "staff", "ticket"))
             `when`(repo.cancelRequest("ticket")).thenReturn(StaffSupportTicket(false, "", "ticket"))
             controller.requestHelp()
             f.await { controller.saving == 0 }
@@ -29,7 +29,7 @@ class StaffSupportControllerTest {
             f.await { controller.saving == 0 }
             assertFalse(controller.requested)
             verify(repo).cancelRequest("ticket")
-            `when`(repo.requestHelp()).thenAnswer { error("Synthetic transport failure") }
+            `when`(repo.requestHelp(anyString())).thenAnswer { error("Synthetic transport failure") }
             controller.requestHelp()
             f.await { controller.saving == 0 }
             assertEquals(R.string.support_request_error, controller.error)

@@ -15,6 +15,7 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.network.hasValidatedInternetConnection
+import com.olive.app.data.network.persistentInstallationId
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
@@ -61,7 +62,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var cacheIndexUpdate: Job? = null
 
     /**
-     * Session messaging: Reports whether messaging screen active.
+     * Checks whether the current screen can keep messaging listeners active.
+     *
+     * @return True when the Safe App is open or a staff or admin account is in its portal.
      */
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||
@@ -113,6 +116,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 waitingForConversations = online
                 updateIndexLoading()
                 val token = epoch
+                scope.launch {
+                    val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
+                    if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
+                        !serverConversationIndexLoaded && conversations.isEmpty()) {
+                        conversations = cached
+                    }
+                }
                 /**
                  * Checks whether current listener.
                  *
@@ -137,13 +147,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             (role ?: device.role).localizedTitle(ResourceText(application.resources)),
                         )
                         return@launch
-                    }
-                    scope.launch {
-                        val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
-                        if (indexGeneration == listenerGeneration && enrollment?.uid == device.uid &&
-                            !serverConversationIndexLoaded && conversations.isEmpty()) {
-                            conversations = cached
-                        }
                     }
                     val identity = AccountIdentity(device.uid, coverUsername)
                     // Organization accounts stay in the portal, so keep their notification listener
@@ -450,16 +453,35 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val failureMessage = runtime.application.getString(
             R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
         )
-        runtime.operations.runOperation(failureMessage) { sessionVersion ->
+        val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null
+        val timeoutMessage = runtime.application.getString(
+            if (create) R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist
+            else R.string.the_operation_timed_out_check_your_connection_and_retry,
+        )
+        runtime.operations.runOperation(
+            failureMessage,
+            timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000,
+            timeoutMessage = timeoutMessage,
+        ) { sessionVersion ->
+            val creatingIdentity = create && runtime.pendingIdentity?.username != InputPolicy.username(username)
             val identity = try {
-                if (create) {
+                if (creatingIdentity) {
                     runtime.accounts.create(username, password, runtime.state.accountRole)
                 } else {
                     runtime.accounts.authenticate(username, password, runtime.state.accountRole)
                 }
             } catch (failure: Exception) {
-                if (!showCredentialFailure(failure, create, sessionVersion)) throw failure
+                if (!showCredentialFailure(failure, creatingIdentity, sessionVersion)) throw failure
                 return@runOperation
+            }
+            if (runtime.epoch != sessionVersion) return@runOperation
+            if (creatingIdentity) runtime.pendingIdentity = identity
+
+            if (!runtime.localMode) {
+                val signInDeviceId = persistentInstallationId(runtime.application, "olive_device_signin", "signin_device_id")
+                runtime.scope.launch {
+                    runCatching { runtime.accounts.recordDeviceSignIn(signInDeviceId, registerOnly = create) }
+                }
             }
 
             val profile = loadProfile(identity)
@@ -468,6 +490,24 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
 
             runtime.pendingIdentity = identity
             runtime.pendingProfile = profile
+            if (needsDeviceConfirmation) {
+                val setupRequired = create || profile == null ||
+                    (runtime.state.accountRole == AccountRole.USER && AccountPolicy.personalProfileNeedsSetup(profile))
+                try {
+                    runtime.passwordRecovery.enrollAfterAuthentication(identity.uid, password, sessionVersion, setupRequired)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    if (setupRequired) {
+                        if (runtime.epoch == sessionVersion) {
+                            runtime.state.failInput(runtime.passwordRecovery.passwordRecoveryFailure(failure))
+                        }
+                        return@runOperation
+                    }
+                    // Existing accounts can sign in even when a legacy key cannot be migrated on this device.
+                }
+                if (runtime.epoch != sessionVersion) return@runOperation
+            }
             openNextScreen(identity, profile)
         }
     }
@@ -502,21 +542,21 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
         if (!organizationEmail && !validUsername) {
             state.credentialFieldError = CredentialFieldError.InvalidUsername
-            state.message = runtime.application.getString(R.string.ui_invalid_username_10e538)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_username_10e538))
             return false
         }
         if (create && !InputPolicy.passwordExcludesUsername(password, username)) {
-            state.message = runtime.application.getString(R.string.password_excludes_username)
+            state.failInput(runtime.application.getString(R.string.password_excludes_username))
             return false
         }
         if (create && !InputPolicy.validAccountPassword(password, username)) {
             state.credentialFieldError = CredentialFieldError.InvalidPassword
-            state.message = runtime.application.getString(R.string.ui_invalid_password_a2df22)
+            state.failInput(runtime.application.getString(R.string.ui_invalid_password_a2df22))
             return false
         }
         if (password.isEmpty()) {
             state.credentialFieldError = CredentialFieldError.IncorrectPassword
-            state.message = runtime.application.getString(R.string.ui_password_required_ec4e2c)
+            state.failInput(runtime.application.getString(R.string.ui_password_required_ec4e2c))
             return false
         }
         return true
@@ -553,14 +593,16 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             } else {
                 CredentialFieldError.IncorrectPassword
             }
-            runtime.state.message = when {
-                usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
-                incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
-                else -> failure.message?.takeIf { it.isNotBlank() }
-                    ?: runtime.application.getString(
-                        R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
-                    )
-            }
+            runtime.state.failInput(
+                when {
+                    usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
+                    incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
+                    else -> failure.message?.takeIf { it.isNotBlank() }
+                        ?: runtime.application.getString(
+                            R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
+                        )
+                }
+            )
         }
         return true
     }
@@ -589,17 +631,21 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val chosenRole = runtime.state.accountRole
         if (profile == null && !create && chosenRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
-                chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator,
+                    chosenRole.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }
         if (profile != null && profile.role != chosenRole) {
             runtime.accounts.signOut()
-            runtime.state.message = runtime.application.getString(
-                R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
-                profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+            runtime.state.failInput(
+                runtime.application.getString(
+                    R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s,
+                    profile.role.localizedTitle(ResourceText(runtime.application.resources)),
+                )
             )
             return false
         }

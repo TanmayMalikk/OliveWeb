@@ -102,6 +102,123 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Account keysets contain an ARK-encrypted private key, never an ARK or a raw file key.
+    // The owner can create its initial ciphertext envelope and retry the exact same envelope; future
+    // rotations require a dedicated, reviewed migration rather than a broad client update rule.
+    function validAccountKeysetFields(data, uid) {
+      return data.version == 1
+        && data.accountId is string && data.accountId == uid
+        && data.keyId is string && data.keyId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        && data.epoch is int && data.epoch == 1
+        && data.algorithm == 'RSA-OAEP-256'
+        && data.publicKey is string && data.publicKey.size() >= 400 && data.publicKey.size() <= 1024
+        && data.iv is string && data.iv.matches('^[A-Za-z0-9+/]{16}$')
+        && data.ciphertext is string && data.ciphertext.size() >= 2000 && data.ciphertext.size() <= 4096
+        && data.ciphertext.matches('^[A-Za-z0-9+/=]+$')
+        && data.updatedAt is timestamp;
+    }
+
+    function validAccountKeysetInitialShape(data, uid) {
+      return data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt'])
+        && validAccountKeysetFields(data, uid);
+    }
+
+    function validPasswordRecoveryEnvelope(data, uid) {
+      return data is map
+        && data.keys().hasOnly(['version','accountId','opaqueRecordId','algorithm','salt','iv','ciphertext','createdAt','updatedAt'])
+        && data.keys().hasAll(['version','accountId','opaqueRecordId','algorithm','salt','iv','ciphertext','createdAt','updatedAt'])
+        && data.version == 1
+        && data.accountId is string && data.accountId == uid
+        && data.opaqueRecordId is string
+        && data.opaqueRecordId.size() >= 16 && data.opaqueRecordId.size() <= 1024
+        && data.opaqueRecordId.matches('^[A-Za-z0-9_-]+$')
+        && data.algorithm == 'OPAQUE-3DH-HKDF-SHA256-AES-256-GCM'
+        && data.salt is string && data.salt.matches('^[A-Za-z0-9+/]{43}=$')
+        && data.iv is string && data.iv.matches('^[A-Za-z0-9+/]{16}$')
+        && data.ciphertext is string && data.ciphertext.matches('^[A-Za-z0-9+/]{64}$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validAccountKeysetShape(data, uid) {
+      return validAccountKeysetInitialShape(data, uid)
+        || (
+          data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt','passwordRecovery'])
+          && data.keys().hasAll(['passwordRecovery'])
+          && validAccountKeysetFields(data, uid)
+          && validPasswordRecoveryEnvelope(data.passwordRecovery, uid)
+        );
+    }
+
+    function validAccountKeysetWrite(data, uid) {
+      return validAccountKeysetInitialShape(data, uid) && data.updatedAt == request.time;
+    }
+
+    match /accountKeysets/{uid} {
+      // A first-run owner must be able to distinguish an absent keyset from an access denial.
+      // Existing records still have to pass the ciphertext-envelope schema before being returned.
+      allow get: if owner(uid) && (resource == null || validAccountKeysetShape(resource.data, uid));
+      allow list, delete: if false;
+      allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
+      // Allow idempotent SetOptions.merge() refreshes (only updatedAt may change) while preserving
+      // an existing server-managed passwordRecovery envelope without allowing clients to add/edit/delete it.
+      allow update: if owner(uid) && validAccountKeysetShape(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
+    }
+
+    // Public wrapping keys are separate from ARK-encrypted private-key envelopes. Authenticated
+    // clients may fetch an exact account key while directory enumeration remains prohibited.
+    function validAccountKeyDirectory(data, uid) {
+      return data.keys().hasOnly(['ownerUid','keyId','epoch','algorithm','publicKey','updatedAt'])
+        && data.ownerUid == uid
+        && data.keyId is string && data.keyId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        && data.epoch is int && data.epoch == 1
+        && data.algorithm == 'RSA-OAEP-256'
+        && data.publicKey is string && data.publicKey.size() >= 400 && data.publicKey.size() <= 1024
+        && data.updatedAt is timestamp;
+    }
+
+    function matchesAccountKeyset(data, uid) {
+      let keyset = getAfter(/databases/$(database)/documents/accountKeysets/$(uid)).data;
+      return keyset.accountId == uid
+        && data.keyId == keyset.keyId
+        && data.epoch == keyset.epoch
+        && data.algorithm == keyset.algorithm
+        && data.publicKey == keyset.publicKey;
+    }
+
+    match /accountKeyDirectories/{uid} {
+      allow get: if signedIn() && (resource == null || validAccountKeyDirectory(resource.data, uid));
+      allow list, delete: if false;
+      allow create: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
+        && matchesAccountKeyset(request.resource.data, uid);
+      allow update: if owner(uid) && validAccountKeyDirectory(request.resource.data, uid)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && matchesAccountKeyset(request.resource.data, uid);
+    }
+
+    // Passkey verifier material, short-lived challenges, and ARK ciphertext envelopes are owned
+    // exclusively by callable functions. An encrypted envelope is released only after a verified,
+    // user-present passkey assertion, never through a direct Firestore read.
+    match /accountRecoveryPasskeys/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery records and short-lived unlock sessions are owned exclusively
+    // by Cloud Functions with App Check and caller UID enforcement. Direct client access is denied.
+    match /accountRecoveryOpaqueRecords/{uid} {
+      allow read, write: if false;
+    }
+
+    // OPAQUE recovery unlock throttling state is owned exclusively by Cloud Functions.
+    // Direct client reads, resets, or deletions are denied so brute-force limits cannot be bypassed.
+    match /accountRecoveryOpaqueThrottle/{uid} {
+      allow read, write: if false;
+    }
+
     function validAccountSyncMarker(data) {
       return data.keys().hasAll(['revision','updatedAt'])
         && data.keys().hasOnly(['revision','updatedAt'])
@@ -225,7 +342,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','phone'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','emailCommunicationConsent','phone'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -251,6 +368,10 @@ service cloud.firestore {
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 
         && (!('cover_app' in p) || p.cover_app is string)
+
+        && (!('email' in p) || (p.email is string && p.email.size() <= 254))
+
+        && (!('emailCommunicationConsent' in p) || p.emailCommunicationConsent is bool)
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -321,7 +442,7 @@ service cloud.firestore {
           && (!data.keys().hasAny(['evidence']) || data.evidence is bool);
       }
       function validEncryptedMedia(data, id) {
-        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
+        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','account_wrapped_keys','allowed_users',
             'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready','emergency_id'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
@@ -329,6 +450,8 @@ service cloud.firestore {
           && data.encrypted_metadata.size() <= 65536
           && data.wrapped_keys is map
           && (!data.keys().hasAny(['device_wrapped_keys']) || data.device_wrapped_keys is map)
+          && (!data.keys().hasAny(['account_wrapped_keys']) || (data.account_wrapped_keys is map
+            && data.account_wrapped_keys.keys().hasOnly(data.allowed_users)))
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
           && data.allowed_users.hasAny([data.owner_id])
@@ -380,7 +503,7 @@ service cloud.firestore {
 
     match /privateEntries/{entryId} {
       function validPrivateEntry(data) {
-        return data.keys().hasOnly(['id','ownerUid','ciphertext','wrappedKeys','allowedUsers','createdAt','updatedAt'])
+        return data.keys().hasOnly(['id','ownerUid','ciphertext','wrappedKeys','deviceWrappedKeys','accountWrappedKeys','allowedUsers','createdAt','updatedAt'])
           && data.id == entryId
           && data.ownerUid is string
           && data.ciphertext is string && data.ciphertext.size() > 0
@@ -388,14 +511,21 @@ service cloud.firestore {
           && data.allowedUsers is list && data.allowedUsers.size() > 0 && data.allowedUsers.size() <= 25
           && data.allowedUsers.hasAny([data.ownerUid])
           && data.wrappedKeys.keys().hasAll(data.allowedUsers)
-          && data.wrappedKeys.keys().hasOnly(data.allowedUsers);
+          && data.wrappedKeys.keys().hasOnly(data.allowedUsers)
+          && (!('deviceWrappedKeys' in data) || (data.deviceWrappedKeys is map && data.deviceWrappedKeys.size() <= 250))
+          && (!('accountWrappedKeys' in data) || (data.accountWrappedKeys is map && data.accountWrappedKeys.keys().hasOnly(data.allowedUsers)));
       }
       allow read: if signedIn() && request.auth.uid in resource.data.allowedUsers;
       allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid
         && validPrivateEntry(request.resource.data);
-      allow update: if signedIn() && request.auth.uid == resource.data.ownerUid
+      allow update: if signedIn()
         && request.resource.data.ownerUid == resource.data.ownerUid
-        && validPrivateEntry(request.resource.data);
+        && validPrivateEntry(request.resource.data)
+        && (request.auth.uid == resource.data.ownerUid ||
+          (request.auth.uid in resource.data.allowedUsers
+            && request.resource.data.ciphertext == resource.data.ciphertext
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.allowedUsers.hasAll(resource.data.allowedUsers)));
       allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
     }
 
@@ -566,6 +696,68 @@ service cloud.firestore {
       allow delete: if owner(ownerUid);
     }
 
+    function liveLocationRecipientUidAt(values, index) {
+      return values.size() <= index || (values[index] is string
+        && values[index].size() > 0 && values[index].size() <= 128);
+    }
+
+    function validLiveLocationSession(data, ownerUid) {
+      return data.keys().hasAll(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.keys().hasOnly(['ownerUid','sessionId','recipientUids','active','startedAt','expiresAt','updatedAt'])
+        && data.ownerUid is string && data.ownerUid == ownerUid
+        && data.sessionId is string && data.sessionId.matches('^[A-Za-z0-9_-]{8,64}$')
+        && data.recipientUids is list && data.recipientUids.size() >= 1 && data.recipientUids.size() <= 25
+        && liveLocationRecipientUidAt(data.recipientUids, 0)
+        && liveLocationRecipientUidAt(data.recipientUids, 1)
+        && liveLocationRecipientUidAt(data.recipientUids, 2)
+        && liveLocationRecipientUidAt(data.recipientUids, 3)
+        && liveLocationRecipientUidAt(data.recipientUids, 4)
+        && liveLocationRecipientUidAt(data.recipientUids, 5)
+        && liveLocationRecipientUidAt(data.recipientUids, 6)
+        && liveLocationRecipientUidAt(data.recipientUids, 7)
+        && liveLocationRecipientUidAt(data.recipientUids, 8)
+        && liveLocationRecipientUidAt(data.recipientUids, 9)
+        && liveLocationRecipientUidAt(data.recipientUids, 10)
+        && liveLocationRecipientUidAt(data.recipientUids, 11)
+        && liveLocationRecipientUidAt(data.recipientUids, 12)
+        && liveLocationRecipientUidAt(data.recipientUids, 13)
+        && liveLocationRecipientUidAt(data.recipientUids, 14)
+        && liveLocationRecipientUidAt(data.recipientUids, 15)
+        && liveLocationRecipientUidAt(data.recipientUids, 16)
+        && liveLocationRecipientUidAt(data.recipientUids, 17)
+        && liveLocationRecipientUidAt(data.recipientUids, 18)
+        && liveLocationRecipientUidAt(data.recipientUids, 19)
+        && liveLocationRecipientUidAt(data.recipientUids, 20)
+        && liveLocationRecipientUidAt(data.recipientUids, 21)
+        && liveLocationRecipientUidAt(data.recipientUids, 22)
+        && liveLocationRecipientUidAt(data.recipientUids, 23)
+        && liveLocationRecipientUidAt(data.recipientUids, 24)
+        && data.active is bool && data.active == true
+        && data.startedAt is int && data.startedAt > 0
+        && data.expiresAt is int && data.expiresAt > data.startedAt
+        && data.expiresAt <= data.startedAt + 73 * 60 * 60 * 1000
+        && data.updatedAt == request.time;
+    }
+
+    // Active live-location session markers track bounded owner-managed sharing sessions.
+    match /liveLocationSessions/{ownerUid} {
+      function liveLocationSessionUser() {
+        return signedIn() && (
+          ('role' in request.auth.token && request.auth.token.role == 'USER')
+          || (!('role' in request.auth.token)
+            && 'email' in request.auth.token
+            && request.auth.token.email is string
+            && request.auth.token.email.matches('.*@users[.]olive[.]invalid'))
+        );
+      }
+      allow get: if owner(ownerUid);
+      allow list: if false;
+      allow create, update: if owner(ownerUid)
+        && liveLocationSessionUser()
+        && validLiveLocationSession(request.resource.data, ownerUid);
+      allow delete: if owner(ownerUid);
+    }
+
     function conversationParticipant(data) {
       return signedIn() && data.participantIds is list && request.auth.uid in data.participantIds;
     }
@@ -582,7 +774,7 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','requestSource','sourceConversationId','supportConversationId'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','accountRoomKeys','requestSource','sourceConversationId','supportConversationId'])
         && data.friendshipId == conversationId
         && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT', 'SUPPORT_BUTTON'])
         && (!data.keys().hasAny(['sourceConversationId']) || data.sourceConversationId is string)
@@ -638,6 +830,27 @@ service cloud.firestore {
         && validAdditionalConversationKeys(data);
     }
 
+    function validAccountRoomKey(data, uid) {
+      return !(uid in data.accountRoomKeys) || (
+        data.accountRoomKeys[uid] is map
+        && data.accountRoomKeys[uid].keys().hasOnly(['keyId','epoch','algorithm','wrappedKey'])
+        && data.accountRoomKeys[uid].keyId == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.keyId
+        && data.accountRoomKeys[uid].epoch == get(/databases/$(database)/documents/accountKeyDirectories/$(uid)).data.epoch
+        && data.accountRoomKeys[uid].algorithm == 'RSA-OAEP-256'
+        && data.accountRoomKeys[uid].wrappedKey is string
+        && data.accountRoomKeys[uid].wrappedKey.size() > 0
+        && data.accountRoomKeys[uid].wrappedKey.size() <= 768
+      );
+    }
+
+    function validAccountRoomKeys(data) {
+      return data.accountRoomKeys is map
+        && data.accountRoomKeys.keys().hasOnly(data.participantIds)
+        && data.accountRoomKeys.size() <= 25
+        && (data.participantIds.size() < 1 || validAccountRoomKey(data, data.participantIds[0]))
+        && (data.participantIds.size() < 2 || validAccountRoomKey(data, data.participantIds[1]));
+    }
+
     match /conversations/{conversationId} {
       // Collection listeners must constrain participantIds to the authenticated UID.
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
@@ -649,7 +862,7 @@ service cloud.firestore {
       allow list: if signedIn()
         && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data)
-        && !request.resource.data.keys().hasAny(['type'])
+        && !request.resource.data.keys().hasAny(['type','accountRoomKeys'])
         && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
@@ -667,6 +880,8 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAny(['lastMessageId']) || request.resource.data.lastMessageId == '')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
             && validConversationKeys(request.resource.data))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accountRoomKeys','updatedAt'])
+            && validAccountRoomKeys(request.resource.data))
         );
       allow delete: if false;
 
@@ -732,6 +947,11 @@ service cloud.firestore {
         (request.auth.token.role == 'ADMIN' || resource.data.ownerUid == request.auth.uid);
       allow write: if false;
     }
+    // Login device alerts, email delivery logs/cooldowns, and release metadata are server-only.
+    match /accountLoginDevices/{uid}/{document=**} { allow read, write: if false; }
+    match /emailNotificationLogs/{logId} { allow read, write: if false; }
+    match /emailCooldowns/{cooldownId} { allow read, write: if false; }
+    match /appReleases/{releaseId} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
 
   }

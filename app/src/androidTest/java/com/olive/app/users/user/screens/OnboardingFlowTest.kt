@@ -31,7 +31,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         nextOnboarding()
         fill("address_city", "Edmonton")
         nextOnboarding()
-        fill("trigger", "moon garden")
+        fillOnboardingTrigger("moon garden")
         hideKeyboard()
     }
 
@@ -52,11 +52,11 @@ class OnboardingFlowTest : OliveUiTestBase() {
             session.runtime.navigation.openScreen(SessionScreen.TriggerSetup)
         }
         waitFor("trigger_setup_submit")
-        fill("trigger", "ab")
+        fillOnboardingTrigger("ab")
         hideKeyboard()
         click("trigger_setup_submit")
         compose.onNodeWithText(compose.activity.getString(R.string.ui_invalid_trigger)).assertExists()
-        fill("trigger", "quiet garden")
+        fillOnboardingTrigger("quiet garden")
         hideKeyboard()
         click("trigger_setup_submit")
         chooseAppPin()
@@ -69,10 +69,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
     fun addingAnEmergencyContactRequiresBothFieldsAndSupportsRemoval() {
         reachCoverPicker("onboard_contact_fixture")
         val add = compose.onNodeWithTag("add_onboarding_contact")
-        add.performScrollTo().assertIsNotEnabled()
+        add.performScrollTo().assertIsEnabled().performClick()
         fill("setup_contact_name", "Synthetic contact")
         hideKeyboard()
-        add.performScrollTo().assertIsNotEnabled()
+        add.performScrollTo().assertIsEnabled().performClick()
         fill("setup_contact_details", "Call after 5 pm")
         hideKeyboard()
         add.performScrollTo().assertIsEnabled().performClick()
@@ -82,7 +82,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         remove.performScrollTo().performClick()
         compose.onNodeWithText("Synthetic contact").assertDoesNotExist()
         compose.onNodeWithText("Call after 5 pm").assertDoesNotExist()
-        add.assertIsNotEnabled()
+        add.assertIsEnabled()
     }
 
     // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.
@@ -131,7 +131,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Invalid password").assertExists()
         compose.onNodeWithText("Passwords differ").assertExists()
         compose.onNodeWithText("0 of 9 required", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 5")
+        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 6")
     }
 
     // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
@@ -164,7 +164,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("address_city", "Edmonton")
         advanceOnboarding("address_city", "profile_submit")
         compose.onNodeWithText("Step 4 of 4", useUnmergedTree = true).assertExists()
-        click("profile_submit")
+        clickAccessibleAction("profile_submit")
+        waitFor("walkthrough_tour_skip")
+        clickAccessibleAction("walkthrough_tour_skip")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitFor("safe_contact_settings")
         compose.onNodeWithTag("cover_root").assertDoesNotExist()
         compose.onNodeWithText("Safe Contact").assertExists()
@@ -177,7 +180,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
-        click("safe_contact_settings")
+        clickAccessibleAction("safe_contact_settings")
         waitFor("save_settings")
         compose.onNodeWithTag("sign_out").assertDoesNotExist()
     }
@@ -196,14 +199,14 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("credentials_submit")
         waitFor("full_name")
         compose.onNodeWithTag("language").assertDoesNotExist()
-        compose.onNodeWithText("Step 2 of 5", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("onboarding_step_5", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Step 2 of 6", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("onboarding_step_6", useUnmergedTree = true).assertExists()
         fill("full_name", "City Test")
         chooseBirthday()
         nextOnboarding()
         fill("address_city", "Edmonton")
         nextOnboarding()
-        fill("trigger", "moon garden")
+        fillOnboardingTrigger("moon garden")
         hideKeyboard()
         compose.onNodeWithTag("cover_choice_fitness").performScrollTo().assertIsSelected()
         compose.onNodeWithTag("cover_choice_news").assertIsNotSelected().performClick()
@@ -216,11 +219,12 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
         compose.onNodeWithTag("cover_choice_news").assertIsSelected()
         compose.onNodeWithTag("cover_choice_fitness").assertIsNotSelected()
-        advanceOnboarding("trigger", "profile_submit")
-        compose.onNodeWithText("Step 5 of 5", useUnmergedTree = true).assertExists()
+        advanceOnboarding("trigger", "friend_invite_code")
+        advanceOnboarding("friend_invite_code", "profile_submit")
+        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
         click("profile_submit")
         chooseAppPin()
-        compose.onNodeWithText("Step 6 of 6", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Step 7 of 7", useUnmergedTree = true).assertExists()
         fill("new_pin", "1234")
         fill("confirm_pin", "1234")
         click("pin_setup_submit")
@@ -235,7 +239,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     fun everyCoverChoiceCanBecomeTheSingleSelectedOption() {
         reachCoverPicker("cover_picker_test")
-        val tags = listOf("cover_choice_news", "cover_choice_fitness", "cover_choice_game")
+        val tags = listOf("cover_choice_news", "cover_choice_fitness")
         tags.forEach { selectedTag ->
             compose.onNodeWithTag(selectedTag).performScrollTo().performClick()
             compose.waitUntil(5_000) {
@@ -250,7 +254,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     // Checks the onboarding contacts quick exit and returning user step with the test's sample data.
     @Test
     fun onboardingContactsQuickExitAndReturningUser() {
-        register(username = "returning_user_tester")
+        registerThroughUi(username = "returning_user_tester")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
         // The selected fitness tab stays alive through private screens and recreation.
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.activity)).performClick()
@@ -277,22 +281,42 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("incident_time_apply")
         fill("incident_location", "Edmonton")
         fill("private_entry_body", "Details that must stay inside Olive Branch")
-        click("save_private_entry")
-        compose.waitUntil(30_000) {
-            compose.onAllNodesWithTag("private_editor_title").fetchSemanticsNodes().isEmpty() &&
-                compose.onAllNodesWithText("Details that must stay inside Olive Branch")
-                    .fetchSemanticsNodes().isNotEmpty()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        val owner = requireNotNull(session.coverAccountId)
+        hideKeyboard()
+        compose.onNodeWithTag("private_editor_list").performScrollToNode(hasTestTag("save_private_entry"))
+        compose.onNodeWithTag("save_private_entry").assertIsEnabled().performClick()
+        compose.waitUntil(15_000) {
+            !session.busy && (session.message != null || session.privateEntries.isNotEmpty())
+        }
+        compose.runOnIdle {
+            assertTrue("Saving the incident failed. message=${session.message}",
+                session.privateEntries.any { it.body == "Details that must stay inside Olive Branch" })
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
         compose.onNodeWithText("Details that must stay inside Olive Branch").assertDoesNotExist()
+        assertEquals("The committed incident must survive Quick Exit in encrypted storage",
+            1, session.runtime.store.privateEntries(owner).size)
         unlock()
         click("safe_notes")
-        compose.onNodeWithText("Details that must stay inside Olive Branch").assertExists()
+        assertEquals(owner, session.coverAccountId)
+        assertEquals(SafePage.Notes, session.page)
+        compose.waitUntil(15_000) { !session.loadingHistory }
+
+        compose.runOnIdle {
+            assertTrue("historyLoadFailed=${session.historyLoadFailed}, incidents=${session.privateEntries.size}",
+                !session.historyLoadFailed && session.privateEntries.any {
+                    it.body == "Details that must stay inside Olive Branch"
+                })
+        }
         fill("private_notes_search", "Private incident")
-        compose.onNodeWithTag("private_entry_row").assertExists()
+        hideKeyboard()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("private_entry_row"))
+        compose.onNodeWithText("Details that must stay inside Olive Branch").assertExists()
         fill("private_notes_search", "")
-        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        hideKeyboard()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("private_entry_row"))
         compose.onNodeWithTag("private_pin").performClick()
         compose.waitUntil(30_000) {
             !session.busy && session.privateEntries.any { it.pinned }
@@ -335,8 +359,17 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("private_entry_row").performClick()
         click("delete_private_entry")
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Moved to Trash for 10 seconds.").fetchSemanticsNodes()
+            compose.onAllNodesWithText("Note moved to Trash.").fetchSemanticsNodes()
                 .isNotEmpty()
+        }
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("private_entry_row").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("private_entry_row").performClick()
+        click("delete_private_entry")
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithText("Note moved to Trash.").fetchSemanticsNodes().isNotEmpty()
         }
         click("open_scratchpad")
         compose.waitUntil(30_000) {

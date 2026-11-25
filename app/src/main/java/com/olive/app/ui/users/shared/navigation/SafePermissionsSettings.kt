@@ -1,5 +1,12 @@
 package com.olive.app.ui.users.shared.navigation
 
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
+import com.olive.app.ui.shared.oliveErrorShake
+import com.olive.app.ui.shared.rememberFieldErrorShakeTrigger
 import android.Manifest
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
@@ -9,49 +16,64 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.olive.app.R
+import com.olive.app.data.update.AppUpdateClient
+import com.olive.app.data.update.AppUpdateInstallerActivity
+import com.olive.app.data.update.AppUpdateStore
 import com.olive.app.data.update.installUpdatesPermissionIntent
 import com.olive.app.ui.covers.fitness.FitnessHealthConnect
-import com.olive.app.ui.shared.AccessibleMessage
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.user.account.SettingsSection
-import com.olive.app.ui.users.user.location.BackgroundLocationPermissionDialog
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
+import com.olive.app.ui.users.user.location.BackgroundLocationPermissionDialog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 private enum class PermissionFeature(val title: Int, val reason: Int, val runtime: List<String> = emptyList()) {
     Camera(R.string.app_permissions_camera, R.string.app_permissions_camera_why, listOf(Manifest.permission.CAMERA)),
@@ -212,7 +234,7 @@ internal fun SafePermissionsSettings() {
             else -> null
         }
     }
-    SettingsSection(stringResource(R.string.app_permissions_install)) {
+    SettingsSection(stringResource(R.string.app_permissions_install), targetId = "settings_perm_install_card") {
         Text(stringResource(R.string.app_permissions_install_why))
         Text(stringResource(permissionStatus(canInstall).label),
             style = MaterialTheme.typography.labelLarge)
@@ -226,7 +248,7 @@ internal fun SafePermissionsSettings() {
         onContinue = { backgroundPrompt = false; scope.launch { requestBackground?.invoke() } },
     )
     feedback?.let { AccessibleMessage(stringResource(it)) }
-    SettingsSection(stringResource(R.string.app_permissions_features)) {
+    SettingsSection(stringResource(R.string.app_permissions_features), headerTargetId = "settings_perm_features_header") {
         PermissionFeature.entries.filter { entry ->
             when (entry) {
                 PermissionFeature.BackgroundLocation, PermissionFeature.Activity -> Build.VERSION.SDK_INT >= 29
@@ -246,7 +268,7 @@ internal fun SafePermissionsSettings() {
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.app_permissions_open_android)) }
     }
-    SettingsSection(stringResource(R.string.app_permissions_automatic)) {
+    SettingsSection(stringResource(R.string.app_permissions_automatic), targetId = "settings_perm_automatic_card") {
         automaticPermissions.forEachIndexed { index, entry ->
             if (index > 0) HorizontalDivider()
             PermissionExplanation(entry.first, entry.second, PermissionStatus.Automatic)
@@ -353,4 +375,276 @@ private inline fun launchWithSafeSession(session: SessionViewModel, launch: () -
         session.finishSafeSystemActivity(marker)
     }
     return false
+}
+
+internal val LocalSafeUpdateReminder = compositionLocalOf<SafeAppUpdateUi?> { null }
+
+internal data class SafeAppUpdateUi(
+    val required: Boolean,
+    val launchFailed: Boolean,
+    val onDownload: () -> Unit,
+)
+
+/**
+ * Observes releases while the private workspace is active and exposes the installer action.
+ *
+ * @param enabled Whether the private workspace can show the update label.
+ * @param launch Launches the installer through the safe system activity handler.
+ * @return The available update action, or null when there is no newer release.
+ */
+@Composable
+internal fun rememberSafeAppUpdate(
+    enabled: Boolean,
+    launch: (Intent) -> Boolean,
+): SafeAppUpdateUi? {
+    val context = LocalContext.current.applicationContext
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val store = remember(context) { AppUpdateStore(context) }
+    var offer by remember(store, enabled) { mutableStateOf(if (enabled) store.offer() else null) }
+    DisposableEffect(store, enabled) {
+        val subscription = if (enabled) store.observe { offer = it } else null
+        onDispose { subscription?.close() }
+    }
+    LaunchedEffect(enabled, store, lifecycle) {
+        if (!enabled) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            val client = AppUpdateClient(context)
+            while (true) {
+                withContext(Dispatchers.IO) { runCatching { store.refresh(client) } }
+                delay(60_000.milliseconds)
+            }
+        }
+    }
+    val current = offer ?: return null
+    var launchFailed by remember(current.release.versionCode) { mutableStateOf(false) }
+    return SafeAppUpdateUi(current.required, launchFailed) {
+        launchFailed = !launch(
+            Intent(context, AppUpdateInstallerActivity::class.java)
+                .putExtra(AppUpdateInstallerActivity.EXTRA_RELEASE_JSON, current.release.toJson())
+        )
+    }
+}
+
+/**
+ * Shows a badged download button when a newer release is available.
+ */
+@Composable
+internal fun SafeAppUpdateReminder() {
+    val update = LocalSafeUpdateReminder.current ?: return
+    val status = stringResource(
+        if (update.required) R.string.app_update_required else R.string.ui_a_new_update_is_available
+    )
+    IconButton(onClick = update.onDownload, modifier = Modifier.testTag("safe_update_reminder")) {
+        BadgedBox(badge = { Badge(Modifier.testTag("safe_update_badge")) }) {
+            Icon(Icons.Outlined.FileDownload, contentDescription = status)
+        }
+    }
+}
+
+/**
+ * Reports an installer launch failure below the dashboard header.
+ */
+@Composable
+internal fun SafeAppUpdateError() {
+    if (LocalSafeUpdateReminder.current?.launchFailed == true) {
+        AccessibleMessage(stringResource(R.string.app_update_failed))
+    }
+}
+
+/**
+ * Gives every long form the same spacing, scrolling, and room above Quick exit.
+ *
+ * @param scrollResetKey Optional scroll reset key supplied to [FormColumn].
+ * @param content Composable content lambda rendered inside this container.
+ */
+@Composable
+internal fun FormColumn(
+    scrollResetKey: Any? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(scrollResetKey) {
+        if (scrollResetKey != null) scrollState.scrollTo(0)
+    }
+    Column(
+        Modifier.fillMaxSize().oliveScrollbar(scrollState).verticalScroll(scrollState)
+            .padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp), content = content
+    )
+}
+
+/**
+ * Shows the app name, page title, and help text, then moves TalkBack focus to the new page title.
+ *
+ * @param title Primary display title text.
+ * @param subtitle Secondary descriptive text.
+ * @param appName App name supplied to [Heading].
+ * @param focusKey Optional focus key supplied to [Heading].
+ */
+@Composable
+internal fun Heading(
+    title: String,
+    subtitle: String,
+    appName: String = stringResource(R.string.olive_branch),
+    focusKey: Any? = title,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // Moves TalkBack focus to the new form heading after the account step changes.
+    LaunchedEffect(focusKey) {
+        if (focusKey != null) {
+            withFrameNanos { }
+            focusRequester.requestFocus()
+        }
+    }
+    Text(appName, fontFamily = FontFamily.Serif, fontSize = 30.sp, color = OliveGreen)
+    Text(
+        title,
+        modifier = Modifier.focusRequester(focusRequester).focusable().semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium
+    )
+    if (subtitle.isNotBlank()) Text(subtitle, color = Muted)
+}
+
+/**
+ * Warns testers when data is only being saved on the current device.
+ *
+ * @param session Shared session view model owning application state and actions.
+ */
+@Composable
+internal fun ModeNotice(session: SessionViewModel) {
+    if (session.localMode) Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Text(
+            stringResource(R.string.local_test_mode_accounts_stay_on_this_installation_firebase_is_not_connected_use_fictional_information_while_testing),
+            Modifier.padding(14.dp),
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+/**
+ * Announces status changes to TalkBack and shows when the app is busy.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param showMessage Whether to show message.
+ */
+@Composable
+internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
+    // Shows the account form message only when there is text to explain.
+    if (showMessage) session.message?.let {
+        AccessibleMessage(
+            it,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)
+                .testTag("session_message")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+        )
+    }
+    AnimatedVisibility(
+        session.busy,
+        enter = fadeIn(tween(120)) + expandVertically(),
+        exit = fadeOut(tween(100)) + shrinkVertically()
+    ) {
+        LoadingSkeleton(SkeletonLayout.Action, Modifier.fillMaxWidth().padding(horizontal = 18.dp))
+    }
+}
+
+/**
+ * Builds a text field with consistent validation, password controls, and keyboard behavior.
+ *
+ * @param label Accessible label or display caption.
+ * @param value Input value to store, parse, or format.
+ * @param tag Tag supplied to [Field].
+ * @param secret Whether to apply secret.
+ * @param numeric Whether to apply numeric.
+ * @param showSecretToggle Whether to show secret toggle.
+ * @param multiline Whether to apply multiline.
+ * @param enabled Whether this feature or control is currently enabled.
+ * @param error Throwable or error message describing a failure, or null when not provided.
+ * @param onFocus Callback invoked when focus changes or occurs.
+ * @param newPassword Whether to apply new password.
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
+ * @param onChange Callback invoked when the value or observed state changes.
+ */
+@Composable
+internal fun Field(
+    label: String,
+    value: String,
+    tag: String,
+    secret: Boolean = false,
+    numeric: Boolean = false,
+    showSecretToggle: Boolean = false,
+    multiline: Boolean = false,
+    enabled: Boolean = true,
+    error: String? = null,
+    onFocus: (() -> Unit)? = null,
+    newPassword: Boolean = false,
+    shakeTrigger: Int = 0,
+    onChange: (String) -> Unit
+) {
+    val uiText = rememberResourceText()
+    val effectiveShake = rememberFieldErrorShakeTrigger(error, shakeTrigger)
+    var secretVisible by rememberSaveable(tag) { mutableStateOf(false) }
+    val secretDescription = when {
+        numeric -> uiText(R.string.a11y_pin)
+        tag.contains("trigger", ignoreCase = true) -> uiText(R.string.a11y_trigger_word)
+        else -> uiText(R.string.a11y_password)
+    }
+    val autofillType = when (tag) {
+        "username" -> ContentType.Username
+        "password" -> if (newPassword) ContentType.NewPassword else ContentType.Password
+        "confirm_password" -> ContentType.NewPassword
+        else -> null
+    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth().testTag(tag).oliveErrorShake(effectiveShake).semantics {
+            error?.let { error(it) }
+            autofillType?.let { contentType = it }
+        }
+            .onFocusChanged { if (it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        enabled = enabled,
+        singleLine = !multiline,
+        minLines = if (multiline) 3 else 1,
+        isError = error != null,
+        supportingText = error?.let { message ->
+            {
+                AccessibleMessage(
+                    message,
+                    modifier = Modifier.testTag("${tag}_error"),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        visualTransformation = if (secret && !secretVisible) PasswordVisualTransformation()
+        else VisualTransformation.None,
+        trailingIcon = if (secret && showSecretToggle) {
+            {
+                IconButton(
+                    onClick = { secretVisible = !secretVisible },
+                    modifier = Modifier.testTag("${tag}_visibility")
+                ) {
+                    Icon(
+                        if (secretVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (secretVisible) uiText(
+                            R.string.ui_hide_value,
+                            secretDescription
+                        ) else uiText(R.string.ui_show_value, secretDescription)
+                    )
+                }
+            }
+        } else null,
+        keyboardOptions = KeyboardOptions(
+            autoCorrectEnabled = false, keyboardType = when {
+                numeric -> KeyboardType.NumberPassword
+                secret -> KeyboardType.Password
+                else -> KeyboardType.Text
+            }
+        )
+    )
 }

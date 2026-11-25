@@ -9,6 +9,7 @@ import {
 } from "./LocalDataStore";
 import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
 import { readStoredObject } from "./StoredAccountJson";
+import type { UnlockedAccountKeyset } from "./AccountKeysetCrypto";
 import {
   emptyHistory,
   emptyProfile,
@@ -16,6 +17,7 @@ import {
   normalizeUsername,
   signInEmail,
   purgeEntry,
+  validPin,
   type Profile,
   type Identity,
   type Role,
@@ -34,11 +36,53 @@ export const cloudMode = Boolean(
 );
 type Cloud = typeof import("./FirebaseClient");
 let cloud: Cloud | null = null;
+let unlockedAccountKeyset: UnlockedAccountKeyset | null = null;
+
+/** Keeps non-extractable recovery keys in this tab only and binds them to one signed-in account. */
+export const accountKeysetSession = {
+  install(keyset: UnlockedAccountKeyset) {
+    unlockedAccountKeyset = keyset;
+  },
+  current(uid: string) {
+    return unlockedAccountKeyset?.accountId === uid ? unlockedAccountKeyset : null;
+  },
+  clear() {
+    unlockedAccountKeyset = null;
+  },
+};
 // Opens Firebase once and waits until the saved sign-in session is ready.
 export async function firebase() {
   cloud ??= await import("./FirebaseClient");
   await cloud.authReady;
   return cloud;
+}
+async function signinDeviceId(): Promise<string> {
+  const db = await database;
+  const existing = await db.get("device", "signin-device-id");
+  if (typeof existing === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(existing)) {
+    return existing;
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  const created = btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  await db.put("device", created, "signin-device-id");
+  return created;
+}
+async function recordWebSignIn(registerOnly: boolean): Promise<void> {
+  if (!cloudMode) return;
+  try {
+    const { functions } = await firebase();
+    const { httpsCallable } = await import("firebase/functions");
+    const deviceId = await signinDeviceId();
+    await httpsCallable(functions, "recordDeviceSignIn")({
+      deviceId,
+      platform: "WEB",
+      registerOnly,
+    });
+  } catch {
+    // Sign-in notifications are best-effort and must not block account access.
+  }
 }
 // Tells other signed-in devices to reload account files after a profile or history write.
 export async function notifyAccountChanged(uid: string) {
@@ -178,6 +222,7 @@ export class Accounts {
         username: user.displayName || user.email!.split("@")[0],
         role,
       };
+      void recordWebSignIn(create);
       const db = await database;
       const saved = await db.get("accounts", `CLOUD:${user.uid}`);
       // A missing history file means this account has no saved activity yet.
@@ -275,6 +320,7 @@ export class Accounts {
       role: profile.role,
       triggerHash: profile.triggerHash,
       pinKey: await wrapKey(pin, raw),
+      pinLength: validPin(pin) ? pin.length : undefined,
       failures: 0,
     };
     await (await database).put("device", enrollment, "current");
@@ -317,8 +363,15 @@ export class Accounts {
       if (!value.profile) throw new Error("Sign in again to finish setup.");
       await (
         await database
-      ).put("device", { ...enrollment, failures: 0 }, "current");
-      if (cloudMode) return await this.load();
+      ).put("device", {
+        ...enrollment,
+        pinLength: validPin(pin) ? pin.length : undefined,
+        failures: 0,
+      }, "current");
+      if (cloudMode) {
+        void recordWebSignIn(true);
+        return await this.load();
+      }
       return {
         ...value,
         history: {
@@ -337,6 +390,7 @@ export class Accounts {
     this.raw?.fill(0);
     this.raw = null;
     this.identity = null;
+    accountKeysetSession.clear();
   }
   async saveProfile(profile: Profile) {
     if (
@@ -436,6 +490,12 @@ export class Accounts {
       EmailAuthProvider.credential(auth.currentUser.email!, current),
     );
     await updatePassword(auth.currentUser, next);
+    try {
+      const { rotateBrowserPasswordRecovery } = await import("./BrowserAccountKeysetRecovery");
+      await rotateBrowserPasswordRecovery(identity.uid, current, next);
+    } catch (error) {
+      console.warn("Failed to rotate password recovery", error);
+    }
     await (
       await database
     ).put("accounts", {

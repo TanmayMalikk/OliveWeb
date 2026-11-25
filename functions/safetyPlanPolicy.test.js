@@ -1,7 +1,7 @@
 // Tests who can edit and share a user's safety plan.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {mergeFields, staffEligible, chooseStaff} = require("./src/safetyPlanPolicy");
+const {mergeFields, staffEligible, chooseStaff, chooseConsultStaff} = require("./src/safetyPlanPolicy");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"olive-test",storageBucket:"olive-test.appspot.com"});
 const {canEdit} = require("./src/safetyPlanAccess");
 
@@ -175,6 +175,10 @@ test("staff assignment randomizes only between equally least-loaded staff", () =
   ];
   assert.equal(chooseStaff(candidates, () => 0).uid, "first");
   assert.equal(chooseStaff(candidates, () => 0.999).uid, "second");
+  assert.equal(chooseConsultStaff([
+    {uid:"support-heavy-zero-consults",consultCount:0,activeCount:5},
+    {uid:"one-consult",consultCount:1,activeCount:1},
+  ]).uid, "support-heavy-zero-consults");
 });
 
 // Inputs: the values in this case. Expected: document and quick-grab sections can be added without replacing legacy notes.

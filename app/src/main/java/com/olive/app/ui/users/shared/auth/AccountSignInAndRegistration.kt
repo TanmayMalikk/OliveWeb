@@ -1,23 +1,50 @@
 // All safe-app roles: shows sign-in and registration for every account role.
 package com.olive.app.ui.users.shared.auth
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.onboarding.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicSecureTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import com.olive.app.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.users.user.account.*
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.olive.app.data.account.AccountRole
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 
 /**
@@ -118,6 +145,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable(create) { mutableIntStateOf(0) }
+    val combinedShakeTrigger = shakeAttempt + session.account.inputErrorVersion
     val organizationLogin =
         !create && session.account.role in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val usernameValid =
@@ -134,7 +163,7 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
         listOf(usernameValid, passwordValid, confirmationValid).take(if (create) 3 else 2)
             .count { it }
     val stages = when {
-        create && session.account.role == AccountRole.USER -> 5
+        create && session.account.role == AccountRole.USER -> 6
         create && session.account.role == AccountRole.SAFE_CONTACT -> 4
         !create && session.account.role == AccountRole.USER -> 2
         else -> 1
@@ -193,7 +222,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
             username,
             "username",
             enabled = !session.account.busy,
-            error = usernameError
+            error = usernameError,
+            shakeTrigger = combinedShakeTrigger
         ) {
             username = it.take(if (create) 24 else 254)
             submitted =
@@ -229,7 +259,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
             showSecretToggle = true,
             enabled = !session.account.busy,
             error = passwordError,
-            newPassword = create
+            newPassword = create,
+            shakeTrigger = combinedShakeTrigger
         ) {
             password = it.take(if (create) 24 else 128)
             submitted =
@@ -273,7 +304,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
                 secret = true,
                 showSecretToggle = true,
                 enabled = !session.account.busy,
-                error = confirmError
+                error = confirmError,
+                shakeTrigger = combinedShakeTrigger
             ) {
                 confirm = it.take(24)
                 submitted = false
@@ -289,11 +321,11 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
         OnboardingNavigation(
             session.navigation::back, {
                 submitted = true
-                if (usernameValid && passwordValid && confirmationValid) session.account.authenticate(
-                    username,
-                    password,
-                    create
-                )
+                if (usernameValid && passwordValid && confirmationValid) {
+                    session.account.authenticate(username, password, create)
+                } else {
+                    shakeAttempt += 1
+                }
             }, nextTag = "credentials_submit", enabled = !session.account.busy,
             nextLabel = if (create) uiText(R.string.create_account) else uiText(R.string.sign_in)
         )
@@ -322,9 +354,10 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val pinValid = InputPolicy.validPin(pin)
     val confirmationValid = confirm.isNotEmpty() && confirm == pin
-    val stages = if (session.account.creatingAccount) 6 else 2
+    val stages = if (session.account.creatingAccount) 7 else 2
     val page = stages - 1
     val completedBeforePin = if (session.account.creatingAccount) 7 else 2
     val totalRequired = completedBeforePin + 2
@@ -344,7 +377,8 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             numeric = true,
             showSecretToggle = true,
             enabled = !session.account.busy,
-            error = if (showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null
+            error = if (showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null,
+            shakeTrigger = shakeAttempt
         ) {
             pin = it.filter(Char::isDigit).take(6)
             showErrors = false
@@ -358,7 +392,8 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             numeric = true,
             showSecretToggle = true,
             enabled = !session.account.busy,
-            error = if (showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null
+            error = if (showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null,
+            shakeTrigger = shakeAttempt
         ) {
             confirm = it.filter(Char::isDigit).take(6)
             showErrors = false
@@ -373,10 +408,11 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
             onBack,
             {
                 showErrors = true
-                if (pinValid && confirmationValid) session.account.createDevicePin(
-                    pin,
-                    confirm
-                )
+                if (pinValid && confirmationValid) {
+                    session.account.createDevicePin(pin, confirm)
+                } else {
+                    shakeAttempt += 1
+                }
             },
             last = true,
             nextTag = "pin_setup_submit",
@@ -420,4 +456,154 @@ internal fun PinPrompt(session: SessionViewModel) {
         return
     }
     SystemPinPrompt(session, challenge)
+}
+
+/**
+ * The same PIN verifier and lockout rules, with Android's numeric password keyboard for everyone.
+ *
+ * @param session Shared session view model owning application state and actions.
+ * @param challenge Challenge supplied to [SystemPinPrompt].
+ */
+@Composable
+internal fun SystemPinPrompt(session: SessionViewModel, challenge: Int) {
+    val uiText = rememberResourceText()
+    val expectedLength = session.account.appPinLength
+    val pinLabel = stringResource(R.string.a11y_pin)
+    val digitsEntered = stringResource(R.string.a11y_digits_entered)
+    val pinField = remember(challenge) { TextFieldState() }
+    val enteredLength = pinField.text.length
+    var localShake by remember(challenge) { mutableIntStateOf(0) }
+    var pinError by remember(challenge) { mutableStateOf(false) }
+    val sessionErrorVersion = session.account.inputErrorVersion
+    var lastSeenErrorVersion by remember(challenge) { mutableIntStateOf(sessionErrorVersion) }
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    val imeInsets = WindowInsets.ime
+    val density = LocalDensity.current
+    var pinFieldPlaced by remember(challenge) { mutableStateOf(false) }
+    var openedKeyboard by remember(challenge) { mutableStateOf(false) }
+    LaunchedEffect(pinField.text) {
+        if (pinField.text.isNotEmpty()) pinError = false
+    }
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            pinError = true
+            localShake += 1
+        }
+    }
+    /**
+     * Submits the entered PIN or shows feedback if digits are missing.
+     */
+    fun submit() {
+        if (session.account.busy || session.privacyBlackout || session.screen != SessionScreen.Pin ||
+            session.pinChallengeVersion != challenge) return
+        val attempt = pinField.text.toString()
+        if (!InputPolicy.validPin(attempt) || (expectedLength != null && attempt.length != expectedLength)) {
+            pinError = true
+            localShake += 1
+            session.account.showError(uiText(if (expectedLength == null) R.string.enter_your_4_6_digit_pin else R.string.enter_your_pin))
+            return
+        }
+        pinError = false
+        pinField.edit { replace(0, length, "") }
+        session.account.submitPin(attempt, challenge)
+    }
+    val readyForKeyboard = pinFieldPlaced && windowFocused && !session.account.busy &&
+        session.screen == SessionScreen.Pin && !session.privacyBlackout
+    LaunchedEffect(challenge, readyForKeyboard, keyboard) {
+        if (!readyForKeyboard || openedKeyboard || keyboard == null) return@LaunchedEffect
+        // The cover editor can finish hiding its IME after the PIN editor has taken focus.
+        for (attempt in 0 until 4) {
+            if (attempt > 0 && imeInsets.getBottom(density) > 0) break
+            if (focus.requestFocus()) {
+                withFrameNanos { }
+                keyboard.show()
+            }
+            delay(180.milliseconds)
+        }
+        openedKeyboard = true
+    }
+    FormColumn {
+        Column(
+            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 320.dp)
+                .fillMaxWidth().padding(top = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Lock, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+            Text(
+                stringResource(R.string.enter_pin),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+            BasicSecureTextField(
+                state = pinField,
+                inputTransformation = InputTransformation {
+                    if (length > (expectedLength ?: 6) || asCharSequence().any { it !in '0'..'9' }) revertAllChanges()
+                },
+                enabled = !session.account.busy,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
+                cursorBrush = SolidColor(Color.Unspecified),
+                textObfuscationMode = TextObfuscationMode.Hidden,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done,
+                    autoCorrectEnabled = false, showKeyboardOnFocus = true),
+                onKeyboardAction = { submit() },
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("unlock_pin")
+                    .onGloballyPositioned { pinFieldPlaced = true }
+                    .oliveErrorShake(localShake)
+                    .semantics {
+                        contentDescription = pinLabel
+                        stateDescription = "$digitsEntered: " +
+                            if (expectedLength != null) "$enteredLength/$expectedLength" else enteredLength.toString()
+                    },
+                decorator = { innerField ->
+                    Box(
+                        Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { innerField() }
+                        PinDots(expectedLength, enteredLength, pinError)
+                    }
+                },
+            )
+            Status(session)
+            Button(onClick = ::submit, enabled = !session.account.busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("unlock_submit")) {
+                Text(stringResource(R.string.a11y_unlock))
+            }
+        }
+    }
+}
+
+/**
+ * Draws the PIN indicators and shows the accepted length when the saved PIN length is unknown.
+ *
+ * @param expectedLength The configured PIN length, or null when it is unknown.
+ * @param enteredLength The number of digits currently entered.
+ * @param isError Whether to draw the indicators in their error state.
+ */
+@Composable
+private fun PinDots(expectedLength: Int?, enteredLength: Int, isError: Boolean) {
+    if (expectedLength == null && enteredLength == 0) {
+        Text(stringResource(R.string.ui_4_6_digits), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    val outline = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+    val fill = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        repeat(expectedLength ?: enteredLength) { index ->
+            Box(
+                Modifier.size(18.dp)
+                    .testTag("unlock_pin_dot_$index")
+                    .background(if (index < enteredLength) fill else Color.Transparent, CircleShape)
+                    .border(1.5.dp, if (index < enteredLength) fill else outline, CircleShape),
+            )
+        }
+    }
 }

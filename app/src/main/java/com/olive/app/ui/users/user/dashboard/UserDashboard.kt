@@ -1,6 +1,11 @@
 // Safe-app users: shows the user’s main safe-app actions.
 package com.olive.app.ui.users.user.dashboard
 
+import com.olive.app.ui.shared.OliveFloatingActionButton as FloatingActionButton
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -45,6 +50,7 @@ import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.safetyplan.*
+import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.*
 import com.olive.app.ui.users.user.documents.EmergencyReportLocation
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
@@ -57,11 +63,24 @@ import kotlinx.coroutines.launch
  *
  * @param session Shared session view model owning application state and actions.
  * @param exit Action or callback executed for exit.
+ * @param guideTopicId The optional walkthrough topic selected for this screen.
  */
 @Composable
-internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
+internal fun SafeArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
     val profile = session.profile ?: return
-    LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
+    val uid = session.coverAccountId ?: return
+    val context = LocalContext.current
+    LaunchedEffect(uid) {
+        val username = session.coverUsername
+        val localMode = session.localMode
+        session.messages.ensureMessagingObservation()
+        launch { session.documents.load(uid, username, localMode) }
+        launch { session.runtime.history.refreshHistory(uid) }
+        val defaults = safetyDefaults(context, !profile.affectedNames.isNullOrBlank(), profile.safetyIntake)
+        launch { session.safetyPlans.open(uid, profile.fullName.ifBlank { profile.username }, defaults, "safe_area_warmup") }
+        launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { com.olive.app.data.safety.HotlineDirectory.readBundled(context) } }
+        launch { runCatching { android.webkit.WebView(context).destroy() } }
+    }
     AnimatedContent(
         targetState = session.page, label = "safe page",
         transitionSpec = {
@@ -83,6 +102,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
             SafePage.Location -> LocationMapScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session, guideTopicId)
         }
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
@@ -110,7 +130,6 @@ private fun StaffHelpScreen(session: SessionViewModel) {
         session.navigation.openSafePage(SafePage.Messages)
         session.messages.openConversation(chat)
     }
-    BackHandler { session.navigation.back() }
     FormColumn {
         IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("staff_help_back")) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ui_previous_safe_page))
@@ -255,6 +274,7 @@ internal fun SafeSupportControls(
             modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding()
                 .padding(start = 12.dp, end = 12.dp, bottom = 92.dp)
                 .widthIn(max = 360.dp).heightIn(max = (maxHeight - 116.dp).coerceAtLeast(0.dp))
+                .walkthroughTarget("support_action_list")
                 .testTag("support_action_list")
                 .accessibilityTraversal(AccessibilityTraversalOrder.OverlayContent),
             enter = fadeIn(tween(160)) + scaleIn(
@@ -290,9 +310,14 @@ internal fun SafeSupportControls(
                     R.string.support_walkthrough,
                     Icons.AutoMirrored.Outlined.MenuBook,
                     "support_walkthrough",
-                    false,
+                    true,
                     120
-                ) {}
+                ) {
+                    if (expanded) {
+                        onExpanded(false)
+                        session.navigation.openSafePage(SafePage.Walkthrough)
+                    }
+                }
                 SupportAction(
                     R.string.support_staff_help,
                     Icons.Outlined.SupportAgent,
@@ -383,6 +408,7 @@ internal fun SafeSupportControls(
 /**
  * Draws one support-menu button and delays its entrance so the list opens smoothly.
  *
+ * @receiver The visibility animation scope that owns this action.
  * @param labelId String resource ID for the accessible display label.
  * @param icon Icon supplied to [SupportAction].
  * @param tag Tag supplied to [SupportAction].
@@ -401,7 +427,7 @@ private fun AnimatedVisibilityScope.SupportAction(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag)
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).walkthroughTarget(tag).testTag(tag)
             .animateEnterExit(
                 enter = fadeIn(tween(160, delayMillis)) + slideInVertically(
                     tween(
@@ -555,16 +581,21 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                SafeAppUpdateReminder()
-                FilledTonalIconButton(
-                    onClick = { session.navigation.openSafePage(SafePage.Camera) },
-                    enabled = !session.localMode,
-                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
-                ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
-                FilledTonalIconButton(
-                    onClick = { session.navigation.openSafePage(SafePage.Settings) },
-                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
-                ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
+                Row(
+                    modifier = Modifier.walkthroughTarget("home_camera_settings"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SafeAppUpdateReminder()
+                    FilledTonalIconButton(
+                        onClick = { session.navigation.openSafePage(SafePage.Camera) },
+                        enabled = !session.localMode,
+                        modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
+                    ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
+                    FilledTonalIconButton(
+                        onClick = { session.navigation.openSafePage(SafePage.Settings) },
+                        modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
+                    ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
+                }
             }
             SafeAppUpdateError()
         }
@@ -579,7 +610,7 @@ private enum class SafeHomeFeature(val page: SafePage, val label: Int, val icon:
 }
 
 /**
- * Composes the safe feature grid UI element.
+ * Arranges the private feature cards in a layout that adapts to the current font scale.
  *
  * @param session Shared session view model owning application state and actions.
  */
@@ -588,7 +619,7 @@ private fun SafeFeatureGrid(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val fontScale = LocalDensity.current.fontScale
     val cardGap = 12.dp
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth().walkthroughTarget("home_feature_grid")) {
         val columns = if (maxWidth >= 300.dp && fontScale < 1.4f) 2 else 1
         Column(verticalArrangement = Arrangement.spacedBy(cardGap)) {
             SafeHomeFeature.entries.chunked(columns).forEach { features ->
@@ -633,7 +664,7 @@ private fun SafeFeatureCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.testTag(feature.tag).semantics { role = Role.Button },
@@ -675,7 +706,7 @@ private fun SafeFeatureCard(
 }
 
 /**
- * Composes the safe home shortcuts UI element.
+ * Arranges the profile and account activity shortcuts for the available width and font scale.
  *
  * @param session Shared session view model owning application state and actions.
  */
@@ -685,7 +716,7 @@ private fun SafeHomeShortcuts(session: SessionViewModel) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val sideBySide = maxWidth >= 280.dp && fontScale < 1.4f
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().walkthroughTarget("home_profile_activity"),
             maxItemsInEachRow = if (sideBySide) 2 else 1,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -707,7 +738,7 @@ private fun SafeHomeShortcuts(session: SessionViewModel) {
 }
 
 /**
- * Composes the safe home shortcut UI element.
+ * Displays an outlined shortcut button and runs its action when selected.
  *
  * @param label Accessible label or display caption.
  * @param icon Icon supplied to [SafeHomeShortcut].

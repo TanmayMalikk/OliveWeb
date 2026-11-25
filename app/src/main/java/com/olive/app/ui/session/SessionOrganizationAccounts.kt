@@ -1,7 +1,10 @@
 // Signed-in users: loads staff and admin account details.
 package com.olive.app.ui.session
 
+import android.os.SystemClock
+import androidx.compose.runtime.*
 import com.olive.app.R
+import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminAccountDraft
 import com.olive.app.data.account.AdminAccountSummary
@@ -15,8 +18,13 @@ import com.olive.app.security.*
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 import android.content.Context
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
@@ -47,7 +55,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
                     !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    failInput(runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_finish_the_organization_profile_check_the_email_and_try)) { token ->
@@ -91,7 +99,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
                     !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    failInput(runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_update_your_olive_tree_profile)) { token ->
@@ -154,21 +162,27 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
                 if (!InputPolicy.validUsername(value.username)) {
-                    message =
+                    failInput(
                         runtime.application.getString(R.string.ui_use_8_24_letters_numbers_or_underscores_for_the_username)
+                    )
                     return
                 }
                 if (!InputPolicy.passwordExcludesUsername(value.password, value.username)) {
-                    message =
-                        runtime.application.getString(R.string.password_excludes_username)
+                    failInput(runtime.application.getString(R.string.password_excludes_username))
                     return
                 }
                 if (!InputPolicy.validAccountPassword(value.password, value.username)) {
-                    message =
+                    failInput(
                         runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                    )
                     return
                 }
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
+                operations.runOperation(
+                    runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be),
+                    timeoutMessage = runtime.application.getString(
+                        R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist,
+                    ),
+                ) { token ->
                     repository.create(value)
                     val rows = repository.accounts()
                     val counts = repository.summary()
@@ -196,10 +210,16 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy || value.protected) return
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_delete_this_account)) { token ->
+                operations.runOperation(
+                    runtime.application.getString(R.string.ui_unable_to_delete_this_account),
+                    timeoutMillis = 120_000,
+                ) { token ->
                     repository.delete(value.uid)
-                    val rows = repository.accounts()
-                    val counts = repository.summary()
+                    val (rows, counts) = coroutineScope {
+                        val rowsDeferred = async { repository.accounts() }
+                        val countsDeferred = async { repository.summary() }
+                        rowsDeferred.await() to countsDeferred.await()
+                    }
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminPreloader.adopt(rows, counts)
@@ -243,11 +263,13 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * @param incidentLatitude Optional incident latitude supplied to [savePrivateEntry].
      * @param incidentLongitude Optional incident longitude supplied to [savePrivateEntry].
      * @param attachmentIds Collection of attachment IDs values to process.
+     * @param newEntryId Stable identity for a new note across repeated save attempts.
      */
     fun savePrivateEntry(
         id: String?, kind: PrivateEntryKind, title: String, body: String,
         incidentDate: String, incidentTime: String, incidentLocation: String,
         incidentLatitude: Double?, incidentLongitude: Double?, attachmentIds: List<String>,
+        newEntryId: String = UUID.randomUUID().toString(),
     ) {
         with(runtime) {
             with(state) {
@@ -270,6 +292,8 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 val uid = enrollment?.uid ?: return
                 val existing =
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }
+                if (id != null && existing == null) return
+                if (id == null && privateEntries.any { it.id == newEntryId }) return
                 val changes = existing?.let { old ->
                     buildList {
                         /**
@@ -297,7 +321,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 }
                 val now = System.currentTimeMillis()
                 val entry = PrivateEntry(
-                    id = existing?.id ?: UUID.randomUUID().toString(),
+                    id = existing?.id ?: newEntryId,
                     timestamp = existing?.timestamp ?: now,
                     updatedAt = now,
                     kind = kind,
@@ -360,19 +384,31 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * Removes private entry from the signed-in session.
      *
      * @param id ID supplied to [trashPrivateEntry].
+     * @param onTrashed Runs after the entry has been moved to trash.
      */
-    fun trashPrivateEntry(id: String) {
+    fun trashPrivateEntry(id: String, onTrashed: (() -> Unit)? = null) {
         with(runtime) {
             with(state) {
                 val existing =
                     privateEntries.firstOrNull { it.id == id && it.deletedAt == null } ?: return
+                if (busy) return
                 val now = System.currentTimeMillis()
                 updatePrivateEntry(
                     existing.copy(updatedAt = now, pinned = false, deletedAt = now),
                     "Unable to move this entry to Trash. Please retry.",
-                    if (PRIVATE_ENTRY_TRASH_RETENTION_MS < 60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days."
+                    when {
+                        onTrashed != null -> null
+                        PRIVATE_ENTRY_TRASH_RETENTION_MS < 60_000L -> "Moved to Trash for 10 seconds."
+                        else -> "Moved to Trash for 30 days."
+                    },
+                    onTrashed,
                 )
                 val uid = enrollment?.uid ?: return
+                if (!localMode) {
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { secureDocumentRepository?.revokeAllRecipients(id, uid) }
+                    }
+                }
                 scope.launch {
                     delay((PRIVATE_ENTRY_TRASH_RETENTION_MS + 100L).milliseconds)
                     val purged =
@@ -410,17 +446,28 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
      * @param entry Entry supplied to [updatePrivateEntry].
      * @param failure Exception or failure reason encountered during execution.
      * @param success Success supplied to [updatePrivateEntry].
+     * @param onSaved Runs after the requested changes are saved.
      */
-    fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
+    private fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String?, onSaved: (() -> Unit)? = null) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe || page != SafePage.Notes || busy) return
                 val uid = enrollment?.uid ?: return
+                val previous = privateEntries.firstOrNull { it.id == entry.id } ?: return
+                privateEntries = privateEntries.map { if (it.id == entry.id) entry else it }
                 operations.runOperation(failure) { token ->
-                    withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    try {
+                        withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    } catch (failure: Exception) {
+                        if (epoch == token && enrollment?.uid == uid) {
+                            privateEntries = privateEntries.map { if (it == entry) previous else it }
+                        }
+                        throw failure
+                    }
                     if (epoch == token && screen == SessionScreen.Safe && page == SafePage.Notes) {
                         privateEntries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
                         message = success
+                        onSaved?.invoke()
                     }
                     history.queueHistorySync()
                 }
@@ -437,6 +484,8 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
 
     /**
      * Allows entry settings only for a user who has an active device enrollment.
+     *
+     * @return True when the active user can change private entry settings.
      */
     private fun editable() = with(runtime) {
         !state.busy && state.screen == SessionScreen.Safe &&
@@ -453,7 +502,7 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         if (!editable()) return
         val device = runtime.enrollment ?: return
         if (method == SafeEntryMethod.APP_PIN && !device.hasAppPin) {
-            runtime.state.message = runtime.application.getString(R.string.entry_set_pin_first)
+            runtime.state.failInput(runtime.application.getString(R.string.entry_set_pin_first))
             return
         }
         change(currentPin, null, method)
@@ -470,13 +519,11 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
     fun savePin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) {
         if (!editable()) return
         if (!InputPolicy.validPin(pin)) {
-            runtime.state.message =
-                runtime.application.getString(R.string.enter_your_4_6_digit_pin)
+            runtime.state.failInput(runtime.application.getString(R.string.enter_your_4_6_digit_pin))
             return
         }
         if (pin != confirmation) {
-            runtime.state.message =
-                runtime.application.getString(R.string.the_new_pins_do_not_match)
+            runtime.state.failInput(runtime.application.getString(R.string.the_new_pins_do_not_match))
             return
         }
         change(currentPin, pin, if (usePin) SafeEntryMethod.APP_PIN else null)
@@ -506,11 +553,11 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
             val verifyPin = device.hasAppPin &&
                     (device.entryMethod == SafeEntryMethod.APP_PIN || !secure)
             if (verifyPin && !InputPolicy.validPin(currentPin)) {
-                state.message = application.getString(R.string.enter_your_4_6_digit_pin)
+                state.failInput(application.getString(R.string.enter_your_4_6_digit_pin))
                 return
             }
             if (!verifyPin && !secure) {
-                state.message = application.getString(R.string.entry_restore_lock)
+                state.failInput(application.getString(R.string.entry_restore_lock))
                 return
             }
             operations.runOperation(
@@ -534,10 +581,12 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                     // Shows the rejection message when the entered PIN does not match.
                     if (result is PinResult.Rejected) {
                         if (result.failures >= 5) navigation.quickExit()
-                        else state.message = application.resources.getQuantityString(
-                            R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                            5 - result.failures,
-                            5 - result.failures
+                        else state.failInput(
+                            application.resources.getQuantityString(
+                                R.plurals.ui_incorrect_pin_value_attempts_remaining,
+                                5 - result.failures,
+                                5 - result.failures
+                            )
                         )
                         return@runOperation
                     }
@@ -676,5 +725,217 @@ internal class EmergencyResponseController(private val context: Context) {
         FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable(if (resolved) "emergencyResolve" else "emergencyReopen")
             .call(mapOf("id" to alertId)).await()
+    }
+}
+
+internal data class AdminPreloaderUiState(
+    val foregroundLoads: Set<String> = emptySet(),
+    val accountsCache: List<AdminAccountSummary>? = null,
+    val staffCache: List<AdminAccountSummary>? = null,
+    val loadingAccounts: Boolean = false,
+    val loadingStaff: Boolean = false,
+    val accountsError: Int? = null,
+    val staffError: Int? = null,
+)
+
+// In-memory admin data belongs to one authenticated session, including legitimately empty results.
+internal class AdminDataPreloader(private val runtime: SessionRuntime) {
+    private enum class Dataset { Summary, Accounts, Staff }
+    private val jobs = ConcurrentHashMap<Dataset, Job>()
+    private val refreshedAt = ConcurrentHashMap<Dataset, Long>()
+    private var owner: Pair<String, Long>? = null
+    private val uiStateFlow = MutableStateFlow(AdminPreloaderUiState())
+    val uiState: StateFlow<AdminPreloaderUiState> = uiStateFlow.asStateFlow()
+    private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
+
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
+    private inline fun updateUiState(transform: (AdminPreloaderUiState) -> AdminPreloaderUiState) {
+        uiStateSnapshot = uiStateFlow.updateAndGet(transform)
+    }
+
+    private var foregroundLoads: Set<String>
+        get() = uiStateSnapshot.foregroundLoads
+        set(value) = updateUiState { it.copy(foregroundLoads = value) }
+    private var accountsCache: List<AdminAccountSummary>?
+        get() = uiStateSnapshot.accountsCache
+        set(value) = updateUiState { it.copy(accountsCache = value) }
+    private var staffCache: List<AdminAccountSummary>?
+        get() = uiStateSnapshot.staffCache
+        set(value) = updateUiState { it.copy(staffCache = value) }
+    var loadingAccounts: Boolean
+        get() = uiStateSnapshot.loadingAccounts
+        private set(value) = updateUiState { it.copy(loadingAccounts = value) }
+    var loadingStaff: Boolean
+        get() = uiStateSnapshot.loadingStaff
+        private set(value) = updateUiState { it.copy(loadingStaff = value) }
+    var accountsError: Int?
+        get() = uiStateSnapshot.accountsError
+        private set(value) = updateUiState { it.copy(accountsError = value) }
+    var staffError: Int?
+        get() = uiStateSnapshot.staffError
+        private set(value) = updateUiState { it.copy(staffError = value) }
+    /**
+     * Returns the session.
+     *
+     * @return The resulting session.
+     */
+    private fun session() = runtime.coverAccountId?.let { it to runtime.epoch }
+    /**
+     * Computes authorized.
+     *
+     * @param token Authentication, push notification, or session token.
+     * @return The resulting authorized.
+     */
+    private fun authorized(token: Pair<String, Long>) = session() == token &&
+        runtime.state.accountRole == AccountRole.ADMIN && runtime.state.screen == SessionScreen.Portal
+    /**
+     * Returns the owns cache.
+     *
+     * @return The resulting owns cache.
+     */
+    private fun ownsCache() = owner == session() && runtime.state.accountRole == AccountRole.ADMIN
+    val accounts get() = if (ownsCache() || owner == null && runtime.state.accountRole == AccountRole.ADMIN) accountsCache ?: runtime.state.adminAccounts else emptyList()
+    val staff get() = if (ownsCache() || owner == null && runtime.state.accountRole == AccountRole.ADMIN) staffCache ?: runtime.state.adminAccounts.filter { it.role == AccountRole.STAFF } else emptyList()
+    val accountsReady get() = ownsCache() && accountsCache != null
+    val staffReady get() = ownsCache() && staffCache != null
+    val showAccountsSkeleton get() = loadingAccounts && (!accountsReady || Dataset.Accounts.name in foregroundLoads)
+    val showStaffSkeleton get() = loadingStaff && (!staffReady || Dataset.Staff.name in foregroundLoads)
+
+    /**
+     * Clears the admin data preloader.
+     */
+    fun clear() {
+        jobs.values.toList().forEach(Job::cancel)
+        jobs.clear()
+        refreshedAt.clear()
+        owner = null
+        foregroundLoads = emptySet()
+        accountsCache = null
+        staffCache = null
+        loadingAccounts = false
+        loadingStaff = false
+        accountsError = null
+        staffError = null
+        runtime.state.adminAccounts = emptyList()
+        runtime.state.setAdminSummary("", AccountCounts())
+    }
+
+    /**
+     * Starts loading the organization summary, accounts, and staff roster.
+     */
+    fun preload() {
+        summary()
+        accounts()
+        staff()
+    }
+    /**
+     * Loads the counts and summary displayed in the admin dashboard.
+     *
+     * @param force Whether to apply force.
+     * @return The resulting summary.
+     */
+    fun summary(force: Boolean = false) = load(Dataset.Summary, force)
+    /**
+     * Loads the organization account list.
+     *
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
+    fun accounts(force: Boolean = false, showLoading: Boolean = false) = load(Dataset.Accounts, force, showLoading)
+    /**
+     * Loads the staff roster for the admin workspace.
+     *
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
+    fun staff(force: Boolean = false, showLoading: Boolean = false) = load(Dataset.Staff, force, showLoading)
+
+    /**
+     * A mutation replaces the directory immediately; workload totals refresh independently.
+     *
+     * @param rows Collection of rows values to process.
+     * @param counts Counts supplied to [adopt].
+     */
+    fun adopt(rows: List<AdminAccountSummary>, counts: AccountCounts) {
+        val token = session() ?: return
+        if (!authorized(token)) return
+        if (owner != token) clear()
+        owner = token
+        jobs.remove(Dataset.Accounts)?.cancel()
+        jobs.remove(Dataset.Summary)?.cancel()
+        accountsCache = rows
+        runtime.state.adminAccounts = rows
+        runtime.state.setAdminSummary(token.first, counts)
+        loadingAccounts = false
+        foregroundLoads = foregroundLoads - Dataset.Accounts.name
+        accountsError = null
+        refreshedAt[Dataset.Accounts] = SystemClock.elapsedRealtime()
+        refreshedAt[Dataset.Summary] = SystemClock.elapsedRealtime()
+        jobs.remove(Dataset.Staff)?.cancel()
+        staff(force = true)
+    }
+
+    /**
+     * Loads the admin data preloader.
+     *
+     * @param dataset Dataset supplied to [load].
+     * @param force Whether to apply force.
+     * @param showLoading Whether to show loading.
+     */
+    private fun load(dataset: Dataset, force: Boolean, showLoading: Boolean = false) {
+        val token = session() ?: return
+        val repository = runtime.adminRepository ?: return
+        if (!authorized(token)) return
+        if (owner != token) { clear(); owner = token }
+        if (jobs[dataset]?.isActive == true) {
+            if (showLoading) foregroundLoads = foregroundLoads + dataset.name
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (!force && refreshedAt[dataset]?.let { now - it < 90_000 } == true) return
+        foregroundLoads = if (showLoading) foregroundLoads + dataset.name else foregroundLoads - dataset.name
+        when (dataset) {
+            Dataset.Accounts -> { loadingAccounts = true; accountsError = null }
+            Dataset.Staff -> { loadingStaff = true; staffError = null }
+            else -> Unit
+        }
+        val request = runtime.scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                withTimeout(25_000) {
+                    when (dataset) {
+                        Dataset.Summary -> repository.summary().let {
+                            if (authorized(token)) runtime.state.setAdminSummary(token.first, it)
+                        }
+                        Dataset.Accounts -> repository.accounts().let {
+                            if (authorized(token)) { accountsCache = it; runtime.state.adminAccounts = it }
+                        }
+                        Dataset.Staff -> repository.staffAccounts().let {
+                            if (authorized(token)) staffCache = it
+                        }
+                    }
+                }
+                if (authorized(token)) refreshedAt[dataset] = SystemClock.elapsedRealtime()
+            } catch (error: Exception) {
+                if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                if (authorized(token)) when (dataset) {
+                    Dataset.Accounts -> accountsError = R.string.ui_unable_to_load_organization_accounts
+                    Dataset.Staff -> staffError = R.string.ui_unable_to_load_organization_accounts
+                    Dataset.Summary -> runtime.state.message = runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)
+                }
+            } finally {
+                if (jobs[dataset] === coroutineContext.job) {
+                    jobs.remove(dataset)
+                    foregroundLoads = foregroundLoads - dataset.name
+                    if (dataset == Dataset.Accounts) loadingAccounts = false
+                    if (dataset == Dataset.Staff) loadingStaff = false
+                }
+            }
+        }
+        jobs[dataset] = request
+        request.start()
     }
 }

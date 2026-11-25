@@ -15,15 +15,30 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import java.io.IOException
 import java.net.URLEncoder
+import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
 import javax.net.ssl.HttpsURLConnection
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.net.URL
 
@@ -280,6 +295,35 @@ private class LiveLocationSharingDataSource(
     }
 
     /**
+     * Records active live-location metadata so backend notification triggers know session timing and recipients.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
+    suspend fun setSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) {
+        val doc = firestore.collection("liveLocationSessions").document(ownerUid)
+        val cleanRecipients = recipientUids.filter { it.isNotBlank() && it != ownerUid }.distinct().take(25)
+        if (active && cleanRecipients.isNotEmpty() && startedAt > 0L && expiresAt > startedAt) {
+            doc.set(
+                mapOf(
+                    "ownerUid" to ownerUid,
+                    "sessionId" to UUID.randomUUID().toString(),
+                    "recipientUids" to cleanRecipients,
+                    "active" to true,
+                    "startedAt" to startedAt,
+                    "expiresAt" to expiresAt,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+        } else {
+            runCatching { doc.delete().await() }
+        }
+    }
+
+    /**
      * Listens for live-location changes and removes the listener when closed.
      *
      * @param currentUid Current user ID supplied to [observe].
@@ -526,6 +570,16 @@ internal interface LocationSharingDataSource {
      */
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
     /**
+     * Records or clears active live-location session metadata for notification scheduling.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
+    suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long = System.currentTimeMillis()) = Unit
+    /**
      * Watches static contacts for changes.
      *
      * @param currentUid Current user ID supplied to [observeStaticContacts].
@@ -598,9 +652,22 @@ internal class LocationSharingRepository private constructor(
      *
      * @param ownerUid Firebase UID of the resource owner.
      * @param friends List of friend records.
+     * @return The encryption key for the updated recipients, or null when no key is available.
      */
     override suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>) =
         liveLocations.setRecipients(ownerUid, friends)
+
+    /**
+     * Records or clears live-location session timing and recipient metadata.
+     *
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientUids The UIDs of the accounts receiving access.
+     * @param expiresAt The expiration time as Unix epoch milliseconds.
+     * @param active Whether the sharing session is active.
+     * @param startedAt The session start time as Unix epoch milliseconds.
+     */
+    override suspend fun setLiveSessionState(ownerUid: String, recipientUids: List<String>, expiresAt: Long, active: Boolean, startedAt: Long) =
+        liveLocations.setSessionState(ownerUid, recipientUids, expiresAt, active, startedAt)
 
     /**
      * Watches static contacts for changes.
@@ -660,6 +727,26 @@ data class AddressSuggestion(
 
 // Builds an address-suggestion request for Geoapify.
 internal object GeoapifyClient {
+    private const val MAX_CACHE_ENTRIES = 64
+    private val cache = object : LinkedHashMap<String, List<AddressSuggestion>>(MAX_CACHE_ENTRIES, 0.75f, true) {
+        /**
+         * Evicts the least-recently-used Geoapify cache entry past [MAX_CACHE_ENTRIES].
+         *
+         * @param eldest The least recently used cache entry being considered for eviction.
+         * @return True when the cache entry should be evicted to enforce the size limit.
+         */
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<AddressSuggestion>>): Boolean =
+            size > MAX_CACHE_ENTRIES
+    }
+    private val cacheLock = Any()
+    private val sharedHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
+    }
+
     val configured get() = BuildConfig.GEOAPIFY_API_KEY.isNotBlank()
 
     /**
@@ -667,38 +754,119 @@ internal object GeoapifyClient {
      *
      * @param query Search query string entered by the user.
      * @param cityOnly Whether to apply city only.
+     * @param minLength The minimum required number of characters.
+     * @param apiKey The credential used to make the API request.
+     * @param openConnection The injected factory used to open an HTTPS connection.
      * @return List of resulting autocomplete items.
      */
-    suspend fun autocomplete(query: String, cityOnly: Boolean): List<AddressSuggestion> =
-        withContext(Dispatchers.IO) {
-            if (!configured || query.trim().length < 3) return@withContext emptyList()
-            val parameters = buildList {
-                add("text=${encode(query.trim())}")
-                add("format=json")
-                add("filter=countrycode:ca")
-                add(
-                    "limit=5"
-                )
-                if (cityOnly) add("type=city")
-                add("apiKey=${encode(BuildConfig.GEOAPIFY_API_KEY)}")
-            }.joinToString("&")
-            val connection =
-                (URL("https://api.geoapify.com/v1/geocode/autocomplete?$parameters")
-                    .openConnection() as HttpsURLConnection).apply {
-                    connectTimeout = 5_000
-                    readTimeout = 5_000
-                    requestMethod =
-                        "GET"
-                    setRequestProperty("Accept", "application/json")
-                }
-            // Turn an unexpected autocomplete failure into a readable message.
-            try {
-                if (connection.responseCode !in 200..299) return@withContext emptyList()
-                parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
-            } finally {
-                connection.disconnect()
-            }
+    suspend fun autocomplete(
+        query: String,
+        cityOnly: Boolean,
+        minLength: Int = 2,
+        apiKey: String = BuildConfig.GEOAPIFY_API_KEY,
+        openConnection: ((URL) -> HttpsURLConnection)? = null,
+    ): List<AddressSuggestion> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (apiKey.isBlank() || trimmed.length < minLength) return@withContext emptyList()
+        val key = "${trimmed.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")}|$cityOnly"
+        synchronized(cacheLock) { cache[key] }?.let { return@withContext it }
+
+        val parameters = buildList {
+            add("text=${encode(trimmed)}")
+            add("format=json")
+            add("filter=countrycode:ca")
+            add("limit=5")
+            if (cityOnly) add("type=city")
+            add("apiKey=${encode(apiKey)}")
+        }.joinToString("&")
+        val url = "https://api.geoapify.com/v1/geocode/autocomplete?$parameters"
+        val (succeeded, results) = if (openConnection == null) {
+            fetchWithOkHttp(url)
+        } else {
+            fetchWithConnection(url, openConnection)
         }
+        if (succeeded) {
+            synchronized(cacheLock) { cache[key] = results }
+        }
+        results
+    }
+
+    /**
+     * Executes a Geoapify autocomplete HTTP request asynchronously via the shared OkHttp client.
+     *
+     * @param url The request URL to open or fetch.
+     * @return The request success flag and list of Geoapify suggestions.
+     */
+    private suspend fun fetchWithOkHttp(url: String): Pair<Boolean, List<AddressSuggestion>> {
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .build()
+        val call = sharedHttpClient.newCall(request)
+        return suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                /**
+                 * Propagates the HTTP failure exception to the suspended caller.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param e The network exception reported by OkHttp.
+                 */
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(e)
+                }
+
+                /**
+                 * Parses the HTTP response body into address suggestions and resumes the caller.
+                 *
+                 * @param call The OkHttp call that completed or failed.
+                 * @param response The upstream response to read and validate.
+                 */
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val outcome = response.use { res ->
+                            if (!res.isSuccessful) false to emptyList()
+                            else true to parseGeoapifySuggestions(res.body.string())
+                        }
+                        if (continuation.isActive) continuation.resume(outcome)
+                    } catch (failure: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(failure)
+                    }
+                }
+            })
+        }
+    }
+
+    /**
+     * Executes a Geoapify autocomplete request using an injected [HttpsURLConnection] factory.
+     *
+     * @param url The request URL to open or fetch.
+     * @param openConnection The injected factory used to open an HTTPS connection.
+     * @return The request success flag and list of Geoapify suggestions.
+     */
+    private suspend fun fetchWithConnection(
+        url: String,
+        openConnection: (URL) -> HttpsURLConnection,
+    ): Pair<Boolean, List<AddressSuggestion>> {
+        currentCoroutineContext().ensureActive()
+        val connection = openConnection(URL(url)).apply {
+            connectTimeout = 5_000
+            readTimeout = 5_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/json")
+        }
+        return try {
+            if (connection.responseCode !in 200..299) false to emptyList()
+            else true to parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** Clears all cached Geoapify address suggestions. */
+    internal fun clearCache() {
+        synchronized(cacheLock) { cache.clear() }
+    }
 
     /**
      * Converts Geoapify result fields into map coordinates.

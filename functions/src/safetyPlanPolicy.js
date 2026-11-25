@@ -92,4 +92,15 @@ function chooseStaff(candidates, random = Math.random) {
   const tied = available.filter((staff) => (staff.activeCount || 0) === leastAssignments);
   return tied[Math.floor(random() * tied.length)];
 }
-module.exports = {FIELD_KEYS, mergeFields, validFields, staffEligible, chooseStaff};
+
+// Assigns the available staff member with the fewest active plan consultation tickets, breaking ties by total active workload and then at random.
+function chooseConsultStaff(candidates, random = Math.random) {
+  const available = candidates.filter((staff) => staff.available !== false);
+  if (!available.length) return undefined;
+  const leastConsults = Math.min(...available.map((staff) => staff.consultCount || 0));
+  const consultTied = available.filter((staff) => (staff.consultCount || 0) === leastConsults);
+  const leastAssignments = Math.min(...consultTied.map((staff) => staff.activeCount || 0));
+  const tied = consultTied.filter((staff) => (staff.activeCount || 0) === leastAssignments);
+  return tied[Math.floor(random() * tied.length)];
+}
+module.exports = {FIELD_KEYS, mergeFields, validFields, staffEligible, chooseStaff, chooseConsultStaff};

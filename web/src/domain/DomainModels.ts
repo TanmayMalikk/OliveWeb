@@ -13,7 +13,8 @@ export type Page =
   | "Hotlines"
   | "StaffHelp"
   | "Documents"
-  | "Location";
+  | "Location"
+  | "Walkthrough";
 export interface Address {
   line1: string;
   line2: string;
@@ -26,6 +27,7 @@ export interface Contact {
   id: string;
   name: string;
   details: string;
+  relationship?: string;
 }
 export interface Profile {
   username: string;
@@ -42,6 +44,7 @@ export interface Profile {
   coverType: Cover;
   role: Role;
   email: string;
+  emailCommunicationConsent?: boolean;
   phone: string;
 }
 export interface Entry {
@@ -103,18 +106,8 @@ export interface Enrollment {
   role: Role;
   triggerHash: string;
   pinKey: WrappedKey;
+  pinLength?: number;
   failures: number;
-}
-export interface NewsArticle {
-  id: string;
-  title: string;
-  summary: string;
-  link: string;
-  source: string;
-  published: string;
-  topic: string;
-  imageUrl?: string;
-  isPaywalled?: boolean;
 }
 export const covers: {
   id: Cover;
@@ -166,6 +159,16 @@ export const validPassword = (v: string) =>
   /[^\p{L}\p{N}\s]/u.test(v);
 // Private entry: Validates an app PIN. It accepts only four to six digits.
 export const validPin = (v: string) => /^\d{4,6}$/.test(v);
+// Contact email: Validates a real optional contact email while rejecting internal Olive aliases.
+export function validEmail(v: string): boolean {
+  const email = v.trim().toLowerCase();
+  return (
+    email.length > 0 &&
+    email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    !email.endsWith(".olive.invalid")
+  );
+}
 // Web domain models: Converts a username into its sign-in email. It accepts an email as-is or converts a username to the account email format.
 export function signInEmail(username: string, role: Role) {
   if ((role === "STAFF" || role === "ADMIN") && username.includes("@"))
@@ -204,6 +207,7 @@ export const emptyProfile = (
   },
   coverType: "FITNESS",
   email: "",
+  emailCommunicationConsent: false,
   phone: "",
 });
 export const newEvent = (action: string, area = "Account"): Event => ({

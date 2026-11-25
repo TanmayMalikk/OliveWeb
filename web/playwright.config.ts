@@ -1,7 +1,8 @@
 // Web developers: runs browser tests for public covers and safe-app flows.
 import { defineConfig } from "@playwright/test";
 const production = process.env.OLIVE_TEST_PUBLIC_ADS === "1";
-const baseURL = production ? "http://127.0.0.1:5190" : "http://127.0.0.1:5173";
+const port = production ? "5190" : "5189";
+const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./tests",
   ...(production ? { testMatch: "public-ads.spec.ts" } : { testIgnore: "public-ads.spec.ts" }),
@@ -22,7 +23,7 @@ export default defineConfig({
   webServer: {
     command: production ? "npm run build && npm run start" : "npm run dev",
     url: baseURL + "/api/health",
-    reuseExistingServer: !production,
+    reuseExistingServer: false,
     timeout: 30000,
     env: {
       ...process.env,
@@ -30,7 +31,9 @@ export default defineConfig({
       VITE_FIREBASE_PROJECT_ID: "",
       VITE_FIREBASE_STORAGE_BUCKET: "",
       VITE_FIREBASE_APP_ID: "",
-      ...(production ? { PORT: "5190", HOST: "127.0.0.1" } : {}),
+      VITE_USE_FIREBASE_EMULATORS: "false",
+      PORT: port,
+      HOST: "127.0.0.1",
     },
   },
 });

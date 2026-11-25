@@ -169,7 +169,8 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
             enrollment.put("lockedUntil", System.currentTimeMillis() - 1)
         }
         unlock()
-        click("safe_activity")
+        clickAccessibleAction("safe_activity")
+        waitFor("activity_list")
         compose.onNodeWithTag("activity_list").performScrollToNode(hasTestTag("attempt_row"))
         compose.onAllNodesWithTag("attempt_row").onFirst().assertExists()
         val root = vault.read()
@@ -204,13 +205,13 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
     fun backgroundAndInFlightUnlockNeverReopenSafeArea() {
         register(username = "privacy_tester")
         unlock()
-        click("safe_profile")
+        clickAccessibleAction("safe_profile")
         compose.onNodeWithText("Test Person Causing Harm").assertExists()
         compose.activityRule.scenario.onActivity { it.onUserLeaveHint() }
         waitCover()
         compose.onNodeWithText("Test Person Causing Harm").assertDoesNotExist()
         unlock()
-        click("safe_profile")
+        clickAccessibleAction("safe_profile")
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
         waitCover()
@@ -262,10 +263,17 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
             "654321"
         )
         fill("confirm_new_device_pin", "654321")
-        click("change_device_pin")
-        compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Safe entry settings saved.").fetchSemanticsNodes()
-                .isNotEmpty()
+        hideKeyboard()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        val vault = EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext, "demo")
+        val uid = requireNotNull(session.coverAccountId)
+        fun pinVerifier() = vault.read().getJSONObject("enrollments").getJSONObject(uid).getString("pinVerifier")
+        val previousVerifier = pinVerifier()
+        clickAccessibleAction("change_device_pin")
+        try {
+            compose.waitUntil(30_000) { !session.busy && pinVerifier() != previousVerifier }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("PIN change did not persist: page=${session.page}, message=${session.message}", timeout)
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()

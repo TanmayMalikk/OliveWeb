@@ -21,8 +21,8 @@ export function contentSecurityPolicy(publicNonce) {
     "img-src 'self' https: data: blob:",
     publicNonce ? "media-src 'self' blob: https:" : "media-src 'self' blob:",
     publicNonce
-      ? "connect-src 'self' blob: https: wss://*.firebaseio.com"
-      : "connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com",
+      ? "connect-src 'self' blob: https: wss://*.firebaseio.com wss://*.firebasedatabase.app"
+      : "connect-src 'self' blob: https://www.google.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com",
     publicNonce
       ? "frame-src blob: https:"
       : "frame-src blob: https://*.firebaseapp.com https://www.google.com",

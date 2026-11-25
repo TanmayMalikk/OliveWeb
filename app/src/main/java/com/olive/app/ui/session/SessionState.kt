@@ -21,6 +21,7 @@ import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.PrivateContactNote
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.safety.SharedPrivateEntry
 import com.olive.app.ui.users.shared.navigation.ActivityCategory
 import com.olive.app.ui.users.shared.navigation.CredentialFieldError
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -40,6 +41,7 @@ internal data class SessionNavigationState(
     val idleCountdownSeconds: Int? = null,
     val privacyBlackout: Boolean = false,
     val coverReset: Int = 0,
+    val walkthroughTourStepId: String? = null,
 )
 
 internal data class SessionAccountState(
@@ -48,14 +50,17 @@ internal data class SessionAccountState(
     val profile: UserProfile? = null,
     val pendingSync: Boolean = false,
     val deliveryAddress: DeliveryAddress = DeliveryAddress(),
-    val language: String = "English",
+    val language: String = "",
     val coverDob: String = "",
     val coverFullName: String = "",
     val coverUsername: String = "",
     val coverType: CoverType = CoverType.FITNESS,
     val accountRole: AccountRole = AccountRole.USER,
     val credentialFieldError: CredentialFieldError? = null,
+    val inputErrorVersion: Int = 0,
     val creatingAccount: Boolean = false,
+    val passwordRecoveryUnlockRequest: PasswordRecoveryUnlockRequest? = null,
+    val passwordRecoveryEnrolled: Boolean? = null,
 )
 
 internal data class SessionActivityState(
@@ -64,6 +69,8 @@ internal data class SessionActivityState(
     val privacyHistory: List<SettingsEvent> = emptyList<SettingsEvent>(),
     val triggerHistory: List<TriggerEvent> = emptyList<TriggerEvent>(),
     val privateEntries: List<PrivateEntry> = emptyList<PrivateEntry>(),
+    val sharedPrivateEntries: List<SharedPrivateEntry> = emptyList<SharedPrivateEntry>(),
+    val sharedEntryRecipients: Map<String, List<String>> = emptyMap<String, List<String>>(),
     val viewedSharedEntry: PrivateEntry? = null,
 )
 
@@ -108,6 +115,23 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         navigationSnapshot = navigationFlow.updateAndGet(transform)
     }
 
+    /**
+     * Enters Safe Home and advances the unlock animation version atomically so Compose never observes
+     * [SessionScreen.Safe] before the reveal overlay is armed.
+     */
+    fun enterSafeWithAnimation() = updateNavigation {
+        val nextScreen = if (canEnterSafe()) SessionScreen.Safe else SessionScreen.Cover
+        it.copy(
+            page = SafePage.Home,
+            screen = nextScreen,
+            unlockAnimationVersion = if (nextScreen == SessionScreen.Safe) {
+                it.unlockAnimationVersion + 1
+            } else {
+                it.unlockAnimationVersion
+            },
+        )
+    }
+
     var screen: SessionScreen
         get() = navigationSnapshot.screen
         set(value) = updateNavigation { it.copy(screen = if (value == SessionScreen.Safe && !canEnterSafe()) SessionScreen.Cover else value) }
@@ -138,6 +162,9 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var coverReset: Int
         get() = navigationSnapshot.coverReset
         set(value) = updateNavigation { it.copy(coverReset = value) }
+    var walkthroughTourStepId: String?
+        get() = navigationSnapshot.walkthroughTourStepId
+        set(value) = updateNavigation { it.copy(walkthroughTourStepId = value) }
 
     private val accountFlow = MutableStateFlow(SessionAccountState())
     val accountState = accountFlow.asStateFlow()
@@ -188,9 +215,30 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var credentialFieldError: CredentialFieldError?
         get() = accountSnapshot.credentialFieldError
         set(value) = updateAccount { it.copy(credentialFieldError = value) }
+    val inputErrorVersion: Int
+        get() = accountSnapshot.inputErrorVersion
+
+    /**
+     * Advances the input error counter so repeated invalid submissions re-trigger field feedback.
+     */
+    fun recordInputError() = updateAccount { it.copy(inputErrorVersion = it.inputErrorVersion + 1) }
+
+    /**
+     * Sets [message] and increments [inputErrorVersion] atomically when an input attempt fails.
+     *
+     * @param text User-facing error message to announce and display.
+     */
+    fun failInput(text: String) =
+        updateAccount { it.copy(message = text, inputErrorVersion = it.inputErrorVersion + 1) }
     var creatingAccount: Boolean
         get() = accountSnapshot.creatingAccount
         set(value) = updateAccount { it.copy(creatingAccount = value) }
+    var passwordRecoveryUnlockRequest: PasswordRecoveryUnlockRequest?
+        get() = accountSnapshot.passwordRecoveryUnlockRequest
+        set(value) = updateAccount { it.copy(passwordRecoveryUnlockRequest = value) }
+    var passwordRecoveryEnrolled: Boolean?
+        get() = accountSnapshot.passwordRecoveryEnrolled
+        set(value) = updateAccount { it.copy(passwordRecoveryEnrolled = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
     val activityState = activityFlow.asStateFlow()
@@ -220,6 +268,12 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var privateEntries: List<PrivateEntry>
         get() = activitySnapshot.privateEntries
         set(value) = updateActivity { it.copy(privateEntries = value) }
+    var sharedPrivateEntries: List<SharedPrivateEntry>
+        get() = activitySnapshot.sharedPrivateEntries
+        set(value) = updateActivity { it.copy(sharedPrivateEntries = value) }
+    var sharedEntryRecipients: Map<String, List<String>>
+        get() = activitySnapshot.sharedEntryRecipients
+        set(value) = updateActivity { it.copy(sharedEntryRecipients = value) }
     var viewedSharedEntry: PrivateEntry?
         get() = activitySnapshot.viewedSharedEntry
         set(value) = updateActivity { it.copy(viewedSharedEntry = value) }

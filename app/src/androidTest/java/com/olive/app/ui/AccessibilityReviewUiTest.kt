@@ -70,7 +70,7 @@ class AccessibilityReviewUiTest {
             override suspend fun lookupBarcode(barcode: String) = FoodSearchResult()
         }
         compose.setContent { OliveTheme {
-            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _ -> }, source, FitnessFoodLibrary(store.preferences))
+            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _, _ -> }, source, FitnessFoodLibrary(store.preferences))
         } }
         compose.onNodeWithTag("food_library_Search").assertIsDisplayed().assertIsFocused().assertHasClickAction()
     }
@@ -81,12 +81,17 @@ class AccessibilityReviewUiTest {
         compose.runOnUiThread { session = ViewModelProvider(compose.activity)[SessionViewModel::class.java] }
         check(session.localMode)
         compose.waitUntil(15_000) { !session.busy }
-        compose.runOnIdle { session.runtime.state.screen = SessionScreen.Pin }
+        compose.runOnIdle {
+            session.runtime.enrollment = com.olive.app.security.DeviceEnrollment("pin-fixture", "", pinLength = 4)
+            session.runtime.state.screen = SessionScreen.Pin
+        }
         compose.setContent { OliveTheme { SystemPinPrompt(session, session.pinChallengeVersion) } }
         val field = compose.onNodeWithTag("unlock_pin")
         field.assert(SemanticsMatcher.keyIsDefined(SemanticsActions.SetText))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
-        compose.onNodeWithTag("unlock_submit").assertIsNotEnabled()
+        repeat(4) { compose.onNodeWithTag("unlock_pin_dot_$it", useUnmergedTree = true).assertIsDisplayed() }
+        compose.onNodeWithTag("unlock_pin_dot_4", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         field.performTextReplacement("0012")
         compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
@@ -104,6 +109,10 @@ class AccessibilityReviewUiTest {
         compose.setContent { OliveTheme {
             com.olive.app.ui.users.shared.messaging.ChatPane(session, "owner", true, null)
         } }
-        compose.onNodeWithTag("open_chat_info").assertIsDisplayed().assertIsFocused()
+        val header = hasTestTag("open_chat_info")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(header and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(header).assertIsDisplayed().assertIsFocused()
     }
 }

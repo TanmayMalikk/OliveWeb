@@ -1,6 +1,10 @@
 // User and safe-contact accounts: shows friend search results, requests, and saved friends.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.*
@@ -16,12 +21,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -43,11 +50,14 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 
 /**
  * Keeps the four friend-related lists together while the parent screen handles chat lists.
  *
+ * @receiver The lazy list scope that receives the item definitions.
  * @param session Shared session view model owning application state and actions.
  * @param pendingExpanded Whether to apply pending expanded.
  * @param onPendingExpandedChange Callback invoked when pending expanded change changes or occurs.
@@ -182,6 +192,7 @@ internal fun LazyListScope.friendLists(
 /**
  * Shows one username result and the friend action currently allowed.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param request Request supplied to [IncomingRequestRow].
  */
@@ -212,6 +223,7 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
 /**
  * Shows a sent friend request and lets the user cancel it.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param request Request supplied to [OutgoingRequestRow].
  */
@@ -244,6 +256,7 @@ private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request:
 /**
  * Shared safe app friend lists shows this friend row view so the user can view its details and use its actions.
  *
+ * @receiver The lazy list item scope that renders this row.
  * @param session Shared session view model owning application state and actions.
  * @param friend Friend relationship record.
  * @param onNoteTargets Callback invoked when note targets changes or occurs.
@@ -419,12 +432,14 @@ internal fun ChatMessageBody(
  * @param mine Whether to apply mine.
  * @param onOpen Callback invoked when open changes or occurs.
  * @param sender Optional sender supplied to [SharedMediaMessage].
+ * @param onLightSurface Whether to use styling intended for a light background.
  */
 @Composable
 internal fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
     onOpen: (SafetyDocument, File) -> Unit,
     sender: String? = null,
+    onLightSurface: Boolean = false,
 ) {
     val opening = id in session.documents.state.openingDocumentIds
     val document = session.documents.state.files.firstOrNull { it.id == id }
@@ -441,7 +456,13 @@ internal fun SharedMediaMessage(
                 id,
             ) { document, local -> onOpen(document, local) }
         }, enabled = !opening, shape = MaterialTheme.shapes.medium,
-        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+        color = when {
+            onLightSurface -> Color.White
+            mine -> Color.White.copy(alpha = .2f)
+            else -> Color.Black.copy(alpha = .05f)
+        },
+        contentColor = if (onLightSurface) Ink else LocalContentColor.current,
+        border = if (onLightSurface) androidx.compose.foundation.BorderStroke(1.dp, ChatBorder) else null,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
             .semantics { if (senderDescription != null) stateDescription = senderDescription }
     ) {
@@ -479,6 +500,10 @@ internal fun SharedMediaMessage(
                 else session.documents.makeAvailableOffline(document)
             },
             enabled = offline != OfflineMediaAvailability.SAVING,
+            colors = if (mine && !onLightSurface) ButtonDefaults.textButtonColors(
+                contentColor = Paper,
+                disabledContentColor = PaleOlive,
+            ) else ButtonDefaults.textButtonColors(),
             modifier = Modifier.testTag("shared_media_offline_$id"),
         ) {
             Text(stringResource(when {
@@ -493,9 +518,13 @@ internal fun SharedMediaMessage(
         )
     }
     error?.let {
-        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+        Text(
+            it,
+            color = if (mine && !onLightSurface) OliveErrorContainer else MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                .testTag("shared_media_error_$id"))
+                .testTag("shared_media_error_$id"),
+        )
     }
     }
 }
@@ -508,3 +537,156 @@ internal fun SharedMediaMessage(
  */
 internal fun canManageSharedMediaOfflineCopy(role: AccountRole) =
     role == AccountRole.USER || role == AccountRole.SAFE_CONTACT
+
+/**
+ * Shows the controls for sharing an invite and connecting with an existing code.
+ *
+ * @param session The signed-in session that creates and claims invites.
+ * @param unreadOnly Optional unread-only filter state to render alongside the invite button.
+ * @param onUnreadOnlyChange Optional callback invoked when the unread-only filter is toggled.
+ * @param modifier Compose modifier applied to the root layout.
+ */
+@Composable
+internal fun FriendInviteControls(
+    session: SessionViewModel,
+    unreadOnly: Boolean? = null,
+    onUnreadOnlyChange: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    var opened by remember(session.coverAccountId) { mutableStateOf(false) }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (unreadOnly != null) Arrangement.SpaceBetween else Arrangement.End,
+        ) {
+            if (unreadOnly != null && onUnreadOnlyChange != null) {
+                FilterChip(
+                    selected = unreadOnly,
+                    onClick = onUnreadOnlyChange,
+                    label = { Text(stringResource(R.string.chat_unread_only)) },
+                )
+            }
+            Button(
+                onClick = { opened = true },
+                enabled = !session.localMode,
+                modifier = Modifier.walkthroughTarget("friend_invite").testTag("friend_invite")
+            ) {
+                Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.friend_invite))
+            }
+        }
+        InviteCodeEntry(
+            messages = session.messages,
+            enabled = !session.localMode,
+            accountUid = session.coverAccountId,
+            onConnected = { session.messages.ensureMessagingObservation() }
+        )
+    }
+    if (opened) {
+        val uid = session.coverAccountId.orEmpty()
+        FriendInviteDialog(
+            uid,
+            createInvite = { refresh -> session.messages.createFriendInvite(uid, refresh) },
+            observeUnavailable = { code, onUnavailable ->
+                session.messages.observeFriendInviteUnavailable(uid, code, onUnavailable)
+            },
+            onDismiss = { opened = false },
+        )
+    }
+}
+
+/**
+ * Lets someone claim an invite code and displays the result in place.
+ *
+ * @param messages The messaging controller that claims the code.
+ * @param enabled Whether the user can enter and submit a code.
+ * @param accountUid The account claiming the invite, if already known to the caller.
+ * @param onConnected Runs after the code is claimed successfully.
+ */
+@Composable
+internal fun InviteCodeEntry(
+    messages: SessionMessages,
+    enabled: Boolean = true,
+    accountUid: String? = null,
+    onConnected: () -> Unit = {},
+) {
+    val scope = rememberCoroutineScope()
+    var code by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var connected by remember { mutableStateOf<String?>(null) }
+    var shakeAttempt by remember { mutableIntStateOf(0) }
+    val effectiveShake = rememberFieldErrorShakeTrigger(error, shakeAttempt)
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().walkthroughTarget("friend_invite_code_card"),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(stringResource(R.string.friend_invite_question), style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.take(32); error = null },
+                    label = { Text(stringResource(R.string.friend_invite_code)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
+                    enabled = enabled && !busy,
+                    isError = error != null,
+                    modifier = Modifier.weight(1f).testTag("friend_invite_code").oliveErrorShake(effectiveShake)
+                )
+                val codeRequiredText = stringResource(R.string.friend_invite_code)
+                Button(
+                    onClick = {
+                        if (code.isBlank()) {
+                            error = codeRequiredText
+                            shakeAttempt += 1
+                            return@Button
+                        }
+                        busy = true; error = null; connected = null
+                        scope.launch {
+                            try {
+                                connected = messages.claimFriendInvite(accountUid, code)
+                                code = ""
+                                onConnected()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                error = failure.localizedMessage
+                                shakeAttempt += 1
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = enabled && !busy,
+                    modifier = Modifier.testTag("friend_invite_claim")
+                ) {
+                    Text(stringResource(if (busy) R.string.friend_invite_connecting else R.string.friend_invite_connect))
+                }
+            }
+            connected?.let {
+                Text(
+                    stringResource(R.string.friend_invite_connected, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            error?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}

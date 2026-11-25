@@ -29,6 +29,7 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.olive.app.R
 import com.olive.app.data.account.HistoryRecord
 import com.olive.app.data.account.PrivateEntry
@@ -36,6 +37,9 @@ import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.trashExpired
 import com.olive.app.ui.session.DeviceLockRequest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 
 // Encrypted, account-scoped activity and private-entry storage; no authentication responsibilities.
@@ -413,8 +417,18 @@ object KeyManager {
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
-        return android.util.Base64.encodeToString(wrappedBytes, android.util.Base64.NO_WRAP)
+        return Base64.getEncoder().encodeToString(wrappedBytes)
     }
+
+    /**
+     * Software account-keyset wrappers use the WebCrypto-compatible OAEP mask digest.
+     *
+     * @param secretKey The symmetric content key to wrap.
+     * @param publicKey The recipient account's public wrapping key.
+     * @return The Base64-encoded content key wrapped with RSA-OAEP using SHA-256 for MGF1.
+     */
+    internal fun wrapForAccountKeyset(secretKey: SecretKey, publicKey: PublicKey): String =
+        wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA256)
 
     /**
      * Converts a Base64 string from Firestore back into an RSA PublicKey.
@@ -437,9 +451,39 @@ object KeyManager {
      * @return The resulting [SecretKey] for unwrap key.
      */
     fun unwrapKey(wrappedKeyBase64: String, keyWrapVersion: Int? = null): SecretKey {
-        val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
         val privateKeys = getPrivateKeys()
         if (privateKeys.isEmpty()) error("Private key missing")
+        return unwrapKey(wrappedKeyBase64, privateKeys, keyWrapVersion)
+    }
+
+    /**
+     * Opens a File DEK with an unlocked account private key during the keyset migration.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKey The private key used to unwrap the symmetric key.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
+    fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKey: PrivateKey,
+        keyWrapVersion: Int? = null,
+    ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
+
+    /**
+     * Unwraps an RSA-OAEP encrypted symmetric key against candidate private keys and digest profiles.
+     *
+     * @param wrappedKeyBase64 The Base64-encoded wrapped encryption key.
+     * @param privateKeys The candidate private keys tried against the wrapper.
+     * @param keyWrapVersion The wrapping format version used to select compatible OAEP settings.
+     * @return The symmetric encryption key recovered from the wrapper.
+     */
+    private fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKeys: List<PrivateKey>,
+        keyWrapVersion: Int?,
+    ): SecretKey {
+        val decodedBytes = Base64.getDecoder().decode(wrappedKeyBase64)
         val candidates = oaepProfiles(keyWrapVersion)
         var lastFailure: GeneralSecurityException? = null
         privateKeys.forEach { privateKey ->
@@ -630,7 +674,7 @@ internal class AndroidDeviceLock(
      * @return The resulting subtitle.
      */
     private fun subtitle(value: DeviceLockRequest) = activity.getString(
-        when {
+        value.subtitleRes ?: when {
             value.settingsChange -> R.string.entry_confirm_settings
             value.challenge.enrolling -> R.string.entry_confirm_setup
             else -> R.string.entry_unlock_description

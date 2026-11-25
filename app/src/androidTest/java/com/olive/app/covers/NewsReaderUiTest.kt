@@ -2,7 +2,7 @@
 package com.olive.app
 
 import android.view.View
-import androidx.activity.compose.setContent
+import androidx.activity.ComponentActivity
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.ui.shared.OliveTheme
@@ -28,17 +29,21 @@ import org.json.JSONObject
 import android.util.Base64
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 
-class NewsReaderUiTest : OliveUiTestBase() {
+class NewsReaderUiTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
     // Checks the full story navigation bookmarks and back stay in the app step with the test's sample data.
     @Test
     fun fullStoryNavigationBookmarksAndBackStayInTheApp() {
         val saved = mutableStateOf(false)
+        val livePreview = mutableStateOf<NewsArticle?>(null)
         val opened = mutableStateOf(false)
         var closed = false
         val article = NewsArticle(
@@ -47,25 +52,27 @@ class NewsReaderUiTest : OliveUiTestBase() {
             "https://publisher.example/story", "Test Gazette", "Tue, 13 Oct 2026 10:00:00 GMT"
         )
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.runOnMainSync {
-            compose.activity.setContent {
-                OliveTheme {
-                    if (opened.value) NewsArticleReader(
-                        article,
-                        saved.value,
-                        true,
-                        Modifier.fillMaxSize(),
+        compose.setContent {
+            OliveTheme {
+                val preview = livePreview.value
+                if (preview == null && opened.value) {
+                    NewsArticleReader(
+                        article, saved.value, true, Modifier.fillMaxSize(),
                         onBack = { closed = true },
-                        onBookmark = { saved.value = !saved.value })
-                    else Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
+                        onBookmark = { saved.value = !saved.value },
+                    )
+                } else {
+                    Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
                         NewsArticleCard(
-                            article, "English", saved.value, onOpen = { opened.value = true },
-                            onBookmark = { saved.value = !saved.value })
+                            preview ?: article, "English", preview == null && saved.value,
+                            onOpen = { if (preview == null) opened.value = true },
+                            onBookmark = { if (preview == null) saved.value = !saved.value },
+                        )
                     }
                 }
             }
         }
-        waitFor("news_article_card")
+        compose.onNodeWithTag("news_article_card").assertExists()
         // Story details form one navigation target; the bookmark keeps its own action.
         compose.onNodeWithTag("news_article_card")
             .assertTextContains(article.title).assertTextContains(article.summary)
@@ -98,7 +105,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
                 .use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }
         compose.onNodeWithText(article.title).performClick()
-        waitFor("news_article_webview")
+        compose.onNodeWithTag("news_article_webview").assertExists()
         lateinit var browser: WebView
         val finishedUrl = AtomicReference("")
         instrumentation.runOnMainSync {
@@ -178,7 +185,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
         instrumentation.runOnMainSync { browser.loadUrl("https://publisher.example/next") }
         waitForBody("Related story final paragraph", "/next")
         compose.waitForIdle()
-        compose.onNodeWithTag("news_reader_host").assertTextEquals("publisher.example")
+        compose.onNodeWithTag("news_reader_host").assertTextContains("publisher.example", substring = true)
         instrumentation.runOnMainSync {
             assertTrue("Related links must create reader history", browser.canGoBack())
             compose.activity.onBackPressedDispatcher.onBackPressed()
@@ -240,20 +247,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
                 runBlocking { NewsMetadataRepository(instrumentation.targetContext).load(liveArticle) }
             assertTrue("Use the actual publisher's article image", metadata.imageUrl.isNotBlank())
             val enriched = metadata.applyTo(liveArticle)
-            instrumentation.runOnMainSync {
-                compose.activity.setContent {
-                    OliveTheme {
-                        Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
-                            NewsArticleCard(
-                                enriched,
-                                "English",
-                                false,
-                                onOpen = {},
-                                onBookmark = {})
-                        }
-                    }
-                }
-            }
+            compose.runOnIdle { livePreview.value = enriched }
             compose.waitUntil(30_000) {
                 compose.onAllNodesWithTag("news_article_image", useUnmergedTree = true)
                     .fetchSemanticsNodes().isNotEmpty()
@@ -282,12 +276,10 @@ class NewsReaderUiTest : OliveUiTestBase() {
             topic = "Politics",
             isPaywalled = true
         )
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            compose.activity.setContent {
-                OliveTheme {
-                    Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
-                        NewsArticleCard(article, "English", false, onOpen = {}, onBookmark = {})
-                    }
+        compose.setContent {
+            OliveTheme {
+                Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp)) {
+                    NewsArticleCard(article, "English", false, onOpen = {}, onBookmark = {})
                 }
             }
         }

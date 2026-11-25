@@ -3,13 +3,15 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
-import android.util.Base64
+import androidx.core.app.NotificationCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -27,7 +29,6 @@ import com.olive.app.data.network.requireString
 import com.olive.app.data.network.requireStringList
 import com.olive.app.data.network.stringMap
 import com.olive.app.data.safety.SafetyPlanSyncWorker
-import com.olive.app.security.KeyManager
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -45,13 +46,15 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
-import com.olive.app.data.work.DurableWorkPolicy
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountKeysetWrappedKey
+import com.olive.app.security.KeyManager
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
-import kotlinx.coroutines.tasks.await
+import java.security.spec.MGF1ParameterSpec
 import javax.crypto.SecretKey
-import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.tasks.await
 
 
 /**
@@ -245,6 +248,35 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return Result.retry()
     }
 
+    /**
+     * Provides the foreground notification used when WorkManager promotes an encrypted upload.
+     *
+     * @return The WorkManager foreground notification and service metadata for the upload.
+     */
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val channelId = "olive_upload_channel"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val manager = applicationContext.getSystemService(android.app.NotificationManager::class.java)
+            if (manager?.getNotificationChannel(channelId) == null) {
+                val channel = android.app.NotificationChannel(
+                    channelId,
+                    "Media Upload",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    setShowBadge(false)
+                }
+                manager?.createNotificationChannel(channel)
+            }
+        }
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setContentTitle("Uploading encrypted file")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        return ForegroundInfo(7001, notification)
+    }
+
     companion object {
         private const val JOB_ID = "jobId"
         const val MEDIA_ID = "mediaId"
@@ -271,10 +303,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
          */
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    10L,
                     TimeUnit.SECONDS,
                 ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
@@ -349,6 +382,7 @@ private class FileSliceRequestBody(
 /**
  * Bridges OkHttp's callback API to structured coroutine cancellation.
  *
+ * @receiver The OkHttp call to start asynchronously.
  * @return The resulting [Response] instance.
  */
 private suspend fun Call.await():Response=suspendCancellableCoroutine { continuation ->
@@ -418,25 +452,12 @@ interface MediaTicketDataSource {
      */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
     /**
-     * Recovers document key.
-     *
-     * @param mediaId Unique identifier of the encrypted media object.
-     * @return The resulting [SecretKey] for recover document key.
-     */
-    suspend fun recoverDocumentKey(mediaId: String): SecretKey = error("Document recovery is unavailable")
-    /**
-     * Stores document key.
-     *
-     * @param mediaId Unique identifier of the encrypted media object.
-     * @param key Lookup key or cryptographic key.
-     */
-    suspend fun storeDocumentKey(mediaId: String, key: SecretKey) = Unit
-    /**
      * Atomically replaces recipients plus their account/device-wrapped AES keys.
      *
      * @param mediaId Unique identifier of the encrypted media object.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys Key-value mapping of account keyset wrapped keys entries.
      * @param grantIndependentRecipients Collection of grant independent recipients values to process.
      * @param revokeIndependentRecipients Collection of revoke independent recipients values to process.
      * @return The resulting [CloudMediaRecord] for update access.
@@ -445,6 +466,7 @@ interface MediaTicketDataSource {
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
@@ -454,12 +476,14 @@ interface MediaTicketDataSource {
      * @param mediaId Unique identifier of the encrypted media object.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update plan access.
      */
     suspend fun updatePlanAccess(
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
     /**
      * Shares in chat.
@@ -469,6 +493,7 @@ interface MediaTicketDataSource {
      * @param recipientUids Collection of recipient uids values to process.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys Key-value mapping of account keyset wrapped keys entries.
      */
     suspend fun shareInChat(
         mediaId:String,
@@ -476,6 +501,7 @@ interface MediaTicketDataSource {
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) { error("Chat attachment sharing is unavailable") }
     /**
      * Adds AES-key copies encrypted for the signed-in account's other registered devices.
@@ -523,13 +549,168 @@ internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
 }
 
 /**
+ * Public account-keyset descriptor for an authorized recipient of an encrypted upload.
+ *
+ * @property keyId Unique identifier of the recipient's account keyset.
+ * @property epoch Keyset rotation epoch expected when unwrapping the key.
+ * @property algorithm Asymmetric key-wrapping algorithm identifier.
+ * @property publicKey Base64-encoded RSA public key for the account keyset.
+ */
+data class MediaRecipientAccountKeyset(
+    val keyId: String,
+    val epoch: Long,
+    val algorithm: String,
+    val publicKey: String,
+)
+
+/**
+ * Public device encryption key descriptor for an authorized upload recipient.
+ *
+ * @property deviceId Recipient device identifier registered in Firestore.
+ * @property publicKey Base64-encoded RSA public key for that device.
+ * @property mgf1Digest OAEP mask-generation digest declared by the recipient device.
+ */
+data class MediaRecipientDeviceKey(
+    val deviceId: String,
+    val publicKey: String,
+    val mgf1Digest: String = "SHA-1",
+)
+
+/**
+ * Public encryption keys for an additional recipient authorized on initial media upload.
+ *
+ * @property uid Firebase UID of the recipient account.
+ * @property accountKeyset Optional enrolled account keyset public key descriptor.
+ * @property publicKey Primary directory public key for the recipient, if published.
+ * @property devices Registered device public keys for immediate device decryption.
+ */
+data class MediaUploadRecipient(
+    val uid: String,
+    val accountKeyset: MediaRecipientAccountKeyset? = null,
+    val publicKey: String = "",
+    val devices: List<MediaRecipientDeviceKey> = emptyList(),
+)
+
+/**
+ * Combined zero-knowledge key envelopes produced during encrypted media preparation.
+ *
+ * @property allowedUsers Ordered list of authorized Firebase UIDs.
+ * @property wrappedKeys Per-account primary public key wrappers.
+ * @property deviceWrappedKeys Per-device RSA-OAEP wrappers keyed by `uid--deviceId`.
+ * @property accountWrappedKeys Account-keyset wrappers used for cross-device recovery.
+ */
+internal data class MediaUploadKeyEnvelopes(
+    val allowedUsers: List<String>,
+    val wrappedKeys: Map<String, String>,
+    val deviceWrappedKeys: Map<String, String>,
+    val accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
+)
+
+/**
+ * Wraps the symmetric media AES key for the owner and any additional authorized recipients.
+ *
+ * @param key Newly generated symmetric AES key encrypting the media payload.
+ * @param ownerUid Firebase UID of the uploading owner.
+ * @param ownerAccountKeyset Owner's enrolled account keyset public metadata.
+ * @param extraRecipients Optional authorized recipients whose public keys should also receive wrapped copies.
+ * @return Combined [MediaUploadKeyEnvelopes] ready for [PreparedEncryptedMedia].
+ */
+internal fun wrapMediaKeyForRecipients(
+    key: SecretKey,
+    ownerUid: String,
+    ownerAccountKeyset: AccountKeysetEnvelope,
+    extraRecipients: List<MediaUploadRecipient> = emptyList(),
+): MediaUploadKeyEnvelopes {
+    val ownerPublicKey = KeyManager.getOrCreatePublicKey()
+    val ownerWrapped = KeyManager.wrapKey(key, ownerPublicKey)
+    val allowedUsers = mutableListOf(ownerUid)
+    val wrappedKeys = linkedMapOf(ownerUid to ownerWrapped)
+    val deviceWrappedKeys = linkedMapOf("${ownerUid}--${KeyManager.deviceId(ownerPublicKey)}" to ownerWrapped)
+    val accountWrappedKeys = linkedMapOf(
+        ownerUid to AccountKeysetWrappedKey(
+            ownerAccountKeyset.keyId,
+            ownerAccountKeyset.epoch,
+            "RSA-OAEP-256",
+            KeyManager.wrapForAccountKeyset(key, KeyManager.decodePublicKey(ownerAccountKeyset.publicKeyBase64)),
+        ),
+    )
+    for (recipient in extraRecipients.distinctBy(MediaUploadRecipient::uid)) {
+        if (recipient.uid.isBlank() || recipient.uid == ownerUid) continue
+        if (allowedUsers.size >= 25) break
+        val accountWrapper = recipient.accountKeyset
+            ?.takeIf {
+                it.keyId.isNotBlank() && it.epoch > 0L &&
+                    it.algorithm == "RSA-OAEP-256" && it.publicKey.isNotBlank()
+            }
+            ?.let { keyset ->
+                runCatching {
+                    AccountKeysetWrappedKey(
+                        keyset.keyId,
+                        keyset.epoch,
+                        keyset.algorithm,
+                        KeyManager.wrapForAccountKeyset(key, KeyManager.decodePublicKey(keyset.publicKey)),
+                    )
+                }.getOrNull()
+            }
+        val wrappedDevices = linkedMapOf<String, String>()
+        for (device in recipient.devices) {
+            if (device.deviceId.isBlank() || device.publicKey.isBlank()) continue
+            val digest = if (device.mgf1Digest == "SHA-256") MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
+            val encoded = runCatching {
+                KeyManager.wrapKey(key, KeyManager.decodePublicKey(device.publicKey), digest)
+            }.getOrNull() ?: continue
+            wrappedDevices["${recipient.uid}--${device.deviceId}"] = encoded
+        }
+        val primaryWrapped = recipient.publicKey.takeIf(String::isNotBlank)?.let { encodedPrimary ->
+            val primaryDigest = recipient.devices.firstOrNull { it.publicKey == encodedPrimary }
+                ?.let { if (it.mgf1Digest == "SHA-256") MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1 }
+                ?: MGF1ParameterSpec.SHA1
+            runCatching {
+                KeyManager.wrapKey(key, KeyManager.decodePublicKey(encodedPrimary), primaryDigest)
+            }.getOrNull()
+        } ?: wrappedDevices.values.firstOrNull() ?: accountWrapper?.wrappedKey ?: continue
+
+        allowedUsers += recipient.uid
+        wrappedKeys[recipient.uid] = primaryWrapped
+        for ((deviceKey, wrappedDeviceKey) in wrappedDevices) {
+            if (deviceWrappedKeys.size >= 250) break
+            deviceWrappedKeys[deviceKey] = wrappedDeviceKey
+        }
+        if (accountWrapper != null) {
+            accountWrappedKeys[recipient.uid] = accountWrapper
+        }
+    }
+    return MediaUploadKeyEnvelopes(allowedUsers, wrappedKeys, deviceWrappedKeys, accountWrappedKeys)
+}
+
+/**
+ * Builds the zero-knowledge upload manifest without unwrapping or exporting the media AES key.
+ *
+ * @param job The upload job whose state or request data is being read.
+ * @return The upload request fields, including the ciphertext metadata and wrapped media keys.
+ */
+internal fun mediaCreateUploadRequest(job:MediaUploadJob):Map<String,Any> = job.source.let { source ->
+    require(job.ownerUid in source.accountWrappedKeys && source.allowedUsers.containsAll(source.accountWrappedKeys.keys)) {
+        "Owner account-keyset wrapper is required and extra wrappers must belong to authorized users"
+    }
+    mapOf(
+        "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
+        "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
+        "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
+        "deviceWrappedKeys" to source.deviceWrappedKeys,
+        "accountWrappedKeys" to source.accountWrappedKeys.mapValues { it.value.toMap() },
+        "encryptionVersion" to source.encryptionVersion,
+    )
+}
+
+/**
  * Firebase Functions implementation of [MediaTicketDataSource].
  *
  * Relationship summary for diagram generation:
  * - called by [MediaUploadWorker] for upload session/ticket/finalization operations;
  * - called by `MediaTransferController` for download tickets;
  * - delegates authorization and R2 signing to `functions/src/mediaTickets.js`;
- * - never accepts plaintext file content; only transfer facts and the account recovery key cross it.
+ * - never accepts plaintext file content or raw AES keys; only ciphertext facts and opaque wrappers cross it.
  *
  * Every returned URL is locally constrained to HTTPS on Cloudflare's R2 hostname before OkHttp sees
  * it. This limits the impact of a malformed or compromised callable response.
@@ -547,66 +728,17 @@ class MediaRepository(
      */
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
         val source=job.source
-        val wrapped = source.wrappedKeys.getValue(job.ownerUid)
-        val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
-        val metadata = org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata, key))
-        val emergencyId = Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
+        val wrapped=source.wrappedKeys.getValue(job.ownerUid)
+        val key=KeyManager.unwrapKey(wrapped,source.encryptionVersion)
+        val metadata=org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata,key))
+        val emergencyId=Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
             .matchEntire(metadata.optString("name"))?.groupValues?.get(1)
         if (emergencyId != null) call(
             "emergencyAttachUpload", mapOf("id" to emergencyId, "jobId" to job.id)
         )
-        val result=call("mediaCreateUpload",mapOf(
-            "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
-            "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
-            "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
-            "deviceWrappedKeys" to source.deviceWrappedKeys,
-            "encryptionVersion" to source.encryptionVersion,
-            "recoveryKeyToSeal" to encodeRecoveryKey(key),
-        ))
+        val result=call("mediaCreateUpload",mediaCreateUploadRequest(job))
         return MediaUploadSession(job.id,result.requireString("mediaId"),result.requireString("objectKey"),
             MediaUploadMode.valueOf(result.requireString("mode")),result.optionalString("uploadId"),result.requireLong("partSize"))
-    }
-
-    /**
-     * Recovers document key.
-     *
-     * @param mediaId Unique identifier of the encrypted media object.
-     * @return The resulting [SecretKey] for recover document key.
-     */
-    override suspend fun recoverDocumentKey(mediaId: String): SecretKey {
-        val result = call("mediaAccountAccessKey", mapOf("mediaId" to mediaId))
-        val raw = Base64.decode(result.requireString("accountAccessKey"), Base64.DEFAULT)
-        return try {
-            require(raw.size == 32) { "Invalid document recovery key" }
-            SecretKeySpec(raw, "AES")
-        } finally {
-            raw.fill(0)
-        }
-    }
-
-    /**
-     * Stores document key.
-     *
-     * @param mediaId Unique identifier of the encrypted media object.
-     * @param key Lookup key or cryptographic key.
-     */
-    override suspend fun storeDocumentKey(mediaId: String, key: SecretKey) {
-        call("mediaStoreAccountAccessKey", mapOf("mediaId" to mediaId, "recoveryKeyToSeal" to encodeRecoveryKey(key)))
-    }
-
-    /**
-     * Encodes recovery key.
-     *
-     * @param key Lookup key or cryptographic key.
-     * @return The resulting encode recovery key string.
-     */
-    private fun encodeRecoveryKey(key: SecretKey): String {
-        val raw = key.encoded
-        return try {
-            Base64.encodeToString(raw, Base64.NO_WRAP)
-        } finally {
-            raw.fill(0)
-        }
     }
 
     /**
@@ -673,21 +805,25 @@ class MediaRepository(
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
      * @param grantIndependentRecipients Collection of grant independent recipients values to process.
      * @param revokeIndependentRecipients Collection of revoke independent recipients values to process.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update access.
      */
     override suspend fun updateAccess(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
         grantIndependentRecipients:List<String>,
         revokeIndependentRecipients:List<String>,
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
+        require(wrappedKeys.keys.containsAll(accountWrappedKeys.keys))
         return call("mediaUpdateAccess",mapOf(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
             "grantIndependentRecipients" to grantIndependentRecipients,
             "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
@@ -699,16 +835,19 @@ class MediaRepository(
      * @param mediaId Unique identifier of the encrypted media object.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      * @return The resulting [CloudMediaRecord] for update plan access.
      */
     override suspend fun updatePlanAccess(
         mediaId: String,
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
+        accountWrappedKeys: Map<String, AccountKeysetWrappedKey>,
     ): CloudMediaRecord = call("mediaUpdateAccess", mapOf(
         "mediaId" to mediaId,
         "wrappedKeys" to wrappedKeys,
         "deviceWrappedKeys" to deviceWrappedKeys,
+        "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         "forPlan" to true,
     )).record()
 
@@ -720,6 +859,7 @@ class MediaRepository(
      * @param recipientUids Collection of recipient uids values to process.
      * @param wrappedKeys Key-value mapping of wrapped keys entries.
      * @param deviceWrappedKeys Key-value mapping of device wrapped keys entries.
+     * @param accountWrappedKeys The account-keyset wrappers indexed by recipient UID.
      */
     override suspend fun shareInChat(
         mediaId:String,
@@ -727,6 +867,7 @@ class MediaRepository(
         recipientUids:List<String>,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        accountWrappedKeys:Map<String,AccountKeysetWrappedKey>,
     ) {
         call("mediaShareInChat",mapOf(
             "mediaId" to mediaId,
@@ -737,6 +878,7 @@ class MediaRepository(
             "recipientUids" to recipientUids,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "accountWrappedKeys" to accountWrappedKeys.mapValues { it.value.toMap() },
         ))
     }
 
@@ -820,14 +962,28 @@ class MediaRepository(
 }
 
 /**
+ * Encrypted media: Reads the account-keyset wrapped AES keys from a downloaded media record.
+ *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
+ * @param name The field name that contains the recipient key wrappers.
+ * @return The downloaded media key wrappers indexed by recipient UID.
+ */
+private fun Map<*,*>.accountWrappedKeyMap(name:String):Map<String,AccountKeysetWrappedKey> =
+    (get(name) as? Map<*,*>)?.entries?.associate { entry ->
+        (entry.key as? String ?: error("Invalid $name key")) to
+            AccountKeysetWrappedKey.fromMap(entry.value as? Map<*,*> ?: error("Invalid $name value"))
+    }.orEmpty()
+
+/**
  * Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
  *
+ * @receiver The remote media record containing wrapped keys or attachment metadata.
  * @return The resulting record.
  */
 private fun Map<*,*>.record()=CloudMediaRecord(requireString("mediaId"),requireString("ownerUid"),requireString("objectKey"),
     requireString("encryptedMetadata"),stringMap("wrappedKeys"),requireStringList("allowedUsers"),requireLong("ciphertextSize"),
     requireString("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,requireLong("createdAt"),
-    stringMap("deviceWrappedKeys"))
+    stringMap("deviceWrappedKeys"),accountWrappedKeyMap("accountWrappedKeys"))
 
 /** Deletes expired, unpinned upload-reuse ciphertext even if no document screen is opened. */
 class OfflineMediaCleanupWorker(context: Context, parameters: WorkerParameters) :

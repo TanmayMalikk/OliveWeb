@@ -126,10 +126,10 @@ if ! $skip_firebase_rules; then
     cd -- "$project_root/firebase"
     [[ -d node_modules ]] || run_check 'Install Firebase test dependencies' npm ci
     if [[ -n "$firebase_java" ]]; then
-        run_check 'Firestore and Storage rules tests' env JAVA_HOME="$firebase_java" \
-            PATH="$firebase_java/bin:$PATH" npm test
+        run_check 'Firebase rules and callable integration tests' env JAVA_HOME="$firebase_java" \
+            PATH="$firebase_java/bin:$PATH" npm run test:all
     else
-        run_check 'Firestore and Storage rules tests' npm test
+        run_check 'Firebase rules and callable integration tests' npm run test:all
     fi
 fi
 cd -- "$project_root"

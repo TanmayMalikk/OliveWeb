@@ -46,4 +46,18 @@
     <string name="location_sharing_until">Sharing until %1$s</string>
     <string name="location_ten_seconds_testing">10 seconds (testing)</string>
     <string name="location_notification_sharing_text">Your live location share is active.</string>
+    <string name="location_gps_destination_title">Free-use GPS destination</string>
+    <string name="location_gps_destination_hint">Search places, addresses, or coordinates</string>
+    <string name="location_gps_start_route">Start route</string>
+    <string name="location_gps_clear_destination">Clear destination</string>
+    <string name="location_gps_coordinates_label">Coordinates: %1$s</string>
+    <string name="location_gps_coordinates_hint">Route directly to these coordinates</string>
+    <string name="location_gps_no_match">No matching destination. Try a place name, address, or coordinates.</string>
+    <string name="location_gps_searching">Searching for places…</string>
+    <string name="location_route_driving">Driving</string>
+    <string name="location_route_walking">Walking</string>
+    <string name="location_compass_north_up">North up</string>
+    <string name="location_compass_heading_up">Heading up</string>
+    <string name="location_compass_toggle_north_desc">Map locked North up. Tap to rotate with walking direction.</string>
+    <string name="location_compass_toggle_heading_desc">Map rotating with walking direction. Tap to lock North up.</string>
 </resources>

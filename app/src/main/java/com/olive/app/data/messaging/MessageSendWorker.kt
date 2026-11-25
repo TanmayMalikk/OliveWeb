@@ -25,7 +25,7 @@ import com.olive.app.data.network.encodeToJsonObject
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentRepository
 import com.olive.app.data.safety.callJsonObject
-import com.olive.app.data.work.DurableWorkPolicy
+import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.security.EncryptionUtils
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
@@ -106,8 +106,12 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
             if (message.ownerUid !in conversation.participantIds) {
                 throw AttachmentDeliveryRejected("PERMISSION_DENIED")
             }
+            val usernames = if (conversation.type == "SUPPORT") {
+                conversation.participantUsernames +
+                    runCatching { conversations.prepareTicketParticipantNames(conversation.id) }.getOrDefault(emptyMap())
+            } else conversation.participantUsernames
             val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
-                conversation.participantUsernames[uid]
+                usernames[uid]?.takeIf(String::isNotBlank)
                     ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
             }
             if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
@@ -191,7 +195,7 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 )
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    10L,
                     TimeUnit.SECONDS,
                 )
                 .addTag(ownerTag(message.ownerUid))
@@ -422,6 +426,7 @@ data class CachedChatAccess(
 /**
  * Converts chat conversation into cache JSON.
  *
+ * @receiver The conversation from which to derive the stored or displayed data.
  * @return The resulting to cache JSON.
  */
 internal fun ChatConversation.toCacheJson() = JSONObject().apply {
@@ -479,6 +484,7 @@ internal fun conversationFromCacheJson(value: JSONObject): ChatConversation {
 /**
  * Converts encrypted chat message into cache JSON.
  *
+ * @receiver The encrypted message to serialize for the cache.
  * @return The resulting to cache JSON.
  */
 internal fun EncryptedChatMessage.toCacheJson() = JSONObject().apply {
@@ -601,9 +607,11 @@ internal class SupportRepository(
     /**
      * Creates a new support ticket without sharing the safety plan.
      *
-     * @return The resulting [StaffSupportTicket] for request help.
+     * @param requestKey The same UUID for each retry of this request.
+     * @return The assigned or waiting support ticket.
      */
-    suspend fun requestHelp(): StaffSupportTicket = updateRequest("request")
+    suspend fun requestHelp(requestKey: String): StaffSupportTicket =
+        updateRequest("request", requestKey = requestKey)
 
     /**
      * Returns true when the user still has a staff request that can be cancelled.
@@ -619,13 +627,20 @@ internal class SupportRepository(
      *
      * @param action Action supplied to [updateRequest].
      * @param conversationId Unique identifier of the conversation or support ticket.
-     * @return The resulting [StaffSupportTicket] for update request.
+     * @param requestKey Stable request UUID for a newly opened ticket.
+     * @return The assigned or waiting support ticket.
      */
-    private suspend fun updateRequest(action: String, conversationId: String = ""): StaffSupportTicket {
-        val ticket = functions.callJsonObject(
-            "staffSupportRequest",
-            mapOf("action" to action, "conversationId" to conversationId),
-        ).getJSONObject("ticket")
+    private suspend fun updateRequest(
+        action: String,
+        conversationId: String = "",
+        requestKey: String = "",
+    ): StaffSupportTicket {
+        val payload = buildMap {
+            put("action", action)
+            put("conversationId", conversationId)
+            if (requestKey.isNotEmpty()) put("requestKey", requestKey)
+        }
+        val ticket = functions.callJsonObject("staffSupportRequest", payload).getJSONObject("ticket")
         return StaffSupportTicket(
             requested = ticket.optBoolean("requested"),
             staffUid = ticket.optString("staffUid"),
@@ -726,7 +741,8 @@ data class OutgoingAttachment(
  * @return `true` if is durable chat attachment, or `false` otherwise.
  */
 internal fun isDurableChatAttachment(document: SafetyDocument, ownerUid: String?) =
-    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank()
+    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank() &&
+        !document.isChatOnlyMedia()
 
 /**
  * Uses the locally opened conversation key without touching Firebase while the device is offline.

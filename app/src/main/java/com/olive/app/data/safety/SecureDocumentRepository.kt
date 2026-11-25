@@ -1,12 +1,22 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data.safety
 
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.PublicKey
 import javax.crypto.SecretKey
@@ -17,8 +27,10 @@ import com.olive.app.data.media.requireIdentity
 import com.olive.app.data.network.cloudStringMap
 import com.olive.app.data.network.decodeJsonObject
 import com.olive.app.data.network.encodeToJsonObject
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
+import com.olive.app.security.UnlockedAccountKeyset
 import com.olive.app.security.child
 import kotlinx.serialization.Serializable
 import org.json.JSONArray
@@ -52,7 +64,9 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         }
 
         val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
-        val documentKey: SecretKey = existingWrapped[ownerUid]?.let(KeyManager::unwrapKey)
+        val existingDevices = existing?.get("deviceWrappedKeys").cloudStringMap().orEmpty()
+        val existingAccounts = parseAccountWrappedKeys(existing?.get("accountWrappedKeys"))
+        val documentKey: SecretKey = existingWrapped[ownerUid]?.let { runCatching { KeyManager.unwrapKey(it) }.getOrNull() }
             ?: EncryptionUtils.generateSymmetricKey()
 
         // 3. Encrypt the payload using the AES key
@@ -63,17 +77,24 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         for ((uid, publicKey) in recipientPublicKeys) {
             wrappedKeysMap[uid] = KeyManager.wrapKey(documentKey, publicKey)
         }
+        val ownerPublic = KeyManager.getOrCreatePublicKey()
+        val deviceWrappedMap = existingDevices.toMutableMap().apply {
+            put("$ownerUid--${KeyManager.deviceId(ownerPublic)}", KeyManager.wrapKey(documentKey, ownerPublic))
+        }
+        val accountWrappedMap = buildAccountWrappedKeys(documentKey, wrappedKeysMap.keys, existingAccounts)
 
         // 5. Construct the secure cloud entity
-        val secureEntry = mapOf(
-            "id" to entry.id,
-            "ownerUid" to ownerUid,
-            "ciphertext" to ciphertext,
-            "wrappedKeys" to wrappedKeysMap,
-            "allowedUsers" to wrappedKeysMap.keys.toList(),
-            "createdAt" to (existing?.get("createdAt") ?: FieldValue.serverTimestamp()),
-            "updatedAt" to FieldValue.serverTimestamp()
-        )
+        val secureEntry = buildMap<String, Any> {
+            put("id", entry.id)
+            put("ownerUid", ownerUid)
+            put("ciphertext", ciphertext)
+            put("wrappedKeys", wrappedKeysMap)
+            put("allowedUsers", wrappedKeysMap.keys.toList())
+            if (deviceWrappedMap.isNotEmpty()) put("deviceWrappedKeys", deviceWrappedMap)
+            if (accountWrappedMap.isNotEmpty()) put("accountWrappedKeys", accountWrappedMap)
+            put("createdAt", existing?.get("createdAt") ?: FieldValue.serverTimestamp())
+            put("updatedAt", FieldValue.serverTimestamp())
+        }
 
         // 6. Upload to Firestore (using set with merge to handle updates cleanly)
         documentRef.set(secureEntry).await()
@@ -95,26 +116,31 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     }
 
     /**
-     * Retrieves and decrypts a shared Private Entry.
+     * Retrieves and decrypts a shared Private Entry, recovering via account keyset when the device key changed.
      *
      * @param entryId Unique identifier of the private entry or note.
      * @param currentUid Current user ID supplied to [loadAndDecryptEntry].
+     * @param accountKeysetUnlocker Optional recovery keyset provider invoked when device key unwrapping fails.
      * @return The resulting [PrivateEntry] for load and decrypt entry.
      */
-    suspend fun loadAndDecryptEntry(entryId: String, currentUid: String): PrivateEntry {
+    internal suspend fun loadAndDecryptEntry(
+        entryId: String,
+        currentUid: String,
+        accountKeysetUnlocker: (suspend (String) -> UnlockedAccountKeyset?)? = null,
+    ): PrivateEntry {
         val snapshot = firestore.collection("privateEntries").document(entryId).get().await()
 
         if (!snapshot.exists()) throw Exception("Document not found.")
 
         val wrappedKeysMap = snapshot.get("wrappedKeys").cloudStringMap()
             ?: throw Exception("Encryption keys missing from document.")
+        if (currentUid !in wrappedKeysMap) {
+            throw Exception("You do not have the cryptographic key to read this document.")
+        }
 
-        // 1. Find the current user's specific wrapped key
-        val myWrappedKey = wrappedKeysMap[currentUid]
+        // 2. Unwrap the AES key using this device's key or recover from accountWrappedKeys
+        val documentKey = unwrapEntryKey(snapshot, currentUid, accountKeysetUnlocker)
             ?: throw Exception("You do not have the cryptographic key to read this document.")
-
-        // 2. Unwrap the AES key using the hardware Private Key
-        val documentKey = KeyManager.unwrapKey(myWrappedKey)
 
         // 3. Decrypt the ciphertext
         val ciphertext = snapshot.getString("ciphertext") ?: throw Exception("Ciphertext missing.")
@@ -130,7 +156,338 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         )
     }
 
+    /**
+     * Replaces the non-owner recipient list for a shared private entry, or deletes the cloud copy when
+     * all recipients are revoked so revoked contacts immediately lose access.
+     *
+     * @param entry The private entry to save, display, or share.
+     * @param ownerUid The UID of the account that owns the data.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
+     */
+    suspend fun updateMultiRecipientEntry(
+        entry: PrivateEntry,
+        ownerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val nonOwnerRecipients = recipientPublicKeys.filterKeys { it != ownerUid }
+        if (nonOwnerRecipients.isEmpty()) {
+            revokeAllRecipients(entry.id, ownerUid)
+            return
+        }
+        val documentRef = firestore.collection("privateEntries").document(entry.id)
+        val existing = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
+        }
+        val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
+        val existingDevices = existing?.get("deviceWrappedKeys").cloudStringMap().orEmpty()
+        val existingAccounts = parseAccountWrappedKeys(existing?.get("accountWrappedKeys"))
+        val documentKey: SecretKey = existingWrapped[ownerUid]?.let { runCatching { KeyManager.unwrapKey(it) }.getOrNull() }
+            ?: EncryptionUtils.generateSymmetricKey()
+        val payload = entry.toJson().toString()
+        val ciphertext = EncryptionUtils.encryptText(payload, documentKey)
+        val ownerPublicKey = recipientPublicKeys[ownerUid] ?: KeyManager.getOrCreatePublicKey()
+        val wrappedKeysMap = linkedMapOf(
+            ownerUid to (existingWrapped[ownerUid] ?: KeyManager.wrapKey(documentKey, ownerPublicKey)),
+        )
+        for ((uid, publicKey) in nonOwnerRecipients) {
+            wrappedKeysMap[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        val deviceKey = "$ownerUid--${KeyManager.deviceId(ownerPublicKey)}"
+        val retainedDevices = existingDevices.filterKeys { key ->
+            wrappedKeysMap.keys.any { uid -> key.startsWith("$uid--") }
+        }.toMutableMap().apply {
+            put(deviceKey, KeyManager.wrapKey(documentKey, ownerPublicKey))
+        }
+        val accountWrappedMap = buildAccountWrappedKeys(documentKey, wrappedKeysMap.keys, existingAccounts)
+        val secureEntry = buildMap<String, Any> {
+            put("id", entry.id)
+            put("ownerUid", ownerUid)
+            put("ciphertext", ciphertext)
+            put("wrappedKeys", wrappedKeysMap)
+            put("allowedUsers", wrappedKeysMap.keys.toList())
+            if (retainedDevices.isNotEmpty()) put("deviceWrappedKeys", retainedDevices)
+            if (accountWrappedMap.isNotEmpty()) put("accountWrappedKeys", accountWrappedMap)
+            put("createdAt", existing?.get("createdAt") ?: FieldValue.serverTimestamp())
+            put("updatedAt", FieldValue.serverTimestamp())
+        }
+        documentRef.set(secureEntry).await()
+    }
+
+    /**
+     * Deletes the shared cloud record for an owned entry when the entry is trashed or all recipients are revoked.
+     *
+     * @param entryId The ID of the private entry.
+     * @param ownerUid The UID of the account that owns the data.
+     */
+    suspend fun revokeAllRecipients(entryId: String, ownerUid: String) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        try {
+            val snapshot = documentRef.get().await()
+            if (snapshot.exists() && snapshot.getString("ownerUid") == ownerUid) {
+                documentRef.delete().await()
+            }
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code !in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) throw error
+        }
+    }
+
+    /**
+     * Grants access to any current conversation participants (such as an escalated Admin or newly added friend)
+     * who were not yet wrapped on a previously shared private entry.
+     *
+     * @param entryId The ID of the private entry.
+     * @param callerUid The UID of the signed-in account making the request.
+     * @param recipientPublicKeys The recipients' public keys, indexed by account UID.
+     */
+    suspend fun ensureRecipientsHaveAccess(
+        entryId: String,
+        callerUid: String,
+        recipientPublicKeys: Map<String, PublicKey>,
+    ) {
+        val documentRef = firestore.collection("privateEntries").document(entryId)
+        val snapshot = try {
+            documentRef.get().await()
+        } catch (error: FirebaseFirestoreException) {
+            if (error.code in setOf(
+                    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                    FirebaseFirestoreException.Code.NOT_FOUND,
+                )) return
+            throw error
+        }
+        val existingAllowed = (snapshot.get("allowedUsers") as? List<*>)
+            .orEmpty().filterIsInstance<String>().toSet()
+        if (!snapshot.exists() || callerUid !in existingAllowed) return
+        val existingWrapped = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
+        val existingAccounts = parseAccountWrappedKeys(snapshot.get("accountWrappedKeys"))
+        val missing = recipientPublicKeys.filterKeys { uid ->
+            uid != callerUid && (uid !in existingWrapped || uid !in existingAllowed)
+        }
+        val missingAccountUids = (existingAllowed + missing.keys).filter { it !in existingAccounts }
+        if (missing.isEmpty() && missingAccountUids.isEmpty()) return
+        val callerWrappedKey = existingWrapped[callerUid] ?: return
+        val documentKey = runCatching { KeyManager.unwrapKey(callerWrappedKey) }.getOrNull() ?: return
+        val updatedWrapped = existingWrapped.toMutableMap()
+        for ((uid, publicKey) in missing) {
+            updatedWrapped[uid] = KeyManager.wrapKey(documentKey, publicKey)
+        }
+        val updatedAccountWrapped = buildAccountWrappedKeys(documentKey, updatedWrapped.keys, existingAccounts)
+        val updates = buildMap<String, Any> {
+            put("wrappedKeys", updatedWrapped)
+            put("allowedUsers", updatedWrapped.keys.toList())
+            if (updatedAccountWrapped.isNotEmpty()) put("accountWrappedKeys", updatedAccountWrapped)
+            put("updatedAt", FieldValue.serverTimestamp())
+        }
+        documentRef.update(updates).await()
+    }
+
+    /**
+     * Streams private entries shared with [currentUid] alongside the recipient map for entries owned by [currentUid].
+     *
+     * @param currentUid The UID of the currently signed-in account.
+     * @param onUpdate Receives the latest decoded entries or snapshot.
+     * @param onError Receives any error raised while observing or decoding entries.
+     * @return The Firestore listener registration that can stop the observation.
+     */
+    internal fun observeUserSharedEntries(
+        currentUid: String,
+        onUpdate: (PrivateEntriesSnapshot) -> Unit,
+        onError: (String) -> Unit = {},
+    ): ListenerRegistration {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        var job: Job? = null
+        val registration = firestore.collection("privateEntries")
+            .whereArrayContains("allowedUsers", currentUid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                job?.cancel()
+                if (error != null) {
+                    onError(error.localizedMessage.orEmpty())
+                    return@addSnapshotListener
+                }
+                val docs = snapshot?.documents.orEmpty()
+                job = scope.launch {
+                    val parsed = withContext(Dispatchers.Default) {
+                        decodeSharedEntriesSnapshot(docs, currentUid)
+                    }
+                    onUpdate(parsed)
+                }
+            }
+        return ListenerRegistration {
+            registration.remove()
+            scope.cancel()
+        }
+    }
+
+    /**
+     * Unwraps and decrypts shared private entries visible to [currentUid].
+     *
+     * @param documents The document repository used to access shared attachments.
+     * @param currentUid The UID of the currently signed-in account.
+     * @return The decrypted shared entries and the recipient metadata visible to the active account.
+     */
+    private suspend fun decodeSharedEntriesSnapshot(
+        documents: List<DocumentSnapshot>,
+        currentUid: String,
+    ): PrivateEntriesSnapshot {
+        val sharedWithMe = mutableListOf<SharedPrivateEntry>()
+        val ownedRecipients = linkedMapOf<String, List<String>>()
+        for (doc in documents) {
+            val ownerUid = doc.getString("ownerUid").orEmpty()
+            if (ownerUid.isBlank()) continue
+            val allowed = (doc.get("allowedUsers") as? List<*>)
+                .orEmpty().filterIsInstance<String>()
+            if (currentUid !in allowed) continue
+            if (ownerUid == currentUid) {
+                val others = allowed.filter { it != currentUid }.distinct()
+                if (others.isNotEmpty()) ownedRecipients[doc.id] = others
+                continue
+            }
+            val ciphertext = doc.getString("ciphertext")?.takeIf(String::isNotBlank) ?: continue
+            val key = unwrapEntryKey(doc, currentUid) ?: continue
+            val entry = runCatching {
+                val plaintext = EncryptionUtils.decryptText(ciphertext, key)
+                val json = JSONObject(plaintext)
+                if (json.has("timestamp")) PrivateEntry.fromJson(json)
+                else PrivateEntry(
+                    id = doc.id,
+                    title = json.optString("title", ""),
+                    body = json.optString("body", ""),
+                )
+            }.getOrNull() ?: continue
+            if (entry.deletedAt == null) {
+                sharedWithMe += SharedPrivateEntry(entry = entry, ownerUid = ownerUid)
+            }
+        }
+        sharedWithMe.sortByDescending { it.entry.updatedAt }
+        return PrivateEntriesSnapshot(
+            sharedWithMe = sharedWithMe,
+            ownedSharedRecipients = ownedRecipients,
+        )
+    }
+
+    /**
+     * Reads the published RSA account-keyset public descriptor for [uid], or returns null when not enrolled.
+     *
+     * @param uid Firebase UID of the recipient account.
+     * @return Triple of keyId, epoch, and Base64 public key, or null.
+     */
+    private suspend fun fetchAccountKeysetDirectory(uid: String): Triple<String, Long, String>? {
+        val row = try {
+            firestore.collection("accountKeyDirectories").document(uid).get().await()
+        } catch (_: Exception) {
+            return null
+        }
+        if (!row.exists() || row.getString("ownerUid") != uid) return null
+        val keyId = row.getString("keyId").orEmpty()
+        val epoch = row.getLong("epoch") ?: 0L
+        val algorithm = row.getString("algorithm").orEmpty()
+        val publicKey = row.getString("publicKey").orEmpty()
+        if (keyId.isBlank() || epoch <= 0L || algorithm != "RSA-OAEP-256" || publicKey.isBlank()) return null
+        return Triple(keyId, epoch, publicKey)
+    }
+
+    /**
+     * Parses per-account recovery key wrappers from a Firestore snapshot field.
+     *
+     * @param raw Raw Firestore map value for `accountWrappedKeys`.
+     * @return Map of UID to parsed [AccountKeysetWrappedKey].
+     */
+    private fun parseAccountWrappedKeys(raw: Any?): Map<String, AccountKeysetWrappedKey> =
+        (raw as? Map<*, *>)?.entries?.mapNotNull { (k, v) ->
+            val uid = (k as? String)?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            val map = v as? Map<*, *> ?: return@mapNotNull null
+            runCatching { uid to AccountKeysetWrappedKey.fromMap(map) }.getOrNull()
+        }?.toMap().orEmpty()
+
+    /**
+     * Builds account-keyset recovery wrappers for every authorized user in [uids], preserving valid existing ones.
+     *
+     * @param documentKey Symmetric AES key protecting the shared private entry.
+     * @param uids Authorized recipient UIDs to cover.
+     * @param existing Previously stored wrappers keyed by UID.
+     * @return Serialized Firestore map entries ready to write under `accountWrappedKeys`.
+     */
+    private suspend fun buildAccountWrappedKeys(
+        documentKey: SecretKey,
+        uids: Collection<String>,
+        existing: Map<String, AccountKeysetWrappedKey> = emptyMap(),
+    ): Map<String, Map<String, Any>> {
+        val result = linkedMapOf<String, Map<String, Any>>()
+        for (uid in uids.distinct()) {
+            val retained = existing[uid]
+            if (retained != null) {
+                result[uid] = retained.toMap()
+                continue
+            }
+            val dir = fetchAccountKeysetDirectory(uid) ?: continue
+            runCatching {
+                AccountKeysetWrappedKey(
+                    keyId = dir.first,
+                    epoch = dir.second,
+                    algorithm = "RSA-OAEP-256",
+                    wrappedKey = KeyManager.wrapForAccountKeyset(documentKey, KeyManager.decodePublicKey(dir.third)),
+                ).toMap()
+            }.getOrNull()?.let { result[uid] = it }
+        }
+        return result
+    }
+
+    /**
+     * Unwraps the symmetric key for [currentUid] using device keys first, falling back to `accountWrappedKeys`.
+     *
+     * @param snapshot Firestore document snapshot for the shared private entry.
+     * @param currentUid Firebase UID of the active reader.
+     * @param accountKeysetUnlocker Optional recovery keyset provider for cross-device fallback.
+     * @return The unwrapped [SecretKey], or null if no usable wrapper succeeds.
+     */
+    private suspend fun unwrapEntryKey(
+        snapshot: DocumentSnapshot,
+        currentUid: String,
+        accountKeysetUnlocker: (suspend (String) -> UnlockedAccountKeyset?)? = null,
+    ): SecretKey? {
+        val deviceWrapped = snapshot.get("deviceWrappedKeys").cloudStringMap().orEmpty()
+        val wrappedKeys = snapshot.get("wrappedKeys").cloudStringMap().orEmpty()
+        val currentDevice = runCatching { KeyManager.deviceId() }.getOrNull()
+        val deviceSpecific = currentDevice?.let { deviceWrapped["$currentUid--$it"] }
+        for (candidate in listOfNotNull(deviceSpecific, wrappedKeys[currentUid])) {
+            val key = runCatching { KeyManager.unwrapKey(candidate) }.getOrNull()
+            if (key != null) return key
+        }
+        val wrapper = parseAccountWrappedKeys(snapshot.get("accountWrappedKeys"))[currentUid] ?: return null
+        val keyset = accountKeysetUnlocker?.let { runCatching { it(currentUid) }.getOrNull() } ?: return null
+        if (wrapper.keyId != keyset.keyId || wrapper.epoch != keyset.epoch) return null
+        val recovered = runCatching { wrapper.unwrap(keyset) }.getOrNull() ?: return null
+        if (currentDevice != null) {
+            runCatching {
+                val publicKey = KeyManager.getOrCreatePublicKey()
+                val rewrapped = KeyManager.wrapKey(recovered, publicKey)
+                val updatedDevices = deviceWrapped + ("$currentUid--${KeyManager.deviceId(publicKey)}" to rewrapped)
+                snapshot.reference.update(
+                    mapOf(
+                        "deviceWrappedKeys" to updatedDevices,
+                        "updatedAt" to FieldValue.serverTimestamp(),
+                    ),
+                ).await()
+            }
+        }
+        return recovered
+    }
+
 }
+
+internal data class SharedPrivateEntry(
+    val entry: PrivateEntry,
+    val ownerUid: String,
+)
+
+internal data class PrivateEntriesSnapshot(
+    val sharedWithMe: List<SharedPrivateEntry> = emptyList(),
+    val ownedSharedRecipients: Map<String, List<String>> = emptyMap(),
+)
 
 // Safe-app users and support staff: defines safety-plan fields and conflict data.
 
@@ -328,6 +685,7 @@ internal fun mergeVisibleSafetyPlan(
 /**
  * Gives the safety plan the safety fields with defaults it needs.
  *
+ * @receiver The safety-plan field to update.
  * @param value Input value to store, parse, or format.
  * @param activeWriterId Active writer ID supplied to [edit].
  * @param activeWriterUid Active writer user ID supplied to [edit].
@@ -519,6 +877,7 @@ class DocumentIndexStore(private val vault: JsonVault) : DocumentIndexDataSource
 /**
  * Converts safety document into index JSON.
  *
+ * @receiver The document whose index metadata or sharing scope is read.
  * @param viewerUid Firebase UID of the viewing account.
  * @return JSON object representing to index JSON.
  */
@@ -542,12 +901,14 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("objectKey", objectKey.take(1024))
         .put("encryptedMetadata", encryptedMetadata.take(64 * 1024))
         .put("viewerWrappedKey", wrappedKeys[viewerUid].orEmpty())
+        .put("viewerAccountWrappedKey", accountWrappedKeys[viewerUid]?.toJson())
         .put("deviceWrappedKeys", JSONObject(viewerDeviceKeys))
         .put("ciphertextSize", ciphertextSize)
         .put("ciphertextSha256", ciphertextSha256.lowercase())
         .put("encryptionVersion", encryptionVersion)
         .put("accountRecoveryReady", accountRecoveryReady)
         .put("evidence", evidence)
+        .put("chatOnly", chatOnly)
         .put("tags", JSONArray(tags.distinct().take(20)))
         .apply {
             ocrText?.take(MAX_OCR_TEXT)?.let { put("ocrText", it) }
@@ -559,6 +920,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
 /**
  * Converts JSON object into document.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param viewerUid Firebase UID of the viewing account.
  * @param id ID supplied to [toDocument].
  * @return The resulting [SafetyDocument] for to document.
@@ -570,6 +932,9 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
     }.distinct()
     require(viewerUid in allowed && allowed.size <= 25)
     val accountKey = optString("viewerWrappedKey").takeIf(String::isNotBlank)
+    val accountWrappedKey = optJSONObject("viewerAccountWrappedKey")?.let {
+        AccountKeysetWrappedKey.fromJson(it)
+    }
     val deviceKeys = optJSONObject("deviceWrappedKeys")?.let { json ->
         json.keys().asSequence().filter { it.startsWith("$viewerUid--") }
             .associateWith(json::getString)
@@ -604,6 +969,8 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         deviceWrappedKeys = deviceKeys,
         evidence = optBoolean("evidence"),
         tags = tags,
+        accountWrappedKeys = accountWrappedKey?.let { mapOf(viewerUid to it) }.orEmpty(),
+        chatOnly = optBoolean("chatOnly"),
     )
 }
 

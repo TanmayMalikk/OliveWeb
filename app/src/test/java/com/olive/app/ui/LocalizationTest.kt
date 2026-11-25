@@ -1,8 +1,6 @@
 // Tests translated Android resources and language selection for all roles.
 package com.olive.app.ui
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -64,19 +62,4 @@ class LocalizationTest {
         }
     }
 
-    // Inputs: the values shown below. Expected: verify app locale manager resolution.
-    @Test
-    fun verifyAppLocaleManagerResolution() {
-        assertEquals("en", AppLocaleManager.getLanguageTag("English"))
-        assertEquals("fr", AppLocaleManager.getLanguageTag("French"))
-        assertEquals("es", AppLocaleManager.getLanguageTag("Spanish"))
-        assertEquals("ar", AppLocaleManager.getLanguageTag("Arabic"))
-        assertEquals("zh-rCN", AppLocaleManager.getLanguageTag("Chinese"))
-
-        assertEquals("Français", AppLocaleManager.getDisplayLanguage("French"))
-        assertEquals("Español", AppLocaleManager.getDisplayLanguage("Spanish"))
-        assertEquals("العربية", AppLocaleManager.getDisplayLanguage("Arabic"))
-        assertEquals("中文", AppLocaleManager.getDisplayLanguage("Chinese"))
-        assertEquals("English", AppLocaleManager.getDisplayLanguage("English"))
-    }
 }

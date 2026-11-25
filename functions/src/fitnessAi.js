@@ -9,6 +9,8 @@ const stripePrice = defineString("FITNESS_STRIPE_WEEKLY_PRICE_ID", {default: ""}
 const stripePublishableKey = defineString("FITNESS_STRIPE_PUBLISHABLE_KEY", {default: ""});
 const billingOptions = {enforceAppCheck: true, secrets: [stripeKey]};
 const historyColumns = ["date", "steps", "calories", "protein", "carbohydrates", "fat"];
+const historyDays = 14;
+const foodNamesPerDay = 8;
 const goalRanges = {
   steps: [500, 100000], calories: [500, 10000], protein: [10, 1000],
   carbohydrates: [10, 2000], fat: [10, 1000], waterMl: [250, 10000],
@@ -58,10 +60,10 @@ function coachInput(data) {
   if (!message || message.length > 1200) {
     throw new HttpsError("invalid-argument", "Enter a fitness question under 1,200 characters.");
   }
-  const conversation = (Array.isArray(data.conversation) ? data.conversation : []).slice(-4)
+  const conversation = (Array.isArray(data.conversation) ? data.conversation : []).slice(-5)
     .filter((turn) => ["user", "model"].includes(turn?.role) && typeof turn.text === "string")
     .map(({role, text}) => ({role, text: text.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "")}));
-  const history = (Array.isArray(data.history) ? data.history : []).slice(-14)
+  const history = (Array.isArray(data.history) ? data.history : []).slice(-historyDays)
     .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day?.date ?? ""))
     .map((day) => {
       const result = {date: day.date};
@@ -69,6 +71,11 @@ function coachInput(data) {
         const number = day[metric];
         if (Number.isFinite(number) && number >= 0 && number <= 100_000) result[metric] = number;
       }
+      const names = (Array.isArray(day.foodNames) ? day.foodNames : []).slice(0, foodNamesPerDay)
+        .filter((name) => typeof name === "string")
+        .map((name) => name.trim().slice(0, 60).replace(/[\uD800-\uDBFF]$/, ""))
+        .filter(Boolean);
+      if (names.length) result.foodNames = [...new Set(names)];
       return result;
     });
   return {message, conversation, history, goals: validatedGoals(data.goals)};
@@ -77,10 +84,11 @@ function coachInput(data) {
 function modelInput(input) {
   const {history, ...request} = input;
   if (!history.length) return request;
+  const columns = history.some((day) => day.foodNames) ? [...historyColumns, "foodNames"] : historyColumns;
   return {
     ...request,
-    historyColumns,
-    history: history.map((day) => historyColumns.map((column) => day[column] ?? null)),
+    historyColumns: columns,
+    history: history.map((day) => columns.map((column) => day[column] ?? null)),
   };
 }
 
@@ -117,7 +125,7 @@ exports.fitnessAiCoach = onCall({enforceAppCheck: true, timeoutSeconds: 45, secr
         systemInstruction: {parts: [{text: knowledge}]},
         contents: [{role: "user", parts: [{text: JSON.stringify(modelInput(input))}]}],
         generationConfig: {
-          maxOutputTokens: 320, thinkingConfig: {thinkingLevel: "MINIMAL"},
+          maxOutputTokens: 800, thinkingConfig: {thinkingLevel: "MINIMAL"},
           responseMimeType: "application/json", responseJsonSchema: schema,
         },
       }),
@@ -127,7 +135,7 @@ exports.fitnessAiCoach = onCall({enforceAppCheck: true, timeoutSeconds: 45, secr
     const result = await response.json();
     const text = result.candidates?.[0]?.content?.parts?.find((part) => part.text && !part.thought)?.text;
     const output = JSON.parse(text);
-    const reply = typeof output.reply === "string" ? output.reply.trim().slice(0, 1800) : "";
+    const reply = typeof output.reply === "string" ? output.reply.trim().slice(0, 3000) : "";
     if (!reply) throw Error("Empty coaching response");
     const goals = validatedGoalChanges(output.goals, input.goals);
     return {reply, goals};

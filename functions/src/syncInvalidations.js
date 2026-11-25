@@ -50,7 +50,7 @@ function stable(value) {
 
 function conversationAccessChanged(before, after) {
   if (!before || !after) return true;
-  return ["participantIds", "participantPublicKeys", "roomKeys", "ownerUid", "staffUid", "adminUid", "closedAt"]
+  return ["participantIds", "participantPublicKeys", "roomKeys", "accountRoomKeys", "ownerUid", "staffUid", "adminUid", "closedAt"]
       .some((field) => stable(before[field]) !== stable(after[field]));
 }
 

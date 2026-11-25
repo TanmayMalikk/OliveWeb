@@ -16,6 +16,10 @@ import com.olive.app.data.account.SettingsEvent
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.account.profileChanges
 import com.olive.app.security.*
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,6 +32,7 @@ import kotlinx.coroutines.sync.withLock
 
 // Saves private profile, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime: SessionRuntime) {
+    private val publishedKeysets = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     /**
      * Saves the user's cover choice and other general account settings.
      *
@@ -37,32 +42,30 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
      * @param dob Date of birth supplied to [saveSettings].
      * @param situation Situation supplied to [saveSettings].
      * @param address Address supplied to [saveSettings].
+     * @param email The contact email address entered by the user.
+     * @param emailCommunicationConsent Whether the user allows communications at the saved email address.
      */
     fun saveSettings(
-        fullName: String,
-        affected: String,
-        abuserName: String,
-        dob: String,
-        situation: String,
-        address: DeliveryAddress
+        fullName: String, affected: String, abuserName: String,
+        dob: String, situation: String, address: DeliveryAddress,
+        email: String? = null, emailCommunicationConsent: Boolean? = null,
     ) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe || busy) return
                 history.recordSettingsInteraction("Olive Branch", "Pressed save profile settings")
+                val nextEmail = email?.let(InputPolicy::normalizedEmail) ?: profile?.email.orEmpty()
+                val nextConsent = if (nextEmail.isBlank()) false else (emailCommunicationConsent ?: (profile?.emailCommunicationConsent == true))
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
-                    message =
-                        runtime.application.getString(R.string.ui_profile_required_fields)
-                    return
+                    failInput(runtime.application.getString(R.string.ui_profile_required_fields)); return
+                }
+                if (nextEmail.isNotBlank() && !InputPolicy.validEmail(nextEmail)) {
+                    failInput(runtime.application.getString(R.string.email_invalid_message)); return
                 }
                 val updated = profile?.copy(
-                    fullName = fullName.trim(),
-                    affectedNames = affected.trim(),
-                    abuserName = abuserName.trim(),
-                    dob = dob,
-                    situation = situation.trim(),
-                    region = address.generalLocation,
-                    address = address
+                    fullName = fullName.trim(), affectedNames = affected.trim(), abuserName = abuserName.trim(),
+                    dob = dob, situation = situation.trim(), region = address.generalLocation,
+                    address = address, email = nextEmail, emailCommunicationConsent = nextConsent,
                 ) ?: return
                 saveSafeProfile(updated)
             }
@@ -82,8 +85,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 if (screen != SessionScreen.Cover || busy) return
                 history.recordSettingsInteraction("Cover", "Pressed save account settings")
                 if (fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
-                    message =
-                        runtime.application.getString(R.string.ui_profile_required_fields)
+                    failInput(runtime.application.getString(R.string.ui_profile_required_fields))
                     return
                 }
                 val device = enrollment ?: return
@@ -233,8 +235,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 history.recordSettingsInteraction("Olive Branch", "Pressed change trigger word")
                 val device = enrollment ?: return
                 if (!InputPolicy.validTrigger(trigger) || !InputPolicy.validPin(pin)) {
-                    message =
-                        runtime.application.getString(R.string.enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin)
+                    failInput(runtime.application.getString(R.string.enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_trigger_please_retry)) { token ->
@@ -248,12 +249,9 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
 
                         is PinResult.Rejected -> {
                             attempts = withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if (result.failures >= 5) navigation.quickExit() else message =
-                                runtime.application.resources.getQuantityString(
-                                    R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                                    5 - result.failures,
-                                    5 - result.failures
-                                )
+                            if (result.failures >= 5) navigation.quickExit() else failInput(
+                                runtime.application.resources.getQuantityString(R.plurals.ui_incorrect_pin_value_attempts_remaining, 5 - result.failures, 5 - result.failures)
+                            )
                         }
                     }
                 }
@@ -412,31 +410,19 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 val username = profile?.username ?: return
                 if (currentPassword.isEmpty()) {
-                    message =
-                        runtime.application.getString(R.string.enter_your_current_password)
+                    failInput(runtime.application.getString(R.string.enter_your_current_password))
                     return
                 }
-                if (!InputPolicy.passwordExcludesUsername(
-                        newPassword,
-                        profile?.username ?: coverUsername
-                    )
-                ) {
-                    message =
-                        runtime.application.getString(R.string.password_excludes_username)
+                if (!InputPolicy.passwordExcludesUsername(newPassword, profile?.username ?: coverUsername)) {
+                    failInput(runtime.application.getString(R.string.password_excludes_username))
                     return
                 }
-                if (!InputPolicy.validAccountPassword(
-                        newPassword,
-                        profile?.username ?: coverUsername
-                    )
-                ) {
-                    message =
-                        runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                if (!InputPolicy.validAccountPassword(newPassword, profile?.username ?: coverUsername)) {
+                    failInput(runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character))
                     return
                 }
                 if (newPassword != confirmation) {
-                    message =
-                        runtime.application.getString(R.string.the_new_passwords_do_not_match)
+                    failInput(runtime.application.getString(R.string.the_new_passwords_do_not_match))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_password_check_your_current_password_and_connection)) { token ->
@@ -445,6 +431,22 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         currentPassword,
                         newPassword
                     )
+                    if (state.passwordRecoveryEnrolled == true) {
+                        try {
+                            val ark = accountRecoveryKey(device.uid, token)
+                            opaqueRecoveryRepository?.rotate(
+                                device.uid,
+                                currentPassword,
+                                newPassword,
+                                ark,
+                                firebasePassword = newPassword,
+                            )
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (e: Exception) {
+                            android.util.Log.e("SessionAccountSettings", "Failed to rotate password recovery", e)
+                        }
+                    }
                     withContext(Dispatchers.IO) {
                         store.recordSettings(
                             device.uid, SettingsEvent(
@@ -463,6 +465,211 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 }
             }
         }
+    }
+
+    /**
+     * Publishes the user's encrypted account keyset envelope to Firestore once per session epoch.
+     *
+     * @param e The encrypted account keyset envelope to publish.
+     */
+    internal suspend fun publishKeyset(e: AccountKeysetEnvelope) {
+        val m = "${e.accountId}:${e.keyId}:${e.epoch}"
+        if (m !in publishedKeysets) { runtime.accountKeysetRepository?.publish(e); publishedKeysets.add(m) }
+    }
+
+    /**
+     * Returns the account recovery key for [uid], unlocking an app-managed local copy or migrating
+     * legacy/missing records through OPAQUE password recovery without biometric prompts.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The unlocked account recovery key for the active account.
+     */
+    internal suspend fun accountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
+        val local = withContext(Dispatchers.IO) { runtime.accountKeysets.read(uid) }
+        if (local != null) {
+            if (local.deviceRecord.version == AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED) {
+                val unlocked = runCatching { unlockDeviceRecoveryKey(local.deviceRecord) }
+                    .onFailure { if (it is CancellationException) throw it }
+                    .getOrNull()
+                if (unlocked != null) {
+                    runtime.scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local.envelope) } }
+                    return unlocked
+                }
+            }
+            val repository = runtime.accountKeysetRepository
+            val remote = repository?.fetch(uid)
+            if (remote != null) {
+                return recoverAccountRecoveryKey(uid, remote, token)
+            }
+            if (repository == null) {
+                return recoverAccountRecoveryKey(uid, local.envelope, token)
+            }
+            withContext(Dispatchers.IO) {
+                runtime.accountKeysets.purge(uid)?.let(AccountRecoveryKeyDeviceProtector()::forget)
+            }
+            return createAccountRecoveryKey(uid, token)
+        }
+        val remote = runtime.accountKeysetRepository?.fetch(uid) ?: return createAccountRecoveryKey(uid, token)
+        return recoverAccountRecoveryKey(uid, remote, token)
+    }
+
+    /**
+     * Checks whether encrypted access can be unlocked on this device without failing on a missing
+     * OPAQUE recovery record.
+     *
+     * @param uid The account UID used to check local and remote recovery readiness.
+     * @return True if an app-managed local ARK exists or OPAQUE password recovery is enrolled.
+     */
+    internal suspend fun canRecoverAccountKeyset(uid: String): Boolean = with(runtime) {
+        val local = withContext(Dispatchers.IO) { accountKeysets.read(uid) }
+        if (local != null && local.deviceRecord.version == AccountRecoveryKeyDeviceRecord.VERSION_APP_MANAGED) {
+            return@with true
+        }
+        val repository = accountKeysetRepository ?: return@with false
+        val enrolled = repository.isPasswordRecoveryEnrolled(uid)
+        if (enrollment?.uid == uid) state.passwordRecoveryEnrolled = enrolled
+        enrolled
+    }
+
+    /**
+     * Generates a new Account Recovery Key and envelope, protects it locally, and publishes it.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return The newly generated recovery key after local protection and publication.
+     */
+    internal suspend fun createAccountRecoveryKey(uid: String, token: Long): AccountRecoveryKey {
+        val repository = checkNotNull(runtime.accountKeysetRepository)
+        val recoveryKey = withContext(Dispatchers.IO) { AccountRecoveryKey.generate() }
+        val envelope = withContext(Dispatchers.IO) { AccountKeysetEnvelope.create(uid, recoveryKey) }
+        protectDeviceRecoveryKey(uid, recoveryKey, envelope, token)
+        try {
+            publishKeyset(envelope)
+        } catch (failure: Exception) {
+            val authoritative = runCatching { repository.fetch(uid) }.getOrNull()
+            if (authoritative != null && authoritative.keyId != envelope.keyId) {
+                withContext(Dispatchers.IO) {
+                    runtime.accountKeysets.purge(uid)?.let(AccountRecoveryKeyDeviceProtector()::forget)
+                }
+            }
+            throw failure
+        }
+        return recoveryKey
+    }
+
+    /**
+     * Recovers and validates the account recovery key through OPAQUE password recovery.
+     *
+     * @param uid Authenticated account whose encrypted keyset is being recovered.
+     * @param keyset Server-fetched encrypted account keyset used to validate the recovered key.
+     * @param token Session generation used to reject stale authentication results.
+     * @return The validated account recovery key held only in client memory.
+     */
+    private suspend fun recoverAccountRecoveryKey(
+        uid: String,
+        keyset: AccountKeysetEnvelope,
+        token: Long,
+    ): AccountRecoveryKey = runtime.passwordRecovery.recoverAccountRecoveryKey(uid, keyset, token)
+
+    /**
+     * Unlocks a locally protected app-managed ARK record without triggering device authentication.
+     *
+     * @param record The locally stored app-managed ARK record to unwrap.
+     * @return The decrypted account recovery key held only in client memory.
+     */
+    internal suspend fun unlockDeviceRecoveryKey(
+        record: AccountRecoveryKeyDeviceRecord,
+    ): AccountRecoveryKey = withContext(Dispatchers.IO) {
+        AccountRecoveryKeyDeviceProtector().unlock(record)
+    }
+
+    /**
+     * Encrypts and stores [recoveryKey] under an app-managed Android Keystore key for [uid],
+     * cleaning up any prior local key material once the new record is saved.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param recoveryKey The account recovery key used to protect or open the private keyset.
+     * @param envelope The encrypted envelope carrying the account keyset.
+     * @param token The session epoch captured when the operation started.
+     */
+    internal suspend fun protectDeviceRecoveryKey(
+        uid: String,
+        recoveryKey: AccountRecoveryKey,
+        envelope: AccountKeysetEnvelope,
+        token: Long,
+    ) {
+        check(currentRecoverySession(uid, token)) { "Recovery session changed" }
+        val protector = AccountRecoveryKeyDeviceProtector()
+        val previous = withContext(Dispatchers.IO) {
+            runCatching { runtime.accountKeysets.read(uid)?.deviceRecord }.getOrNull()
+        }
+        val record = withContext(Dispatchers.IO) { protector.protect(uid, recoveryKey) }
+        try {
+            check(currentRecoverySession(uid, token)) { "Recovery session changed" }
+            withContext(Dispatchers.IO) {
+                runtime.accountKeysets.save(AccountKeysetLocalStore.Saved(envelope, record))
+            }
+        } catch (failure: Throwable) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { protector.forget(record) }
+            throw failure
+        }
+        if (previous != null && (previous.protectionId != record.protectionId || previous.version != record.version)) {
+            withContext(Dispatchers.IO) { protector.forget(previous) }
+        }
+    }
+
+    /**
+     * Verifies that the setup or unlocked Safe/Portal session still belongs to the same account.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @param token The session epoch captured when the operation started.
+     * @return True while the same user and session may complete recovery setup or unlock.
+     */
+    internal fun currentRecoverySession(uid: String, token: Long) = with(runtime) {
+        if (epoch != token || state.privacyBlackout) return@with false
+        when (state.screen) {
+            SessionScreen.Safe, SessionScreen.Portal -> enrollment?.uid == uid
+            SessionScreen.NewCredentials, SessionScreen.ReturningCredentials ->
+                enrollment == null && pendingIdentity?.uid == uid && accounts.authenticatedUid() == uid
+            else -> false
+        }
+    }
+
+    /**
+     * Ensures media encryption has a stable account public key without unlocking private material.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @return The account keyset envelope containing the stable public wrapping key.
+     */
+    internal suspend fun ensureAccountKeysetForMedia(uid: String): AccountKeysetEnvelope = with(runtime) {
+        withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }?.let { local ->
+            scope.launch(Dispatchers.IO) { runCatching { publishKeyset(local) } }
+            return@with local
+        }
+        accountKeysetRepository?.fetch(uid)?.let { remote ->
+            scope.launch(Dispatchers.IO) { runCatching { publishKeyset(remote) } }
+            return@with remote
+        }
+        val token = epoch
+        check(currentRecoverySession(uid, token)) { "Account session changed" }
+        accountRecoveryKey(uid, token)
+        withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope } ?: error("Account recovery keyset was not stored")
+    }
+
+    /**
+     * Unlocks account private material only in client memory for one media-key operation.
+     *
+     * @param uid The account UID used to scope this operation.
+     * @return The unlocked account keyset, including the private key needed to unwrap media keys.
+     */
+    internal suspend fun unlockAccountKeysetForMedia(uid: String): UnlockedAccountKeyset = with(runtime) {
+        val token = epoch
+        check(currentRecoverySession(uid, token)) { "Account session changed" }
+        val recoveryKey = accountRecoveryKey(uid, token)
+        val envelope = withContext(Dispatchers.IO) { accountKeysets.read(uid)?.envelope }
+            ?: ensureAccountKeysetForMedia(uid)
+        withContext(Dispatchers.Default) { envelope.unlock(uid, recoveryKey) }
     }
 
 }

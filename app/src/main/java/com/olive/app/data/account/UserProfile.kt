@@ -34,6 +34,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
 
 private open class BoundedCoordinateSerializer(
     name: String,
@@ -42,11 +44,23 @@ private open class BoundedCoordinateSerializer(
 ) : KSerializer<Double?> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(name, PrimitiveKind.DOUBLE)
 
+    /**
+     * Serializes the nullable double coordinate.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The optional geographic coordinate to serialize.
+     */
     @OptIn(ExperimentalSerializationApi::class)
     override fun serialize(encoder: Encoder, value: Double?) {
         if (value == null) encoder.encodeNull() else encoder.encodeDouble(value)
     }
 
+    /**
+     * Deserializes the coordinate, ensuring it falls within bounded limits.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded coordinate, or null if the stored value is absent or out of bounds.
+     */
     override fun deserialize(decoder: Decoder): Double? {
         val jsonDecoder = decoder as? JsonDecoder
         val parsed = if (jsonDecoder != null) {
@@ -65,21 +79,57 @@ private object LongitudeSerializer : BoundedCoordinateSerializer("Longitude", -1
 
 object AccountRoleSerializer : KSerializer<AccountRole> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("AccountRole", PrimitiveKind.STRING)
+    /**
+     * Serializes the account role name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The account role to store by name.
+     */
     override fun serialize(encoder: Encoder, value: AccountRole) = encoder.encodeString(value.name)
+    /**
+     * Deserializes the account role from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The account role reconstructed from storage.
+     */
     override fun deserialize(decoder: Decoder): AccountRole = AccountRole.fromStored(decoder.decodeString())
 }
 
 object CoverTypeSerializer : KSerializer<CoverType> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CoverType", PrimitiveKind.STRING)
+    /**
+     * Serializes the cover type name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The cover app selection to store by name.
+     */
     override fun serialize(encoder: Encoder, value: CoverType) = encoder.encodeString(value.name)
+    /**
+     * Deserializes the cover type from stored representation.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The cover app reconstructed from storage.
+     */
     override fun deserialize(decoder: Decoder): CoverType = CoverType.fromStored(decoder.decodeString())
 }
 
 private object SafeContactListSerializer : KSerializer<List<SafeContact>> {
     override val descriptor: SerialDescriptor = ListSerializer(SafeContact.serializer()).descriptor
+    /**
+     * Serializes the list of safe contacts.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The contacts to encode in the saved profile.
+     */
     override fun serialize(encoder: Encoder, value: List<SafeContact>) =
         encoder.encodeSerializableValue(ListSerializer(SafeContact.serializer()), value)
 
+    /**
+     * Deserializes the list of safe contacts, discarding invalid entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The valid contacts decoded from the stored list.
+     */
     override fun deserialize(decoder: Decoder): List<SafeContact> {
         val jsonDecoder = decoder as? JsonDecoder
             ?: return decoder.decodeSerializableValue(ListSerializer(SafeContact.serializer()))
@@ -124,7 +174,7 @@ enum class AccountRole(val title: String, val description: String) {
 // Pick the visible cover here; add another option before wiring its screen and launcher icon.
 @Serializable(with = CoverTypeSerializer::class)
 enum class CoverType(val title: String) {
-    NEWS("Daily Digest"), FITNESS("Fitness Tracker"), GAME("Game");
+    NEWS("Daily Digest"), FITNESS("Fitness Tracker");
 
     companion object {
         /**
@@ -155,7 +205,9 @@ data class UserProfile(
     val coverType: CoverType = CoverType.FITNESS,
     val role: AccountRole = AccountRole.USER,
     val email: String = "",
+    val emailCommunicationConsent: Boolean = false,
     val phone: String = "",
+    val safetyIntake: SafetyPlanIntake = SafetyPlanIntake(),
 ) {
     /**
      * Converts this account record into fields that Firebase can store.
@@ -186,7 +238,9 @@ data class UserProfile(
         "coverType" to coverType.name,
         "role" to role.name,
         "email" to email,
+        "emailCommunicationConsent" to emailCommunicationConsent,
         "phone" to phone,
+        "safetyIntake" to safetyIntake.toMap(),
     )
 
     /**
@@ -312,7 +366,7 @@ data class AdminAccountDraft(
     val dob: String = "",
     val email: String = "",
     val phone: String = "",
-    val language: String = "English",
+    val language: String = "",
     val city: String = "",
     val affectedNames: String = "",
     val abuserName: String = "",
@@ -371,7 +425,9 @@ class AdminRepository(private val functions: FirebaseFunctions = FirebaseFunctio
      * @param uid Firebase UID of the target user account.
      */
     suspend fun delete(uid: String) {
-        functions.getHttpsCallable("adminDeleteAccount").call(mapOf("uid" to uid)).await()
+        functions.getHttpsCallable("adminDeleteAccount")
+            .apply { setTimeout(120, java.util.concurrent.TimeUnit.SECONDS) }
+            .call(mapOf("uid" to uid)).await()
     }
 
     /**
@@ -755,4 +811,196 @@ internal fun parseIncidentDate(value: String, today: LocalDate = LocalDate.now()
     if (!text.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) return null
     return runCatching { LocalDate.parse(text) }.getOrNull()
         ?.takeIf { it.year >= 1 && !it.isAfter(today) }
+}
+
+enum class ImmigrationStatus {
+    PREFER_NOT_TO_SAY,
+    CITIZEN,
+    PERMANENT_RESIDENT,
+    TEMPORARY_OR_SPONSORED,
+    REFUGEE_OR_CLAIMANT,
+    UNDOCUMENTED_OR_UNCERTAIN,
+}
+
+enum class DependantNeed {
+    CHILDREN,
+    ELDER_OR_ADULT_DEPENDANT,
+    PETS,
+}
+
+enum class FinancialSituation {
+    PREFER_NOT_TO_SAY,
+    INDEPENDENT,
+    SHARED_OR_MONITORED,
+    NO_INDEPENDENT_ACCESS,
+}
+
+enum class TransportSituation {
+    PREFER_NOT_TO_SAY,
+    OWN_VEHICLE,
+    PUBLIC_TRANSIT,
+    NEEDS_RIDE_SUPPORT,
+}
+
+enum class SafetyCircumstance {
+    LEGAL_OR_COURT_ORDERS,
+    MARRIAGE_OR_PARENTING,
+    PRESCRIPTIONS_OR_MEDICAL,
+    SHARED_LEASE_OR_MORTGAGE,
+}
+
+enum class AbuseType {
+    PHYSICAL,
+    EMOTIONAL_OR_PSYCHOLOGICAL,
+    FINANCIAL,
+    DIGITAL_OR_STALKING,
+    SEXUAL,
+    CULTURAL_OR_IMMIGRATION,
+}
+
+private open class SafeEnumSerializer<T : Enum<T>>(
+    serialName: String,
+    private val defaultValue: T,
+    private val parse: (String) -> T?,
+) : KSerializer<T> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
+
+    /**
+     * Serializes the enum entry by its name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The enum option to store by name.
+     */
+    override fun serialize(encoder: Encoder, value: T) = encoder.encodeString(value.name)
+
+    /**
+     * Deserializes the enum entry, falling back to [defaultValue] when unrecognized.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded enum constant, or the configured fallback when the stored name is unknown.
+     */
+    override fun deserialize(decoder: Decoder): T {
+        val raw = (decoder as? JsonDecoder)?.let { json ->
+            (json.decodeJsonElement() as? JsonPrimitive)?.takeIf { it.isString }?.content
+        } ?: runCatching { decoder.decodeString() }.getOrNull()
+        return raw?.let(parse) ?: defaultValue
+    }
+}
+
+private open class SafeEnumSetSerializer<T : Enum<T>>(
+    serialName: String,
+    private val parse: (String) -> T?,
+) : KSerializer<Set<T>> {
+    override val descriptor: SerialDescriptor = SetSerializer(String.serializer()).descriptor
+
+    /**
+     * Serializes the enum set as a sorted list of enum names.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The selected enum options to store as names.
+     */
+    override fun serialize(encoder: Encoder, value: Set<T>) =
+        encoder.encodeSerializableValue(ListSerializer(String.serializer()), value.map { it.name }.sorted())
+
+    /**
+     * Deserializes a JSON array of enum names into a set, ignoring unknown entries.
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The set of recognized options from the stored enum names.
+     */
+    override fun deserialize(decoder: Decoder): Set<T> {
+        val json = decoder as? JsonDecoder
+            ?: return decoder.decodeSerializableValue(ListSerializer(String.serializer())).mapNotNull(parse).toSet()
+        val array = json.decodeJsonElement() as? JsonArray ?: return emptySet()
+        return array.mapNotNull { element ->
+            val name = (element as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return@mapNotNull null
+            parse(name)
+        }.toSet()
+    }
+}
+
+/**
+ * Returns the enum constant matching [name], or null when unrecognized.
+ *
+ * @param T The enum type to search for a matching constant.
+ * @param name The stored enum constant name to look up.
+ * @return The matching enum constant, or null when the name is unknown.
+ */
+private inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
+    enumValues<T>().firstOrNull { it.name == name }
+
+object ImmigrationStatusSerializer : KSerializer<ImmigrationStatus> by SafeEnumSerializer(
+    "ImmigrationStatus",
+    ImmigrationStatus.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object FinancialSituationSerializer : KSerializer<FinancialSituation> by SafeEnumSerializer(
+    "FinancialSituation",
+    FinancialSituation.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object TransportSituationSerializer : KSerializer<TransportSituation> by SafeEnumSerializer(
+    "TransportSituation",
+    TransportSituation.PREFER_NOT_TO_SAY,
+    ::enumOrNull,
+)
+
+object DependantNeedSetSerializer : KSerializer<Set<DependantNeed>> by SafeEnumSetSerializer(
+    "DependantNeedSet",
+    ::enumOrNull,
+)
+
+object SafetyCircumstanceSetSerializer : KSerializer<Set<SafetyCircumstance>> by SafeEnumSetSerializer(
+    "SafetyCircumstanceSet",
+    ::enumOrNull,
+)
+
+object AbuseTypeSetSerializer : KSerializer<Set<AbuseType>> by SafeEnumSetSerializer(
+    "AbuseTypeSet",
+    ::enumOrNull,
+)
+
+/**
+ * Private onboarding questionnaire answers that tailor the user's initial safety-plan documents and steps.
+ */
+@Serializable
+data class SafetyPlanIntake(
+    val completed: Boolean = false,
+    @Serializable(with = AbuseTypeSetSerializer::class)
+    val abuseTypes: Set<AbuseType> = emptySet(),
+    @Serializable(with = ImmigrationStatusSerializer::class)
+    val immigrationStatus: ImmigrationStatus = ImmigrationStatus.PREFER_NOT_TO_SAY,
+    @Serializable(with = DependantNeedSetSerializer::class)
+    val dependants: Set<DependantNeed> = emptySet(),
+    @Serializable(with = FinancialSituationSerializer::class)
+    val financialSituation: FinancialSituation = FinancialSituation.PREFER_NOT_TO_SAY,
+    @Serializable(with = TransportSituationSerializer::class)
+    val transportSituation: TransportSituation = TransportSituation.PREFER_NOT_TO_SAY,
+    @Serializable(with = SafetyCircumstanceSetSerializer::class)
+    val circumstances: Set<SafetyCircumstance> = emptySet(),
+) {
+    val hasAnySelection: Boolean
+        get() = abuseTypes.isNotEmpty() ||
+            immigrationStatus != ImmigrationStatus.PREFER_NOT_TO_SAY ||
+            dependants.isNotEmpty() ||
+            financialSituation != FinancialSituation.PREFER_NOT_TO_SAY ||
+            transportSituation != TransportSituation.PREFER_NOT_TO_SAY ||
+            circumstances.isNotEmpty()
+
+    /**
+     * Converts questionnaire answers into a plain map for structured Firebase profile storage.
+     *
+     * @return Map containing the serialized safety-intake fields.
+     */
+    fun toMap(): Map<String, Any> = mapOf(
+        "completed" to completed,
+        "abuseTypes" to abuseTypes.map { it.name }.sorted(),
+        "immigrationStatus" to immigrationStatus.name,
+        "dependants" to dependants.map { it.name }.sorted(),
+        "financialSituation" to financialSituation.name,
+        "transportSituation" to transportSituation.name,
+        "circumstances" to circumstances.map { it.name }.sorted(),
+    )
 }

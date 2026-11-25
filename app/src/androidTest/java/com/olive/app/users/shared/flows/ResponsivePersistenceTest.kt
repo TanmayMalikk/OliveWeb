@@ -4,7 +4,7 @@ package com.olive.app
 import androidx.test.core.app.ApplicationProvider
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
-import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.security.CoverStateStore
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.data.news.NewsFeedCacheStore

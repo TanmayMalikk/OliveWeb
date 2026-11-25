@@ -171,6 +171,7 @@ class SessionStateTest {
             val dataSources = SessionDataSources(
                 accounts, admin, messaging, secureChat, secureDocuments,
                 media, safetyDocuments, locations, adminLocations,
+                null, null,
             )
             `when`(accounts.authenticatedUid()).thenReturn("owner")
             `when`(accounts.authenticatedUsername()).thenReturn("fixture_owner")
@@ -250,7 +251,7 @@ class SessionStateTest {
                     assertSame(runtime.staffSupport, vm.staffSupport)
                     assertFalse(vm.pendingSync)
                     assertEquals("", vm.deliveryAddress.city)
-                    assertEquals("English", vm.language)
+                    assertEquals("", vm.language)
                     assertEquals("", vm.coverDob)
                     assertEquals("", vm.coverFullName)
                     assertEquals("fixture_owner", vm.coverUsername)

@@ -1,8 +1,12 @@
 // All safe-app roles: shows staff and admin account settings, workload cards, and live organization map.
 package com.olive.app.ui.users.shared.organization
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
 import android.util.Patterns
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -50,13 +54,36 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
     val profile = session.profile ?: return
     var fullName by remember(profile) { mutableStateOf(profile.fullName) }
     var birthday by rememberBirthdayInput(profile.dob)
-    var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
+    var profileErrors by remember(profile) { mutableStateOf(false) }
+    var profileShake by remember { mutableIntStateOf(0) }
     var email by remember(profile) { mutableStateOf(profile.email) }
     var phone by remember(profile) { mutableStateOf(profile.phone) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
+    var passwordErrors by remember { mutableStateOf(false) }
+    var passwordShake by remember { mutableIntStateOf(0) }
+    var pendingPasswordCheck by remember { mutableStateOf(false) }
+    var currentPasswordRejected by remember { mutableStateOf(false) }
+    val sessionErrorVersion = session.inputErrorVersion
+    var lastSeenErrorVersion by remember { mutableIntStateOf(sessionErrorVersion) }
+    LaunchedEffect(sessionErrorVersion) {
+        if (sessionErrorVersion > lastSeenErrorVersion) {
+            lastSeenErrorVersion = sessionErrorVersion
+            if (pendingPasswordCheck) {
+                currentPasswordRejected = true
+                pendingPasswordCheck = false
+                passwordErrors = true
+            }
+        }
+    }
     var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
+    val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+    LaunchedEffect(session.coverAccountId, session.localMode) {
+        if (!session.localMode && session.coverAccountId != null) {
+            session.refreshPasswordRecovery()
+        }
+    }
     OlivePrivateDesign {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -80,16 +107,30 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                             fullName,
                             "organization_settings_name",
                             enabled = !session.account.busy,
-                        ) { fullName = it.take(120) }
+                            error = if (profileErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                            shakeTrigger = profileShake,
+                        ) {
+                            fullName = it.take(120)
+                            profileErrors = false
+                        }
                         BirthdayPicker(
-                            birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
+                            birthday,
+                            "organization_settings_dob",
+                            !session.account.busy,
+                            profileErrors,
+                            shakeTrigger = profileShake,
                         ) { birthday = it }
                         Field(
                             uiText(R.string.ui_email),
                             email,
                             "organization_settings_email",
                             enabled = !session.account.busy,
-                        ) { email = it.take(254) }
+                            error = if (profileErrors && !emailValid) uiText(R.string.ui_invalid_email) else null,
+                            shakeTrigger = profileShake,
+                        ) {
+                            email = it.take(254)
+                            profileErrors = false
+                        }
                         Field(
                             uiText(R.string.ui_phone_optional),
                             phone,
@@ -98,14 +139,33 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                         ) { phone = it.take(40) }
                         Button(
                             onClick = {
-                                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                                if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
+                                val validProfile = fullName.isNotBlank() && InputPolicy.validDob(birthday) && emailValid
+                                profileErrors = !validProfile
+                                if (!validProfile) {
+                                    profileShake += 1
+                                    session.updateOrganizationProfile(fullName, birthday, email, phone)
+                                } else {
+                                    session.updateOrganizationProfile(fullName, birthday, email, phone)
+                                }
                             },
                             enabled = !session.account.busy,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.save_profile)) }
                     }
                     else -> SettingsSection(uiText(R.string.change_password)) {
+                        val currentError = when {
+                            currentPasswordRejected -> uiText(R.string.ui_incorrect_password)
+                            passwordErrors && currentPassword.isEmpty() -> uiText(R.string.enter_your_current_password)
+                            else -> null
+                        }
+                        val newPasswordError = when {
+                            !passwordErrors -> null
+                            !InputPolicy.passwordExcludesUsername(newPassword, profile.username) -> uiText(R.string.password_excludes_username)
+                            !InputPolicy.validAccountPassword(newPassword, profile.username) -> uiText(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character)
+                            else -> null
+                        }
+                        val confirmError = if (passwordErrors && confirmation != newPassword) uiText(R.string.the_new_passwords_do_not_match) else null
+                        val passwordShakeTrigger = passwordShake + sessionErrorVersion
                         Field(
                             uiText(R.string.current_password),
                             currentPassword,
@@ -113,7 +173,13 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                             secret = true,
                             showSecretToggle = true,
                             enabled = !session.account.busy,
-                        ) { currentPassword = it.take(128) }
+                            error = currentError,
+                            shakeTrigger = passwordShakeTrigger,
+                        ) {
+                            currentPassword = it.take(128)
+                            currentPasswordRejected = false
+                            passwordErrors = false
+                        }
                         Field(
                             uiText(R.string.new_password),
                             newPassword,
@@ -121,7 +187,12 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                             secret = true,
                             showSecretToggle = true,
                             enabled = !session.account.busy,
-                        ) { newPassword = it.take(24) }
+                            error = newPasswordError,
+                            shakeTrigger = passwordShakeTrigger,
+                        ) {
+                            newPassword = it.take(24)
+                            passwordErrors = false
+                        }
                         Field(
                             uiText(R.string.confirm_new_password),
                             confirmation,
@@ -129,9 +200,26 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                             secret = true,
                             showSecretToggle = true,
                             enabled = !session.account.busy,
-                        ) { confirmation = it.take(24) }
+                            error = confirmError,
+                            shakeTrigger = passwordShakeTrigger,
+                        ) {
+                            confirmation = it.take(24)
+                            passwordErrors = false
+                        }
                         Button(
-                            onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
+                            onClick = {
+                                currentPasswordRejected = false
+                                val validLocal = currentPassword.isNotEmpty() &&
+                                    InputPolicy.validAccountPassword(newPassword, profile.username) &&
+                                    confirmation == newPassword
+                                passwordErrors = !validLocal
+                                if (!validLocal) {
+                                    passwordShake += 1
+                                } else {
+                                    pendingPasswordCheck = true
+                                }
+                                session.changePassword(currentPassword, newPassword, confirmation)
+                            },
                             enabled = !session.account.busy,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.change_password)) }
@@ -162,6 +250,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
     var page by rememberSaveable(existing?.username) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val pages = listOf(uiText(R.string.ui_personal_details), uiText(R.string.ui_contact_details))
     val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val required = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), emailValid)
@@ -190,13 +279,14 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 fullName,
                 "organization_full_name",
                 enabled = !session.account.busy,
-                error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null
+                error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                shakeTrigger = shakeAttempt
             ) {
                 fullName = it.take(120)
                 showErrors = false
             }
             BirthdayPicker(
-                birthday, "organization_dob", !session.account.busy, showErrors,
+                birthday, "organization_dob", !session.account.busy, showErrors, shakeTrigger = shakeAttempt,
             ) { birthday = it }
         } else {
             Field(
@@ -204,7 +294,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 email,
                 "organization_email",
                 enabled = !session.account.busy,
-                error = if (showErrors && !emailValid) uiText(R.string.ui_invalid_email) else null
+                error = if (showErrors && !emailValid) uiText(R.string.ui_invalid_email) else null,
+                shakeTrigger = shakeAttempt
             ) {
                 email = it.take(254)
                 showErrors = false
@@ -232,6 +323,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                         email,
                         phone
                     ) else page++
+                } else {
+                    shakeAttempt += 1
                 }
             },
             last = page == pages.lastIndex,
@@ -270,6 +363,9 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
         Surface(
             modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = 280.dp),
             shape = MaterialTheme.shapes.large,
+            color = Paper,
+            contentColor = Ink,
+            border = BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
             shadowElevation = 4.dp,
         ) {
             Row(
@@ -292,6 +388,10 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
             Surface(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
+                color = Paper,
+                contentColor = Ink,
+                border = BorderStroke(1.dp, OliveOutline.copy(alpha = 0.55f)),
+                shadowElevation = 4.dp,
             ) {
                 AccessibleMessage(
                     it,

@@ -151,3 +151,26 @@
 .personal-link-panel > .button {
   margin-top: 1rem;
 }
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.checkbox-field.full {
+  grid-column: 1 / -1;
+}
+.checkbox-field > input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  min-height: 0;
+  padding: 0;
+  margin: 0.15rem 0 0;
+  flex: none;
+  accent-color: var(--olive);
+  cursor: pointer;
+}

@@ -16,6 +16,7 @@ class UserProfileEdgeCaseTest {
         assertEquals(AccountRole.USER, AccountRole.fromStored("SUPER_ADMIN"))
         assertEquals(AccountRole.USER, AccountRole.fromStored(""))
         assertEquals(CoverType.FITNESS, CoverType.fromStored("VIDEO"))
+        assertEquals(CoverType.FITNESS, CoverType.fromStored("GAME"))
         assertEquals(CoverType.FITNESS, CoverType.fromStored("REMOVED_COVER"))
     }
 

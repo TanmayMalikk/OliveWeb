@@ -27,17 +27,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class SessionHistoryRefreshTest {
     @Test
-    fun newsBookmarksAreRestoredForOnlyTheEnrolledAccountAndToggleByLink() = runBlocking<Unit> {
+    fun newsBookmarksAreRestoredForOnlyTheEnrolledAccountAndSetByLink() = runBlocking<Unit> {
         SessionRuntimeFixture().use { fixture ->
             val runtime = fixture.runtime
             val cover = SessionCoverState(runtime)
             val story = NewsArticle("Synthetic news", "Fixture summary", "https://example.invalid/story", "Fixture", "")
             val existing = story.copy(title = "Another account", link = "https://example.invalid/another")
             runtime.coverStore.saveNews("other", listOf(existing))
-            cover.toggleNewsBookmark(story)
+            cover.setNewsBookmark(story, bookmarked = true)
+            cover.setNewsBookmark(story, bookmarked = true)
             assertEquals(listOf(story), runtime.state.savedNews)
             fixture.await { runtime.coverStore.restore("owner") == listOf(story) }
-            cover.toggleNewsBookmark(story.copy(title = "An updated headline"))
+            cover.setNewsBookmark(story.copy(title = "An updated headline"), bookmarked = false)
             assertTrue(runtime.state.savedNews.isEmpty())
             fixture.await { runtime.coverStore.restore("owner").isEmpty() }
 
@@ -46,7 +47,7 @@ class SessionHistoryRefreshTest {
             assertEquals(listOf(existing), runtime.state.savedNews)
             assertTrue(runtime.coverStore.restore("owner").isEmpty())
             runtime.enrollment = null
-            cover.toggleNewsBookmark(story)
+            cover.setNewsBookmark(story, bookmarked = true)
             assertEquals(listOf(existing), runtime.state.savedNews)
         }
     }
@@ -71,7 +72,7 @@ class SessionHistoryRefreshTest {
             val runtime = fixture.runtime
             val identity = AccountIdentity("owner", "fixture_owner")
             val profile = UserProfile("fixture_owner", "Remote fixture owner", "", "", "2000-01-01", "English", "", "Calgary",
-                "synthetic-hash", coverType = CoverType.GAME, address = DeliveryAddress(city = "Calgary"))
+                "synthetic-hash", coverType = CoverType.NEWS, address = DeliveryAddress(city = "Calgary"))
             val note = PrivateEntry(title = "Synced fixture entry", body = "Synthetic history")
             val db = FirestoreTestDriver()
             val marker = "accountSync/owner"
@@ -86,7 +87,7 @@ class SessionHistoryRefreshTest {
                 fixture.await { runtime.state.privateEntries.any { it.id == note.id } }
                 assertEquals(profile, runtime.state.profile)
                 assertEquals("Calgary", runtime.state.deliveryAddress.city)
-                assertEquals(CoverType.GAME, runtime.state.coverType)
+                assertEquals(CoverType.NEWS, runtime.state.coverType)
                 assertEquals("synthetic-hash", runtime.enrollment?.triggerHash)
                 db.fail(marker, FirebaseFirestoreException("Synthetic sync failure", FirebaseFirestoreException.Code.UNAVAILABLE))
                 assertEquals("Synthetic sync failure", runtime.state.message)

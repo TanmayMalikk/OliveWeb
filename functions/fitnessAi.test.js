@@ -10,9 +10,10 @@ test("coach payload accepts only cover aggregate fields and bounds conversation 
     emergencyContacts: ["fixture"],
     profile: {name: "Fixture Account"},
     goals: {steps: 7500, calories: 2200, waterMl: -10, weightKg: 80},
-    history: Array.from({length: 18}, (_, n) => ({
-      date: "2026-11-" + (n + 1).toString().padStart(2, "0"),
+    history: Array.from({length: 16}, (_, n) => ({
+      date: new Date(Date.UTC(2026, 0, n + 1)).toISOString().slice(0, 10),
       steps: 5000, calories: 1900, location: "fixture", heartRate: 60,
+      foodNames: n === 2 ? [" Oats ", "Oats", "", {note: "private"}] : undefined,
     })),
     conversation: Array.from({length: 10}, (_, index) => ({
       role: "user", text: index === 9 ? "x".repeat(599) + "🌿" : `Turn ${index}`, private: true,
@@ -21,13 +22,14 @@ test("coach payload accepts only cover aggregate fields and bounds conversation 
   assert.deepEqual(Object.keys(input), ["message", "conversation", "history", "goals"]);
   assert.deepEqual(input.goals, {steps: 7500, calories: 2200});
   assert.equal(input.history.length, 14);
-  assert.deepEqual(input.history[0], {date: "2026-11-05", steps: 5000, calories: 1900});
-  assert.equal(input.conversation.length, 4);
-  assert.deepEqual(input.conversation[0], {role: "user", text: "Turn 6"});
+  assert.deepEqual(input.history[0], {date: "2026-01-03", steps: 5000, calories: 1900, foodNames: ["Oats"]});
+  assert.equal(input.conversation.length, 5);
+  assert.deepEqual(input.conversation[0], {role: "user", text: "Turn 5"});
   assert.equal(input.conversation.at(-1).text, "x".repeat(599));
   const compact = modelInput(input);
-  assert.deepEqual(compact.historyColumns, ["date", "steps", "calories", "protein", "carbohydrates", "fat"]);
-  assert.deepEqual(compact.history[0], ["2026-11-05", 5000, 1900, null, null, null]);
+  assert.deepEqual(compact.historyColumns, ["date", "steps", "calories", "protein", "carbohydrates", "fat", "foodNames"]);
+  assert.deepEqual(compact.history[0], ["2026-01-03", 5000, 1900, null, null, null, ["Oats"]]);
+  assert.equal(compact.history[1].at(-1), null);
   assert.ok(JSON.stringify(compact).length < JSON.stringify(input).length);
 });
 
@@ -155,4 +157,29 @@ test("in-app checkout resumes the unpaid subscription and does not grant access 
   plans[0].status = "active";
   assert.equal((await billing.status("member")).active, true);
   await assert.rejects(billing.paymentSheet("member", "pk_test_fixture"), {code: "failed-precondition"});
+});
+
+test("Stripe status returns currentPeriodEndMs from item or plan period end capped by cancel_at", async () => {
+  const price = {id: "price_weekly", currency: "cad", unit_amount: 599, recurring: {interval: "week", interval_count: 1}};
+  let plans = [];
+  const f = fixture({stripe: class {
+    subscriptions = {list: () => plans};
+  }});
+  f.records.set("fitnessAiBilling/member", {customerId: "cus_member"});
+  const billing = f.load("fitnessAiBilling").fitnessBilling("fixture", price.id);
+
+  // Inactive plans omit currentPeriodEndMs.
+  plans = [{status: "canceled", current_period_end: 2_000_000_000, items: {data: [{price, current_period_end: 2_000_000_000}]}}];
+  assert.deepEqual(await billing.status("member"), {active: false, canManage: true});
+
+  // Stripe v23 item-level current_period_end is converted to milliseconds.
+  plans = [{status: "active", items: {data: [{price, current_period_end: 1_800_000_000}]}}];
+  assert.deepEqual(await billing.status("member"), {active: true, canManage: true, currentPeriodEndMs: 1_800_000_000_000});
+
+  // Falls back to top-level plan.current_period_end and caps by earlier cancel_at; picks latest across active plans.
+  plans = [
+    {status: "active", current_period_end: 1_800_001_000, cancel_at: 1_800_000_500, items: {data: [{price}]}},
+    {status: "active", cancel_at: 1_800_002_000, items: {data: [{price, current_period_end: 1_800_001_200}]}},
+  ];
+  assert.deepEqual(await billing.status("member"), {active: true, canManage: true, currentPeriodEndMs: 1_800_001_200_000});
 });

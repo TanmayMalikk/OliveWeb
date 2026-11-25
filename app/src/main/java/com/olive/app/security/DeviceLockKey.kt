@@ -28,7 +28,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
-
 // A separate authentication-bound key guards device-lock entry. Cover storage stays usable while locked.
 internal class DeviceLockKey(private val namespace: String) {
     /**
@@ -88,10 +87,22 @@ internal class DeviceLockKey(private val namespace: String) {
     }
 }
 
+/** Minimum cipher contract needed by the shared Android device-authentication prompt. */
+internal interface DeviceAuthenticationChallenge {
+    val enrolling: Boolean
+    val promptCipher: Cipher?
+    /**
+     * Creates an unlocked cipher used for legacy pre-API-30 authentication prompts.
+     *
+     * @return The initialized cipher for the legacy Android authentication prompt.
+     */
+    fun legacyCipher(): Cipher
+}
+
 class DeviceLockChallenge internal constructor(
     private val uid: String, private val key: SecretKey, private val saved: JSONObject?,
     private val keyId: String, private val alias: String,
-) {
+) : DeviceAuthenticationChallenge {
     private var committed = false
     /**
      * Reports whether this phone finished creating its device-lock key.
@@ -113,18 +124,18 @@ class DeviceLockChallenge internal constructor(
         }
     }
 
-    val enrolling get() = saved == null
+    override val enrolling get() = saved == null
     private val expected get() = "olive-safe-entry-v1:$uid".toByteArray(Charsets.UTF_8)
 
     // API 30+ binds this exact operation to BiometricPrompt. Legacy devices initialize only after credentials succeed.
-    internal val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
+    override val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
     private var credentialCipher: Cipher? = null
     /**
      * Creates the legacy cipher that protects app security.
      *
      * @return The resulting [Cipher] for legacy cipher.
      */
-    internal fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
+    override fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
     /**
      * Creates the cipher that wraps or unwraps the account key after device authentication.
      *
@@ -324,6 +335,25 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
+
+    // Decrypted memory cache for instantaneous reads within an active authenticated session.
+    @Volatile private var cachedJson: String? = null
+    @Volatile private var cachedLastModified = -1L
+
+    init {
+        registerInstance(this)
+    }
+
+    /**
+     * Purges decrypted memory cache. Called on quick exit or app backgrounding.
+     */
+    fun purge() {
+        synchronized(fileLock) {
+            cachedJson = null
+            cachedLastModified = -1L
+        }
+    }
+
     /**
      * Gets the phone-only key that locks and unlocks this private file.
      *
@@ -354,18 +384,31 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     override fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
     /**
      * Reads and parses the encrypted vault file while the caller holds the shared file lock.
+     * Reuses in-memory decrypted JSON if the underlying file on disk has not changed.
      *
      * @return JSON object representing read unlocked.
      */
     private fun readUnlocked(): JSONObject {
-        if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
+        val currentMod = if (file.baseFile.exists()) file.baseFile.lastModified() else -1L
+        val cached = cachedJson
+        if (cached != null && cachedLastModified == currentMod && currentMod != -1L) {
+            return JSONObject(cached)
+        }
+        if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) {
+            cachedJson = null
+            cachedLastModified = -1L
+            return JSONObject()
+        }
         val bytes = file.openRead().use { it.readBytes() }
         require(bytes.size > 29 && bytes[0] == 1.toByte()) { "Unsupported encrypted store" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(1, 13)))
         val plain = cipher.doFinal(bytes.copyOfRange(13, bytes.size))
         return try {
-            JSONObject(String(plain, Charsets.UTF_8))
+            val jsonStr = String(plain, Charsets.UTF_8)
+            cachedJson = jsonStr
+            cachedLastModified = file.baseFile.lastModified()
+            JSONObject(jsonStr)
         } finally {
             plain.fill(0)
         }
@@ -381,7 +424,8 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         change(root)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
-        val plain = root.toString().toByteArray(Charsets.UTF_8)
+        val jsonStr = root.toString()
+        val plain = jsonStr.toByteArray(Charsets.UTF_8)
         val bytes = try {
             byteArrayOf(1) + cipher.iv + cipher.doFinal(plain)
         } finally {
@@ -394,6 +438,8 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
             }
             // AtomicFile.finishWrite can silently keep the old file when renameTo cannot replace it.
             Files.move(stagingFile.toPath(), file.baseFile.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            cachedJson = jsonStr
+            cachedLastModified = file.baseFile.lastModified()
         } finally {
             stagingFile.delete()
         }
@@ -403,16 +449,48 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
     /**
      * Deletes a disposable encrypted store without removing its Android Keystore key.
      */
-    override fun clear() = synchronized(fileLock) { file.delete() }
+    override fun clear() = synchronized(fileLock) {
+        cachedJson = null
+        cachedLastModified = -1L
+        file.delete()
+    }
 
-    private companion object {
-        val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    companion object {
+        private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+        private val activeInstances =
+            java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<EncryptedVault>>()
+
+        /**
+         * Tracks an [EncryptedVault] instance so [purgeAll] can clear its cache later.
+         *
+         * @param vault The encrypted vault instance to track for cache invalidation.
+         */
+        private fun registerInstance(vault: EncryptedVault) {
+            activeInstances.add(java.lang.ref.WeakReference(vault))
+        }
+
+        /**
+         * Purges all in-memory decrypted vault caches across the app on Quick Exit or app backgrounding.
+         */
+        fun purgeAll() {
+            val iterator = activeInstances.iterator()
+            while (iterator.hasNext()) {
+                val ref = iterator.next()
+                val vault = ref.get()
+                if (vault != null) {
+                    vault.purge()
+                } else {
+                    activeInstances.remove(ref)
+                }
+            }
+        }
     }
 }
 
 /**
  * Returns an existing JSON section or adds an empty one when it is missing.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param name Field, key, or display name.
  * @return JSON object representing child.
  */
@@ -520,5 +598,56 @@ object MediaCipher {
             cipher.doFinal()?.let(output::write)
             output.flush()
         } finally { buffer.fill(0) }
+    }
+}
+
+/**
+ * Checks whether Android temporarily owns the foreground for an approved app operation.
+ *
+ * @param deviceCredential True while a biometric or device-credential prompt is active.
+ * @param runtimePermission True while a system runtime permission dialog is open.
+ * @param externalFilePicker True while the system file or media picker is open.
+ * @param callPermission True while a call-related permission prompt is open.
+ * @param safeSystemActivity True while another approved safe-app system activity is open.
+ * @return True if any trusted Android system handoff is currently in progress.
+ */
+internal fun trustedSystemHandoffActive(
+    deviceCredential: Boolean,
+    runtimePermission: Boolean,
+    externalFilePicker: Boolean,
+    callPermission: Boolean,
+    safeSystemActivity: Boolean,
+): Boolean = deviceCredential || runtimePermission || externalFilePicker ||
+    callPermission || safeSystemActivity
+
+/** Holds a credential result only until the private activity is visible again. */
+internal class LifecycleResultGate<T>(private val discard: (T) -> Unit = {}) {
+    private var pending: T? = null
+
+    /**
+     * Returns [value] immediately when the activity is [resumed], or stages it until resume.
+     *
+     * @param value Newly produced credential or prompt result.
+     * @param resumed Whether the host activity is currently resumed.
+     * @return [value] if [resumed] is true, or `null` when queued for delivery on resume.
+     */
+    fun offer(value: T, resumed: Boolean): T? {
+        cancel()
+        return if (resumed) value else null.also { pending = value }
+    }
+
+    /**
+     * Consumes and returns the pending credential result staged before resume.
+     *
+     * @return The staged result, or `null` if none is waiting.
+     */
+    fun resume(): T? = pending.also { pending = null }
+
+    /**
+     * Discards any staged result and clears the pending reference.
+     */
+    fun cancel() {
+        pending?.let(discard)
+        pending = null
     }
 }

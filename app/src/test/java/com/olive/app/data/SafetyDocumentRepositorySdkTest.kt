@@ -69,7 +69,6 @@ class SafetyDocumentRepositorySdkTest {
             assertEquals(listOf("evidence", "safety"), document.tags)
             assertEquals("Recognized sample", document.ocrText)
             assertEquals(.8f, document.ocrConfidence)
-            verify(media).recoverDocumentKey("file")
             verify(reference).get(Source.SERVER)
             assertTrue(document.deviceWrappedKeys.keys.single().startsWith("owner--"))
         }
@@ -98,20 +97,24 @@ class SafetyDocumentRepositorySdkTest {
     fun removingIndependentAccessRetainsOnlyAuthorizedAccountAndDeviceEnvelopes() = withDeviceKey {
         runBlocking {
             reference("file", encryptedFields() + mapOf(
-                "wrapped_keys" to mapOf("owner" to "owner-envelope", "trusted" to "trusted-envelope", "other" to "other-envelope"),
+                "wrapped_keys" to mapOf("owner" to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey()), "trusted" to "trusted-envelope", "other" to "other-envelope"),
                 "device_wrapped_keys" to mapOf("trusted--phone" to "trusted-device", "other--phone" to "other-device"),
+                "account_wrapped_keys" to mapOf("owner" to accountWrapperMap(), "trusted" to accountWrapperMap(), "other" to accountWrapperMap()),
             ))
             repository.revokeAccess("file", "owner", "trusted")
             val call = mockingDetails(media).invocations.single { it.method.name == "updateAccess" }
             assertEquals("file", call.arguments[0])
-            assertEquals(mapOf("owner" to "owner-envelope", "other" to "other-envelope"), call.arguments[1])
+            val retained = call.arguments[1] as Map<*, *>
+            assertEquals(setOf("owner", "other"), retained.keys)
+            assertEquals("other-envelope", retained["other"])
+            assertArrayEquals(key.encoded, KeyManager.unwrapKey(retained["owner"] as String).encoded)
             @Suppress("UNCHECKED_CAST")
             val devices = call.arguments[2] as Map<String, String>
             assertEquals("other-device", devices["other--phone"])
-            assertTrue(devices.keys.any { it.startsWith("owner--") })
             assertFalse(devices.keys.any { it.startsWith("trusted--") })
-            assertEquals(emptyList<String>(), call.arguments[3])
-            assertEquals(listOf("trusted"), call.arguments[4])
+            assertEquals(setOf("owner", "other"), (call.arguments[3] as Map<*, *>).keys)
+            assertEquals(emptyList<String>(), call.arguments[4])
+            assertEquals(listOf("trusted"), call.arguments[5])
             assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.revokeAccess("file", "owner", "owner") } }
         }
     }
@@ -146,7 +149,7 @@ class SafetyDocumentRepositorySdkTest {
     }
 
     @Test
-    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = withDeviceKey {
+    fun cachedFileSnapshotsStayReadableAndSubscriptionCanBeClosed() = TestAndroidKeyStore.install().use {
         val files = mock(CollectionReference::class.java)
         val query = mock(Query::class.java)
         val registration = mock(ListenerRegistration::class.java)
@@ -163,48 +166,21 @@ class SafetyDocumentRepositorySdkTest {
         `when`(snapshot.metadata).thenReturn(metadata)
         `when`(metadata.isFromCache).thenReturn(true)
         val legacy = row("legacy", mapOf("owner_id" to "owner", "file_name" to "Legacy.txt", "file_type" to "text/plain", "allowed_users" to listOf("owner")))
-        `when`(snapshot.documents).thenReturn(listOf(legacy))
+        val encrypted = row("encrypted", encryptedFields())
+        `when`(snapshot.documents).thenReturn(listOf(legacy, encrypted))
         capture.value.onEvent(snapshot, null)
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals("Legacy.txt", updates.single().documents.single().name)
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (updates.isEmpty() && System.nanoTime() < deadline) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        val names = updates.single().documents.map(SafetyDocument::name).toSet()
+        assertEquals(setOf("Legacy.txt", "Private sample.pdf"), names)
         assertEquals(DocumentListSource.FIRESTORE_CACHE, updates.single().source)
         capture.value.onEvent(null, FirebaseFirestoreException("No access", FirebaseFirestoreException.Code.PERMISSION_DENIED))
         assertEquals(listOf("No access"), errors)
         subscription.close()
         verify(registration).remove()
-    }
-
-    @Test
-    fun upgradingRecoveryOnlySubmitsTheCurrentOwnersDecryptableEncryptedDocuments() = withDeviceKey {
-        runBlocking {
-            val files = mock(CollectionReference::class.java)
-            val query = mock(Query::class.java)
-            val snapshot = mock(QuerySnapshot::class.java)
-            `when`(firestore.collection("files")).thenReturn(files)
-            `when`(files.whereArrayContains("allowed_users", "owner")).thenReturn(query)
-            `when`(query.get(Source.SERVER)).thenReturn(Tasks.forResult(snapshot))
-            val wrapped = KeyManager.wrapKey(key, KeyManager.getOrCreatePublicKey())
-            val fields = encryptedFields() + mapOf(
-                "account_recovery_ready" to false, "wrapped_keys" to mapOf("owner" to wrapped),
-            )
-            val rows = listOf(
-                row("shared", fields + ("owner_id" to "other")),
-                row("ready", fields + ("account_recovery_ready" to true)),
-                row("legacy", fields - "object_key"),
-                row("missing-key", fields + ("wrapped_keys" to emptyMap<String, String>())),
-                row("retry", fields),
-                row("eligible", fields),
-            )
-            `when`(snapshot.documents).thenReturn(rows)
-            doAnswer { throw IllegalStateException("Synthetic recovery service unavailable") }.`when`(media)
-                .storeDocumentKey(eq("retry") ?: "retry", any<javax.crypto.SecretKey>() ?: key)
-
-            repository.upgradeOwnedRecoveryKeys("owner")
-
-            val stored = mockingDetails(media).invocations.filter { it.method.name == "storeDocumentKey" }
-            assertEquals(listOf("retry", "eligible"), stored.map { it.arguments[0] })
-            assertArrayEquals(key.encoded, (stored.last().arguments[1] as javax.crypto.SecretKey).encoded)
-        }
     }
 
     @Test
@@ -245,8 +221,6 @@ class SafetyDocumentRepositorySdkTest {
                 wrappedKeys = mapOf("owner" to KeyManager.wrapKey(key, KeyManager.getOrCreatePublicKey())),
                 deviceWrappedKeys = mapOf("owner--existing" to "existing-envelope"),
             )
-            doAnswer { throw IllegalStateException("Synthetic recovery outage") }.`when`(media)
-                .storeDocumentKey(eq("file") ?: "file", any<javax.crypto.SecretKey>() ?: key)
             val directory = mock(CollectionReference::class.java)
             val account = mock(DocumentReference::class.java)
             val devices = mock(CollectionReference::class.java)
@@ -272,8 +246,6 @@ class SafetyDocumentRepositorySdkTest {
             repository.approveCurrentAccountDevices(document, "owner", " Fixture_Owner ")
 
             val invocations = mockingDetails(media).invocations
-            val recovery = invocations.single { it.method.name == "storeDocumentKey" }
-            assertArrayEquals(key.encoded, (recovery.arguments[1] as javax.crypto.SecretKey).encoded)
             val update = invocations.single { it.method.name == "updateDeviceKeys" }
             assertEquals("file", update.arguments[0])
             val wrapped = update.arguments[1] as Map<*, *>
@@ -283,7 +255,7 @@ class SafetyDocumentRepositorySdkTest {
             }
             repository.approveCurrentAccountDevices(document.copy(accountRecoveryReady = true), "owner", "fixture_owner")
             repository.approveCurrentAccountDevices(document, "other", "fixture_owner")
-            verify(devices, times(1)).get()
+            verify(devices, times(2)).get()
         }
     }
 
@@ -341,14 +313,41 @@ class SafetyDocumentRepositorySdkTest {
         assertTrue(runCatching { repository.download(context, document.copy(objectKey = "encrypted/file")) }.isFailure)
     }
 
-    private fun encryptedFields(): Map<String, Any> {
-        val metadata = JSONObject().put("name", "Private sample.pdf").put("mimeType", "application/pdf")
+    @Test
+    fun chatOnlyMetadataAndLegacyVoiceNamesAreClassifiedWithoutAffectingNormalAudio() = withDeviceKey {
+        runBlocking {
+            val fields = encryptedFields(
+                name = "Recording.m4a",
+                mimeType = "audio/mp4",
+                chatOnly = true,
+            )
+            reference("voice", fields)
+            val tagged = repository.getFor("owner", "voice")
+            assertTrue(tagged.chatOnly)
+            assertTrue(tagged.isChatOnlyMedia())
+
+            val base = SafetyDocument("id", "owner", "", "Voice message.m4a", "audio/mp4", listOf("owner"))
+            assertTrue(base.isChatOnlyMedia())
+            assertTrue(base.copy(name = "voice message").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Recording.m4a").isChatOnlyMedia())
+            assertFalse(base.copy(name = "Voice message.pdf", mimeType = "application/pdf").isChatOnlyMedia())
+        }
+    }
+
+    private fun encryptedFields(
+        name: String = "Private sample.pdf",
+        mimeType: String = "application/pdf",
+        chatOnly: Boolean = false,
+    ): Map<String, Any> {
+        val metadata = JSONObject().put("name", name).put("mimeType", mimeType)
             .put("tags", org.json.JSONArray(listOf("evidence", "safety")))
             .put("ocrText", "Recognized sample").put("ocrConfidence", .8).put("ocrSuccessful", true)
+            .apply { if (chatOnly) put("chatOnly", true) }
         return mapOf(
             "owner_id" to "owner", "object_key" to "encrypted/file", "allowed_users" to listOf("owner", "trusted"),
             "account_recovery_ready" to true, "evidence" to true, "encrypted_metadata" to EncryptionUtils.encryptText(metadata.toString(), key),
-            "wrapped_keys" to mapOf("owner" to "unavailable-envelope"),
+            "wrapped_keys" to mapOf("owner" to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey())),
+            "device_wrapped_keys" to mapOf("owner--${KeyManager.deviceId()}" to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey())),
         )
     }
 
@@ -374,6 +373,13 @@ class SafetyDocumentRepositorySdkTest {
     private fun record() = CloudMediaRecord("file", "owner", "encrypted/file", "", emptyMap(),
         listOf("owner"), 20, "checksum", 2, 1)
 
+    private fun accountWrapperMap() = mapOf(
+        "keyId" to "123e4567-e89b-42d3-a456-426614174000",
+        "epoch" to 1L,
+        "algorithm" to "RSA-OAEP-256",
+        "wrappedKey" to "opaque-wrapper",
+    )
+
     private fun withDeviceKey(work: () -> Unit) {
         val pair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
         val certificate = mock(Certificate::class.java)
@@ -381,7 +387,6 @@ class SafetyDocumentRepositorySdkTest {
         `when`(certificate.publicKey).thenReturn(pair.public)
         `when`(store.getCertificate(anyString())).thenReturn(certificate)
         `when`(store.getKey(anyString(), isNull())).thenReturn(pair.private)
-        runBlocking { `when`(media.recoverDocumentKey("file")).thenReturn(key) }
         mockStatic(KeyStore::class.java).use { keys ->
             keys.`when`<KeyStore> { KeyStore.getInstance("AndroidKeyStore") }.thenReturn(store)
             work()

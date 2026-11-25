@@ -5,6 +5,29 @@ const rows: ManagedAccount[] = [
   { uid: "main", username: "main_admin", role: "ADMIN", fullName: "Test Administrator", email: "", phone: "", profileComplete: true, protected: true },
 ];
 export async function listAccounts() { return structuredClone(rows); }
+export async function loadAdminSummary() {
+  return {
+    counts: {
+      USER: rows.filter((row) => row.role === "USER").length,
+      SAFE_CONTACT: rows.filter((row) => row.role === "SAFE_CONTACT").length,
+      STAFF: rows.filter((row) => row.role === "STAFF").length,
+      ADMIN: rows.filter((row) => row.role === "ADMIN").length,
+    },
+    tickets: { open: 1, closed: 0 },
+  };
+}
+export async function listStaffWorkloads() {
+  return structuredClone(rows)
+    .filter((row) => row.role === "STAFF")
+    .map((row) => ({
+      ...row,
+      assignedUsers: 0,
+      safetyPlans: 0,
+      completedSafetyPlans: 0,
+      supportChats: 0,
+      closedSupportChats: 0,
+    }));
+}
 export async function createAccount(form: Record<string, FormDataEntryValue>) {
   const username = String(form.username);
   rows.push({

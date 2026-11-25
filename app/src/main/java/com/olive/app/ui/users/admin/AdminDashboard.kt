@@ -1,19 +1,18 @@
 // Admins: shows admin tools, dashboard portal, and account totals.
 package com.olive.app.ui.users.admin
 
-import kotlin.time.Duration.Companion.milliseconds
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,10 +32,7 @@ import com.olive.app.R
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminAccountSummary
-import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
-import com.olive.app.data.safety.SafetyDocument
-import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -47,13 +43,6 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.organization.*
 import com.olive.app.ui.users.staff.SafetyConsultations
-import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
-import com.olive.app.ui.users.user.location.InteractiveLocationMap
-import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.launch
 
 private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages, Emergencies }
 
@@ -87,67 +76,60 @@ internal fun AdminPortal(session: SessionViewModel) {
     }
     var trackingUid by remember { mutableStateOf<String?>(null) }
     val alert = emergencies.orEmpty().firstOrNull { it.resolvedAt == 0L && it.id !in acknowledged }
-    BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
-    // Opens the selected admin dashboard section.
-    when (page) {
-        AdminPage.Dashboard -> AdminDashboard(
-            session,
-            onAccounts = { page = AdminPage.Accounts },
-            onStaffManagement = { page = AdminPage.StaffManagement },
-            onSettings = { page = AdminPage.Settings },
-            onMap = { page = AdminPage.Map },
-            onSafetyPlans = { page = AdminPage.SafetyPlans },
-            onMessages = { page = AdminPage.Messages },
-            onEmergencies = { page = AdminPage.Emergencies },
-        )
-        AdminPage.Accounts -> AdminAccounts(
-            session,
-            onBack = { page = AdminPage.Dashboard },
-            onCreate = { createOpen = true },
-            onDelete = { deleteTarget = it },
-        )
-        AdminPage.StaffManagement -> StaffManagement(
-            session = session,
-            onBack = { page = AdminPage.Dashboard },
-        )
-        AdminPage.Settings -> OrganizationSettings(
-            session,
-            onBack = { page = AdminPage.Dashboard },
-        )
-        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard; trackingUid = null }, initialFollowUid = trackingUid)
-        AdminPage.Emergencies -> EmergencyResponseScreen(
-            session, emergencies, emergencyError,
-            onBack = { page = AdminPage.Dashboard },
-            onTrack = { trackingUid = it; page = AdminPage.Map },
-        )
-        AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
-        AdminPage.Messages -> MessagesScreen(
-            session,
-            exit = { page = AdminPage.Dashboard },
-            initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
-        )
+    val back = rememberOliveBack(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
+    OliveRouteEntrance(page, back) {
+        // Opens the selected admin dashboard section.
+        when (page) {
+            AdminPage.Dashboard -> AdminDashboard(
+                session,
+                onAccounts = { page = AdminPage.Accounts },
+                onStaffManagement = { page = AdminPage.StaffManagement },
+                onSettings = { page = AdminPage.Settings },
+                onMap = { page = AdminPage.Map },
+                onSafetyPlans = { page = AdminPage.SafetyPlans },
+                onMessages = { page = AdminPage.Messages },
+                onEmergencies = { page = AdminPage.Emergencies },
+            )
+            AdminPage.Accounts -> AdminAccounts(
+                session,
+                onBack = { page = AdminPage.Dashboard },
+                onCreate = { createOpen = true },
+                onDelete = { deleteTarget = it },
+            )
+            AdminPage.StaffManagement -> StaffManagement(
+                session = session,
+                onBack = { page = AdminPage.Dashboard },
+            )
+            AdminPage.Settings -> OrganizationSettings(
+                session,
+                onBack = { page = AdminPage.Dashboard },
+            )
+            AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard; trackingUid = null }, initialFollowUid = trackingUid)
+            AdminPage.Emergencies -> EmergencyResponseScreen(
+                session, emergencies, emergencyError,
+                onBack = { page = AdminPage.Dashboard },
+                onTrack = { trackingUid = it; page = AdminPage.Map },
+            )
+            AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
+            AdminPage.Messages -> MessagesScreen(
+                session,
+                exit = { page = AdminPage.Dashboard },
+                initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
+            )
+        }
     }
-    if (alert != null) AlertDialog(
-        onDismissRequest = { acknowledge(alert.id) },
-        title = { Text(stringResource(R.string.emergency_response_alert)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(alert.ownerName)
-                EmergencyLocationPreview(session, alert.ownerUid)
-            }
+    if (alert != null) EmergencyAlertDialog(
+        session = session,
+        alert = alert,
+        onDismiss = { acknowledge(alert.id) },
+        onTrack = {
+            acknowledge(alert.id)
+            trackingUid = alert.ownerUid
+            page = AdminPage.Map
         },
-        confirmButton = {
-            TextButton(onClick = {
-                acknowledge(alert.id)
-                trackingUid = alert.ownerUid
-                page = AdminPage.Map
-            }) { Text(stringResource(R.string.emergency_response_track)) }
-        },
-        dismissButton = {
-            TextButton(onClick = {
-                acknowledge(alert.id)
-                page = AdminPage.Emergencies
-            }) { Text(stringResource(R.string.emergency_response_title)) }
+        onOpenResponse = {
+            acknowledge(alert.id)
+            page = AdminPage.Emergencies
         },
     )
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
@@ -421,164 +403,5 @@ private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel:
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.titleMedium)
         Text("$total ($finished $finishedLabel)", color = OliveGreen)
-    }
-}
-
-/**
- * Composes the observe emergency alerts UI element.
- *
- * @param session Shared session view model owning application state and actions.
- * @return The resulting [Pair] for observe emergency alerts.
- */
-@Composable
-internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<EmergencyAlert>?, String?> {
-    var alerts by remember(session.coverAccountId, session.localMode) {
-        mutableStateOf<List<EmergencyAlert>?>(if (session.localMode) emptyList() else null)
-    }
-    var error by remember(session.coverAccountId) { mutableStateOf<String?>(null) }
-    DisposableEffect(session.coverAccountId, session.localMode) {
-        val listener = if (session.localMode) null else session.emergencyResponses.observeAlerts(
-            onUpdate = { alerts = it; error = null },
-            onError = { error = it },
-        )
-        onDispose { listener?.close() }
-    }
-    val unavailable = stringResource(R.string.emergency_alerts_load_failed)
-    LaunchedEffect(session.coverAccountId, alerts) {
-        if (alerts == null) {
-            kotlinx.coroutines.delay(12_000.milliseconds)
-            if (error == null) error = unavailable
-        }
-    }
-    return alerts to error
-}
-
-/**
- * Renders the emergency response screen UI.
- *
- * @param session Shared session view model owning application state and actions.
- * @param alerts Collection of alerts values to process.
- * @param error Throwable or error message describing a failure, or null when not provided.
- * @param onBack Callback invoked when the user navigates back.
- * @param onTrack Callback invoked when track changes or occurs.
- */
-@Composable
-internal fun EmergencyResponseScreen(
-    session: SessionViewModel,
-    alerts: List<EmergencyAlert>?,
-    error: String?,
-    onBack: () -> Unit,
-    onTrack: (String) -> Unit,
-) {
-    var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
-    var showResolved by remember { mutableStateOf(false) }
-    var resolving by remember { mutableStateOf(emptySet<String>()) }
-    var resolveError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    val visibleAlerts = alerts.orEmpty().filter { (it.resolvedAt > 0L) == showResolved }
-    opened?.let { (document, file) ->
-        SafetyDocumentViewer(document, file) { opened = null }
-        return
-    }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { androidx.compose.material3.Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
-                Text(stringResource(R.string.emergency_response_title), style = MaterialTheme.typography.headlineSmall)
-            }
-        }
-        error?.let { item { AccessibleMessage(it) } }
-        resolveError?.let { item { AccessibleMessage(it) } }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !showResolved, onClick = { showResolved = false }, label = { Text(stringResource(R.string.emergency_response_active)) })
-                FilterChip(selected = showResolved, onClick = { showResolved = true }, label = { Text(stringResource(R.string.emergency_response_resolved)) })
-            }
-        }
-        if (alerts == null && error == null) item { LoadingSkeleton(SkeletonLayout.EmergencyAlerts) }
-        if (alerts != null && visibleAlerts.isEmpty() && error == null) item { Text(stringResource(R.string.emergency_response_empty)) }
-        items(visibleAlerts, key = { it.id }) { alert ->
-            OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(alert.ownerName, style = MaterialTheme.typography.titleMedium)
-                    if (alert.createdAt > 0) Text(
-                        DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
-                            .format(Instant.ofEpochMilli(alert.createdAt)),
-                    )
-                    OutlinedButton(onClick = { onTrack(alert.ownerUid) }) { Text(stringResource(R.string.emergency_response_track)) }
-                    if (alert.mediaId.isBlank()) Text(stringResource(R.string.emergency_response_waiting_pdf))
-                    else Button(
-                        enabled = alert.mediaId !in session.documents.state.openingDocumentIds,
-                        onClick = {
-                            session.coverAccountId?.let { uid ->
-                                session.documents.openShared(uid, alert.mediaId) { document, file ->
-                                    opened = document to file
-                                }
-                            }
-                        }
-                    ) { Text(stringResource(R.string.emergency_response_pdf)) }
-                    session.documents.state.attachmentErrors[alert.mediaId]?.let { AccessibleMessage(it) }
-                    FilledTonalButton(
-                        modifier = Modifier.align(Alignment.End),
-                        enabled = alert.id !in resolving,
-                        onClick = {
-                            resolving = resolving + alert.id
-                            resolveError = null
-                            scope.launch {
-                                try {
-                                    session.emergencyResponses.setResolved(
-                                        session.coverAccountId, alert.id, alert.resolvedAt == 0L,
-                                    )
-                                } catch (failure: Exception) {
-                                    if (failure is kotlinx.coroutines.CancellationException) throw failure
-                                    resolveError = failure.localizedMessage
-                                } finally {
-                                    resolving = resolving - alert.id
-                                }
-                            }
-                        },
-                    ) {
-                        androidx.compose.material3.Icon(if (alert.resolvedAt == 0L) Icons.Outlined.CheckCircle else Icons.Outlined.Replay, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (alert.resolvedAt == 0L) R.string.emergency_response_resolve else R.string.emergency_response_reopen))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Composes the emergency location preview UI element.
- *
- * @param session Shared session view model owning application state and actions.
- * @param ownerUid Firebase UID of the resource owner.
- */
-@Composable
-internal fun EmergencyLocationPreview(session: SessionViewModel, ownerUid: String) {
-    var points by remember(session.coverAccountId, ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }
-    var error by remember(session.coverAccountId, ownerUid) { mutableStateOf<String?>(null) }
-    var loading by remember(session.coverAccountId, ownerUid) { mutableStateOf(true) }
-    DisposableEffect(session.coverAccountId, ownerUid) {
-        val subscription = session.emergencyResponses.observeLocations(
-            onUpdate = { values ->
-                points = values.filter { it.uid == ownerUid }
-                error = null
-                loading = false
-            },
-            onError = { error = it; loading = false },
-        )
-        onDispose { subscription.close() }
-    }
-    Column {
-        if (!loading && points.isEmpty()) Text(error ?: stringResource(R.string.emergency_response_no_location))
-        else InteractiveLocationMap(
-            points = points, ownPointUid = null, initialFollowUid = ownerUid,
-            modifier = Modifier.fillMaxWidth().height(200.dp),
-        )
     }
 }

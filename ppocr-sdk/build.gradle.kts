@@ -5,7 +5,9 @@ plugins {
 
 android {
     namespace = "com.paddle.ocr"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
 
     defaultConfig {
         minSdk = 28
@@ -27,14 +29,14 @@ android {
             "**/libc++_shared.so",
             "**/libonnxruntime.so",
             "**/libonnxruntime4j_jni.so",
-            "**/libopencv_java4.so",
+            "**/libopencv_java5.so",
         )
     }
 }
 
 dependencies {
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.1")
-    implementation("org.opencv:opencv:4.14.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.32.0")
+    implementation("org.opencv:opencv:5.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("androidx.core:core-ktx:1.19.1")
 

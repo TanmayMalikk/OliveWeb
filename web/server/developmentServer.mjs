@@ -1,5 +1,6 @@
 // Web visitors: starts the local site server with Vite for development.
 import "./serverEnvironment.mjs";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "vite";
 import { createServerApp } from "./httpApp.mjs";
 const rawPort =
@@ -11,16 +12,17 @@ const host =
   (process.env.DEFAULT_APP_PORT ? "0.0.0.0" : "127.0.0.1");
 const port = Number(rawPort ?? process.env.DEFAULT_APP_PORT ?? 5173);
 const app = createServerApp({ development: true });
+const server = createHttpServer(app);
 const vite = await createServer({
   server: {
     middlewareMode: true,
     allowedHosts: true,
-    ...(host === "0.0.0.0" || port === 3000 ? { hmr: false } : {}),
+    ...(host === "0.0.0.0" || port === 3000 ? { hmr: false } : { ws: { server } }),
   },
   appType: "spa",
 });
 app.use(vite.middlewares);
-const server = app.listen(port, host, () =>
+server.listen(port, host, () =>
   console.log(`Olive Branch → http://${host}:${port}`),
 );
 async function close() {

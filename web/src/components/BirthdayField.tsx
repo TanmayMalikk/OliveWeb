@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "./FormElements";
+import { clearFieldInvalid, shakeFormElement, shouldTriggerControlledFieldShake } from "./FormShake";
 
 const steps = ["Choose a year range", "Choose a year", "Choose a month", "Choose a day"];
 const firstBirthYear = 1927;
@@ -17,9 +18,16 @@ function numbers(min: number, max: number) {
   return Array.from({ length: max - min + 1 }, (_, index) => min + index);
 }
 
-export function BirthdayField({ defaultValue = "", required = false }: {
+export function BirthdayField({
+  defaultValue = "",
+  required = false,
+  error,
+  shakeTrigger = 0,
+}: {
   defaultValue?: string;
   required?: boolean;
+  error?: string;
+  shakeTrigger?: number;
 }) {
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -48,6 +56,17 @@ export function BirthdayField({ defaultValue = "", required = false }: {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(1);
   const heading = useRef<HTMLHeadingElement>(null);
+  const wrapperRef = useRef<HTMLFieldSetElement>(null);
+  const lastError = useRef<string | undefined>(error);
+  const lastTrigger = useRef<number>(shakeTrigger);
+
+  useEffect(() => {
+    if (shouldTriggerControlledFieldShake(lastError.current, error, lastTrigger.current, shakeTrigger)) {
+      shakeFormElement(wrapperRef.current);
+    }
+    lastError.current = error;
+    lastTrigger.current = shakeTrigger;
+  }, [error, shakeTrigger]);
 
   useEffect(() => {
     if (open) heading.current?.focus();
@@ -82,6 +101,7 @@ export function BirthdayField({ defaultValue = "", required = false }: {
       case 2: setMonth(number); break;
       case 3:
         setValue(formatDate(year, month, number));
+        clearFieldInvalid(wrapperRef.current);
         setOpen(false);
         return;
     }
@@ -89,7 +109,7 @@ export function BirthdayField({ defaultValue = "", required = false }: {
   }
 
   return (
-    <fieldset className="birthday-field">
+    <fieldset ref={wrapperRef} className={error ? "birthday-field field-invalid" : "birthday-field"}>
       <legend>Date of birth{required ? " (required)" : " (optional)"}</legend>
       <Button variant="outline" onClick={openPicker} aria-haspopup="dialog">
         {displayDate || "Choose date of birth"}
@@ -98,6 +118,7 @@ export function BirthdayField({ defaultValue = "", required = false }: {
         <Button variant="outline" onClick={() => setValue("")}>Clear date of birth</Button>
       )}
       <input type="hidden" name="dob" value={value} />
+      {error && <small className="error" role="alert">{error}</small>}
       {open && (
         <Modal title="Choose date of birth" onClose={() => setOpen(false)}>
           <h3 ref={heading} tabIndex={-1}>{steps[step]}</h3>

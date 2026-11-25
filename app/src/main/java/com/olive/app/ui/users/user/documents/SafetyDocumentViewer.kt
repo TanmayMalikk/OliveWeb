@@ -1,6 +1,8 @@
 // Users and support staff: opens shared images, videos, and documents in the app.
 package com.olive.app.ui.users.user.documents
 
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import android.annotation.SuppressLint
 import com.olive.app.ui.shared.*
 import android.graphics.Bitmap
@@ -12,7 +14,6 @@ import android.os.ParcelFileDescriptor
 import android.view.ViewGroup
 import android.widget.MediaController
 import android.widget.VideoView
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -76,10 +77,10 @@ import kotlin.math.abs
  */
 @Composable
 internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
+    val back = rememberOliveBack(preview = !document.mimeType.startsWith("video/"), onBack = onBack)
     // Reload the preview when the selected encrypted file changes.
     DisposableEffect(file) { onDispose { file.delete() } }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().oliveBackPreview(back)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically

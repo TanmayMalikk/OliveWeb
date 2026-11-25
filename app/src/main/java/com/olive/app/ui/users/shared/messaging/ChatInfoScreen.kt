@@ -1,6 +1,10 @@
 // All chat roles: shows conversation members and shared items away from the message timeline.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,8 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.ChatMembershipAction
@@ -32,6 +34,35 @@ import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import java.io.File
+import android.content.ClipData
+import android.content.Intent
+import android.text.format.DateFormat
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.FriendInvite
+import com.olive.app.ui.shared.OliveButton
+import com.olive.app.ui.shared.OliveOutlinedButton
+import com.olive.app.ui.shared.OliveTextButton
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
+import com.olive.app.ui.users.shared.navigation.LocalSafeSystemLauncher
+import java.util.Date
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private data class SharedChatItem(
     val key: String,
@@ -54,7 +85,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
         val parts = message.body.split(":", limit = 3)
         val kind = parts.firstOrNull().orEmpty()
         if (kind !in setOf(
-                "SHARED_MEDIA", "SHARED_NOTE", "SHARED_INCIDENT", "SHARED_SAFETY_PLAN", "SHARED_LOCATION"
+                "SHARED_MEDIA", "SHARED_VOICE", "SHARED_NOTE", "SHARED_INCIDENT", "SHARED_SAFETY_PLAN", "SHARED_LOCATION"
             )
         ) return@mapNotNull null
         val id = parts.getOrNull(1).orEmpty()
@@ -62,7 +93,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
             key = "$kind:${id.ifBlank { message.id }}",
             kind = kind,
             id = id,
-            title = parts.getOrNull(2).orEmpty(),
+            title = if (kind == "SHARED_VOICE") "Voice message.m4a" else parts.getOrNull(2).orEmpty(),
             senderUid = message.senderUid,
         )
     }
@@ -77,6 +108,7 @@ private fun sharedChatItems(messages: List<ChatMessage>): List<SharedChatItem> =
  * @param onClose Callback invoked when close changes or occurs.
  * @param onOpenMedia Callback invoked when open media changes or occurs.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatInfoDialog(
     session: SessionViewModel,
@@ -162,40 +194,35 @@ internal fun ChatInfoDialog(
         }
     }
 
-    Dialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ModalBottomSheet(
         onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        sheetState = sheetState,
+        sheetGesturesEnabled = true,
+        containerColor = ChatPageBackground,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = Modifier.fillMaxWidth().testTag("chat_info_screen")
     ) {
-        Surface(
-            Modifier.fillMaxSize().testTag("chat_info_screen"),
-            color = ChatPageBackground,
-        ) {
-            Scaffold(
-                containerColor = ChatPageBackground,
-                floatingActionButton = {
-                    if (quickExit != null) FloatingQuickExit(quickExit)
-                },
-                topBar = {
-                    Row(
-                        Modifier.fillMaxWidth().background(Color.White)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = onClose, modifier = Modifier.testTag("chat_info_back")) {
-                            Icon(Icons.Outlined.Close, stringResource(R.string.close))
-                        }
-                        Text(
-                            stringResource(R.string.chat_info),
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f),
-                        )
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onClose, modifier = Modifier.testTag("chat_info_back")) {
+                        Icon(Icons.Outlined.Close, stringResource(R.string.close))
                     }
-                },
-            ) { padding ->
+                    Text(
+                        stringResource(R.string.chat_info),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 LazyColumn(
-                    Modifier.fillMaxSize().padding(padding),
+                    Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(
-                        start = 20.dp, top = 20.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 20.dp,
+                        start = 20.dp, top = 16.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 24.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -400,12 +427,13 @@ internal fun ChatInfoDialog(
                     }
                     items(sharedItems, key = SharedChatItem::key) { item ->
                         when (item.kind) {
-                            "SHARED_MEDIA" -> SharedMediaMessage(
+                            "SHARED_MEDIA", "SHARED_VOICE" -> SharedMediaMessage(
                                 item.id,
                                 item.title,
                                 session,
                                 item.senderUid == currentUid,
                                 onOpenMedia,
+                                onLightSurface = true,
                             )
                             "SHARED_NOTE", "SHARED_INCIDENT" -> Button(
                                 onClick = {
@@ -446,8 +474,188 @@ internal fun ChatInfoDialog(
                     }
                 }
             }
+            if (quickExit != null) {
+                FloatingQuickExit(
+                    onClick = quickExit,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                )
+            }
         }
     }
 }
 
-
+/**
+ * Lets the user copy, share, or refresh their invite and indicates when it becomes unavailable.
+ *
+ * @param uid The account that owns the invite.
+ * @param createInvite Loads or creates an invite. A refresh requests a replacement code.
+ * @param observeUnavailable Subscribes to changes that invalidate the displayed code.
+ * @param onDismiss Closes the dialog.
+ * @param inWindow Whether the dialog is hosted in the current window.
+ */
+@Composable
+internal fun FriendInviteDialog(
+    uid: String,
+    createInvite: suspend (refresh: Boolean) -> FriendInvite,
+    observeUnavailable: (String, () -> Unit) -> ChatSubscription,
+    onDismiss: () -> Unit,
+    inWindow: Boolean = false,
+) {
+    val context = LocalContext.current
+    val openSystem = LocalSafeSystemLauncher.current
+    val clipboard = LocalClipboard.current
+    val inviteLabel = stringResource(R.string.friend_invite)
+    val scope = rememberCoroutineScope()
+    var invite by remember { mutableStateOf<FriendInvite?>(null) }
+    var busy by remember { mutableStateOf(true) }
+    var unavailable by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    /**
+     * Loads an invite and updates the dialog with the invite or an error.
+     *
+     * @param refresh Whether to replace the current invite.
+     */
+    suspend fun generate(refresh: Boolean) {
+        busy = true
+        error = null
+        invite = null
+        unavailable = false
+        try { invite = createInvite(refresh); unavailable = false }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { error = failure.localizedMessage }
+        finally { busy = false }
+    }
+    LaunchedEffect(uid) { generate(false) }
+    LaunchedEffect(invite) {
+        invite?.let { delay((it.expiresAt - System.currentTimeMillis()).coerceAtLeast(0)); unavailable = true }
+    }
+    DisposableEffect(uid, invite?.code) {
+        val subscription = invite?.let { current ->
+            observeUnavailable(current.code) {
+                if (invite?.code == current.code) unavailable = true
+            }
+        }
+        onDispose { subscription?.close() }
+    }
+    /**
+     * Copies invite information to the system clipboard.
+     *
+     * @param value The invite code or link to copy.
+     */
+    fun copy(value: String) {
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(inviteLabel, value))) }
+    }
+    val bodyContent: @Composable () -> Unit = {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            val message = if (unavailable) stringResource(R.string.friend_invite_unavailable) else error
+            message?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            invite?.takeUnless { unavailable }?.let { value ->
+                val expiry = Date(value.expiresAt)
+                val expiresAt = remember(context, value.expiresAt) {
+                    "${DateFormat.getMediumDateFormat(context).format(expiry)} · ${DateFormat.getTimeFormat(context).format(expiry)}"
+                }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Column(
+                        Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(stringResource(R.string.friend_invite_code), style = MaterialTheme.typography.labelLarge)
+                        SelectionContainer {
+                            Text(
+                                value.code,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.friend_invite_expires, expiresAt),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                OliveButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, value.link)
+                        }
+                        openSystem(Intent.createChooser(intent, inviteLabel))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.friend_invite_share))
+                }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OliveOutlinedButton(onClick = { copy(value.code) }) {
+                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.friend_invite_copy_code))
+                    }
+                    OliveOutlinedButton(onClick = { copy(value.link) }) {
+                        Icon(Icons.Outlined.Link, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.friend_invite_copy_link))
+                    }
+                }
+            }
+            HorizontalDivider()
+            OliveTextButton(
+                onClick = { scope.launch { generate(true) } },
+                enabled = !busy,
+            ) {
+                Icon(Icons.Outlined.Refresh, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.friend_invite_refresh))
+            }
+            if (invite != null && !unavailable) {
+                Text(
+                    stringResource(R.string.friend_invite_once),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "friend_invite_dialog",
+            title = { Text(inviteLabel) },
+            onDismiss = onDismiss,
+            confirmButton = { OliveTextButton(onClick = onDismiss) { Text(stringResource(R.string.friend_invite_done)) } },
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(inviteLabel) },
+            text = bodyContent,
+            confirmButton = {
+                OliveTextButton(onClick = onDismiss) { Text(stringResource(R.string.friend_invite_done)) }
+            },
+        )
+    }
+}

@@ -27,51 +27,20 @@ class NewsRepositoryTest {
 
     private val repository = GoogleNewsRepository()
 
-    // Inputs: the values shown below. Expected: rss locale query generates correct google news parameters for each language.
     @Test
-    fun rssLocaleQueryGeneratesCorrectGoogleNewsParametersForEachLanguage() {
-        val zhQuery = repository.rssLocaleQuery("Chinese")
-        assertTrue(
-            "Chinese query should contain zh-CN, got: $zhQuery",
-            zhQuery.contains("hl=zh-CN")
-        )
-        assertTrue(
-            "Chinese query should contain zh-Hans ceid, got: $zhQuery",
-            zhQuery.contains("ceid=CN:zh-Hans")
-        )
+    fun newsEditionUsesDeviceLanguageAndRegion() {
+        assertEquals("hl=fr-CA&gl=CA&ceid=CA:fr", repository.rssLocaleQuery("fr-CA"))
+        assertEquals("hl=es-MX&gl=MX&ceid=MX:es", repository.rssLocaleQuery("es-MX"))
+        assertEquals("hl=ar-SA&gl=SA&ceid=SA:ar", repository.rssLocaleQuery("ar-SA"))
+        assertEquals("hl=zh-CN&gl=CN&ceid=CN:zh-Hans", repository.rssLocaleQuery("zh-CN"))
+        assertEquals("hl=zh-TW&gl=TW&ceid=TW:zh-Hant", repository.rssLocaleQuery("zh-TW"))
+        assertEquals("hl=en-GB&gl=GB&ceid=GB:en", repository.rssLocaleQuery("en-GB"))
+    }
 
-        val zhCodeQuery = repository.rssLocaleQuery("zh")
-        assertTrue(
-            "zh query should contain zh-CN, got: $zhCodeQuery",
-            zhCodeQuery.contains("hl=zh-CN")
-        )
-
-        val frQuery = repository.rssLocaleQuery("French")
-        assertTrue("French query should contain fr-CA, got: $frQuery", frQuery.contains("hl=fr-CA"))
-
-        val esQuery = repository.rssLocaleQuery("Spanish")
-        assertTrue(
-            "Spanish query should contain es-419, got: $esQuery",
-            esQuery.contains("hl=es-419")
-        )
-
-        val arQuery = repository.rssLocaleQuery("Arabic")
-        assertTrue("Arabic query should contain ar, got: $arQuery", arQuery.contains("hl=ar"))
-
-        val tlQuery = repository.rssLocaleQuery("Tagalog")
-        assertTrue("Unmapped Tagalog falls back to en-CA, got: $tlQuery", tlQuery.contains("hl=en-CA"))
-
-        val enQuery = repository.rssLocaleQuery("English")
-        assertTrue(
-            "English query should contain en-CA, got: $enQuery",
-            enQuery.contains("hl=en-CA")
-        )
-
-        val jaQuery = repository.rssLocaleQuery("Japanese")
-        assertTrue(
-            "Unsupported language query should default to en-CA, got: $jaQuery",
-            jaQuery.contains("hl=en-CA")
-        )
+    @Test
+    fun deviceLanguagesWithoutOliveTranslationsStillDriveTheNewsEdition() {
+        assertEquals("hl=ja-JP&gl=JP&ceid=JP:ja", repository.rssLocaleQuery("ja-JP"))
+        assertEquals("hl=de&gl=DE&ceid=DE:de", repository.rssLocaleQuery("de"))
     }
 
     @Test
@@ -101,8 +70,8 @@ class NewsRepositoryTest {
             }
         }
 
-        val local = repo.latest("English", NewsScope.LOCAL, "")
-        val global = repo.latest("English", NewsScope.GLOBAL, "Edmonton")
+        val local = repo.latest("en-CA", NewsScope.LOCAL, "")
+        val global = repo.latest("en-CA", NewsScope.GLOBAL, "Edmonton")
 
         assertEquals(1, local.size)
         assertEquals(1, global.size)
@@ -110,22 +79,22 @@ class NewsRepositoryTest {
         assertTrue(urls.last().contains("/rss/headlines/section/topic/WORLD"))
         assertEquals("Opening game tonight", local.single().summary)
         assertEquals("Sports", local.single().topic)
-        assertTrue(local.single().localPublishedDate("English").contains("2026"))
-        assertEquals("bad-date", NewsArticle("T", link = "https://news.google.com/1", published = "bad-date").localPublishedDate("English"))
+        assertTrue(local.single().localPublishedDate("en-CA").contains("2026"))
+        assertEquals("bad-date", NewsArticle("T", link = "https://news.google.com/1", published = "bad-date").localPublishedDate("en-CA"))
     }
 
     @Test
     fun feedCacheStorePersistsArticlesAndRejectsCorruptOrEmptyPayloads() {
         val app = RuntimeEnvironment.getApplication()
         val store = NewsFeedCacheStore(app)
-        assertNull(store.load("English", NewsScope.LOCAL))
+        assertNull(store.load("en-CA", NewsScope.LOCAL))
 
-        store.save("English", NewsScope.LOCAL, "Edmonton", emptyList())
-        assertNull(store.load("English", NewsScope.LOCAL))
+        store.save("en-CA", NewsScope.LOCAL, "Edmonton", emptyList())
+        assertNull(store.load("en-CA", NewsScope.LOCAL))
 
         val articles = listOf(NewsArticle("Headline", "Summary", "https://news.google.com/rss/articles/1"))
-        store.save("English", NewsScope.LOCAL, "Edmonton", articles)
-        val restored = store.load("English", NewsScope.LOCAL)
+        store.save("en-CA", NewsScope.LOCAL, "Edmonton", articles)
+        val restored = store.load("en-CA", NewsScope.LOCAL)
         assertEquals("Edmonton", restored?.place)
         assertEquals(articles, restored?.articles)
 

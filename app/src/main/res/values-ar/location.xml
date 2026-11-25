@@ -46,4 +46,18 @@
     <string name="location_sharing_until">تتم المشاركة حتى %1$s</string>
     <string name="location_ten_seconds_testing">10 ثوانٍ (للاختبار)</string>
     <string name="location_notification_sharing_text">مشاركة موقعك المباشر نشطة.</string>
+    <string name="location_gps_destination_title">وجهة GPS حرة</string>
+    <string name="location_gps_destination_hint">ابحث عن مكان أو عنوان أو إحداثيات</string>
+    <string name="location_gps_start_route">بدء المسار</string>
+    <string name="location_gps_clear_destination">مسح الوجهة</string>
+    <string name="location_gps_coordinates_label">الإحداثيات: %1$s</string>
+    <string name="location_gps_coordinates_hint">التوجيه مباشرة إلى هذه الإحداثيات</string>
+    <string name="location_gps_no_match">لم يتم العثور على الوجهة. جرّب اسم مكان أو عنوانًا أو إحداثيات.</string>
+    <string name="location_gps_searching">جارٍ البحث عن أماكن…</string>
+    <string name="location_route_driving">بالسيارة</string>
+    <string name="location_route_walking">سيرًا</string>
+    <string name="location_compass_north_up">الشمال للأعلى</string>
+    <string name="location_compass_heading_up">تدوير بالاتجاه</string>
+    <string name="location_compass_toggle_north_desc">الخريطة ثابتة نحو الشمال. اضغط للتدوير حسب اتجاه المشي.</string>
+    <string name="location_compass_toggle_heading_desc">الخريطة تدور حسب اتجاه المشي. اضغط للتثبيت نحو الشمال.</string>
 </resources>

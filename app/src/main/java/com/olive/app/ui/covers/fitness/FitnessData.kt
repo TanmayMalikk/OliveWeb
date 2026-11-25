@@ -50,6 +50,61 @@ internal class FitnessStore(private val context: Context, private val accountId:
     }
 
     /**
+     * Checks whether initial fitness or nutrition goals have been set on this phone or synced from the cloud.
+     *
+     * @return `true` when the user completed setup or has saved goal keys, or `false` for fresh defaults.
+     */
+    fun hasConfiguredGoals(): Boolean =
+        preferences.getBoolean(GOALS_QUESTIONNAIRE_COMPLETED_KEY, false) ||
+            CONFIGURED_PROFILE_KEYS.any { preferences.contains(it) }
+
+    /**
+     * Checks whether the initial goal questionnaire card should be shown on the fitness home tab.
+     *
+     * @return `true` if goals are still unconfigured and the prompt has not been dismissed.
+     */
+    fun shouldPromptGoalQuestionnaire(): Boolean =
+        !hasConfiguredGoals() && !preferences.getBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, false)
+
+    /**
+     * Hides the home-screen initial goal questionnaire prompt without overwriting default goals.
+     */
+    fun dismissGoalQuestionnaire() = preferences.edit {
+        putBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, true)
+    }
+
+    /**
+     * Loads previously saved questionnaire answers paired with the current height and weight.
+     *
+     * @return The saved [FitnessGoalQuestionnaireInput] for pre-filling the questionnaire.
+     */
+    fun savedQuestionnaireInput(): FitnessGoalQuestionnaireInput =
+        FitnessGoalCalculator.fromJson(
+            preferences.getString(GOALS_QUESTIONNAIRE_ANSWERS_KEY, null),
+            profile(),
+        )
+
+    /**
+     * Saves goals produced by the initial questionnaire and marks onboarding complete locally.
+     *
+     * @param input Questionnaire selections chosen by the user.
+     * @param profile Resulting [FitnessProfile] targets to persist and sync.
+     * @return The updated [FitnessSnapshot] after saving the profile.
+     */
+    fun saveQuestionnaireGoals(
+        input: FitnessGoalQuestionnaireInput,
+        profile: FitnessProfile,
+    ): FitnessSnapshot {
+        saveProfile(profile)
+        preferences.edit {
+            putBoolean(GOALS_QUESTIONNAIRE_COMPLETED_KEY, true)
+            putBoolean(GOALS_QUESTIONNAIRE_DISMISSED_KEY, false)
+            putString(GOALS_QUESTIONNAIRE_ANSWERS_KEY, FitnessGoalCalculator.toJson(input))
+        }
+        return snapshot()
+    }
+
+    /**
      * Loads the snapshot needed by the fitness cover.
      *
      * @param today Today supplied to [snapshot].
@@ -125,6 +180,26 @@ internal class FitnessStore(private val context: Context, private val accountId:
             )
         }
     }
+
+    /**
+     * Reads up to 14 days of logged activity and meals for the coach.
+     *
+     * @param today Most recent date to include, even if today's log is still empty.
+     * @return Chronological entries with missing activity or nutrition kept separate from zero.
+     */
+    fun coachHistory(today: LocalDate = LocalDate.now()): List<FitnessCoachDay> =
+        (FITNESS_COACH_HISTORY_DAYS - 1 downTo 0).mapNotNull { daysAgo ->
+            val date = today.minusDays(daysAgo.toLong())
+            val steps = activitySteps(date).takeIf {
+                preferences.contains(activityStepsKey(date)) || preferences.contains(legacyStepsKey(date))
+            }
+            val meals = foods(date)
+            if (steps == null && meals.isEmpty() && date != today) return@mapNotNull null
+            val nutrition = meals.takeIf { it.isNotEmpty() }?.nutritionTotals()
+            val foodNames = meals.asSequence().map { it.food.name.trim().take(60) }
+                .filter { it.isNotEmpty() }.distinct().take(8).toList()
+            FitnessCoachDay(date, steps, nutrition, foodNames)
+        }
 
     /**
      * Phone fitness users: counts phone steps only while a worn watch is not actively reporting.
@@ -317,10 +392,10 @@ internal class FitnessStore(private val context: Context, private val accountId:
     }
 
     /**
-     * Computes water total.
+     * Adds up the saved water entries for the requested day.
      *
-     * @param today Today supplied to [waterTotal].
-     * @return The computed water total numeric value.
+     * @param today The date whose stored water entries are read.
+     * @return The nonnegative total in milliliters, or zero if the saved entries cannot be read.
      */
     private fun waterTotal(today: LocalDate): Int = runCatching {
         val entries = JSONArray(preferences.getString("water_$today", "[]"))
@@ -335,6 +410,7 @@ internal class FitnessStore(private val context: Context, private val accountId:
      * @param servings Servings supplied to [addFood].
      * @param meal Meal supplied to [addFood].
      * @param today Today supplied to [addFood].
+     * @param logId Stable key for the add operation and its Firestore document.
      * @return The resulting [FitnessSnapshot] for add food.
      */
     fun addFood(
@@ -342,17 +418,31 @@ internal class FitnessStore(private val context: Context, private val accountId:
         servings: Float,
         meal: MealType,
         today: LocalDate = LocalDate.now(),
+        logId: String = UUID.randomUUID().toString(),
     ): FitnessSnapshot {
         val entry = FoodLogEntry(
-            logId = UUID.randomUUID().toString(),
+            logId = logId,
             food = food,
             servings = servings.coerceIn(0.0001f, 10_000f),
             meal = meal,
             loggedAt = System.currentTimeMillis(),
         )
-        saveFoods(today, foods(today) + entry)
-        FitnessAccountSync.meal(context, accountId, today.toString(), entry.logId, entry.toJson().toString())
-        return snapshot(today)
+        return restoreFood(entry, today)
+    }
+
+    /**
+     * Inserts a diary entry once, retaining its original time and sync key when undoing a deletion.
+     *
+     * @param entry The food entry to insert.
+     * @param date The diary date that owns the entry.
+     * @return The latest fitness snapshot.
+     */
+    fun restoreFood(entry: FoodLogEntry, date: LocalDate): FitnessSnapshot {
+        val existing = foods(date)
+        if (existing.any { it.logId == entry.logId }) return snapshot(date)
+        saveFoods(date, (existing + entry).sortedBy(FoodLogEntry::loggedAt))
+        FitnessAccountSync.meal(context, accountId, date.toString(), entry.logId, entry.toJson().toString())
+        return snapshot(date)
     }
 
     /**
@@ -379,7 +469,10 @@ internal class FitnessStore(private val context: Context, private val accountId:
      * @return The resulting [FitnessSnapshot] for remove food.
      */
     fun removeFood(logId: String, today: LocalDate = LocalDate.now()): FitnessSnapshot {
-        saveFoods(today, foods(today).filterNot { it.logId == logId })
+        val existing = foods(today)
+        val remaining = existing.filterNot { it.logId == logId }
+        if (remaining.size == existing.size) return snapshot(today)
+        saveFoods(today, remaining)
         FitnessAccountSync.meal(context, accountId, today.toString(), logId, null)
         return snapshot(today)
     }
@@ -645,12 +738,25 @@ internal class FitnessStore(private val context: Context, private val accountId:
 
     private companion object {
         const val MAX_DAILY_STEPS = 500_000
+        const val GOALS_QUESTIONNAIRE_COMPLETED_KEY = "goals_questionnaire_completed"
+        const val GOALS_QUESTIONNAIRE_DISMISSED_KEY = "goals_questionnaire_dismissed"
+        const val GOALS_QUESTIONNAIRE_ANSWERS_KEY = "goals_questionnaire_answers"
+        val CONFIGURED_PROFILE_KEYS = listOf(
+            "weight_kg",
+            "height_cm",
+            "step_goal",
+            "calorie_goal",
+            "protein_goal",
+            "carbohydrate_goal",
+            "fat_goal",
+        )
     }
 }
 
 /**
  * Fitness cover: Converts this record into JSON.
  *
+ * @receiver The logged food entry to serialize.
  * @return JSON representation of this object.
  */
 private fun FoodLogEntry.toJson() = JSONObject().apply {
@@ -664,6 +770,7 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
 /**
  * Serializes this instance into a JSON object.
  *
+ * @receiver The nutrition record to serialize.
  * @param includeServingOptions Whether to include serving options.
  * @return JSON object representing to JSON.
  */
@@ -711,6 +818,7 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
 /**
  * Converts JSON object into nutrition food.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param includeServingOptions Whether to include serving options.
  * @return The resulting [NutritionFood], or `null` if unavailable.
  */
@@ -753,6 +861,7 @@ internal fun readNutritionFoods(array: JSONArray?, includeServingOptions: Boolea
 /**
  * Formats the food serving amount shown in the diary.
  *
+ * @receiver The serving amount to format for display.
  * @return The resulting display amount string.
  */
 internal fun Float.displayAmount(): String = when {
@@ -906,23 +1015,31 @@ internal data class FitnessSnapshot(
     val watchSeenWithinFourteenDays: Boolean = false,
     val waterTodayMl: Int = 0,
 ) {
-    val nutrition = foodsToday.fold(NutritionTotals()) { total, entry ->
-        val servings = entry.servings
-        val food = entry.food
-        NutritionTotals(
-            calories = total.calories + food.calories * servings,
-            proteinGrams = total.proteinGrams + food.proteinGrams * servings,
-            carbohydrateGrams = total.carbohydrateGrams + food.carbohydrateGrams * servings,
-            fatGrams = total.fatGrams + food.fatGrams * servings,
-            saturatedFatGrams = total.saturatedFatGrams + food.saturatedFatGrams * servings,
-            transFatGrams = total.transFatGrams + food.transFatGrams * servings,
-            fiberGrams = total.fiberGrams + food.fiberGrams * servings,
-            sugarGrams = total.sugarGrams + food.sugarGrams * servings,
-            sodiumMilligrams = total.sodiumMilligrams + food.sodiumMilligrams * servings,
-            cholesterolMilligrams = total.cholesterolMilligrams + food.cholesterolMilligrams * servings,
-            potassiumMilligrams = total.potassiumMilligrams + food.potassiumMilligrams * servings,
-        )
-    }
+    val nutrition = foodsToday.nutritionTotals()
+}
+
+/**
+ * Calculates aggregated nutrition totals across a list of food log entries.
+ *
+ * @receiver The logged food entries contributing to the totals.
+ * @return The sum of calories and macros for all entries.
+ */
+private fun List<FoodLogEntry>.nutritionTotals() = fold(NutritionTotals()) { total, entry ->
+    val servings = entry.servings
+    val food = entry.food
+    NutritionTotals(
+        calories = total.calories + food.calories * servings,
+        proteinGrams = total.proteinGrams + food.proteinGrams * servings,
+        carbohydrateGrams = total.carbohydrateGrams + food.carbohydrateGrams * servings,
+        fatGrams = total.fatGrams + food.fatGrams * servings,
+        saturatedFatGrams = total.saturatedFatGrams + food.saturatedFatGrams * servings,
+        transFatGrams = total.transFatGrams + food.transFatGrams * servings,
+        fiberGrams = total.fiberGrams + food.fiberGrams * servings,
+        sugarGrams = total.sugarGrams + food.sugarGrams * servings,
+        sodiumMilligrams = total.sodiumMilligrams + food.sodiumMilligrams * servings,
+        cholesterolMilligrams = total.cholesterolMilligrams + food.cholesterolMilligrams * servings,
+        potassiumMilligrams = total.potassiumMilligrams + food.potassiumMilligrams * servings,
+    )
 }
 
 internal data class FitnessHistoryDay(

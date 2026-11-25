@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "pretest": "node -e \"require('node:fs').mkdirSync('../build/reports', {recursive: true})\"",
-    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/firebase-rules-tests.xml rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs friend-invites.test.mjs\""
+    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"npm run test:cases\"",
+    "test:all": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"npm run test:cases -- ../functions/opaqueRecovery.emulator.test.js\"",
+    "pretest:cases": "node -e \"require('node:fs').mkdirSync('../build/reports', {recursive: true})\"",
+    "test:cases": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/firebase-rules-tests.xml rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs friend-invites.test.mjs",
+    "test:opaque-functions": "firebase emulators:exec --only firestore --project demo-olive-rules --config emulator.json \"node --test ../functions/opaqueRecovery.emulator.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",

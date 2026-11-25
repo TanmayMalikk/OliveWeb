@@ -5,7 +5,7 @@ const {db, messaging, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");
-const {saveSupportConversation, supportConversationId, SUPPORT} =
+const {saveSupportConversation, supportConversationId, SUPPORT, eligibleStaffCandidates} =
   require("./supportGroups");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 
@@ -53,15 +53,9 @@ function fcmTargetsForConversationUpdate(before, after, conversationId) {
   };
 }
 
-// Finds staff accounts that are active and ready to receive support tickets.
+// Finds staff accounts that are active, have completed their profile, and prefer key-ready accounts.
 async function candidates() {
-  const result = [];
-  for (const user of await listEveryUser()) {
-    if (user.disabled || user.customClaims?.role !== "STAFF") continue;
-    const profile = await readProfile(user.uid);
-    if (staffEligible(user, profile)) result.push({uid: user.uid, name: profile.fullName});
-  }
-  return result;
+  return eligibleStaffCandidates();
 }
 
 // Starts or cancels a user's regular support ticket independently of consultations.
@@ -71,7 +65,12 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   if (caller.role !== "USER" || !["request", "stop"].includes(action)) {
     throw new HttpsError("permission-denied", "Owner only.");
   }
-  const newConversationId = supportConversationId(caller.uid, SUPPORT);
+  const requestKey = request.data?.requestKey;
+  if (action === "request" && requestKey !== undefined &&
+      (typeof requestKey !== "string" || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(requestKey))) {
+    throw new HttpsError("invalid-argument", "Invalid support request key.");
+  }
+  const newConversationId = supportConversationId(caller.uid, SUPPORT, requestKey);
   const requestedConversationId = typeof request.data?.conversationId === "string" ?
     request.data.conversationId : "";
   const reference = db.collection("supportRequests").doc(
@@ -102,6 +101,11 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   const staffCandidates = await candidates();
   const ticket = await db.runTransaction(async transaction => {
     const chat = await transaction.get(db.collection("conversations").doc(newConversationId));
+    if (chat.get("closedAt")) {
+      return {ownerUid: caller.uid, requested: false, staffUid: "", conversationId: ""};
+    }
+    const existing = (await transaction.get(reference)).data();
+    if (existing) return existing;
     const references = new Map(staffCandidates.map(staff => [
       staff.uid, db.collection("safetyStaff").doc(staff.uid),
     ]));

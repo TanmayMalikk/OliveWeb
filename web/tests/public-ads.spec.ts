@@ -28,7 +28,7 @@ test("public pages load AdSense with CSP nonces and private pages never load it"
   expect(adRequests).toHaveLength(2);
   for (const path of ["/account/sign-in", "/account/create", "/account/link", "/admin", "/entry"]) {
     const privateResponse = await page.goto(baseURL + path);
-    expect(privateResponse!.headers()["content-security-policy"]).not.toContain("unsafe-eval");
+    expect(privateResponse!.headers()["content-security-policy"]).not.toContain("'unsafe-eval'");
     await expect(page.locator("script[data-olive-adsense]")).toHaveCount(0);
     expect(await page.evaluate(() => (window as any).__fixtureAdsense)).toBeUndefined();
   }

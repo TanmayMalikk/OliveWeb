@@ -110,7 +110,7 @@ class DocumentWorkspaceUiTest {
     private fun session(documents:Documents):SessionViewModel {
         lateinit var session:SessionViewModel
         val app=compose.activity.application
-        val sources=SessionDataSources(LocalAccountRepository(EncryptedVault(app,"ui-fixture-accounts")),null,null,null,null,null,documents,null,null)
+        val sources=SessionDataSources(LocalAccountRepository(EncryptedVault(app,"ui-fixture-accounts")),null,null,null,null,null,documents,null,null,null,null)
         instrumentation.runOnMainSync {
             session=ViewModelProvider(compose.activity,object:ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST") override fun <T:ViewModel> create(modelClass:Class<T>):T=SessionViewModel(app,sources,false) as T

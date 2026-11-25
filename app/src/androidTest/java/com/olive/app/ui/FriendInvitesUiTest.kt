@@ -1,9 +1,10 @@
 package com.olive.app.ui
 
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.runtime.CompositionLocalProvider
@@ -44,8 +45,8 @@ class FriendInvitesUiTest {
             session.runtime.state.screen = SessionScreen.Safe
         }
         compose.setContent { OliveTheme { MessagesScreen(session) } }
-        compose.onNodeWithTag("friend_invite").assertIsDisplayed()
-        compose.onNodeWithTag("friend_invite_code").assertExists()
+        compose.onNodeWithTag("friend_invite").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("friend_invite_code").assertIsNotEnabled()
         compose.onNodeWithTag("friend_invite_claim").assertIsNotEnabled()
         compose.onNodeWithTag("message_username").assertDoesNotExist()
         compose.onNodeWithTag("search_users").assertDoesNotExist()
@@ -64,9 +65,20 @@ class FriendInvitesUiTest {
         val renewed = FriendInvite("Fixture2", "https://example.test/get/?invite=Fixture2", expires)
         var dismissed = false
         var share: Intent? = null
+        val copied = mutableListOf<String>()
+        val clipboard = object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry? = null
+
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                copied += requireNotNull(clipEntry).clipData.getItemAt(0).text.toString()
+            }
+        }
         compose.setContent {
             OliveTheme {
-                CompositionLocalProvider(LocalSafeSystemLauncher provides { share = it; true }) {
+                CompositionLocalProvider(
+                    LocalSafeSystemLauncher provides { share = it; true },
+                    LocalClipboard provides clipboard,
+                ) {
                     FriendInviteDialog("synthetic-owner", createInvite = { refresh ->
                         attempts += refresh
                         when (attempts.size) {
@@ -84,15 +96,9 @@ class FriendInvitesUiTest {
         fun label(id: Int) = compose.activity.getString(id)
         compose.onNodeWithText(first.code).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.friend_invite_copy_code)).performScrollTo().performClick()
-        compose.runOnIdle {
-            val clipboard = compose.activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            assertEquals(first.code, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
-        }
+        compose.runOnIdle { assertEquals(listOf(first.code), copied) }
         compose.onNodeWithText(label(R.string.friend_invite_copy_link)).performScrollTo().performClick()
-        compose.runOnIdle {
-            val clipboard = compose.activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            assertEquals(first.link, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
-        }
+        compose.runOnIdle { assertEquals(listOf(first.code, first.link), copied) }
         compose.onNodeWithText(label(R.string.friend_invite_share)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(Intent.ACTION_CHOOSER, share?.action) }
         compose.runOnIdle { targets.getValue(first.code)() }

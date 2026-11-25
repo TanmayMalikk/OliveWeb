@@ -1,9 +1,9 @@
 // All safe-app roles: guides new safe-app users through account setup.
 package com.olive.app.ui.users.shared.onboarding
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
 import com.olive.app.ui.shared.*
-
-
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -44,6 +44,42 @@ import androidx.compose.ui.unit.sp
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlin.random.Random
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.data.account.AbuseType
+import com.olive.app.data.account.DependantNeed
+import com.olive.app.data.account.FinancialSituation
+import com.olive.app.data.account.ImmigrationStatus
+import com.olive.app.data.account.SafetyCircumstance
+import com.olive.app.data.account.SafetyPlanIntake
+import com.olive.app.data.account.TransportSituation
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.WalkthroughInWindowDialog
 
 /**
  * Requirement bullets begin neutral, then turn green or red as the user types.
@@ -273,6 +309,7 @@ internal fun OnboardingProgress(
 /**
  * Offshoots and leaf tips lean right, giving the branch a clear direction of growth.
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param base Base supplied to [drawOnboardingSprig].
  * @param spacing Spacing supplied to [drawOnboardingSprig].
  * @param sprig Sprig supplied to [drawOnboardingSprig].
@@ -316,6 +353,7 @@ private fun DrawScope.drawOnboardingSprig(
 /**
  * Two curved edges form a narrow olive leaf; its vein points back to the stem.
  *
+ * @receiver The Compose drawing scope and its coordinate system.
  * @param base Base supplied to [drawOnboardingLeaf].
  * @param tip Tip supplied to [drawOnboardingLeaf].
  * @param color Color supplied to [drawOnboardingLeaf].
@@ -437,4 +475,406 @@ private fun OnboardingOlive(index: Int, done: Boolean, active: Boolean, stepOffs
             }
         }
     }
+}
+
+/**
+ * Renders the onboarding and safety-plan tailoring questionnaire inside a vertical onboarding column or scrollable dialog.
+ *
+ * @param intake Current questionnaire answers.
+ * @param enabled Whether the controls are interactive.
+ * @param onChange Callback invoked whenever any selection changes.
+ */
+@Composable
+internal fun SafetyPlanQuestionnaireForm(
+    intake: SafetyPlanIntake,
+    enabled: Boolean,
+    onChange: (SafetyPlanIntake) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            stringResource(R.string.safety_intake_intro),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Muted,
+        )
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_abuse_title),
+            subtitle = stringResource(R.string.safety_intake_abuse_subtitle),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                AbuseType.entries.forEach { option ->
+                    val checked = option in intake.abuseTypes
+                    QuestionnaireCheckboxRow(
+                        label = stringResource(abuseTypeLabel(option)),
+                        checked = checked,
+                        enabled = enabled,
+                        tag = "intake_abuse_${option.name}",
+                        onToggle = { next ->
+                            val updated = if (next) intake.abuseTypes + option else intake.abuseTypes - option
+                            onChange(intake.copy(abuseTypes = updated))
+                        },
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_immigration_title),
+            subtitle = stringResource(R.string.safety_intake_immigration_subtitle),
+        ) {
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ImmigrationStatus.entries.forEach { option ->
+                    QuestionnaireRadioRow(
+                        label = stringResource(immigrationLabel(option)),
+                        selected = intake.immigrationStatus == option,
+                        enabled = enabled,
+                        tag = "intake_immigration_${option.name}",
+                        onSelect = { onChange(intake.copy(immigrationStatus = option)) },
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_dependants_title),
+            subtitle = stringResource(R.string.safety_intake_dependants_subtitle),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                DependantNeed.entries.forEach { option ->
+                    val checked = option in intake.dependants
+                    QuestionnaireCheckboxRow(
+                        label = stringResource(dependantLabel(option)),
+                        checked = checked,
+                        enabled = enabled,
+                        tag = "intake_dependant_${option.name}",
+                        onToggle = { next ->
+                            val updated = if (next) intake.dependants + option else intake.dependants - option
+                            onChange(intake.copy(dependants = updated))
+                        },
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_financial_title),
+            subtitle = stringResource(R.string.safety_intake_financial_subtitle),
+        ) {
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FinancialSituation.entries.forEach { option ->
+                    QuestionnaireRadioRow(
+                        label = stringResource(financialLabel(option)),
+                        selected = intake.financialSituation == option,
+                        enabled = enabled,
+                        tag = "intake_financial_${option.name}",
+                        onSelect = { onChange(intake.copy(financialSituation = option)) },
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_transport_title),
+            subtitle = stringResource(R.string.safety_intake_transport_subtitle),
+        ) {
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                TransportSituation.entries.forEach { option ->
+                    QuestionnaireRadioRow(
+                        label = stringResource(transportLabel(option)),
+                        selected = intake.transportSituation == option,
+                        enabled = enabled,
+                        tag = "intake_transport_${option.name}",
+                        onSelect = { onChange(intake.copy(transportSituation = option)) },
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        QuestionnaireQuestionSection(
+            title = stringResource(R.string.safety_intake_circumstances_title),
+            subtitle = stringResource(R.string.safety_intake_circumstances_subtitle),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SafetyCircumstance.entries.forEach { option ->
+                    val checked = option in intake.circumstances
+                    QuestionnaireCheckboxRow(
+                        label = stringResource(circumstanceLabel(option)),
+                        checked = checked,
+                        enabled = enabled,
+                        tag = "intake_circumstance_${option.name}",
+                        onToggle = { next ->
+                            val updated = if (next) intake.circumstances + option else intake.circumstances - option
+                            onChange(intake.copy(circumstances = updated))
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Opens the safety-plan questionnaire in a dialog so an existing user can update preferences and add matching checklist items.
+ *
+ * @param initialIntake Existing saved questionnaire answers.
+ * @param enabled Whether the controls are currently enabled.
+ * @param onDismiss Callback invoked when the user closes without saving.
+ * @param onSave Callback invoked with the updated completed [SafetyPlanIntake].
+ * @param inWindow Whether the dialog is hosted in the current window.
+ */
+@Composable
+internal fun SafetyPlanQuestionnaireDialog(
+    initialIntake: SafetyPlanIntake,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (SafetyPlanIntake) -> Unit,
+    inWindow: Boolean = false,
+) {
+    var draft by remember(initialIntake) { mutableStateOf(initialIntake) }
+    val titleContent: @Composable () -> Unit = {
+        Text(
+            stringResource(R.string.onboarding_safety_questionnaire),
+            modifier = Modifier.semantics { heading() },
+        )
+    }
+    val bodyContent: @Composable () -> Unit = {
+        Column(
+            Modifier.heightIn(max = if (inWindow) 240.dp else 420.dp).verticalScroll(rememberScrollState()),
+        ) {
+            SafetyPlanQuestionnaireForm(draft, enabled) { draft = it }
+        }
+    }
+    val confirmContent: @Composable () -> Unit = {
+        Button(
+            onClick = { onSave(draft.copy(completed = true)) },
+            enabled = enabled,
+            modifier = Modifier.testTag("safety_intake_dialog_save"),
+        ) {
+            Text(stringResource(R.string.safety_intake_dialog_apply))
+        }
+    }
+    val dismissContent: @Composable () -> Unit = {
+        TextButton(onClick = onDismiss, enabled = enabled) {
+            Text(stringResource(R.string.cancel))
+        }
+    }
+    if (inWindow) {
+        WalkthroughInWindowDialog(
+            dialogTargetId = "safety_questionnaire_dialog",
+            title = titleContent,
+            onDismiss = { if (enabled) onDismiss() },
+            confirmButton = confirmContent,
+            dismissButton = dismissContent,
+            text = bodyContent,
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = { if (enabled) onDismiss() },
+            title = titleContent,
+            text = bodyContent,
+            confirmButton = confirmContent,
+            dismissButton = dismissContent,
+        )
+    }
+}
+
+/**
+ * Renders a titled safety-plan onboarding question block with subtitle and option content.
+ *
+ * @param title The heading displayed for the section or item.
+ * @param subtitle The supporting text displayed below the title.
+ * @param content The composable content to render inside the component.
+ */
+@Composable
+private fun QuestionnaireQuestionSection(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Muted)
+        content()
+    }
+}
+
+/**
+ * Renders a single radio selection row inside an outlined card.
+ *
+ * @param label The label displayed for the control.
+ * @param selected Whether this item is currently selected.
+ * @param enabled Whether the control or feature is enabled.
+ * @param tag The support ticket category identifier.
+ * @param onSelect Runs when the user chooses an option.
+ */
+@Composable
+private fun QuestionnaireRadioRow(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onSelect: () -> Unit,
+) {
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .selectable(
+                    selected = selected,
+                    enabled = enabled,
+                    role = Role.RadioButton,
+                    onClick = onSelect,
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .testTag(tag),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            RadioButton(
+                selected = selected,
+                onClick = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Renders a toggleable checkbox option row inside an outlined card.
+ *
+ * @param label The label displayed for the control.
+ * @param checked Whether the switch is currently on.
+ * @param enabled Whether the control or feature is enabled.
+ * @param tag The support ticket category identifier.
+ * @param onToggle Runs when the user changes the switch state.
+ */
+@Composable
+private fun QuestionnaireCheckboxRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onToggle: (Boolean) -> Unit,
+) {
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onToggle,
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .testTag(tag),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Maps an [AbuseType] option to its localized label resource ID.
+ *
+ * @param type The selected option or category.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun abuseTypeLabel(type: AbuseType): Int = when (type) {
+    AbuseType.PHYSICAL -> R.string.safety_intake_abuse_physical
+    AbuseType.EMOTIONAL_OR_PSYCHOLOGICAL -> R.string.safety_intake_abuse_emotional
+    AbuseType.FINANCIAL -> R.string.safety_intake_abuse_financial
+    AbuseType.DIGITAL_OR_STALKING -> R.string.safety_intake_abuse_digital
+    AbuseType.SEXUAL -> R.string.safety_intake_abuse_sexual
+    AbuseType.CULTURAL_OR_IMMIGRATION -> R.string.safety_intake_abuse_cultural
+}
+
+/**
+ * Maps an [ImmigrationStatus] option to its localized label resource ID.
+ *
+ * @param status The option representing the user's immigration status.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun immigrationLabel(status: ImmigrationStatus): Int = when (status) {
+    ImmigrationStatus.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
+    ImmigrationStatus.CITIZEN -> R.string.safety_intake_immigration_citizen
+    ImmigrationStatus.PERMANENT_RESIDENT -> R.string.safety_intake_immigration_pr
+    ImmigrationStatus.TEMPORARY_OR_SPONSORED -> R.string.safety_intake_immigration_temporary
+    ImmigrationStatus.REFUGEE_OR_CLAIMANT -> R.string.safety_intake_immigration_refugee
+    ImmigrationStatus.UNDOCUMENTED_OR_UNCERTAIN -> R.string.safety_intake_immigration_uncertain
+}
+
+/**
+ * Maps a [DependantNeed] option to its localized label resource ID.
+ *
+ * @param need The selected dependant-care need.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun dependantLabel(need: DependantNeed): Int = when (need) {
+    DependantNeed.CHILDREN -> R.string.safety_intake_dependant_children
+    DependantNeed.ELDER_OR_ADULT_DEPENDANT -> R.string.safety_intake_dependant_adult
+    DependantNeed.PETS -> R.string.safety_intake_dependant_pets
+}
+
+/**
+ * Maps a [FinancialSituation] option to its localized label resource ID.
+ *
+ * @param situation The recorded situation described by the user.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun financialLabel(situation: FinancialSituation): Int = when (situation) {
+    FinancialSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
+    FinancialSituation.INDEPENDENT -> R.string.safety_intake_financial_independent
+    FinancialSituation.SHARED_OR_MONITORED -> R.string.safety_intake_financial_shared
+    FinancialSituation.NO_INDEPENDENT_ACCESS -> R.string.safety_intake_financial_none
+}
+
+/**
+ * Maps a [TransportSituation] option to its localized label resource ID.
+ *
+ * @param situation The recorded situation described by the user.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun transportLabel(situation: TransportSituation): Int = when (situation) {
+    TransportSituation.PREFER_NOT_TO_SAY -> R.string.safety_intake_prefer_not_to_say
+    TransportSituation.OWN_VEHICLE -> R.string.safety_intake_transport_vehicle
+    TransportSituation.PUBLIC_TRANSIT -> R.string.safety_intake_transport_transit
+    TransportSituation.NEEDS_RIDE_SUPPORT -> R.string.safety_intake_transport_ride_support
+}
+
+/**
+ * Maps a [SafetyCircumstance] option to its localized label resource ID.
+ *
+ * @param circumstance The selected safety circumstance.
+ * @return The localized string resource ID for the selected option.
+ */
+private fun circumstanceLabel(circumstance: SafetyCircumstance): Int = when (circumstance) {
+    SafetyCircumstance.LEGAL_OR_COURT_ORDERS -> R.string.safety_intake_circumstance_legal
+    SafetyCircumstance.MARRIAGE_OR_PARENTING -> R.string.safety_intake_circumstance_marriage
+    SafetyCircumstance.PRESCRIPTIONS_OR_MEDICAL -> R.string.safety_intake_circumstance_medical
+    SafetyCircumstance.SHARED_LEASE_OR_MORTGAGE -> R.string.safety_intake_circumstance_housing
 }

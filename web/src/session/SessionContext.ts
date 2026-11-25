@@ -46,6 +46,12 @@ export type SessionValue = {
   beginEntry: () => Promise<void>;
   quickExit: () => void;
   unlock: (pin: string) => Promise<void>;
+  recoverEncryptedAccess: (password: string) => Promise<void>;
+  enablePasswordRecovery: (password: string) => Promise<void>;
+  refreshPasswordRecoveryStatus: () => Promise<void>;
+  hasEncryptedAccess: boolean;
+  passwordRecoveryEnrolled: boolean | null;
+  passwordRecoveryKeysetExists: boolean;
   saveProfile: (profile: Profile, action?: string) => Promise<void>;
   saveEntry: (entry: Entry) => Promise<void>;
   record: (category: Category, event: Event | Entry) => Promise<void>;

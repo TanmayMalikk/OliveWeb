@@ -2,8 +2,6 @@
 package com.olive.app.ui.users.user.documents
 
 import kotlin.time.Duration.Companion.milliseconds
-
-
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -12,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentDataSource
+import com.olive.app.data.safety.isChatOnlyMedia
 import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.safety.DocumentListSource
@@ -37,6 +36,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import java.io.File
+import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.safety.withDecryptedMetadata
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
+import com.olive.app.security.UnlockedAccountKeyset
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import org.json.JSONObject
 
 internal data class SafetyDocumentsState(
     val ownerUid: String? = null,
@@ -69,6 +79,7 @@ internal class SafetyDocumentsController(
     private var generation = 0
     private var subscription: ChatSubscription? = null
     private var initialLoadTimeout: Job? = null
+    private var allSnapshotDocuments: List<SafetyDocument> = emptyList()
     private val evidenceWrites = mutableMapOf<String, CompletableDeferred<Unit>>()
     private val stateMutableFlow = MutableStateFlow(SafetyDocumentsState())
     val stateFlow: StateFlow<SafetyDocumentsState> = stateMutableFlow.asStateFlow()
@@ -90,6 +101,7 @@ internal class SafetyDocumentsController(
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         evidenceWrites.clear()
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
@@ -107,6 +119,7 @@ internal class SafetyDocumentsController(
             subscription?.close()
             subscription = null
             generation++
+            allSnapshotDocuments = emptyList()
             state = SafetyDocumentsState(ownerUid = ownerUid)
         }
         if (localMode || repository == null) return
@@ -125,11 +138,14 @@ internal class SafetyDocumentsController(
         subscription = repository.observeFor(ownerUid, { snapshot ->
             // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
-                val documents = snapshot.documents.map { incoming ->
-                    if (incoming.id in state.evidenceUpdates) incoming.copy(
-                        evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
-                    ) else incoming
-                }
+                allSnapshotDocuments = snapshot.documents
+                val documents = snapshot.documents
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
+                    .map { incoming ->
+                        if (incoming.id in state.evidenceUpdates) incoming.copy(
+                            evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
+                        ) else incoming
+                    }
                 if (snapshot.source == DocumentListSource.SERVER) {
                     awaitingServer = false
                     initialLoadTimeout?.cancel()
@@ -175,7 +191,7 @@ internal class SafetyDocumentsController(
         tags: Set<String> = emptySet(),
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         transfers.queueDocument(uri, identity, ocrReview, tags, onQueued = {
             state = state.copy(loading = false, error = null)
             if (subscription == null) load(identity.uid, identity.username, false)
@@ -207,7 +223,7 @@ internal class SafetyDocumentsController(
         onComplete: () -> Unit
     ) {
         val transfers = media ?: return reportError(fallbackError)
-        state = state.copy(loading = true, error = null)
+        state = state.copy(error = null)
         val review = when {
             kind != MediaKind.DOCUMENT -> OcrReview.NOT_APPLICABLE
             ocr == null -> OcrReview.NOT_RUN
@@ -230,16 +246,18 @@ internal class SafetyDocumentsController(
      * @param document Safety document metadata record.
      * @param onReady Callback invoked when ready changes or occurs.
      */
-    fun download(document: SafetyDocument, onReady: (File) -> Unit) {
+    fun download(document: SafetyDocument, onReady: (SafetyDocument, File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         if (!beginOpening(document.id)) return
         val token = generation
         scope.launch {
             try {
                 runCatching { openDocument(document, viewerUid) }
-                    .onSuccess { file ->
-                        if (token == generation && state.ownerUid == viewerUid) onReady(file)
-                        else file.delete()
+                    .onSuccess { opened ->
+                        rememberRecoveredDocument(viewerUid, opened.document)
+                        if (token == generation && state.ownerUid == viewerUid) {
+                            onReady(opened.document, opened.file)
+                        } else opened.file.delete()
                     }
                     .onFailure { failure ->
                         if (failure is CancellationException) throw failure
@@ -282,9 +300,11 @@ internal class SafetyDocumentsController(
                         source.getFor(viewerUid, documentId)
                     } else source.cachedFor(viewerUid, documentId)
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
-                    val file = openDocument(document, viewerUid)
-                    if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                    else file.delete()
+                    val opened = openDocument(document, viewerUid)
+                    rememberRecoveredDocument(viewerUid, opened.document)
+                    if (token == generation && state.ownerUid == viewerUid) {
+                        onReady(opened.document, opened.file)
+                    } else opened.file.delete()
                 }.onFailure { failure ->
                     if (failure is CancellationException) throw failure
                     if (token == generation) {
@@ -305,8 +325,24 @@ internal class SafetyDocumentsController(
      * @param document Safety document metadata record.
      * @param ownerUid Firebase UID of the resource owner.
      */
-    fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
-        checkNotNull(repository).delete(document, ownerUid)
+    fun delete(document: SafetyDocument, ownerUid: String) {
+        if (state.ownerUid != ownerUid) return
+        val previous = state.files
+        val previousAll = allSnapshotDocuments
+        allSnapshotDocuments = previousAll.filterNot { it.id == document.id }
+        state = state.copy(files = previous.filterNot { it.id == document.id }, error = null)
+        val reconciled = if (previousAll.isNotEmpty()) allSnapshotDocuments else state.files
+        media?.onDocumentSnapshot(ownerUid, reconciled, true)
+        scope.launch {
+            runCatching {
+                checkNotNull(repository).delete(document, ownerUid)
+            }.onFailure {
+                if (state.ownerUid == ownerUid) {
+                    allSnapshotDocuments = previousAll
+                    state = state.copy(files = previous, error = localizedFailure(it))
+                }
+            }
+        }
     }
 
     /**
@@ -415,7 +451,8 @@ internal class SafetyDocumentsController(
                         applicationContext.getString(R.string.emergency_report_device_verification_failed), error,
                     )
                 }
-                emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                val startResult = emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                val adminRecipients = parseEmergencyRecipients(startResult.data)
                 if (token == generation && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid) {
                     onAlertSent()
                 }
@@ -426,26 +463,30 @@ internal class SafetyDocumentsController(
                 val incidents = emergencyIncidents(entries)
                 // A just-selected Evidence checkbox must reach the server before the export rereads it.
                 evidenceWrites.values.toList().forEach { it.await() }
-                val available = repository?.listFor(ownerUid)?.documents ?: state.files
+                val available = (repository?.listFor(ownerUid)?.documents ?: state.files)
+                    .filterNot(SafetyDocument::isChatOnlyMedia)
                 val relevantIds = incidents.flatMapTo(linkedSetOf()) { it.attachmentIds }.apply {
                     addAll(available.filter(SafetyDocument::evidence).map(SafetyDocument::id))
                 }
                 val relevant = available.filter { it.id in relevantIds }
                 val files = linkedMapOf<String, EmergencyReportMedia>()
                 relevant.forEach { document ->
-                    val file = runCatching { openDocument(document, ownerUid) }.getOrNull()
-                    files[document.id] = EmergencyReportMedia(document, file)
+                    val opened = runCatching { openDocument(document, ownerUid) }.getOrNull()
+                    files[document.id] = EmergencyReportMedia(
+                        opened?.document ?: document,
+                        opened?.file,
+                    )
                 }
                 withContext(Dispatchers.IO) {
                     renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
-                }
+                } to adminRecipients
             }
             result.onFailure { error ->
                 if (token == generation) {
                     state = state.copy(loading = false, error = error.localizedMessage)
                     onFinished(Result.failure(error))
                 }
-            }.onSuccess { report ->
+            }.onSuccess { (report, adminRecipients) ->
                 if (token != generation) {
                     report.delete()
                     return@onSuccess
@@ -484,6 +525,7 @@ internal class SafetyDocumentsController(
                             onFinished(Result.failure(error))
                         }
                     },
+                    extraRecipients = adminRecipients,
                 )
             }
         }
@@ -547,6 +589,7 @@ internal class SafetyDocumentsController(
         subscription?.close()
         subscription = null
         generation++
+        allSnapshotDocuments = emptyList()
         media?.clearState()
         File(applicationContext.cacheDir, "opened-documents").listFiles()?.forEach(File::delete)
         state = SafetyDocumentsState()
@@ -592,8 +635,13 @@ internal class SafetyDocumentsController(
     private suspend fun refresh(ownerUid: String) {
         val snapshot = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) {
-            state = state.copy(files = snapshot.documents, source = snapshot.source,
-                lastSyncedAt = snapshot.lastSyncedAt, error = null)
+            allSnapshotDocuments = snapshot.documents
+            state = state.copy(
+                files = snapshot.documents.filterNot(SafetyDocument::isChatOnlyMedia),
+                source = snapshot.source,
+                lastSyncedAt = snapshot.lastSyncedAt,
+                error = null,
+            )
             media?.onDocumentSnapshot(ownerUid, snapshot.documents,
                 snapshot.source == DocumentListSource.SERVER)
         }
@@ -604,13 +652,13 @@ internal class SafetyDocumentsController(
      *
      * @param document Safety document metadata record.
      * @param viewerUid Firebase UID of the viewing account.
-     * @return The resulting [File] for open document.
+     * @return The resulting [OpenedMedia] for open document.
      */
-    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
+    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): OpenedMedia =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
         } else {
-            checkNotNull(repository).download(applicationContext, document)
+            OpenedMedia(document, checkNotNull(repository).download(applicationContext, document))
         }
 
     /**
@@ -642,6 +690,38 @@ internal class SafetyDocumentsController(
     }
 
     /**
+     * Applies restored metadata immediately and commits it to the encrypted account index.
+     *
+     * @param ownerUid Active account that owns the encrypted index partition.
+     * @param documents Locally authenticated records carrying current-device wrappers.
+     */
+    internal suspend fun rememberRecoveredDocuments(
+        ownerUid: String,
+        documents: List<SafetyDocument>,
+    ) {
+        withContext(Dispatchers.IO) {
+            documents.forEach { repository?.rememberRecovered(ownerUid, it) }
+        }
+        if (state.ownerUid == ownerUid) {
+            val recovered = documents.associateBy(SafetyDocument::id)
+            state = state.copy(files = state.files.map { recovered[it.id] ?: it })
+        }
+    }
+
+    /**
+     * Persists updated metadata for a single recovered document.
+     *
+     * @param ownerUid Firebase UID of the signed-in document owner.
+     * @param document Document record whose local metadata and key wrappers were recovered.
+     */
+    private fun rememberRecoveredDocument(ownerUid: String, document: SafetyDocument) {
+        if (state.ownerUid == ownerUid) {
+            state = state.copy(files = state.files.map { if (it.id == document.id) document else it })
+        }
+        scope.launch(Dispatchers.IO) { repository?.rememberRecovered(ownerUid, document) }
+    }
+
+    /**
      * Computes localized failure.
      *
      * @param failure Exception or failure reason encountered during execution.
@@ -653,10 +733,10 @@ internal class SafetyDocumentsController(
 }
 
 /**
- * Computes media failure resource.
+ * Maps bounded media and recovery failures to localized user guidance.
  *
- * @param failure Exception or failure reason encountered during execution.
- * @return The computed media failure resource numeric value.
+ * @param failure Failure returned by the encrypted media access pipeline.
+ * @return String resource describing the safe next action without exposing cryptographic details.
  */
 internal fun mediaFailureResource(failure: Throwable): Int {
     if (failure is MediaDeviceVerificationException) {
@@ -670,9 +750,97 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.ACCESS_REVOKED -> R.string.documents_access_revoked
         MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
         MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
+        MediaAccessError.ACCOUNT_WRAPPER_MISSING -> R.string.documents_account_wrapper_missing
+        MediaAccessError.ACCOUNT_RECOVERY_FAILED -> R.string.documents_account_recovery_failed
+        MediaAccessError.ACCOUNT_KEYSET_MISMATCH -> R.string.documents_account_keyset_mismatch
+        MediaAccessError.ACCOUNT_WRAPPER_UNWRAP_FAILED -> R.string.documents_account_wrapper_failed
+        MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED -> R.string.documents_ciphertext_authentication_failed
         MediaAccessError.ACCOUNT_MISMATCH -> R.string.documents_account_mismatch
         MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed
         null -> R.string.documents_open_failed
+    }
+}
+
+internal data class MediaAccessRecoveryResult(
+    val documents: List<SafetyDocument>,
+    val failedIds: Set<String>,
+    val pendingSyncIds: Set<String>,
+)
+
+/**
+ * Selects authorized media whose account wrapper can provision the current device.
+ *
+ * @param documents Encrypted media records visible to the account.
+ * @param viewerUid Active Firebase account identifier.
+ * @param deviceId Stable identifier derived from the current device encryption key.
+ * @return Distinct media records missing this device's wrapped DEK.
+ */
+internal fun recoverableMediaDocuments(
+    documents: List<SafetyDocument>,
+    viewerUid: String,
+    deviceId: String,
+): List<SafetyDocument> = documents.filter { document ->
+    document.objectKey.isNotBlank() &&
+        viewerUid in document.allowedUsers &&
+        document.accountWrappedKeys[viewerUid] != null &&
+        document.deviceWrappedKeys["$viewerUid--$deviceId"].isNullOrBlank()
+}.distinctBy(SafetyDocument::id)
+
+/** Restores media DEKs for only the current device while keeping payload bytes untouched. */
+internal class EncryptedMediaAccessRecovery(
+    private val repository: MediaTicketDataSource,
+) {
+    /**
+     * Restores authenticated metadata and device wrappers with one unlocked account keyset.
+     *
+     * @param documents Authorized encrypted media records visible to the account.
+     * @param viewerUid Active Firebase account identifier.
+     * @param keyset Account private key unlocked for this foreground recovery operation.
+     * @return Locally restored records, rejected IDs, and wrappers awaiting server synchronization.
+     */
+    suspend fun restore(
+        documents: List<SafetyDocument>,
+        viewerUid: String,
+        keyset: UnlockedAccountKeyset,
+    ): MediaAccessRecoveryResult = coroutineScope {
+        val deviceId = KeyManager.deviceId()
+        val deviceMapKey = "$viewerUid--$deviceId"
+        val publicKey = KeyManager.getOrCreatePublicKey()
+        val gate = Semaphore(4)
+        val candidates = recoverableMediaDocuments(documents, viewerUid, deviceId)
+        val outcomes = candidates.map { document ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    runCatching {
+                        val accountWrapper = checkNotNull(document.accountWrappedKeys[viewerUid])
+                        check(accountWrapper.keyId == keyset.keyId && accountWrapper.epoch == keyset.epoch) {
+                            "Account keyset does not match encrypted media"
+                        }
+                        val documentKey = accountWrapper.unwrap(keyset)
+                        val deviceWrapper = KeyManager.wrapKey(documentKey, publicKey)
+                        val metadataResolved = if (document.encryptedMetadata.isBlank()) document else {
+                            document.withDecryptedMetadata(
+                                JSONObject(EncryptionUtils.decryptText(document.encryptedMetadata, documentKey)),
+                            )
+                        }
+                        val resolved = metadataResolved.copy(
+                            deviceWrappedKeys = document.deviceWrappedKeys + (deviceMapKey to deviceWrapper),
+                        )
+                        val synced = runCatching {
+                            repository.updateDeviceKeys(document.id, mapOf(deviceMapKey to deviceWrapper))
+                        }.isSuccess
+                        Triple(resolved, synced, document.id)
+                    }
+                }
+            }
+        }.awaitAll()
+        val restored = outcomes.mapNotNull { it.getOrNull() }
+        val restoredIds = restored.mapTo(mutableSetOf()) { it.third }
+        MediaAccessRecoveryResult(
+            documents = restored.map { it.first },
+            failedIds = candidates.mapTo(mutableSetOf(), SafetyDocument::id) - restoredIds,
+            pendingSyncIds = restored.filterNot { it.second }.mapTo(mutableSetOf()) { it.third },
+        )
     }
 }

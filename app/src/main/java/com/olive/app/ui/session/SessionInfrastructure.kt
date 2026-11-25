@@ -9,6 +9,9 @@ import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRepository
+import com.olive.app.data.account.AccountKeysetRepository
+import com.olive.app.data.account.OpaqueRecoveryRepository
+import com.olive.app.data.account.AndroidOpaqueClient
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminRepository
 import com.olive.app.data.account.CoverType
@@ -16,7 +19,7 @@ import com.olive.app.data.account.FirebaseAccountRepository
 import com.olive.app.data.account.LocalAccountRepository
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.account.UserProfile
-import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.security.CoverStateStore
 import com.olive.app.data.location.AdminLocationRepository
 import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationSharingRepository
@@ -77,6 +80,7 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
     val chatCache = ChatCacheStore(application)
     val documentIndex = DocumentIndexStore(application)
     val offlineMediaCache = OfflineMediaCache(application)
+    val accountKeysets = AccountKeysetLocalStore(vault)
 }
 
 // Builds cloud repositories only for a Firebase session. Tests can supply a replacement bundle.
@@ -90,6 +94,8 @@ internal class SessionDataSources(
     val safetyDocuments: SafetyDocumentDataSource?,
     val locations: LocationSharingDataSource?,
     val adminLocations: AdminLocationRepository?,
+    val accountKeysets: AccountKeysetRepository?,
+    val opaqueRecovery: OpaqueRecoveryRepository? = null,
 ) {
     companion object {
         /**
@@ -123,6 +129,8 @@ internal class SessionDataSources(
                 },
                 locations = if (localMode) null else LocationSharingRepository(application),
                 adminLocations = if (localMode) null else AdminLocationRepository(),
+                accountKeysets = if (localMode) null else AccountKeysetRepository(),
+                opaqueRecovery = if (localMode) null else OpaqueRecoveryRepository(opaqueClient = AndroidOpaqueClient(application)),
             )
         }
     }
@@ -220,7 +228,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 if (device.role != AccountRole.USER || activeTriggerId == null || !device.allowsAppPin()) return
                 if (!InputPolicy.validPin(pin)) {
-                    message = runtime.application.getString(R.string.enter_your_4_6_digit_pin)
+                    failInput(runtime.application.getString(R.string.enter_your_4_6_digit_pin))
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
@@ -233,12 +241,14 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                     }
                     if (epoch != token || screen != SessionScreen.Pin || challenge != pinChallengeVersion) return@runOperation
                     when (result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, usingAppPin = true)
+                        PinResult.Accepted -> unlockVerifiedDevice(device, token, SessionScreen.Pin, challenge, verifiedPinLength = pin.length)
                         is PinResult.Rejected -> if (result.failures >= 5) navigation.quickExit() else {
-                            message = runtime.application.resources.getQuantityString(
-                                R.plurals.ui_incorrect_pin_value_attempts_remaining,
-                                5 - result.failures,
-                                5 - result.failures
+                            failInput(
+                                runtime.application.resources.getQuantityString(
+                                    R.plurals.ui_incorrect_pin_value_attempts_remaining,
+                                    5 - result.failures,
+                                    5 - result.failures
+                                )
                             )
                         }
                     }
@@ -254,23 +264,23 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
      * @param token Authentication, push notification, or session token.
      * @param expectedScreen Expected screen supplied to [unlockVerifiedDevice].
      * @param challenge Optional challenge supplied to [unlockVerifiedDevice].
-     * @param usingAppPin Whether to apply using app PIN.
+     * @param verifiedPinLength Length recorded after successful app PIN verification, if used.
      */
     internal suspend fun unlockVerifiedDevice(
         device: DeviceEnrollment,
         token: Long,
         expectedScreen: SessionScreen,
         challenge: Int? = null,
-        usingAppPin: Boolean = false
+        verifiedPinLength: Int? = null,
     ) {
         with(runtime) {
             with(state) {
-                if (usingAppPin && !device.allowsAppPin()) return
+                if (verifiedPinLength != null && !device.allowsAppPin()) return
                 val saved = withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
                 if (epoch != token || screen != expectedScreen || enrollment != device || privacyBlackout ||
-                    (challenge != null && challenge != pinChallengeVersion) ||
-                    (usingAppPin && !device.allowsAppPin())
+                    (challenge != null && challenge != pinChallengeVersion)
                 ) return
+                if (verifiedPinLength != null) enrollment = device.copy(pinLength = verifiedPinLength)
                 pinAuthorizedUid = device.uid
                 pinAuthorizedEpoch = token
                 busy = false
@@ -280,13 +290,8 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 history.refreshHistory(device.uid)
                 screenHistory.clear()
                 safePageHistory.clear()
-                page = SafePage.Home
-                screen = SessionScreen.Safe
-                unlockAnimationVersion++
+                enterSafeWithAnimation()
                 privacy.startIdleTimer()
-                scope.launch(Dispatchers.IO) {
-                    runCatching { dataSources.safetyDocuments?.upgradeOwnedRecoveryKeys(device.uid) }
-                }
             }
         }
     }
@@ -294,8 +299,9 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
 
 // Holds an active biometric/device-credential unlock request.
 internal class DeviceLockRequest internal constructor(
-    val challenge: DeviceLockChallenge,
-    val settingsChange: Boolean = false
+    val challenge: DeviceAuthenticationChallenge,
+    val settingsChange: Boolean = false,
+    @androidx.annotation.StringRes val subtitleRes: Int? = null,
 ) {
     internal val result = CompletableDeferred<Cipher?>()
     /**
@@ -305,6 +311,20 @@ internal class DeviceLockRequest internal constructor(
      */
     fun complete(cipher: Cipher?) {
         result.complete(cipher)
+    }
+}
+
+/** Holds an active in-app prompt asking the user for their backup recovery password. */
+internal class PasswordRecoveryUnlockRequest internal constructor() {
+    internal val result = CompletableDeferred<String?>()
+
+    /**
+     * Delivers the entered recovery password or null if the prompt was dismissed.
+     *
+     * @param password Recovery password entered by the user, or `null` when cancelled.
+     */
+    fun complete(password: String?) {
+        result.complete(password)
     }
 }
 
@@ -379,12 +399,13 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Computes current.
+     * Checks that a private-entry request still belongs to the same account and screen.
      *
-     * @param token Authentication, push notification, or session token.
-     * @param expected Expected supplied to [current].
-     * @param uid Firebase UID of the target user account.
-     * @param enroll Whether to apply enroll.
+     * @param token The session epoch captured when the request started.
+     * @param expected The screen that must still be active.
+     * @param uid The UID that must match the pending or enrolled account.
+     * @param enroll Whether to check the pending enrollment instead of the enrolled device.
+     * @return True when the original user session and screen are still active and visible.
      */
     private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) = with(runtime) {
         epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&
@@ -400,6 +421,7 @@ internal class SessionRuntime(
     val scope: CoroutineScope,
     dataSourcesOverride: SessionDataSources? = null,
     val localMode: Boolean = !BuildConfig.FIREBASE_CONFIGURED,
+    prioritySyncOverride: PrioritySyncCoordinator? = null,
 ) {
     val state: SessionState = SessionState { canEnterSafe() }
     private val localStorage = SessionLocalStorage(application, localMode)
@@ -424,7 +446,8 @@ internal class SessionRuntime(
     val chatCache get() = localStorage.chatCache
     val documentIndex get() = localStorage.documentIndex
     val offlineMediaCache get() = localStorage.offlineMediaCache
-    val prioritySync = PrioritySyncCoordinator(application)
+    val accountKeysets get() = localStorage.accountKeysets
+    val prioritySync = prioritySyncOverride ?: PrioritySyncCoordinator(application)
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(
         application,
         localMode,
@@ -439,6 +462,8 @@ internal class SessionRuntime(
     val mediaRepository get() = dataSources.media
     val safetyDocumentRepository get() = dataSources.safetyDocuments
     val locationSharingRepository get() = dataSources.locations
+    val accountKeysetRepository get() = dataSources.accountKeysets
+    val opaqueRecoveryRepository get() = dataSources.opaqueRecovery
     private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
     var enrollment: DeviceEnrollment?
         get() = activeEnrollment
@@ -490,6 +515,7 @@ internal class SessionRuntime(
     val safety = SessionSafetyPlans(this)
     val staffSupport = StaffSupportController(this)
     val settings = SessionSettings(this)
+    val passwordRecovery = SessionPasswordRecovery(this)
     val operations = SessionOperations(this)
 
     val configured get() = enrollment != null
@@ -555,9 +581,17 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
      *
      * @param failure Exception or failure reason encountered during execution.
      * @param timeoutMillis Duration or timestamp for timeout, in milliseconds.
+     * @param timeoutMessage Message shown if the task exceeds [timeoutMillis].
+     * @param failureFor Maps an exception to a localized failure message.
      * @param block Callback or suspending lambda executed within this scope.
      */
-    fun runOperation(failure: String, timeoutMillis: Long = 25_000, block: suspend (Long) -> Unit) {
+    fun runOperation(
+        failure: String,
+        timeoutMillis: Long = 25_000,
+        timeoutMessage: String = runtime.application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry),
+        failureFor: (Exception) -> String = { failure },
+        block: suspend (Long) -> Unit,
+    ) {
         with(runtime) {
             with(state) {
                 val token = epoch
@@ -570,17 +604,16 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                     try {
                         withTimeout(timeoutMillis.milliseconds) { block(token) }
                     } catch (_: TimeoutCancellationException) {
-                        if (epoch == token) finalFailure =
-                            application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist)
+                        if (epoch == token) finalFailure = timeoutMessage
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (_: Exception) { // Convert unexpected operation failures into the feature's prepared user-facing error.
-                        if (epoch == token) finalFailure = failure
+                    } catch (error: Exception) {
+                        if (epoch == token) finalFailure = failureFor(error)
                     } finally {
                         if (operationJob === runningJob) {
                             operationJob = null
                             busy = false
-                            finalFailure?.let { message = it }
+                            finalFailure?.let { failInput(it) }
                         }
                     }
                 }

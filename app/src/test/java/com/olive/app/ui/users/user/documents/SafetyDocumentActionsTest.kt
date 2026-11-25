@@ -124,21 +124,21 @@ class SafetyDocumentActionsTest {
     @Test
     fun openingTheSameDocumentTwiceDownloadsOnceAndAccountSwitchDiscardsTheStalePlaintext() = runBlocking<Unit> {
         Fixture().use { fixture ->
-            val download = CompletableDeferred<File>()
+            val download = CompletableDeferred<OpenedMedia>()
             doAnswer { invocation ->
                 @Suppress("UNCHECKED_CAST")
-                val continuation = invocation.rawArguments.last() as kotlin.coroutines.Continuation<File>
-                val operation: suspend () -> File = { download.await() }
+                val continuation = invocation.rawArguments.last() as kotlin.coroutines.Continuation<OpenedMedia>
+                val operation: suspend () -> OpenedMedia = { download.await() }
                 operation.startCoroutineUninterceptedOrReturn(continuation)
             }.`when`(fixture.media).downloadFile(fixture.doc, "owner")
             val local = File.createTempFile("synthetic-opened-", ".pdf", fixture.f.application.cacheDir)
             try {
-                fixture.controller.download(fixture.doc) { fail("A previous account's document must stay closed") }
-                fixture.controller.download(fixture.doc) { fail("A duplicate request must stay closed") }
+                fixture.controller.download(fixture.doc) { _, _ -> fail("A previous account's document must stay closed") }
+                fixture.controller.download(fixture.doc) { _, _ -> fail("A duplicate request must stay closed") }
                 assertEquals(setOf("doc"), fixture.controller.state.openingDocumentIds)
                 verify(fixture.media).downloadFile(fixture.doc, "owner")
                 fixture.controller.prepare("another")
-                download.complete(local)
+                download.complete(OpenedMedia(fixture.doc, local))
                 fixture.f.await { !local.exists() }
                 assertEquals("another", fixture.controller.state.ownerUid)
                 assertTrue(fixture.controller.state.openingDocumentIds.isEmpty())
@@ -304,6 +304,42 @@ class SafetyDocumentActionsTest {
                     t.f.await { noMediaResult != null }
                     assertEquals(true, noMediaResult?.isFailure)
                 }
+            }
+        }
+    }
+
+    @Test
+    fun controllerHidesChatOnlyAndLegacyVoiceDocumentsWhilePreservingMediaTrackingAndOpenShared() = runBlocking<Unit> {
+        Fixture().use { t ->
+            val taggedVoice = t.doc.copy(id = "voice-tagged", name = "Audio.m4a", mimeType = "audio/mp4", chatOnly = true)
+            val legacyVoice = t.doc.copy(id = "voice-legacy", name = "Voice message.m4a", mimeType = "audio/mp4")
+            val manualAudio = t.doc.copy(id = "audio-file", name = "Recording.m4a", mimeType = "audio/mp4")
+            val allDocs = listOf(t.doc, taggedVoice, legacyVoice, manualAudio)
+
+            t.snapshot(DocumentListSnapshot(allDocs, DocumentListSource.SERVER, 200))
+
+            assertEquals(listOf("doc", "audio-file"), t.controller.state.files.map(SafetyDocument::id))
+            verify(t.media).acknowledgePublished(setOf("doc", "voice-tagged", "voice-legacy", "audio-file"))
+            verify(t.media).onDocumentSnapshot("owner", allDocs, true)
+
+            `when`(t.repo.listFor("owner")).thenReturn(DocumentListSnapshot(allDocs, DocumentListSource.SERVER, 201))
+            var shared = false
+            t.controller.share(t.doc, "owner", mapOf("friend" to "fixture_friend")) { shared = true }
+            assertTrue(shared)
+            assertEquals(listOf("doc", "audio-file"), t.controller.state.files.map(SafetyDocument::id))
+            verify(t.media, times(2)).onDocumentSnapshot("owner", allDocs, true)
+
+            val openedFile = File.createTempFile("voice-open-", ".m4a", t.f.application.cacheDir).apply { writeText("audio") }
+            try {
+                `when`(t.repo.getFor("owner", "voice-tagged")).thenReturn(taggedVoice)
+                `when`(t.repo.cachedFor("owner", "voice-tagged")).thenReturn(taggedVoice)
+                `when`(t.media.downloadFile(taggedVoice, "owner")).thenReturn(OpenedMedia(taggedVoice, openedFile))
+                var opened: Pair<SafetyDocument, File>? = null
+                t.controller.openShared("owner", "voice-tagged") { doc, file -> opened = doc to file }
+                t.f.await { opened != null }
+                assertEquals("voice-tagged", opened?.first?.id)
+            } finally {
+                openedFile.delete()
             }
         }
     }

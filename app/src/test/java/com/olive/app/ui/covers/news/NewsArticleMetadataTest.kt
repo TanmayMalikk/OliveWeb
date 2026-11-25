@@ -210,4 +210,18 @@ class NewsArticleMetadataTest {
         assertFalse(isSecureNewsUrl("https://user@publisher.example/story"))
         assertFalse(isSecureNewsUrl("not a url"))
     }
+
+    @Test
+    fun extractsActualWordCountFromArticleMarkup() {
+        val words = (1..600).joinToString(" ") { "word$it" }
+        val html = """
+            <html><body>
+                <article>
+                    <p>$words</p>
+                </article>
+            </body></html>
+        """.trimIndent()
+        val result = parseNewsArticleMetadata(html, url)
+        assertEquals(600, result.wordCount)
+    }
 }

@@ -159,6 +159,155 @@ test('account sync revisions are owner-only, exact, and monotonic', async () => 
   await assertFails(deleteDoc(target));
 });
 
+test('account keysets are owner-only immutable ciphertext envelopes', async () => {
+  const uid = 'keyset-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('keyset-bob').firestore();
+  const anonymous = env.unauthenticatedContext().firestore();
+  const target = doc(alice, 'accountKeysets', uid);
+  await assertSucceeds(getDoc(target));
+  await assertFails(getDoc(doc(bob, 'accountKeysets', uid)));
+  await assertFails(getDoc(doc(anonymous, 'accountKeysets', uid)));
+  const envelope = {
+    version: 1,
+    accountId: uid,
+    keyId: '123e4567-e89b-12d3-a456-426614174000',
+    epoch: 1,
+    algorithm: 'RSA-OAEP-256',
+    publicKey: 'A'.repeat(400),
+    iv: 'A'.repeat(16),
+    ciphertext: 'A'.repeat(2000),
+    updatedAt: serverTimestamp(),
+  };
+
+  await assertSucceeds(setDoc(target, envelope));
+  await assertSucceeds(getDoc(target));
+  await assertSucceeds(setDoc(target, {...envelope, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(target, {...envelope, ciphertext: 'B'.repeat(2000), updatedAt: serverTimestamp()}));
+  await assertFails(getDoc(doc(bob, 'accountKeysets', uid)));
+  await assertFails(getDoc(doc(anonymous, 'accountKeysets', uid)));
+  await assertFails(getDocs(collection(alice, 'accountKeysets')));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      updatedAt: Date.now(),
+    });
+  });
+  await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      passwordRecovery: {
+        version: 1,
+        accountId: uid,
+        opaqueRecordId: 'rec_1234567890123456',
+        algorithm: 'OPAQUE-3DH-HKDF-SHA256-AES-256-GCM',
+        salt: `${'A'.repeat(43)}=`,
+        iv: 'A'.repeat(16),
+        ciphertext: 'A'.repeat(64),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await assertSucceeds(getDoc(target));
+  await assertSucceeds(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }, { merge: true }));
+  await assertFails(setDoc(target, { ...envelope, updatedAt: serverTimestamp() }));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      'passwordRecovery.salt': 'invalid',
+    });
+  });
+  await assertFails(getDoc(target));
+
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'accountKeysets', uid), {
+      ...envelope,
+      version: 2,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await assertFails(getDoc(target));
+});
+
+test('account key directory exposes exact public wrapping keys without enumeration', async () => {
+  const uid = 'key-directory-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('key-directory-bob').firestore();
+  const anonymous = env.unauthenticatedContext().firestore();
+  const target = doc(alice, 'accountKeyDirectories', uid);
+  const keysetTarget = doc(alice, 'accountKeysets', uid);
+  const directory = {
+    ownerUid: uid,
+    keyId: '123e4567-e89b-12d3-a456-426614174000',
+    epoch: 1,
+    algorithm: 'RSA-OAEP-256',
+    publicKey: 'A'.repeat(400),
+    updatedAt: serverTimestamp(),
+  };
+  const envelope = {
+    version: 1, accountId: uid, keyId: directory.keyId, epoch: directory.epoch,
+    algorithm: directory.algorithm, publicKey: directory.publicKey,
+    iv: 'A'.repeat(16), ciphertext: 'A'.repeat(2000), updatedAt: serverTimestamp(),
+  };
+
+  const publish = writeBatch(alice);
+  publish.set(keysetTarget, envelope);
+  publish.set(target, directory);
+  await assertSucceeds(publish.commit());
+  await assertSucceeds(getDoc(target));
+  await assertSucceeds(getDoc(doc(bob, 'accountKeyDirectories', uid)));
+  await assertFails(getDoc(doc(anonymous, 'accountKeyDirectories', uid)));
+  await assertFails(getDocs(collection(alice, 'accountKeyDirectories')));
+  await assertFails(setDoc(doc(bob, 'accountKeyDirectories', uid), directory));
+  await assertFails(setDoc(target, {...directory, ownerUid: 'key-directory-bob'}));
+  await assertFails(setDoc(target, {...directory, algorithm: 'RSA-OAEP'}));
+  await assertSucceeds(setDoc(target, {...directory, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(target, {...directory, epoch: 2, updatedAt: serverTimestamp()}));
+  await assertFails(setDoc(target, {...directory, publicKey: 'B'.repeat(400), updatedAt: serverTimestamp()}));
+  await assertFails(deleteDoc(target));
+});
+
+test('passkey recovery factors are callable-service-only', async () => {
+  const uid = 'passkey-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('passkey-bob').firestore();
+  const credentialPath = `accountRecoveryPasskeys/${uid}/credentials/credential_abcdefghijklmnop`;
+  const challengePath = `accountRecoveryPasskeys/${uid}/challenges/challenge_abcdefghijklmnop`;
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), credentialPath), {ownerUid: uid, ciphertext: 'opaque'});
+    await setDoc(doc(context.firestore(), challengePath), {ownerUid: uid, challenge: 'server-only'});
+  });
+
+  for (const client of [alice, bob, env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(client, credentialPath)));
+    await assertFails(getDoc(doc(client, challengePath)));
+    await assertFails(setDoc(doc(client, credentialPath), {ownerUid: uid, ciphertext: 'forged'}));
+  }
+});
+
+test('opaque recovery throttling state is callable-service-only', async () => {
+  const uid = 'opaque-throttle-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('opaque-throttle-bob').firestore();
+  const throttlePath = `accountRecoveryOpaqueThrottle/${uid}`;
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), throttlePath), {failedAttempts: 5, lockedUntil: Date.now() + 60000});
+  });
+
+  for (const client of [alice, bob, env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(client, throttlePath)));
+    await assertFails(getDocs(collection(client, 'accountRecoveryOpaqueThrottle')));
+    await assertFails(setDoc(doc(client, throttlePath), {failedAttempts: 0, lockedUntil: 0}));
+    await assertFails(updateDoc(doc(client, throttlePath), {failedAttempts: 0}));
+    await assertFails(deleteDoc(doc(client, throttlePath)));
+  }
+});
+
 test('safety plan reads require valid path identity and bounded access fields', async () => {
   const ownerUid='rules-plan-owner';
   const owner=env.authenticatedContext(ownerUid,{role:'USER'}).firestore();
@@ -301,6 +450,7 @@ test('authorized users can query encrypted media without exposing other file rec
   const mediaId='encrypted-media-1';
   const encrypted={owner_id:'media-alice',object_key:`users/media-alice/media/${mediaId}`,
     encrypted_metadata:'encrypted-display-metadata',wrapped_keys:{'media-alice':'wrapped-owner-key','media-bob':'wrapped-recipient-key'},
+    account_wrapped_keys:{'media-alice':{wrappedKey:'opaque-owner'},'media-bob':{wrappedKey:'opaque-recipient'}},
     allowed_users:['media-alice','media-bob'],ciphertext_size:4096,
     ciphertext_sha256:'a'.repeat(64),encryption_version:1,account_recovery_ready:true,created_at:serverTimestamp()};
 
@@ -309,6 +459,14 @@ test('authorized users can query encrypted media without exposing other file rec
     await setDoc(doc(context.firestore(),`files/${mediaId}`),encrypted);
     await setDoc(doc(context.firestore(),'files/malformed-encrypted-media'),{
       ...encrypted,object_key:'users/media-alice/media/malformed-encrypted-media',unexpected:'forbidden'});
+    await setDoc(doc(context.firestore(),'files/partial-account-wrappers'),{
+      ...encrypted,object_key:'users/media-alice/media/partial-account-wrappers',
+      account_wrapped_keys:{'media-alice':{wrappedKey:'opaque-owner'}},
+    });
+    await setDoc(doc(context.firestore(),'files/unauthorized-account-wrapper'),{
+      ...encrypted,object_key:'users/media-alice/media/unauthorized-account-wrapper',
+      account_wrapped_keys:{...encrypted.account_wrapped_keys,'media-charlie':{wrappedKey:'opaque-outsider'}},
+    });
   });
 
   const visibleToAlice=query(collection(alice,'files'),where('allowed_users','array-contains','media-alice'));
@@ -324,6 +482,8 @@ test('authorized users can query encrypted media without exposing other file rec
   await assertSucceeds(getDoc(doc(bob,`files/${mediaId}`)));
   await assertFails(getDoc(doc(charlie,`files/${mediaId}`)));
   await assertFails(getDoc(doc(alice,'files/malformed-encrypted-media')));
+  await assertSucceeds(getDoc(doc(bob,'files/partial-account-wrappers')));
+  await assertFails(getDoc(doc(alice,'files/unauthorized-account-wrapper')));
 });
 
 test('users and safe contacts get encrypted private DMs and only the sender can unsend', async () => {
@@ -387,17 +547,29 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
     acceptedRequestId:requestId,createdAt:serverTimestamp()}));
 
-  const accept=writeBatch(bob);
-  accept.set(doc(bob,'friendships/'+friendshipId),{participantIds:['social-a','social-b'],
+  const friendship={participantIds:['social-a','social-b'],
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
-    acceptedRequestId:requestId,createdAt:serverTimestamp()});
-  accept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),{friendshipId,friendUid:'social-b',
-    friendUsername:'social_bob',createdAt:serverTimestamp()});
-  accept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),{friendshipId,friendUid:'social-a',
-    friendUsername:'social_alice',createdAt:serverTimestamp()});
+    acceptedRequestId:requestId,createdAt:serverTimestamp()};
+  const aliceFriend={friendshipId,friendUid:'social-b',friendUsername:'social_bob',createdAt:serverTimestamp()};
+  const bobFriend={friendshipId,friendUid:'social-a',friendUsername:'social_alice',createdAt:serverTimestamp()};
   const conversation={friendshipId,participantIds:['social-a','social-b'],
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
+  const invalidAccept=writeBatch(bob);
+  invalidAccept.set(doc(bob,'friendships/'+friendshipId),friendship);
+  invalidAccept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),aliceFriend);
+  invalidAccept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),bobFriend);
+  invalidAccept.set(doc(bob,'conversations/'+friendshipId),{
+    ...conversation,
+    accountRoomKeys:{'social-a':{keyId:'unvalidated',epoch:0,algorithm:'raw',wrappedKey:'plaintext'}},
+  });
+  invalidAccept.delete(doc(bob,'friendRequests/'+requestId));
+  await assertFails(invalidAccept.commit());
+
+  const accept=writeBatch(bob);
+  accept.set(doc(bob,'friendships/'+friendshipId),friendship);
+  accept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),aliceFriend);
+  accept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),bobFriend);
   accept.set(doc(bob,'conversations/'+friendshipId),conversation);
   accept.delete(doc(bob,'friendRequests/'+requestId));
   await assertSucceeds(accept.commit());
@@ -447,6 +619,23 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
     {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
+  const accountKeyId='123e4567-e89b-42d3-a456-426614174000';
+  await env.withSecurityRulesDisabled(async context => {
+    for (const uid of ['social-a','social-b']) await setDoc(
+      doc(context.firestore(),'accountKeyDirectories',uid),
+      {ownerUid:uid,keyId:accountKeyId,epoch:1,algorithm:'RSA-OAEP-256',publicKey:'A'.repeat(400),updatedAt:new Date()},
+    );
+  });
+  const accountRoomKeys=Object.fromEntries(['social-a','social-b'].map(uid=>[uid,{
+    keyId:accountKeyId,epoch:1,algorithm:'RSA-OAEP-256',wrappedKey:'A'.repeat(512),
+  }]));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
+    {accountRoomKeys,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    accountRoomKeys:{...accountRoomKeys,'social-c':accountRoomKeys['social-a']},updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    accountRoomKeys:{...accountRoomKeys,'social-a':{...accountRoomKeys['social-a'],keyId:'223e4567-e89b-42d3-a456-426614174000'}},
+    updatedAt:serverTimestamp()}));
   // An empty conversation may repair stale wrapped keys because no message history can be lost.
   await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),
     {roomKeys:{'social-a':'replacement','social-b':'replacement'},
@@ -639,6 +828,10 @@ test('organization locations are written by users and readable only by admins', 
   await assertFails(set(ref(admin,path),point));
   await assertFails(set(ref(user,path),{...point,latitude:91}));
   await assertFails(set(ref(user,path),{...point,extra:'not allowed'}));
+  const legacyUser=env.authenticatedContext('legacy-map-user',{email:'legacy_user@users.olive.invalid'}).database();
+  const legacySafe=env.authenticatedContext('legacy-map-safe',{email:'legacy_safe@safe.olive.invalid'}).database();
+  await assertSucceeds(set(ref(legacyUser,'adminLiveLocations/legacy-map-user'),point));
+  await assertFails(set(ref(legacySafe,'adminLiveLocations/legacy-map-safe'),point));
 });
 
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {

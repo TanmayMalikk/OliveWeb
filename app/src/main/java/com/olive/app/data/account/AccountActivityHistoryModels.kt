@@ -35,8 +35,10 @@ data class HistoryRecord(val category: String, val id: String, val json: String)
 /**
  * Keep the machine timestamp for sorting and add an ISO value humans can read in Firebase Storage.
  *
+ * @receiver The JSON object containing the stored fields.
  * @param name Field, key, or display name.
  * @param value Input value to store, parse, or format.
+ * @return The same JSON object with the epoch and ISO timestamp fields set.
  */
 private fun JSONObject.putReadableTime(name: String, value: Long) =
     put(name, value).put("${name}Iso", Instant.ofEpochMilli(value).toString())
@@ -45,9 +47,21 @@ object PrivateEntryKindSerializer : KSerializer<PrivateEntryKind> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("PrivateEntryKind", PrimitiveKind.STRING)
 
+    /**
+     * Serializes the entry kind by name.
+     *
+     * @param encoder The serialization encoder that receives the value.
+     * @param value The note or incident category to encode.
+     */
     override fun serialize(encoder: Encoder, value: PrivateEntryKind) =
         encoder.encodeString(value.name)
 
+    /**
+     * Deserializes the entry kind, falling back to [PrivateEntryKind.Note].
+     *
+     * @param decoder The serialization decoder that supplies the stored value.
+     * @return The decoded entry type, defaulting to Note when the stored name is unknown.
+     */
     override fun deserialize(decoder: Decoder): PrivateEntryKind =
         runCatching { PrivateEntryKind.valueOf(decoder.decodeString()) }.getOrDefault(PrivateEntryKind.Note)
 }
@@ -162,6 +176,7 @@ private fun elapsedSince(timestamp: Long, now: Long): Long {
 /**
  * Returns true after a trashed entry reaches the deletion limit.
  *
+ * @receiver The trashed private entry whose retention period is checked.
  * @param now Current epoch timestamp in milliseconds.
  * @return The resulting trash expired.
  */
@@ -171,6 +186,7 @@ fun PrivateEntry.trashExpired(now: Long = System.currentTimeMillis()) =
 /**
  * Calculates how many full days remain before a trashed entry is deleted.
  *
+ * @receiver The trashed private entry whose retention period is checked.
  * @param now Current epoch timestamp in milliseconds.
  * @return The computed trash days remaining numeric value.
  */
@@ -183,6 +199,7 @@ fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int
 /**
  * Calculates the remaining trash time for the live countdown.
  *
+ * @receiver The trashed private entry whose retention period is checked.
  * @param now Current epoch timestamp in milliseconds.
  * @return The computed trash seconds remaining numeric value.
  */
@@ -304,6 +321,12 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
     changed("Province / state", before.address.province, after.address.province)
     changed("Postal / ZIP", before.address.postalCode, after.address.postalCode)
     changed("Country", before.address.country, after.address.country)
+    changed("Email", before.email, after.email)
+    changed(
+        "Email notifications",
+        if (before.emailCommunicationConsent) "Enabled" else "Disabled",
+        if (after.emailCommunicationConsent) "Enabled" else "Disabled",
+    )
     changed("Cover app", before.coverType.title, after.coverType.title)
     if (before.triggerHash != after.triggerHash) add(
         FieldChange(
@@ -311,6 +334,13 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
             "Hidden",
             "Changed"
         )
+    )
+    if (before.safetyIntake != after.safetyIntake) add(
+        FieldChange(
+            "Safety plan questionnaire",
+            "",
+            "Updated",
+        ),
     )
     if (before.contacts != after.contacts) {
         /**
@@ -590,6 +620,18 @@ class FirebaseAccountRepository(
     override fun signOut() = auth.signOut()
 
     /**
+     * Records this Android installation for cross-device sign-in notifications.
+     *
+     * @param deviceId The ID of the device participating in the operation.
+     * @param registerOnly Whether the request should only register this device.
+     */
+    override suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean) {
+        functions.getHttpsCallable("recordDeviceSignIn")
+            .call(mapOf("deviceId" to deviceId, "platform" to "APP", "registerOnly" to registerOnly))
+            .await()
+    }
+
+    /**
      * Converts a stored activity JSON record into short text suitable for the history screen.
      *
      * @param category Category supplied to [readableHistory].
@@ -725,6 +767,13 @@ interface AccountRepository {
      * @return The resulting [AccountRole], or `null` if unavailable.
      */
     suspend fun authenticatedRole(): AccountRole? = null
+    /**
+     * Records one device sign-in for cross-device security alerts.
+     *
+     * @param deviceId The ID of the device participating in the operation.
+     * @param registerOnly Whether the request should only register this device.
+     */
+    suspend fun recordDeviceSignIn(deviceId: String, registerOnly: Boolean = false) = Unit
     /**
      * Signs out the current account and clears its repository session.
      */

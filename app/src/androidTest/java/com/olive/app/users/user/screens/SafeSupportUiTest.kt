@@ -4,6 +4,7 @@ package com.olive.app
 import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.walkthrough.walkthroughTourStepsForRole
 import com.olive.app.ui.users.user.dashboard.*
 
 import android.graphics.Bitmap
@@ -102,7 +103,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         click("private_kind_incident")
         fill("private_entry_title", "Test incident")
         fill("private_entry_body", "Synthetic test details")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        hideKeyboard()
         click("incident_date")
         compose.onNodeWithTag("incident_calendar").assertIsDisplayed()
         click("incident_date_apply")
@@ -110,7 +111,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("incident_clock").assertIsDisplayed()
         click("incident_time_apply")
         fill("incident_location", "Edmonton")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        hideKeyboard()
         click("save_private_entry")
         compose.waitUntil(15_000) { session.privateEntries.any { it.title == "Test incident" } }
         compose.runOnIdle {
@@ -209,7 +210,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     }
 
     // Checks the setup step with the test's sample data.
-    private fun setup(): SessionViewModel {
+    private fun setup(showInitialWalkthrough: Boolean = false): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -246,6 +247,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         )
         click("pin_setup_submit")
         waitCover()
+        if (!showInitialWalkthrough) markInitialWalkthroughSeen(session)
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         unlock()
         return session
@@ -268,7 +270,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
         toggle()
-        compose.onNodeWithTag("support_walkthrough").assertIsNotEnabled()
+        compose.onNodeWithTag("support_walkthrough").assertIsEnabled()
         compose.onNodeWithTag("support_emergency").assertIsEnabled()
         compose.onNodeWithTag("support_staff_help").assertIsEnabled()
         compose.onNodeWithTag("support_hotlines").assertIsEnabled()
@@ -279,6 +281,65 @@ class SafeSupportUiTest : OliveUiTestBase() {
         waitCover()
         compose.onNodeWithTag("support_hotlines").assertDoesNotExist()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
+    }
+
+    @Test
+    fun walkthroughOpensFromSupportMenuWithAutoExpandedSupportMenuAndAllSettingsTabs() {
+        val session = setup()
+        toggle()
+        compose.onNodeWithTag("support_walkthrough").performClick()
+        waitFor("walkthrough_screen")
+        assertEquals(SafePage.Walkthrough, session.page)
+        compose.onNodeWithTag("walkthrough_toc").assertExists()
+
+        compose.onNodeWithTag("walkthrough_toc_staff_help").performScrollTo().performClick()
+        waitFor("walkthrough_active_feature")
+        assertEquals(SafePage.Home, session.page)
+        compose.onNodeWithTag("support_action_list").assertIsDisplayed()
+        compose.onNodeWithTag("walkthrough_target_highlight").assertExists()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
+
+        compose.onNodeWithTag("walkthrough_tour_toc").performClick()
+        waitFor("walkthrough_toc")
+        compose.onNodeWithTag("walkthrough_toc_cover_entry").performScrollTo().performClick()
+        waitFor("walkthrough_active_feature")
+        assertEquals(SafePage.Settings, session.page)
+        val settingsSteps = walkthroughTourStepsForRole(session.accountRole)
+            .filter { it.topicId == "cover_entry" && it.settingsTabTag != null }
+        assertEquals(
+            listOf("settings_tab_profile", "settings_tab_password", "settings_tab_privacy", "settings_tab_permissions"),
+            settingsSteps.mapNotNull { it.settingsTabTag }.distinct(),
+        )
+        settingsSteps.forEachIndexed { index, step ->
+            if (index > 0) clickAccessibleAction("walkthrough_tour_next")
+            compose.waitUntil(10_000) { session.runtime.state.walkthroughTourStepId == step.id }
+            compose.onNodeWithTag(requireNotNull(step.settingsTabTag)).assertIsSelected()
+        }
+
+        compose.onNodeWithTag("walkthrough_tour_skip").performClick()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
+    }
+
+    @Test
+    fun firstLoginAutoOpensWalkthroughWithoutBlockingQuickExitAndNeverReopens() {
+        val session = setup(showInitialWalkthrough = true)
+        waitFor("walkthrough_active_feature")
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("walkthrough_tour_skip").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
+
+        click("safe_notes")
+        waitFor("new_private_entry")
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
+
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Documents) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
+
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
+        unlock()
+        compose.onNodeWithTag("walkthrough_active_feature").assertDoesNotExist()
     }
 
     // Checks the trusted contacts open from the support menu instead of settings step with the test's sample data.
@@ -300,9 +361,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
     @Test
     fun hotlinesMatchTheSavedCityAndCanBrowseAnotherProvince() {
         val session = setup()
-        toggle()
-        compose.onNodeWithTag("support_hotlines")
-            .performClick()
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Hotlines) }
         waitFor("hotline_page")
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("hotline_use_device_location").fetchSemanticsNodes()

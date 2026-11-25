@@ -17,12 +17,14 @@ import com.olive.app.data.messaging.FriendRelationship
 import com.olive.app.data.messaging.FriendRequest
 import com.olive.app.data.messaging.SupportRepository
 import com.olive.app.data.news.NewsArticle
+import com.olive.app.security.EncryptedVault
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.withTimeout
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -61,6 +63,8 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 pinAuthorizedEpoch = -1L
                 deviceLockRequest?.complete(null)
                 deviceLockRequest = null
+                passwordRecoveryUnlockRequest?.complete(null)
+                passwordRecoveryUnlockRequest = null
                 operationJob?.cancel()
                 operationJob = null
                 idleJob?.cancel()
@@ -81,6 +85,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 activityCategory = null
                 screenHistory.clear()
                 safePageHistory.clear()
+                walkthroughTourStepId = null
                 if (accountRole == AccountRole.USER) profile = null
                 attempts = emptyList()
                 message = null
@@ -89,7 +94,10 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 privacyHistory = emptyList()
                 triggerHistory =
                     emptyList()
+                secureSharing.stopSharedEntriesObservation()
                 privateEntries = emptyList()
+                sharedPrivateEntries = emptyList()
+                sharedEntryRecipients = emptyMap()
                 messaging.stopMessaging()
                 if (!localMode) messaging.syncLocalNotificationHandler()
                 activeTriggerId = null
@@ -97,6 +105,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 pendingIdentity = null
                 pendingProfile = null
                 credentialFieldError = null
+                EncryptedVault.purgeAll()
             }
         }
     }
@@ -108,7 +117,10 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 // Also discard partially entered onboarding fields when leaving the app.
-                if (screen == SessionScreen.Cover || screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
+                if (screen == SessionScreen.Cover || screen == SessionScreen.Loading || screen == SessionScreen.StorageError) {
+                    EncryptedVault.purgeAll()
+                    return
+                }
                 // Without a saved enrollment, private entry must return to account setup.
                 if (enrollment == null) {
                     epoch++
@@ -123,6 +135,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     screenHistory.clear()
                     screen = SessionScreen.Cover
                     message = null
+                    EncryptedVault.purgeAll()
                 } else if (accountRole == AccountRole.USER) quickExit()
             }
         }
@@ -134,7 +147,9 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun back() {
         with(runtime) {
             with(state) {
-                if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
+                if (screen == SessionScreen.Safe && walkthroughTourStepId != null) {
+                    walkthroughTourStepId = null
+                } else if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
                 else if (screen == SessionScreen.Safe && page == SafePage.Activity && activityCategory != null) {
                     activityCategory = null
                     message = null
@@ -169,6 +184,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
             with(state) {
                 // Safe App pages use their own back stack before leaving the private area.
                 if (screen == SessionScreen.Safe) {
+                    walkthroughTourStepId = null
                     if (value != page) safePageHistory += page
                     page = value
                     message = null
@@ -187,6 +203,46 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                             showFeedback = true
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Activates the live in-app walkthrough coachmark at [stepId] and opens [tourPage].
+     *
+     * @param stepId Walkthrough step identifier to display.
+     * @param tourPage Destination safe page containing the live target controls.
+     */
+    fun startWalkthroughTour(stepId: String, tourPage: SafePage) {
+        with(runtime) {
+            with(state) {
+                if (screen != SessionScreen.Safe) return
+                if (page != tourPage) navigate(tourPage)
+                walkthroughTourStepId = stepId
+            }
+        }
+    }
+
+    /**
+     * Dismisses the active in-app walkthrough coachmark without leaving the current safe page.
+     */
+    fun dismissWalkthroughTour() {
+        runtime.state.walkthroughTourStepId = null
+    }
+
+    /**
+     * Completes the live in-app walkthrough and returns cleanly to Safe App Home.
+     */
+    fun completeWalkthroughTour() {
+        with(runtime) {
+            with(state) {
+                walkthroughTourStepId = null
+                if (screen == SessionScreen.Safe) {
+                    safePageHistory.clear()
+                    page = SafePage.Home
+                    activityCategory = null
+                    message = null
                 }
             }
         }
@@ -213,24 +269,32 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
     }
 
     /**
-     * Switches news bookmark on or off.
+     * Sets the bookmark state for one news article.
      *
-     * @param article Article supplied to [toggleNewsBookmark].
+     * @param article The article to bookmark or remove.
+     * @param bookmarked The requested bookmark state.
      */
-    fun toggleNewsBookmark(article: NewsArticle) {
+    fun setNewsBookmark(article: NewsArticle, bookmarked: Boolean) {
         with(runtime) {
             with(state) {
                 val uid = enrollment?.uid ?: return
-                savedNews =
-                    if (savedNews.any { it.link == article.link }) savedNews.filterNot { it.link == article.link }
-                    else (listOf(article) + savedNews).take(100)
+                val previous = savedNews
+                if (previous.any { it.link == article.link } == bookmarked) return
+                savedNews = if (bookmarked) (listOf(article) + previous).take(100)
+                    else previous.filterNot { it.link == article.link }
                 val latest = savedNews
                 val revision = (newsRevisions[uid] ?: 0L) + 1L
                 newsRevisions[uid] = revision
                 scope.launch {
                     coverSaveMutex.withLock {
                         if (newsRevisions[uid] != revision) return@withLock
-                        withContext(Dispatchers.IO) { coverStore.saveNews(uid, latest) }
+                        try {
+                            withContext(Dispatchers.IO) { coverStore.saveNews(uid, latest) }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            if (enrollment?.uid == uid && newsRevisions[uid] == revision) savedNews = previous
+                        }
                     }
                 }
             }
@@ -255,10 +319,16 @@ internal class StaffSupportController(
     repositoryFactory: () -> SupportRepository = { SupportRepository() },
 ) {
     private val repository by lazy(repositoryFactory)
+    private var pendingRequest: Pair<String, String>? = null
     private val uiStateFlow = MutableStateFlow(StaffSupportUiState())
     val uiState: StateFlow<StaffSupportUiState> = uiStateFlow.asStateFlow()
     private var uiStateSnapshot by mutableStateOf(uiStateFlow.value)
 
+    /**
+     * Atomically updates the UI state flow and updates the local state snapshot.
+     *
+     * @param transform State reducer transforming current state.
+     */
     private inline fun updateUiState(transform: (StaffSupportUiState) -> StaffSupportUiState) {
         uiStateSnapshot = uiStateFlow.updateAndGet(transform)
     }
@@ -308,8 +378,13 @@ internal class StaffSupportController(
         }
         if (runtime.state.accountRole != AccountRole.USER) return
         val actor = runtime.coverAccountId ?: return
+        val requestEpoch = runtime.epoch
         val ticketToCancel = conversationId
+        val requestKey = if (cancel) "" else {
+            pendingRequest?.takeIf { it.first == actor }?.second ?: UUID.randomUUID().toString()
+        }
         if (!cancel) {
+            pendingRequest = actor to requestKey
             // Clear the last ticket before searching so this screen cannot reopen an older chat.
             requested = false
             staffUid = ""
@@ -322,10 +397,11 @@ internal class StaffSupportController(
             try {
                 val ticket = withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
-                        if (cancel) repository.cancelRequest(ticketToCancel) else repository.requestHelp()
+                        if (cancel) repository.cancelRequest(ticketToCancel) else repository.requestHelp(requestKey)
                     }
                 }
-                if (runtime.coverAccountId == actor) {
+                if (!cancel && pendingRequest == (actor to requestKey)) pendingRequest = null
+                if (runtime.coverAccountId == actor && runtime.epoch == requestEpoch) {
                     requested = ticket.requested
                     staffUid = ticket.staffUid
                     conversationId = ticket.conversationId

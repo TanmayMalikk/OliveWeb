@@ -1,6 +1,11 @@
 // All safe-app roles: shows friends, direct messages, and staff support chats.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import androidx.compose.ui.semantics.heading
@@ -8,12 +13,12 @@ import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -108,6 +113,26 @@ internal fun MessagesScreen(
         }
     }
     val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
+    val listState = rememberLazyListState()
+    val wtDirective = LocalWalkthroughDirective.current
+    var wtInviteOpen by remember(currentUid) { mutableStateOf(false) }
+    LaunchedEffect(wtDirective?.stepId, wtDirective?.action) {
+        when (wtDirective?.action) {
+            "messages_tab_dms" -> {
+                changeChatTab(false)
+                wtInviteOpen = false
+            }
+            "messages_open_invite" -> {
+                changeChatTab(false)
+                wtInviteOpen = true
+            }
+            "messages_tab_tickets" -> {
+                changeChatTab(true)
+                wtInviteOpen = false
+            }
+            else -> wtInviteOpen = false
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         // Wide screens place the conversation list and open chat beside each other.
@@ -119,6 +144,7 @@ internal fun MessagesScreen(
                 onSupportFilterChange = { supportFilter = it },
                 onShowingArchivedChange = { showingArchived = it },
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
+                listState = listState,
             )
             VerticalDivider()
             if (active == null) Box(
@@ -137,10 +163,24 @@ internal fun MessagesScreen(
             onSupportFilterChange = { supportFilter = it },
             onShowingArchivedChange = { showingArchived = it },
             modifier = Modifier.fillMaxSize(),
+            listState = listState,
         )
         else {
-            BackHandler { session.messages.closeConversation() }
-            ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
+            val back = rememberOliveBack(onBack = session.messages::closeConversation)
+            OliveRouteEntrance(active.id, back) {
+                ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
+            }
+        }
+        if (wtInviteOpen) {
+            FriendInviteDialog(
+                uid = currentUid,
+                createInvite = { refresh -> session.messages.createFriendInvite(currentUid, refresh) },
+                observeUnavailable = { code, onUnavailable ->
+                    session.messages.observeFriendInviteUnavailable(currentUid, code, onUnavailable)
+                },
+                inWindow = true,
+                onDismiss = { wtInviteOpen = false },
+            )
         }
     }
 }
@@ -182,6 +222,7 @@ private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
  * @param onChatTabChange Callback invoked when chat tab change changes or occurs.
  * @param onSupportFilterChange Callback invoked when support filter change changes or occurs.
  * @param modifier Compose modifier applied to the root layout.
+ * @param listState The scroll state of the displayed list.
  */
 @Composable
 private fun MessagingSidebar(
@@ -195,8 +236,10 @@ private fun MessagingSidebar(
     onChatTabChange: (Boolean) -> Unit,
     onSupportFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val uiText = rememberResourceText()
+    val offerUndo = LocalOliveUndo.current
     val messaging by session.messages.state.collectAsState()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
@@ -226,8 +269,14 @@ private fun MessagingSidebar(
     var friendsExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingExpanded by rememberSaveable { mutableStateOf(false) }
     var outgoingExpanded by rememberSaveable { mutableStateOf(false) }
-    val listState = rememberLazyListState()
-    LaunchedEffect(ticketChats) { listState.scrollToItem(0) }
+    var lastListFilter by remember { mutableStateOf(Triple(ticketChats, showingArchived, supportFilter)) }
+    LaunchedEffect(ticketChats, showingArchived, supportFilter) {
+        val current = Triple(ticketChats, showingArchived, supportFilter)
+        if (current != lastListFilter) {
+            lastListFilter = current
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         modifier,
         state = listState,
@@ -253,18 +302,21 @@ private fun MessagingSidebar(
             )
         }
         if (!organizationAccount) item("chat_tabs") {
-            PrimaryTabRow(selectedTabIndex = if (ticketChats) 1 else 0) {
+            PrimaryTabRow(
+                selectedTabIndex = if (ticketChats) 1 else 0,
+                modifier = Modifier.walkthroughTarget("messages_chat_tabs"),
+            ) {
                 Tab(
                     selected = !ticketChats,
                     onClick = { onChatTabChange(false) },
                     text = { ChatTabLabel(uiText(R.string.chat_dms_tab), session.messages.unreadCountForChatTab(false)) },
-                    modifier = Modifier.testTag("messages_dms_tab"),
+                    modifier = Modifier.walkthroughTarget("messages_dms_tab").testTag("messages_dms_tab"),
                 )
                 Tab(
                     selected = ticketChats,
                     onClick = { onChatTabChange(true) },
                     text = { ChatTabLabel(uiText(R.string.chat_tickets_tab), session.messages.unreadCountForChatTab(true)) },
-                    modifier = Modifier.testTag("messages_tickets_tab"),
+                    modifier = Modifier.walkthroughTarget("messages_tickets_tab").testTag("messages_tickets_tab"),
                 )
             }
         }
@@ -274,6 +326,8 @@ private fun MessagingSidebar(
                 color = WarmBannerYellow,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                var reconnectShake by remember { mutableIntStateOf(0) }
+                var reconnectError by remember { mutableStateOf(false) }
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         uiText(R.string.ui_reconnect_your_account),
@@ -289,23 +343,37 @@ private fun MessagingSidebar(
                         "messaging_reconnect_password",
                         secret = true,
                         showSecretToggle = true,
-                        enabled = !session.messages.busy
+                        enabled = !session.messages.busy,
+                        error = if (reconnectError && reconnectPassword.isBlank()) uiText(R.string.enter_your_current_password) else null,
+                        shakeTrigger = reconnectShake,
                     ) {
                         reconnectPassword = it.take(128)
+                        reconnectError = false
                     }
                     Button(
                         onClick = {
-                            session.messages.reconnectMessaging(reconnectPassword) {
-                                reconnectPassword = ""
+                            if (reconnectPassword.isBlank()) {
+                                reconnectError = true
+                                reconnectShake += 1
+                            } else {
+                                session.messages.reconnectMessaging(reconnectPassword) {
+                                    reconnectPassword = ""
+                                }
                             }
                         },
-                        enabled = reconnectPassword.isNotBlank() && !session.messages.busy,
+                        enabled = !session.messages.busy,
                         modifier = Modifier.fillMaxWidth().testTag("messaging_reconnect")
                     ) { Text(stringResource(R.string.reconnect)) }
                 }
             }
         }
-        item("unread_filter") {
+        if (!organizationAccount && !ticketChats && !showingArchived) item("friend_invite_controls") {
+            FriendInviteControls(
+                session = session,
+                unreadOnly = unreadOnly,
+                onUnreadOnlyChange = { unreadOnly = !unreadOnly },
+            )
+        } else item("unread_filter") {
             FilterChip(
                 selected = unreadOnly,
                 onClick = { unreadOnly = !unreadOnly },
@@ -349,15 +417,13 @@ private fun MessagingSidebar(
                 }
             }
         }
-        if (!organizationAccount && !ticketChats && !showingArchived) item {
-            FriendInviteControls(session)
-        }
-        if (session.messages.loadingIndex) item {
+        val showSkeleton = session.messages.conversations.isEmpty() && session.messages.loadingIndex
+        if (showSkeleton) item {
             val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
             LoadingSkeleton(layout, rows = 3)
         }
         item { Status(session) }
-        if (session.messages.loadingIndex) return@LazyColumn
+        if (showSkeleton) return@LazyColumn
         if (!organizationAccount && !ticketChats && !showingArchived) friendLists(
             session = session,
             pendingExpanded = pendingExpanded,
@@ -429,14 +495,17 @@ private fun MessagingSidebar(
                     // Staff closing a ticket archives the same chat for every participant.
                     session.messages.closeSupportChat(conversation.id)
                 } else {
-                    session.messages.setConversationArchived(
+                    val archive = !isConversationArchived(
                         conversation,
-                        !isConversationArchived(
-                            conversation,
-                            session.messages.archivedConversationIds,
-                            session.messages.restoredClosedConversationIds,
-                        ),
+                        session.messages.archivedConversationIds,
+                        session.messages.restoredClosedConversationIds,
                     )
+                    session.messages.setConversationArchived(conversation, archive) {
+                        val message = if (archive) R.string.undo_chat_archived else R.string.undo_chat_restored
+                        offerUndo(uiText(message)) {
+                            session.messages.setConversationArchived(conversation, !archive)
+                        }
+                    }
                 }
                 conversationActions = null
             },
@@ -528,6 +597,7 @@ private fun ConversationRow(
  * Formats the support tag label shown by secure messaging.
  *
  * @param tag Tag supplied to [supportTagLabel].
+ * @return The localized label for the support ticket category.
  */
 @Composable
 private fun supportTagLabel(tag: String) = stringResource(
@@ -543,6 +613,7 @@ private fun supportTagLabel(tag: String) = stringResource(
 /**
  * Lists the friends or supported users who may have a private contact note.
  *
+ * @receiver The conversation from which to derive the stored or displayed data.
  * @param currentUid Current user ID supplied to [privateNoteTargets].
  * @param role Account role determining workspace permissions.
  * @param friendUids Collection of friend uids values to process.

@@ -105,6 +105,7 @@ class FirebaseAccountRepositorySdkTest {
                 admin.create(AdminAccountDraft("staff_member", "Synthetic-123!", AccountRole.STAFF))
                 verify(create).call(argThat<Map<String, Any>> { it["username"] == "staff_member" && it["role"] == "STAFF" })
                 admin.delete("staff-id")
+                verify(delete).setTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
                 verify(delete).call(mapOf("uid" to "staff-id"))
                 assertEquals(profile, admin.completeOrganizationProfile(profile.fullName, profile.dob, "", ""))
                 verify(complete).call(mapOf("fullName" to profile.fullName, "dob" to profile.dob, "email" to "", "phone" to ""))

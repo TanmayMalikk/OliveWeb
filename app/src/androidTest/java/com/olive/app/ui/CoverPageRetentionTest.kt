@@ -4,14 +4,18 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.ui.covers.fitness.FitnessCover
+import com.olive.app.ui.covers.fitness.FitnessStore
 import com.olive.app.ui.covers.fitness.ManualFoodEntryDialog
+import com.olive.app.ui.covers.fitness.MealType
+import com.olive.app.ui.covers.fitness.NutritionFood
+import com.olive.app.ui.covers.fitness.FoodDataSource
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
@@ -57,6 +61,10 @@ class CoverPageRetentionTest {
         compose.onNode(nutrition).assertIsSelected()
         restoration.emulateSavedInstanceStateRestore()
         compose.onNode(nutrition).assertIsSelected()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        val home = hasContentDescription(context.getString(R.string.home)) and
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
+        compose.onNode(home).assertIsSelected()
     }
     @Test fun manualFoodFormSurvivesRecreationWhileAnExternalCameraIsOpen() {
         val restoration = StateRestorationTester(compose)
@@ -66,6 +74,46 @@ class CoverPageRetentionTest {
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("manual_food_name").assertTextContains("Test oats")
         compose.onNodeWithTag("manual_food_serving").assertTextContains("100 g")
+    }
+
+    @Test fun coachKeepsTheFitnessTabsVisible() {
+        val session = session()
+        compose.setContent { FitnessCover(session) }
+        val tabRole = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
+        val coach = hasContentDescription(context.getString(R.string.fitness_coach_tab)) and tabRole
+        compose.onNode(coach).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_screen").assertIsDisplayed()
+        for (label in listOf(R.string.home, R.string.activity, R.string.fitness_vitals, R.string.nutrition)) {
+            compose.onNode(hasContentDescription(context.getString(label)) and tabRole).assertIsDisplayed()
+        }
+        val nutrition = hasContentDescription(context.getString(R.string.nutrition)) and tabRole
+        compose.onNode(nutrition).performClick().assertIsSelected()
+        compose.onNodeWithTag("fitness_coach_screen").assertDoesNotExist()
+    }
+
+    @Test fun removingFoodUpdatesTheDiaryImmediatelyAndUndoRestoresIt() {
+        val session = session()
+        val store = FitnessStore(context, session.coverAccountId ?: "guest")
+        val food = NutritionFood("undo-oats", "Undo test oats", "", "1 bowl", 150f, 5f, 27f, 3f, FoodDataSource.MANUAL)
+        val entry = store.addFood(food, 1f, MealType.BREAKFAST).foodsToday.last()
+        try {
+            compose.setContent { FitnessCover(session) }
+            val nutrition = hasContentDescription(context.getString(R.string.nutrition)) and
+                SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
+            compose.onNode(nutrition).performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("fitness_today").fetchSemanticsNodes().isNotEmpty()
+            }
+            val row = hasContentDescription(food.name, substring = true)
+            val remove = hasContentDescription(context.getString(R.string.remove)) and hasAnySibling(row)
+            compose.onNodeWithTag("fitness_today").performScrollToNode(remove)
+            compose.onNode(remove).performClick()
+            compose.runOnIdle { assertFalse(store.snapshot().foodsToday.any { it.logId == entry.logId }) }
+            compose.onNodeWithText(context.getString(R.string.fitness_diary_undo)).performClick()
+            compose.runOnIdle { assertEquals(entry, store.snapshot().foodsToday.single { it.logId == entry.logId }) }
+        } finally {
+            store.removeFood(entry.logId)
+        }
     }
     @Test fun leavingPrivateScreensStillClearsPinAuthorization() {
         val session = session()

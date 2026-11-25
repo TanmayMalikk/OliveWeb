@@ -75,22 +75,6 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithText("5").assertDoesNotExist()
     }
 
-    // Checks the game cover keeps its controls individually accessible step with the test's sample data.
-    @Test
-    fun gameCoverKeepsItsControlsIndividuallyAccessible() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            compose.activity.setContent {
-                OliveTheme { com.olive.app.ui.covers.GameCover() }
-            }
-        }
-        compose.onNodeWithTag("cover_brand_game", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithText("Olive Tap").assertExists()
-        compose.onNodeWithTag("game_score").assertTextContains("Score: 0")
-        compose.onNodeWithTag("game_entry").assertHasClickAction()
-        compose.onNodeWithTag("game_olive").assertHasClickAction().performClick()
-        compose.onNodeWithTag("game_score").assertTextContains("Score: 1")
-    }
-
     // Checks the pin errors and quick exit use live regions without stealing talk back focus step with the test's sample data.
     @Test
     fun pinErrorsAndQuickExitUseLiveRegionsWithoutStealingTalkBackFocus() {
@@ -229,10 +213,10 @@ class AccessibilityUiTest : OliveUiTestBase() {
         val field = compose.onNodeWithTag("unlock_pin")
         field.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.SetText))
-        compose.onNodeWithTag("unlock_submit").assertIsNotEnabled()
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
         field.performTextReplacement("12")
-        compose.onNodeWithTag("unlock_submit").assertIsNotEnabled()
+        compose.onNodeWithTag("unlock_submit").assertIsEnabled()
         field.performTextClearance()
         enterPin("9999")
         waitFor("session_message")

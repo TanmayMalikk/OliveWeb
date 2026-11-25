@@ -152,7 +152,7 @@ class AdminAccountMappingTest {
     fun minimalCreatePayloadIncludesStableDefaults() {
         val payload =
             adminAccountPayload(AdminAccountDraft("user_name", "password1!", AccountRole.USER))
-        assertEquals("English", payload["language"])
+        assertEquals("", payload["language"])
         assertEquals("", payload["fullName"])
         assertEquals("", payload["region"])
         assertTrue(payload.keys.containsAll(listOf("username", "password", "role", "address")))

@@ -129,3 +129,57 @@ test("removing an admin keeps the consultation and restores its staff conversati
   assert.equal(restored[0].safeContactUid, "trusted-contact");
   assert.equal(f.users.has("acting-admin"), true);
 });
+
+test("deleting an account queries many friend lists in parallel batches instead of sequentially", async () => {
+  const f = fixture();
+  f.setCaller({uid: "admin", role: "ADMIN"});
+  f.users.set("target", {uid: "target", displayName: "fixture_user", customClaims: {role: "USER"}});
+  for (let i = 0; i < 40; i++) {
+    const friendUid = i % 2 === 0 ? "target" : "other";
+    f.records.set(`friendLists/owner-${i}/friends/f-${i}`, {friendUid});
+  }
+  let activeFriendQueries = 0;
+  let peakConcurrentFriendQueries = 0;
+  const wrapFriendRef = (ref) => {
+    const wrapQuery = (q) => ({
+      ...q,
+      where: (...args) => wrapQuery(q.where(...args)),
+      get: async () => {
+        activeFriendQueries += 1;
+        peakConcurrentFriendQueries = Math.max(peakConcurrentFriendQueries, activeFriendQueries);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        try {
+          return await q.get();
+        } finally {
+          activeFriendQueries -= 1;
+        }
+      },
+    });
+    return {
+      ...ref,
+      collection: (sub) => (sub === "friends" ? wrapQuery(ref.collection(sub)) : ref.collection(sub)),
+    };
+  };
+  const originalCollection = f.db.collection.bind(f.db);
+  f.db.collection = (name) => {
+    const col = originalCollection(name);
+    if (name !== "friendLists") return col;
+    return {
+      ...col,
+      listDocuments: async () => (await col.listDocuments()).map(wrapFriendRef),
+    };
+  };
+
+  const api = f.load("accountDeletion");
+  await api.adminDeleteAccount({auth: {uid: "admin"}, data: {uid: "target"}});
+
+  assert.equal(f.users.has("target"), false);
+  for (let i = 0; i < 40; i++) {
+    const key = `friendLists/owner-${i}/friends/f-${i}`;
+    assert.equal(f.records.has(key), i % 2 !== 0, key);
+  }
+  assert.ok(
+    peakConcurrentFriendQueries > 1,
+    `Expected batched concurrent friend queries (> 1), saw peak=${peakConcurrentFriendQueries}`,
+  );
+});

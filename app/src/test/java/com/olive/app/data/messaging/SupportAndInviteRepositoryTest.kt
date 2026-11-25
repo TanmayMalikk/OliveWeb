@@ -34,8 +34,8 @@ class SupportAndInviteRepositoryTest {
             "requested" to true, "staffUid" to "staff", "conversationId" to "ticket",
         )))
         val support = SupportRepository(functions)
-        assertEquals(StaffSupportTicket(true, "staff", "ticket"), support.requestHelp())
-        verify(tickets).call(mapOf("action" to "request", "conversationId" to ""))
+        assertEquals(StaffSupportTicket(true, "staff", "ticket"), support.requestHelp("request-key"))
+        verify(tickets).call(mapOf("action" to "request", "conversationId" to "", "requestKey" to "request-key"))
 
         reply("staffSupportRequest", mapOf("ticket" to mapOf("conversationId" to "ticket"))).also {
             assertEquals(StaffSupportTicket(false, "", "ticket"), support.cancelRequest("ticket"))
@@ -69,7 +69,7 @@ class SupportAndInviteRepositoryTest {
         val absent = runCatching { support.requestStaffForConversation("group") }.exceptionOrNull()
         assertEquals("The support chat was not created.", absent?.message)
         reply("staffSupportRequest", "unexpected")
-        val invalid = runCatching { support.requestHelp() }.exceptionOrNull()
+        val invalid = runCatching { support.requestHelp("request-key") }.exceptionOrNull()
         assertEquals("Invalid response", invalid?.message)
     }
 

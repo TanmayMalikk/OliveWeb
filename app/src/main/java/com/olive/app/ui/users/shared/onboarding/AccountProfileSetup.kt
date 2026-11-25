@@ -1,6 +1,10 @@
 // All safe-app roles: collects profile details during account setup.
 package com.olive.app.ui.users.shared.onboarding
 
+import com.olive.app.ui.shared.systemLocale
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 
 
@@ -9,7 +13,9 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.account.CoverPicker
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
@@ -20,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -31,6 +39,7 @@ import kotlinx.coroutines.withContext
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.SafetyPlanIntake
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.shared.AddressFields
@@ -92,6 +101,90 @@ private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (Str
 }
 
 /**
+ * Renders the optional contact email field and explicit email communication consent checkbox.
+ *
+ * @param email Current email value entered by the user.
+ * @param consent Whether the user agreed to email communications.
+ * @param enabled Whether edits are currently permitted.
+ * @param showErrors Whether field-level validation errors are currently visible.
+ * @param requireConsentWhenEntered Whether non-blank email requires checked consent.
+ * @param emailTag Test tag for the email field.
+ * @param consentTag Test tag for the consent row.
+ * @param shakeTrigger Monotonic counter to re-trigger shake feedback on repeated failed attempts.
+ * @param onEmailChange Callback invoked when email text changes.
+ * @param onConsentChange Callback invoked when consent checkbox toggles.
+ * @param onFocusEmail Callback invoked when email field gains focus.
+ */
+@Composable
+internal fun EmailConsentSection(
+    email: String,
+    consent: Boolean,
+    enabled: Boolean,
+    showErrors: Boolean,
+    requireConsentWhenEntered: Boolean,
+    emailTag: String,
+    consentTag: String,
+    shakeTrigger: Int = 0,
+    onEmailChange: (String) -> Unit,
+    onConsentChange: (Boolean) -> Unit,
+    onFocusEmail: () -> Unit = {},
+) {
+    val uiText = rememberResourceText()
+    val invalidEmail = showErrors && email.isNotBlank() && !InputPolicy.validEmail(email)
+    val missingConsent = requireConsentWhenEntered && showErrors && email.isNotBlank() && !consent
+    val consentErrorText = if (missingConsent) uiText(R.string.email_consent_required) else null
+    val consentShake = rememberFieldErrorShakeTrigger(consentErrorText, shakeTrigger)
+    Field(
+        uiText(R.string.email_optional),
+        email,
+        emailTag,
+        enabled = enabled,
+        error = if (invalidEmail) uiText(R.string.email_invalid_message) else null,
+        shakeTrigger = shakeTrigger,
+        onFocus = onFocusEmail,
+    ) { onEmailChange(it.take(254)) }
+    if (email.isNotBlank()) {
+        val consentBorder = if (missingConsent) {
+            Modifier.border(1.5.dp, MaterialTheme.colorScheme.error, MaterialTheme.shapes.small).padding(horizontal = 8.dp, vertical = 4.dp)
+        } else Modifier
+        Row(
+            Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .oliveErrorShake(consentShake)
+                .then(consentBorder)
+                .toggleable(
+                    value = consent,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onConsentChange,
+                )
+                .testTag(consentTag),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(
+                checked = consent,
+                onCheckedChange = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+            Text(
+                uiText(R.string.email_communication_consent),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (missingConsent) {
+            Text(
+                uiText(R.string.email_consent_required),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/**
  * USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks. UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
  *
  * @param session Shared session view model owning application state and actions.
@@ -106,15 +199,20 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
     var birthday by rememberBirthdayInput(existing?.dob.orEmpty())
     val dob = birthday
-    val language = existing?.language?.ifBlank { "English" } ?: "English"
+    var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
+    var emailConsent by remember(existing) { mutableStateOf(existing?.emailCommunicationConsent == true) }
+    val locale = systemLocale()
+    val language = locale.getDisplayLanguage(locale).ifBlank { locale.toLanguageTag() }
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
     var trigger by remember { mutableStateOf("") }
     var contactName by remember { mutableStateOf("") }
     var contactDetails by remember { mutableStateOf("") }
+    var contactRelationship by remember { mutableStateOf("") }
     val contacts =
         remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FITNESS) }
+    var safetyIntake by remember(existing) { mutableStateOf(existing?.safetyIntake ?: SafetyPlanIntake()) }
     val pages = if (safeContact) listOf(
         uiText(R.string.ui_personal_details),
         uiText(R.string.location),
@@ -124,10 +222,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
             uiText(R.string.ui_personal_details),
             uiText(R.string.location),
             uiText(R.string.ui_safe_entry_cover),
-            uiText(R.string.friend_invite_code)
+            uiText(R.string.friend_invite_code),
+            uiText(R.string.onboarding_safety_questionnaire),
         )
     var page by rememberSaveable(existing?.username, safeContact) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
+    var shakeAttempt by rememberSaveable { mutableIntStateOf(0) }
     val validation = ProfileSetupValidation(
         safeContact,
         fullName,
@@ -135,18 +235,22 @@ internal fun ProfileSetup(session: SessionViewModel) {
         address,
         trigger,
         contactName,
-        contactDetails
+        contactDetails,
+        email,
+        emailConsent,
+        contactRelationship = contactRelationship,
     )
     val required = validation.requiredFields
     val completed = required.count { it }
     val supportValid = validation.supportValid
     val localCompletion = validation.pageCompletion
-    val stages = if (safeContact) 4 else 5
+    val stages = if (safeContact) 4 else 6
     val progressPage = page + 1
     val credentialCount = if (session.account.creatingAccount) 3 else 2
     val totalRequired = credentialCount + required.size + if (safeContact) 0 else 2
     val progressCompleted = credentialCount + completed
-    val pageCompletion = listOf(true) + localCompletion + true
+    val pageCompletion = if (safeContact) listOf(true) + localCompletion + true
+    else listOf(true) + localCompletion + listOf(true, true)
     /**
      * Gives account storage the collected contacts it needs.
      *
@@ -158,9 +262,10 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 SafeContact(
                     UUID.randomUUID().toString(),
                     contactName.trim(),
-                    contactDetails.trim()
+                    contactDetails.trim(),
+                    relationship = contactRelationship.trim(),
                 )
-            ) else emptyList()).take(25)
+            ) else emptyList()).take(100)
 
     // Checks the onboarding fields and saves the completed account profile.
     val saveScope = rememberCoroutineScope()
@@ -184,7 +289,10 @@ internal fun ProfileSetup(session: SessionViewModel) {
             contacts = if (safeContact) emptyList() else collectedContacts(),
             address = address,
             coverType = coverType,
-            role = session.account.role
+            role = session.account.role,
+            email = InputPolicy.normalizedEmail(email),
+            emailCommunicationConsent = email.isNotBlank() && emailConsent,
+            safetyIntake = if (safeContact) SafetyPlanIntake() else safetyIntake.copy(completed = true),
         )
         preparingProfile = true
         saveScope.launch {
@@ -214,14 +322,34 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         fullName,
                         "full_name",
                         enabled = !session.account.busy,
-                        error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null
+                        error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         fullName = it.take(120)
                         showErrors = false
                     }
                     BirthdayPicker(
-                        birthday, "dob", !session.account.busy, showErrors,
+                        birthday, "dob", !session.account.busy, showErrors, shakeTrigger = shakeAttempt,
                     ) { birthday = it }
+                    EmailConsentSection(
+                        email = email,
+                        consent = emailConsent,
+                        enabled = !session.account.busy,
+                        showErrors = showErrors,
+                        requireConsentWhenEntered = true,
+                        emailTag = "setup_email",
+                        consentTag = "setup_email_consent",
+                        shakeTrigger = shakeAttempt,
+                        onEmailChange = {
+                            email = it
+                            if (it.isBlank()) emailConsent = false
+                            showErrors = false
+                        },
+                        onConsentChange = {
+                            emailConsent = it
+                            showErrors = false
+                        },
+                    )
                     if (!safeContact) {
                         HorizontalDivider()
                         AffectedPeopleFields(affected, !session.account.busy) { affected = it }
@@ -251,7 +379,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     AddressFields(
                         address,
                         cityOnlyRequired = true,
-                        cityError = if (showErrors && !address.locationValid) uiText(R.string.ui_city_required) else null
+                        cityError = if (showErrors && !address.locationValid) uiText(R.string.ui_city_required) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         address = it
                         showErrors = false
@@ -270,7 +399,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         secret = true,
                         showSecretToggle = true,
                         enabled = !session.account.busy,
-                        error = if (showErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null
+                        error = if (showErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         trigger = it.take(64)
                         showErrors = false
@@ -313,7 +443,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                                     )
                                     Text(
-                                        contact.details,
+                                        listOf(contact.relationship, contact.details)
+                                            .filter(String::isNotBlank).joinToString(" · "),
                                         color = Muted,
                                         style = MaterialTheme.typography.bodySmall
                                     )
@@ -334,34 +465,51 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         uiText(R.string.ui_contact_name_optional),
                         contactName,
                         "setup_contact_name",
-                        enabled = !session.account.busy && contacts.size < 25,
-                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null
+                        enabled = !session.account.busy && contacts.size < 100,
+                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         contactName = it.take(120)
                         showErrors = false
                     }
                     Field(
+                        uiText(R.string.contact_relationship),
+                        contactRelationship,
+                        "setup_contact_relationship",
+                        enabled = !session.account.busy && contacts.size < 100,
+                    ) {
+                        contactRelationship = it.take(120)
+                    }
+                    Field(
                         uiText(R.string.ui_phone_or_email_optional),
                         contactDetails,
                         "setup_contact_details",
-                        enabled = !session.account.busy && contacts.size < 25,
-                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null
+                        enabled = !session.account.busy && contacts.size < 100,
+                        error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
+                        shakeTrigger = shakeAttempt
                     ) {
                         contactDetails = it.take(200)
                         showErrors = false
                     }
                     OutlinedButton(
                         onClick = {
-                            contacts += SafeContact(
-                                UUID.randomUUID().toString(),
-                                contactName.trim(),
-                                contactDetails.trim()
-                            )
-                            contactName = ""
-                            contactDetails = ""
-                            showErrors = false
+                            if (contactName.isBlank() || contactDetails.isBlank()) {
+                                showErrors = true
+                                shakeAttempt += 1
+                            } else {
+                                contacts += SafeContact(
+                                    UUID.randomUUID().toString(),
+                                    contactName.trim(),
+                                    contactDetails.trim(),
+                                    relationship = contactRelationship.trim(),
+                                )
+                                contactName = ""
+                                contactDetails = ""
+                                contactRelationship = ""
+                                showErrors = false
+                            }
                         },
-                        enabled = !session.account.busy && contactName.isNotBlank() && contactDetails.isNotBlank() && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 100,
                         modifier = Modifier.fillMaxWidth().testTag("add_onboarding_contact")
                     ) {
                         Icon(Icons.Outlined.Add, null)
@@ -371,9 +519,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         )
                     }
                 }
+
+                uiText(R.string.onboarding_safety_questionnaire) ->
+                    SafetyPlanQuestionnaireForm(safetyIntake, !session.account.busy) { safetyIntake = it }
             }
         }
-        if (page == pages.lastIndex) {
+        if (pages[page] == uiText(R.string.friend_invite_code)) {
             com.olive.app.ui.users.shared.messaging.InviteCodeEntry(messages = session.messages, enabled = !session.localMode,
                 accountUid = session.runtime.pendingIdentity?.uid)
         }
@@ -390,6 +541,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 if (finalProfilePage || validation.isPageValid(page)) {
                     showErrors = false
                     if (finalProfilePage) saveProfile() else page++
+                } else {
+                    shakeAttempt += 1
                 }
             },
             last = last,
@@ -409,9 +562,16 @@ internal class ProfileSetupValidation(
     private val trigger: String,
     private val contactName: String,
     private val contactDetails: String,
+    private val email: String = "",
+    private val emailConsent: Boolean = false,
+    private val contactRelationship: String = "",
 ) {
-    val personalValid get() = fullName.isNotBlank() && InputPolicy.validDob(dob)
-    val supportValid get() = contactName.isBlank() == contactDetails.isBlank()
+    val emailValid get() = email.isBlank() || InputPolicy.validEmail(email)
+    val emailConsentValid get() = email.isBlank() || emailConsent
+    val personalValid get() = fullName.isNotBlank() && InputPolicy.validDob(dob) && emailValid && emailConsentValid
+    val supportValid get() = if (contactRelationship.isBlank()) {
+        contactName.isBlank() == contactDetails.isBlank()
+    } else contactName.isNotBlank() && contactDetails.isNotBlank()
     val requiredFields
         get() = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), address.locationValid) +
                 if (safeContact) emptyList() else listOf(InputPolicy.validTrigger(trigger))
@@ -433,6 +593,7 @@ internal class ProfileSetupValidation(
         0 -> personalValid
         1 -> address.locationValid
         2 -> InputPolicy.validTrigger(trigger) && supportValid
+        3 -> !safeContact
         else -> false
     }
 }

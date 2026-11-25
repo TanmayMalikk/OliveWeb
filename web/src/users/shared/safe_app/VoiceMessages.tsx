@@ -126,7 +126,7 @@ export function VoiceMessageComposer({ conversation, identity, roomKey, disabled
     setPhase("sending");
     setError("");
     try {
-      draft.mediaId ??= await uploadBrowserDocument(draft.file, identity);
+      draft.mediaId ??= await uploadBrowserDocument(draft.file, identity, undefined, { chatOnly: true });
       draft.message ??= await prepareVoiceMessage(draft.mediaId, conversation, roomKey);
       await publishVoiceMessage(draft.message, identity);
       if (generation.current === token) discard();

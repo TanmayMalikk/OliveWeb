@@ -1,42 +1,56 @@
 import { useEffect, useState } from "react";
-import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
+import { Button, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { accounts, cloudMode } from "../../../services/AccountService";
 import { claimFriendInvite, createFriendInvite, subscribeFriendInvite, type FriendInvite } from "../../../services/FriendInviteService";
+import { useWalkthroughAction } from "./WalkthroughCoachmark";
 
 export function InviteCodeEntry() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState(false);
-  return <Form onSubmit={async () => {
+  return <div data-walkthrough-id="messages-invite-code"><Form onSubmit={async (_data, form) => {
     setBusy(true); setFeedback(""); setError(false);
     try {
       const result = await claimFriendInvite(code);
       setCode(""); setFeedback(`Connected with ${result.username}. You can add another code.`);
     } catch (failure) {
+      shakeNamedFields(form, ["inviteCode"]);
       setError(true); setFeedback(failure instanceof Error ? failure.message : "Unable to use this invite. Try again.");
     } finally { setBusy(false); }
   }}>
     <Field label="Have an invite code? (optional)" name="inviteCode" value={code}
       onChange={(event: React.ChangeEvent<HTMLInputElement>) => setCode(event.target.value)}
       maxLength={32} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={busy || !cloudMode} />
-    <Button type="submit" variant="outline" disabled={!cloudMode || busy || !code.trim()}>
+    <Button type="submit" variant="outline" disabled={!cloudMode || busy}>
       {busy ? "Connecting…" : "Add connection"}
     </Button>
     {feedback && <p role={error ? "alert" : "status"}>{feedback}</p>}
-  </Form>;
+  </Form></div>;
 }
 
 export function FriendInviteControls() {
   const uid = accounts.identity?.uid;
   const [opened, setOpened] = useState(false);
+  const [wtOpened, setWtOpened] = useState(false);
+  const wt = useWalkthroughAction();
   const [invite, setInvite] = useState<FriendInvite>();
   const [unavailable, setUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   useEffect(() => {
-    setOpened(false); setInvite(undefined); setUnavailable(false); setFeedback("");
+    setOpened(false); setWtOpened(false); setInvite(undefined); setUnavailable(false); setFeedback("");
   }, [uid]);
+  useEffect(() => {
+    if (wt.action === "messages_open_invite") {
+      setWtOpened(true);
+      if (cloudMode && uid) void generate(false);
+      else setOpened(true);
+    } else if (wtOpened) {
+      setOpened(false);
+      setWtOpened(false);
+    }
+  }, [wt.stepId, wt.action]);
   async function generate(refresh: boolean) {
     setOpened(true); setBusy(true); setFeedback(""); setInvite(undefined); setUnavailable(false);
     try { setInvite(await createFriendInvite(refresh)); setUnavailable(false); }
@@ -64,7 +78,8 @@ export function FriendInviteControls() {
   return <>
     <Button disabled={!cloudMode || busy} onClick={() => void generate(false)}>Invite</Button>
     <InviteCodeEntry />
-    {opened && <Modal title="Invite someone" onClose={() => setOpened(false)}>
+    {opened && <Modal title="Invite someone" nonModal={wtOpened} onClose={() => { setOpened(false); setWtOpened(false); }}>
+      {!cloudMode && <p className="help-note">Connect this browser to Firebase to generate single-use 48-hour invite codes and shareable links.</p>}
       {busy && <p role="status">Preparing invite…</p>}
       {unavailable && <p>This invite has expired or been used. Refresh to create another.</p>}
       {invite && !unavailable && <>

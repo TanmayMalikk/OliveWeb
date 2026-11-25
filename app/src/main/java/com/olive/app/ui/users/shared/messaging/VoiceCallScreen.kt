@@ -1,6 +1,9 @@
 // Voice calls and private contact note dialogs for safe-app messaging.
 package com.olive.app.ui.users.shared.messaging
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalButton as FilledTonalButton
+import com.olive.app.ui.shared.OliveFloatingActionButton as FloatingActionButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -30,10 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import com.olive.app.ui.shared.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -311,6 +319,7 @@ internal fun DraggableCallBubble(
 /**
  * Prevents a dragged call bubble from covering the system edges or leaving the app window.
  *
+ * @receiver The Compose offset to constrain or classify.
  * @param parent Parent supplied to [coerceInside].
  * @param child Child supplied to [coerceInside].
  * @return The resulting [Offset] for coerce inside.
@@ -468,5 +477,66 @@ private fun CallAction(
         ) { icon() }
         Spacer(Modifier.height(8.dp))
         Text(label, modifier = Modifier.clearAndSetSemantics { }, color = Color.White, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * Shows one voice call status card in the conversation timeline.
+ *
+ * @param call Call supplied to [CallHistoryRow].
+ * @param canJoin Whether can join.
+ * @param onJoin Callback invoked when join changes or occurs.
+ */
+@Composable
+internal fun CallHistoryRow(
+    call: VoipCall,
+    canJoin: Boolean = false,
+    onJoin: () -> Unit = {},
+) {
+    val label = stringResource(
+        when (call.status) {
+            VoipCallStatus.MISSED -> R.string.ui_missed_call
+            VoipCallStatus.DECLINED -> R.string.ui_call_declined
+            VoipCallStatus.ENDED -> R.string.ui_call_ended
+            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
+        }
+    )
+    val activeColor = MaterialTheme.colorScheme.primaryContainer
+    Surface(
+        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
+        else MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .testTag("call_history_${call.callId}")
+            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                Modifier.clickable(onClick = onJoin)
+            } else Modifier),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LocalizedIcon(Icons.Outlined.Call, null, tint = OliveGreen)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall)
+                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
+                if (timestamp > 0) Text(
+                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.ofEpochMilli(timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
+            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                FilledTonalButton(
+                    onClick = onJoin,
+                    modifier = Modifier.testTag("join_call_${call.callId}"),
+                ) {
+                    Text(stringResource(R.string.ui_join_call))
+                }
+            }
+        }
     }
 }

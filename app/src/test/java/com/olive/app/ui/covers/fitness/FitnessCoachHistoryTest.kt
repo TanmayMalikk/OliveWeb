@@ -28,4 +28,15 @@ class FitnessCoachHistoryTest {
             FitnessCoachHistory(context, "coach-second").load(),
         )
     }
+
+    @Test fun clearDeletesOnlyOwnerHistory() {
+        val context = RuntimeEnvironment.getApplication()
+        val first = FitnessCoachHistory(context, "coach-first")
+        val second = FitnessCoachHistory(context, "coach-second")
+        first.append("Q1", "R1")
+        second.append("Q2", "R2")
+        first.clear()
+        assertTrue(first.load().isEmpty())
+        assertEquals(listOf(CoachTurn("user", "Q2"), CoachTurn("model", "R2")), second.load())
+    }
 }

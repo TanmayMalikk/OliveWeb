@@ -236,7 +236,7 @@ Class PaddleOcrManager
  */
 class PaddleOcrManager @JvmOverloads constructor(
     private val context: Context,
-    private val initOpenCv: (Context) -> Unit = { OpenCVUtils.init(it) },
+    private val initOpenCv: () -> Unit = { check(OpenCVUtils.init()) { "OpenCV initialization failed" } },
     private val straightenerFactory: (Context) -> OrientationPreprocessor = ::OrientationPreprocessor,
     private val ocrFactory: suspend (Context) -> PaddleOCR = { ctx ->
         PaddleOCR.create(
@@ -282,7 +282,7 @@ class PaddleOcrManager @JvmOverloads constructor(
         if (paddleOcr == null) {
             // Turn an unexpected ensure initialized failure into a readable message.
             try {
-                initOpenCv(context.applicationContext)
+                initOpenCv()
                 straightener = straightenerFactory(context.applicationContext)
                 paddleOcr = ocrFactory(context)
             } catch (e: Exception) {

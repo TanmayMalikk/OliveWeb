@@ -3,7 +3,7 @@ const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {db} = require("./firebaseAdminClient");
 const {safetyCaller} = require("./safetyPlanAccess");
 
-exports.messagingAuthorizePeer = onCall({enforceAppCheck: true}, async request => {
+exports.messagingAuthorizePeer = onCall({enforceAppCheck: true, invoker: "public"}, async request => {
   const caller = await safetyCaller(request);
   const username = typeof request.data?.username === "string" ? request.data.username.trim().toLowerCase() : "";
   if (!/^[a-z0-9_]{4,24}$/.test(username)) throw new HttpsError("invalid-argument", "Invalid messaging identity.");

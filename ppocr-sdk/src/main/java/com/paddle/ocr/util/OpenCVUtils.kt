@@ -14,8 +14,6 @@
 
 package com.paddle.ocr.util
 
-import android.content.Context
-import android.util.Log
 import org.opencv.android.OpenCVLoader
 
 // Groups the data and actions for open cvutils.
@@ -24,22 +22,14 @@ object OpenCVUtils {
     private var initialized = false
 
     /**
-     * Initializes the open cv utils.
+     * Loads the native OpenCV library packaged with the app.
      *
-     * @param context Android context used to access system services, resources, or storage.
-     * @return `true` if init, or `false` otherwise.
+     * @return Whether OpenCV initialized successfully.
      */
-    fun init(context: Context): Boolean {
+    @Synchronized
+    fun init(): Boolean {
         if (initialized) return true
-        try {
-            initialized = OpenCVLoader.initLocal()
-            if (!initialized) {
-                System.loadLibrary("opencv_java")
-                initialized = true
-            }
-        } catch (e: Exception) {
-            Log.e("OpenCVUtils", "Failed to initialize OpenCV 5.0.0.1: ${e.message}")
-        }
+        initialized = OpenCVLoader.initLocal()
         return initialized
     }
 }

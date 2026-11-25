@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.ui.users.shared.walkthrough.WalkthroughVisits
 import com.olive.app.dismissTestKeyboard
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
@@ -33,6 +34,7 @@ import com.olive.app.data.safety.SafetyConsultation
 import com.olive.app.security.DeviceEnrollment
 import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.ui.shared.OliveTheme
+import com.olive.app.ui.shared.OliveUndoOverlay
 import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.ui.users.admin.AdminAccounts
 import com.olive.app.ui.users.admin.AdminPortal
@@ -137,6 +139,7 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
 
         compose.runOnIdle {
+            WalkthroughVisits(compose.activity, "contact").markInitialTourSeen()
             session.runtime.enrollment = DeviceEnrollment("contact", "", AccountRole.SAFE_CONTACT)
             session.runtime.state.accountRole = AccountRole.SAFE_CONTACT
             session.runtime.state.profile = UserProfile(
@@ -146,7 +149,12 @@ class OrganizationAndChatUiTest {
             session.runtime.state.page = SafePage.Home
             session.runtime.state.screen = SessionScreen.Safe
         }
-        compose.onNodeWithTag("safe_contact_profile").assertIsDisplayed()
+        val contactProfile = compose.onNodeWithTag("safe_contact_profile")
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("safe_contact_profile").fetchSemanticsNodes().size == 1
+        }
+        if (!contactProfile.isDisplayed()) contactProfile.performScrollTo()
+        contactProfile.assertIsDisplayed()
         compose.onNodeWithTag("cover_root").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
     }
@@ -200,7 +208,11 @@ class OrganizationAndChatUiTest {
                 type = "GROUP",
             ))
         }
-        compose.setContent { OliveTheme { MessagesScreen(session) } }
+        compose.setContent {
+            OliveTheme {
+                OliveUndoOverlay(scopeKey = owner, enabled = true) { MessagesScreen(session) }
+            }
+        }
         val list = compose.onNode(hasScrollToIndexAction())
         val row = hasTestTag("conversation_action-chat")
         list.performScrollToNode(row)
@@ -215,6 +227,12 @@ class OrganizationAndChatUiTest {
         compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
         compose.onNodeWithText(text(R.string.archive_chat)).performClick()
         compose.onNode(row).assertDoesNotExist()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.undo_action)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.undo_action)).performClick()
+        list.performScrollToNode(row)
+        compose.onNode(row).assertIsDisplayed()
+        compose.onNode(row).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.onNodeWithText(text(R.string.archive_chat)).performClick()
         val archive = hasTestTag("archived_chats")
         list.performScrollToNode(archive)
         compose.onNode(archive).performClick()
@@ -271,8 +289,9 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithTag("safety_staff_available").assertHasClickAction()
         compose.onNodeWithTag("safety_consultation_owner").performClick()
         compose.onNodeWithText("Private owner").assertDoesNotExist()
+        compose.waitUntil(5_000) { !session.safetyPlans.loadingPlan && session.safetyPlans.plan?.ownerUid == "owner" }
         val complete = hasTestTag("complete_safety_consultation")
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(complete)
+        compose.onNodeWithTag("safety_plan_page").performScrollToNode(complete)
         compose.onNode(complete).performClick()
         compose.onNodeWithText(text(R.string.safety_complete_consultation_title)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.cancel)).performClick()
@@ -287,11 +306,19 @@ class OrganizationAndChatUiTest {
         }
         compose.setContent { OliveTheme { Box(Modifier.fillMaxSize()) { ChatInfoDialog(session, "staff", {}, { _, _ -> }) } } }
         compose.onNodeWithText("Support Ticket #520").assertExists()
+        val expandSheet = compose.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsActions.Expand),
+            useUnmergedTree = true,
+        )
+        if (expandSheet.fetchSemanticsNodes().isNotEmpty()) {
+            expandSheet.onFirst().performSemanticsAction(SemanticsActions.Expand)
+        }
         compose.onNodeWithText("Ticket #520").assertIsDisplayed()
         scrollDialogTo(hasTestTag("chat_member_member"))
         compose.onNodeWithText("Friend", ignoreCase = false).assertIsDisplayed()
-        scrollDialogTo(hasTestTag("chat_member_admin"))
-        compose.onNodeWithText(text(R.string.support_admin_chat_name)).assertIsDisplayed()
+        val adminLabel = text(R.string.support_admin_chat_name)
+        scrollDialogTo(hasText(adminLabel))
+        compose.onNodeWithText(adminLabel).assertIsDisplayed()
         compose.onNodeWithText("Private owner").assertDoesNotExist()
         compose.onNodeWithText("Private friend").assertDoesNotExist()
         scrollDialogTo(hasText(text(R.string.chat_no_shared_items)))
@@ -499,7 +526,7 @@ class OrganizationAndChatUiTest {
         val password = hasTestTag("messaging_reconnect_password")
         val reconnect = hasTestTag("messaging_reconnect")
         list.performScrollToNode(reconnect)
-        compose.onNode(reconnect).assertIsNotEnabled()
+        compose.onNode(reconnect).assertIsEnabled().performClick()
         list.performScrollToNode(password)
         compose.onNode(password).performTextReplacement("synthetic-password")
         list.performScrollToNode(reconnect)

@@ -96,6 +96,11 @@
     <string name="documents_access_revoked">لم يعد لديك وصول إلى هذا الملف. تمت إزالة النسخة غير المتصلة.</string>
     <string name="documents_offline_copy_corrupt">النسخة غير المتصلة تالفة وتمت إزالتها. نزّلها مرة أخرى.</string>
     <string name="documents_key_unavailable">لا يملك هذا الجهاز مفتاح تشفير هذا الملف. افتح المستندات على جهاز معتمد سابقًا لهذا الحساب، أو اطلب من مالك الملف مشاركته مرة أخرى.</string>
+    <string name="documents_account_wrapper_missing">لم يُجهّز هذا الملف لاسترداد الحساب. افتحه على الجهاز الذي رفعه ثم شاركه مرة أخرى.</string>
+    <string name="documents_account_recovery_failed">تعذر استعادة الوصول المشفر إلى حسابك. تحقق من الاتصال وأدخل كلمة مرور الاسترداد مرة أخرى.</string>
+    <string name="documents_account_keyset_mismatch">ينتمي هذا الملف إلى مجموعة مفاتيح مشفرة مختلفة. استعد كلمة مرور الاسترداد الأصلية للحساب ثم حاول مرة أخرى.</string>
+    <string name="documents_account_wrapper_failed">تعذر استعادة المفتاح المشفر لهذا الملف. اترك الملف دون تغيير وحاول الاسترداد مرة أخرى.</string>
+    <string name="documents_ciphertext_authentication_failed">تعذر التحقق من صحة الملف المشفر. قد يكون تالفًا أو يستخدم مفتاح استرداد مختلفًا.</string>
     <string name="documents_account_mismatch">هذه النسخة غير المتصلة تخص حسابًا آخر.</string>
     <string name="documents_storage_full">لا توجد مساحة كافية لهذه النسخة غير المتصلة.</string>
     <string name="documents_download_failed">تعذر تنزيل الملف المشفر. حاول مرة أخرى.</string>

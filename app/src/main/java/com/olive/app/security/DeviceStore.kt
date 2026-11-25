@@ -1,7 +1,11 @@
 // All signed-in roles: stores device state.
 package com.olive.app.security
 
+import android.content.Context
+import android.content.SharedPreferences
+import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.news.NewsArticle
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -90,6 +94,7 @@ class DeviceStore(
             root.child("enrollments").put(
                 identity.uid, JSONObject()
                     .put("pinVerifier", verifier).put("triggerHash", profile.triggerHash)
+                    .put("pinLength", pin.length)
                     .put("role", profile.role.name)
                     .put("failures", 0)
             )
@@ -111,7 +116,7 @@ class DeviceStore(
                     }
                 })
         )
-        return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role)
+        return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role, pinLength = pin.length)
     }
 
     /**
@@ -126,7 +131,8 @@ class DeviceStore(
         entry.optString("triggerHash"),
         AccountRole.fromStored(entry.optString("role")),
         SafeEntryMethod.fromStored(entry.optString("entryMethod")),
-        entry.has("pinVerifier")
+        entry.has("pinVerifier"),
+        entry.optInt("pinLength").takeIf { it in 4..6 && entry.has("pinVerifier") },
     )
 
     /**
@@ -195,8 +201,11 @@ class DeviceStore(
         vault.update { root ->
             check(root.optString("activeUid") == expected.uid)
             val entry = root.getJSONObject("enrollments").getJSONObject(expected.uid)
-            check(enrollment(expected.uid, entry) == expected && expected.role == AccountRole.USER)
-            verifier?.let { entry.put("pinVerifier", it) }
+            val stored = enrollment(expected.uid, entry)
+            // Verification may have recorded the length of a legacy PIN since this enrollment was loaded.
+            val comparable = if (expected.pinLength == null) stored.copy(pinLength = null) else stored
+            check(comparable == expected && expected.role == AccountRole.USER)
+            if (pin != null) entry.put("pinVerifier", verifier).put("pinLength", pin.length)
             grant?.let { entry.put("deviceLockGrant", it) }
             val chosen = method ?: expected.entryMethod
             check(if (chosen == SafeEntryMethod.APP_PIN) entry.has("pinVerifier") else entry.has("deviceLockGrant"))
@@ -235,6 +244,7 @@ class DeviceStore(
         vault.update { root ->
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
                 remove("pinVerifier")
+                remove("pinLength")
                 remove("lockedUntil")
                 remove("pinLockouts")
                 put("failures", 0)
@@ -271,6 +281,7 @@ class DeviceStore(
             )
             saved.put("failures", if (next.failures >= 5) 0 else next.failures)
             if (accepted) {
+                saved.put("pinLength", pin.length)
                 saved.remove("lockedUntil")
                 saved.remove("pinLockouts")
             } else if (next.failures >= 5) {
@@ -714,6 +725,7 @@ object InputPolicy {
      * Trims and lowercases a username before the app checks or stores it.
      *
      * @param value Input value to store, parse, or format.
+     * @return The trimmed, lowercase username.
      */
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
     /**
@@ -727,6 +739,7 @@ object InputPolicy {
      * Accepts only a new username with 8–24 letters, numbers, or underscores.
      *
      * @param value Input value to store, parse, or format.
+     * @return True when the normalized username has 8–24 allowed characters and includes a letter.
      */
     fun validUsername(value: String) =
         username(value).matches(Regex("[a-z0-9_]{8,24}")) && usernameHasLetter(value)
@@ -735,8 +748,31 @@ object InputPolicy {
      * Existing accounts created under the former four-character minimum remain able to sign in.
      *
      * @param value Input value to store, parse, or format.
+     * @return True when the normalized username has 4–24 allowed characters.
      */
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
+    private val emailRegex = Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""")
+
+    /**
+     * Normalizes an optional contact email address before validation or storage.
+     *
+     * @param value The email address to trim and lowercase.
+     * @return The trimmed, lowercase email address.
+     */
+    fun normalizedEmail(value: String) = value.trim().lowercase(Locale.ROOT)
+
+    /**
+     * Accepts a real contact email while rejecting empty strings and internal aliases.
+     *
+     * @param value The contact email address to validate.
+     * @return True when the normalized value is a valid contact email and is not an internal alias.
+     */
+    fun validEmail(value: String): Boolean {
+        val normalized = normalizedEmail(value)
+        return normalized.length in 1..254 &&
+            emailRegex.matches(normalized) &&
+            !normalized.endsWith(".olive.invalid")
+    }
     /**
      * Keeps passwords between 8 and 24 characters.
      *
@@ -804,9 +840,10 @@ object InputPolicy {
      */
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
     /**
-     * Checks whether cover input matches the saved discreet trigger phrase.
+     * Checks whether text is an acceptable length for a discreet trigger phrase.
      *
-     * @param value Input value to store, parse, or format.
+     * @param value The proposed trigger phrase before trimming.
+     * @return True when the trimmed trigger text is between 3 and 64 characters long.
      */
     fun validTrigger(value: String) = value.trim().length in 3..64
     /**
@@ -818,7 +855,7 @@ object InputPolicy {
     fun triggerHash(value: String): String = SecretVerifier.createTrigger(normalizeTrigger(value))
 
     /**
-     * Computes matches trigger.
+     * Checks the entered trigger against the stored verifier, including the legacy digest format.
      *
      * @param value Input value to store, parse, or format.
      * @param stored Stored supplied to [matchesTrigger].
@@ -839,7 +876,7 @@ object InputPolicy {
     private fun normalizeTrigger(value: String) = value.lowercase(Locale.ROOT).filterNot(Char::isWhitespace)
 
     /**
-     * Computes unsalted trigger hash.
+     * Hashes the normalized trigger using the legacy SHA-256 format.
      *
      * @param value Input value to store, parse, or format.
      * @return The resulting unsalted trigger hash string.
@@ -898,6 +935,22 @@ object IdlePolicy {
         timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }
 
     /**
+     * Returns up to three ascending idle timeout options (in seconds) strictly larger than [currentSeconds]
+     * so users can extend their timeout directly from the inactivity warning dialog.
+     *
+     * @param currentSeconds Currently configured idle timeout duration in seconds.
+     * @return Ascending list of available extension durations, or empty when already at [MAX_TIMEOUT_SECONDS].
+     */
+    fun extendOptions(currentSeconds: Int): List<Int> {
+        val normalized = normalizeTimeout(currentSeconds)
+        val larger = timeoutOptions.filter { it > normalized }
+        if (larger.isEmpty()) return emptyList()
+        return listOf(larger.first(), 300, MAX_TIMEOUT_SECONDS)
+            .filter { it > normalized && it in timeoutOptions }
+            .distinct()
+    }
+
+    /**
      * Computes countdown.
      *
      * @param elapsedMs Duration or timestamp for elapsed, in milliseconds.
@@ -945,6 +998,7 @@ enum class SafeEntryMethod {
 /**
  * A saved app PIN is an optional second route even when device lock stays preferred.
  *
+ * @receiver The local device enrollment whose app-PIN configuration is checked.
  * @return `true` if allows app PIN, or `false` otherwise.
  */
 internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin
@@ -953,11 +1007,87 @@ internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin
 
 data class DeviceEnrollment(
     val uid: String, val triggerHash: String, val role: AccountRole = AccountRole.USER,
-    val entryMethod: SafeEntryMethod = SafeEntryMethod.APP_PIN, val hasAppPin: Boolean = true
+    val entryMethod: SafeEntryMethod = SafeEntryMethod.APP_PIN, val hasAppPin: Boolean = true,
+    val pinLength: Int? = null,
 )
 
 data class DeviceSession(val enrollment: DeviceEnrollment, val profile: UserProfile)
 sealed interface PinResult {
     data object Accepted : PinResult
     data class Rejected(val failures: Int) : PinResult
+}
+
+// Device-local choices are isolated by account; never inherit another account's setting.
+internal object ScreenCapturePreferences {
+    /**
+     * Stores the screen capture preferences.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @return The resulting [SharedPreferences] instance.
+     */
+    fun store(context: Context): SharedPreferences =
+        context.getSharedPreferences("olive_capture_privacy", Context.MODE_PRIVATE)
+
+    /**
+     * Computes enabled.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account, or null when not provided.
+     * @return `true` if enabled, or `false` otherwise.
+     */
+    fun enabled(context: Context, uid: String?): Boolean =
+        if (uid.isNullOrBlank()) context.resources.getBoolean(R.bool.screen_capture_protection_enabled)
+        else store(context).getBoolean("blocked_$uid", context.resources.getBoolean(R.bool.screen_capture_protection_enabled))
+
+    /**
+     * Sets enabled.
+     *
+     * @param context Android context used to access system services, resources, or storage.
+     * @param uid Firebase UID of the target user account.
+     * @param enabled Whether this feature or control is currently enabled.
+     */
+    fun setEnabled(context: Context, uid: String, enabled: Boolean) {
+        require(uid.isNotBlank())
+        store(context).edit().putBoolean("blocked_$uid", enabled).apply()
+    }
+}
+
+// Persists account-isolated state for the cover applications.
+class CoverStateStore(private val vault: EncryptedVault) {
+    /**
+     * Restores the saved news feed for the given account.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting restore items.
+     */
+    fun restore(uid: String): List<NewsArticle> = news(uid)
+
+    /**
+     * Reads cached news articles from the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @return List of resulting news items.
+     */
+    fun news(uid: String): List<NewsArticle> {
+        val item = vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
+        val rows = item.optJSONArray("news") ?: JSONArray()
+        return (0 until rows.length()).mapNotNull { index ->
+            runCatching { NewsArticle.fromJson(rows.getJSONObject(index)) }.getOrNull()
+        }
+    }
+
+    /**
+     * Saves cached news articles into the encrypted local vault.
+     *
+     * @param uid Firebase UID of the target user account.
+     * @param articles Collection of articles values to process.
+     */
+    fun saveNews(uid: String, articles: List<NewsArticle>) {
+        vault.update { root ->
+            root.child("accounts").child(uid).put(
+                "news",
+                JSONArray().also { rows -> articles.forEach { rows.put(it.toJson()) } },
+            )
+        }
+    }
 }

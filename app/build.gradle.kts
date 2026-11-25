@@ -78,7 +78,9 @@ android {
         }
     }
     namespace = "com.olive.app"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
     // Change the app ID or release numbers here; a new app ID also needs a matching Firebase config.
     defaultConfig {
         applicationId = "com.olive.app"
@@ -115,21 +117,19 @@ android {
         }
     }
 }
-val cameraxVersion = "1.6.2"
+val cameraxVersion = "1.7.0"
 
 dependencies {
-    implementation("com.stripe:stripe-android:23.25.1")
+    implementation("com.stripe:stripe-android:23.26.0")
     implementation("androidx.camera:camera-core:${cameraxVersion}")
     implementation("androidx.camera:camera-camera2:${cameraxVersion}")
     implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
     implementation("androidx.camera:camera-view:${cameraxVersion}")
     implementation("androidx.camera:camera-video:${cameraxVersion}")
     implementation("androidx.camera:camera-extensions:${cameraxVersion}")
-    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.11.01"))
     // App and instrumented tests both need the same Compose version constraints.
-    listOf("implementation", "androidTestImplementation").forEach { configuration ->
-        add(configuration, platform("androidx.compose:compose-bom:2026.09.00"))
-    }
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.11.01"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.biometric:biometric:1.1.0")
@@ -141,12 +141,12 @@ dependencies {
     implementation("androidx.compose.animation:animation-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.exifinterface:exifinterface:1.3.6")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.1")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.health.connect:connect-client:1.1.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-installations")
@@ -159,13 +159,13 @@ dependencies {
     implementation("com.google.android.gms:play-services-wearable:20.0.1")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.jsoup:jsoup:1.24.1")
     implementation(project(":ppocr-sdk"))
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.1")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.32.0")
     // Media transfers use OkHttp directly; do not rely on Coil's transitive dependency.
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("io.livekit:livekit-android:2.30.0")
@@ -177,8 +177,8 @@ dependencies {
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
-    testImplementation("org.robolectric:robolectric:4.17")
-    testImplementation("org.mockito:mockito-core:5.20.0")
+    testImplementation("org.robolectric:robolectric:4.18.1")
+    testImplementation("org.mockito:mockito-core:5.24.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")

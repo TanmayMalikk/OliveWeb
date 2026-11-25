@@ -6,11 +6,17 @@ const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = requ
 const {saveSupportConversation, PLAN_CONSULT} = require("./supportGroups");
 const {stripeKey, closeFitnessBilling} = require("./fitnessAiBilling");
 
+// Runs async work in bounded batches so Firestore cleanup finishes well within callable timeouts.
+async function runInBatches(items, batchSize, worker) {
+  for (let index = 0; index < items.length; index += batchSize) {
+    await Promise.all(items.slice(index, index + batchSize).map(worker));
+  }
+}
+
 // Deletes every document returned by an account-cleanup query.
 async function deleteQuery(query) {
   const snapshot = await query.get();
-  // Keep cleanup sequential so large accounts do not exhaust Firestore stream listeners.
-  for (const document of snapshot.docs) await db.recursiveDelete(document.ref);
+  await runInBatches(snapshot.docs, 10, (document) => db.recursiveDelete(document.ref));
 }
 
 // Removes the deleted account from friend subcollections owned by other users.
@@ -18,14 +24,51 @@ async function deleteFriendListReferences(uid) {
   // Parent friend-list documents may not exist, so list their references and query each subcollection.
   // This also repairs accounts whose earlier deletion stopped after removing the friendship document.
   const owners = await db.collection("friendLists").listDocuments();
-  for (const owner of owners) {
+  await runInBatches(owners, 25, async (owner) => {
     const references = await owner.collection("friends").where("friendUid", "==", uid).get();
-    for (const reference of references.docs) await reference.ref.delete();
-  }
+    if (!references.empty) {
+      await Promise.all(references.docs.map((reference) => reference.ref.delete()));
+    }
+  });
+}
+
+// Deletes private entries owned by the account and removes its key from entries shared by others.
+async function deletePrivateEntryReferences(uid) {
+  const privateEntries = await db.collection("privateEntries").where("allowedUsers", "array-contains", uid).get();
+  await runInBatches(privateEntries.docs, 10, (entry) => (
+    entry.get("ownerUid") === uid
+      ? entry.ref.delete()
+      : entry.ref.update({
+        [`wrappedKeys.${uid}`]: FieldValue.delete(),
+        allowedUsers: FieldValue.arrayRemove(uid),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+  ));
+}
+
+// Removes a deleted staff assignment without deleting the user's safety plan.
+async function clearStaffAssignments(uid) {
+  const sharedPlans = await db.collection("safetyPlans").where("staffUid", "==", uid).get();
+  await runInBatches(sharedPlans.docs, 10, (plan) => plan.ref.update({staffUid: "", staffName: ""}));
+}
+
+// Returns escalated plans to their staff conversation when an admin is deleted.
+async function clearAdminAssignments(uid) {
+  const escalatedPlans = await db.collection("safetyPlans").where("adminUid", "==", uid).get();
+  await runInBatches(escalatedPlans.docs, 10, async (snapshot) => {
+    const plan = {...snapshot.data(), adminUid: "", adminName: ""};
+    await snapshot.ref.update({adminUid: "", adminName: ""});
+    if (plan.staffUid) {
+      await saveSupportConversation(
+        {...plan, conversationId: plan.consultationConversationId, supportOrigin: PLAN_CONSULT},
+        plan.supportSafeContactUid || "",
+      );
+    }
+  });
 }
 
 // Lets an admin remove one non-protected account and all records that identify it.
-exports.adminDeleteAccount = onCall({secrets: [stripeKey]}, async (request) => {
+exports.adminDeleteAccount = onCall({secrets: [stripeKey], timeoutSeconds: 120}, async (request) => {
   const {caller} = await requireAdmin(request);
   const uid = text(request.data?.uid, 128);
   if (!uid || uid === caller.uid) throw new HttpsError("failed-precondition", "You cannot delete the account you are using.");
@@ -43,51 +86,47 @@ exports.adminDeleteAccount = onCall({secrets: [stripeKey]}, async (request) => {
     if (adminCount <= 1) throw new HttpsError("failed-precondition", "The last Admin account cannot be deleted.");
   }
   await closeFitnessBilling(uid);
-  await db.recursiveDelete(db.collection("safetyPlans").doc(uid));
-  await db.recursiveDelete(db.collection("supportRequests").doc(uid));
-  await deleteQuery(db.collection("supportRequests").where("ownerUid", "==", uid));
-  // Removes a deleted staff assignment without deleting the user's safety plan.
-  const sharedPlans = await db.collection("safetyPlans").where("staffUid", "==", uid).get();
-  for (const plan of sharedPlans.docs) await plan.ref.update({staffUid: "", staffName: ""});
-  // Returns escalated plans to their staff conversation when an admin is deleted.
-  const escalatedPlans = await db.collection("safetyPlans").where("adminUid", "==", uid).get();
-  for (const snapshot of escalatedPlans.docs) {
-    const plan = {...snapshot.data(), adminUid: "", adminName: ""};
-    await snapshot.ref.update({adminUid: "", adminName: ""});
-    if (plan.staffUid) await saveSupportConversation(
-        {...plan, conversationId: plan.consultationConversationId, supportOrigin: PLAN_CONSULT},
-        plan.supportSafeContactUid || "");
-  }
-  await db.collection("safetyStaff").doc(uid).delete();
-  await deleteQuery(db.collection("friendInvites").where("ownerUid", "==", uid));
-  await db.collection("friendInviteOwners").doc(uid).delete();
-  await db.collection("friendInviteAttempts").doc(uid).delete();
-  await db.recursiveDelete(db.collection("messagingPeerAccess").doc(uid)).catch(() => {});
-  await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));
-  await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));
-  await deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid));
-  await deleteQuery(db.collection("conversations").where("participantIds", "array-contains", uid));
-  // Deletes entries owned by the account and removes its key from entries shared by others.
-  const privateEntries = await db.collection("privateEntries").where("allowedUsers", "array-contains", uid).get();
-  for (const entry of privateEntries.docs) {
-    if (entry.get("ownerUid") === uid) await entry.ref.delete();
-    else await entry.ref.update({
-      [`wrappedKeys.${uid}`]: FieldValue.delete(),
-      allowedUsers: FieldValue.arrayRemove(uid),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  }
-  await deleteFriendListReferences(uid);
-  await db.recursiveDelete(db.collection("friendLists").doc(uid)).catch(() => {});
-  await db.recursiveDelete(db.collection("notificationTokens").doc(uid)).catch(() => {});
-  await db.collection("users").doc(uid).delete().catch(() => {});
+  await Promise.all([
+    db.recursiveDelete(db.collection("safetyPlans").doc(uid)),
+    db.recursiveDelete(db.collection("supportRequests").doc(uid)),
+    db.recursiveDelete(db.collection("accountKeysets").doc(uid)),
+    db.recursiveDelete(db.collection("accountKeyDirectories").doc(uid)),
+    db.recursiveDelete(db.collection("accountRecoveryPasskeys").doc(uid)),
+    db.recursiveDelete(db.collection("accountRecoveryOpaqueRecords").doc(uid)),
+    db.recursiveDelete(db.collection("accountRecoveryOpaqueThrottle").doc(uid)),
+    deleteQuery(db.collection("supportRequests").where("ownerUid", "==", uid)),
+    db.collection("safetyStaff").doc(uid).delete(),
+    deleteQuery(db.collection("friendInvites").where("ownerUid", "==", uid)),
+    db.collection("friendInviteOwners").doc(uid).delete(),
+    db.collection("friendInviteAttempts").doc(uid).delete(),
+    db.recursiveDelete(db.collection("messagingPeerAccess").doc(uid)).catch(() => {}),
+    deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid)),
+    deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid)),
+    deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid)),
+    deleteQuery(db.collection("conversations").where("participantIds", "array-contains", uid)),
+    deletePrivateEntryReferences(uid),
+    deleteFriendListReferences(uid),
+    db.recursiveDelete(db.collection("friendLists").doc(uid)).catch(() => {}),
+    db.recursiveDelete(db.collection("notificationTokens").doc(uid)).catch(() => {}),
+    db.recursiveDelete(db.collection("accountLoginDevices").doc(uid)).catch(() => {}),
+    db.collection("liveLocationSessions").doc(uid).delete().catch(() => {}),
+    db.collection("emailCooldowns").doc(`safety-plan--${uid}`).delete().catch(() => {}),
+    deleteQuery(db.collection("emailNotificationLogs").where("uid", "==", uid)).catch(() => {}),
+    db.collection("users").doc(uid).delete().catch(() => {}),
+  ]);
+  await Promise.all([
+    clearStaffAssignments(uid),
+    clearAdminAssignments(uid),
+  ]);
   // Frees the global username only after its conversations and private records are cleaned up.
-  if (username) {
-    await db.collection("messageDirectory").doc(username).delete().catch(() => {});
-    await db.collection("accountDirectory").doc(username).delete().catch(() => {});
-  }
-  await deleteOrganizationLogin(profile?.email);
-  await bucket.deleteFiles({prefix: `accounts/${uid}/`});
+  await Promise.all([
+    ...(username ? [
+      db.collection("messageDirectory").doc(username).delete().catch(() => {}),
+      db.collection("accountDirectory").doc(username).delete().catch(() => {}),
+    ] : []),
+    deleteOrganizationLogin(profile?.email),
+    bucket.deleteFiles({prefix: `accounts/${uid}/`}),
+  ]);
   await auth.deleteUser(uid);
   return {deleted: true, uid};
 });

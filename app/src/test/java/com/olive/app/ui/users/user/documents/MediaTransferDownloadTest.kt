@@ -8,6 +8,7 @@ import com.olive.app.support.TestAndroidKeyStore
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,12 +93,12 @@ class MediaTransferDownloadTest {
         Fixture().use { f ->
             f.ticket()
             val opened = f.controller.downloadFile(f.document, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
-            assertTrue(opened.name.endsWith(".pdf"))
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
+            assertTrue(opened.file.name.endsWith(".pdf"))
             assertEquals(MediaTransferState.Idle, f.controller.state)
             assertEquals(1, f.requests)
             verify(f.cache).retainRecentDownloaded(eq("owner") ?: "", eq(f.document) ?: f.document, any<File>() ?: f.encrypted)
-            opened.delete()
+            opened.file.delete()
         }
     }
 
@@ -107,10 +108,162 @@ class MediaTransferDownloadTest {
             f.online = false
             `when`(f.cache.verifiedCiphertext("owner", f.document)).thenReturn(f.encrypted)
             val opened = f.controller.downloadFile(f.document, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
             assertEquals(0, f.requests)
             verifyNoInteractions(f.repository)
-            opened.delete()
+            opened.file.delete()
+        }
+    }
+
+    @Test
+    fun freshDeviceOpensMediaUsingOnlyItsRecoveredAccountWrapper() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val recoveredKeyset = envelope.unlock("owner", recoveryKey)
+            val accountWrapper = AccountKeysetWrappedKey(
+                envelope.keyId,
+                envelope.epoch,
+                "RSA-OAEP-256",
+                KeyManager.wrapForAccountKeyset(f.key, recoveredKeyset.publicKey),
+            )
+            val encryptedMetadata = EncryptionUtils.encryptText(
+                JSONObject()
+                    .put("name", "recovered-report.pdf")
+                    .put("mimeType", "application/pdf")
+                    .put("tags", org.json.JSONArray().put("recovered"))
+                    .toString(),
+                f.key,
+            )
+            val freshDeviceDocument = f.document.copy(
+                name = "Encrypted document",
+                mimeType = "application/octet-stream",
+                encryptedMetadata = encryptedMetadata,
+                wrappedKeys = emptyMap(),
+                deviceWrappedKeys = emptyMap(),
+                accountRecoveryReady = true,
+                accountWrappedKeys = mapOf("owner" to accountWrapper),
+            )
+            `when`(f.cache.availability("owner", freshDeviceDocument))
+                .thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.ticket()
+            val controller = MediaTransferController(
+                f.app,
+                f.scope,
+                f.repository,
+                f.store,
+                f.cache,
+                OkHttpClient.Builder().addInterceptor { chain ->
+                    Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                        .message("fixture").body(f.bytes.toResponseBody()).build()
+                }.build(),
+                accountKeysetUnlocker = { recoveredKeyset },
+            )
+
+            val opened = controller.downloadFile(freshDeviceDocument, "owner")
+
+            assertArrayEquals(f.plaintext, opened.file.readBytes())
+            assertEquals("recovered-report.pdf", opened.document.name)
+            assertEquals("application/pdf", opened.document.mimeType)
+            assertEquals(listOf("recovered"), opened.document.tags)
+            assertTrue(opened.file.name.endsWith(".pdf"))
+            opened.file.delete()
+        }
+    }
+
+    @Test
+    fun corruptedPrivateMetadataNeverReturnsAPlaintextPreview() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val valid = EncryptionUtils.encryptText(
+                JSONObject().put("name", "report.pdf").put("mimeType", "application/pdf").toString(),
+                f.key,
+            )
+            val corrupted = valid.dropLast(1) + if (valid.last() == 'A') "B" else "A"
+            val document = f.document.copy(
+                name = "Encrypted document",
+                mimeType = "application/octet-stream",
+                encryptedMetadata = corrupted,
+            )
+            `when`(f.cache.availability("owner", document))
+                .thenReturn(OfflineMediaAvailability.NOT_CACHED)
+            f.ticket()
+            val folder = File(f.app.cacheDir, "opened-documents")
+            val before = folder.listFiles().orEmpty().map(File::getName).toSet()
+
+            val failure = assertThrows(MediaAccessException::class.java) {
+                runBlocking { f.controller.downloadFile(document, "owner") }
+            }
+
+            assertEquals(MediaAccessError.CIPHERTEXT_AUTHENTICATION_FAILED, failure.reason)
+            assertEquals(before, folder.listFiles().orEmpty().map(File::getName).toSet())
+        }
+    }
+
+    @Test
+    fun oneAccountUnlockRestoresRepeatedMediaClassesAndIsolatesFailures() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val keyset = envelope.unlock("owner", recoveryKey)
+            val originalKeys = mutableMapOf<String, javax.crypto.SecretKey>()
+            val documents = (0 until 25).map { index ->
+                val documentKey = EncryptionUtils.generateSymmetricKey()
+                val id = "restore-$index"
+                originalKeys[id] = documentKey
+                val metadata = EncryptionUtils.encryptText(
+                    JSONObject()
+                        .put("name", "restored-$index.${if (index % 2 == 0) "pdf" else "jpg"}")
+                        .put("mimeType", if (index % 2 == 0) "application/pdf" else "image/jpeg")
+                        .toString(),
+                    documentKey,
+                )
+                f.document.copy(
+                    id = id,
+                    name = "Encrypted document",
+                    mimeType = "application/octet-stream",
+                    encryptedMetadata = metadata,
+                    wrappedKeys = emptyMap(),
+                    deviceWrappedKeys = emptyMap(),
+                    accountWrappedKeys = mapOf(
+                        "owner" to AccountKeysetWrappedKey(
+                            envelope.keyId,
+                            envelope.epoch,
+                            "RSA-OAEP-256",
+                            KeyManager.wrapForAccountKeyset(documentKey, keyset.publicKey),
+                        ),
+                    ),
+                )
+            }
+            val corrupted = documents.first().copy(
+                id = "corrupted",
+                encryptedMetadata = documents.first().encryptedMetadata.dropLast(1) + "!",
+            )
+            val wrongRecoveryKey = AccountRecoveryKey.generate()
+            val wrongEnvelope = AccountKeysetEnvelope.create("owner", wrongRecoveryKey)
+            val wrongKeyset = wrongEnvelope.unlock("owner", wrongRecoveryKey)
+            val mismatched = documents.last().copy(
+                id = "mismatched",
+                accountWrappedKeys = mapOf(
+                    "owner" to AccountKeysetWrappedKey(
+                        wrongEnvelope.keyId,
+                        wrongEnvelope.epoch,
+                        "RSA-OAEP-256",
+                        KeyManager.wrapForAccountKeyset(originalKeys.getValue(documents.last().id), wrongKeyset.publicKey),
+                    ),
+                ),
+            )
+
+            val result = f.controller.restoreDeviceAccess(documents + corrupted + mismatched, "owner", keyset)
+
+            assertEquals(25, result.documents.size)
+            assertEquals(setOf("corrupted", "mismatched"), result.failedIds)
+            assertTrue(result.pendingSyncIds.isEmpty())
+            result.documents.forEach { restored ->
+                assertNotEquals("Encrypted document", restored.name)
+                val wrapped = restored.deviceWrappedKeys.getValue("owner--${KeyManager.deviceId()}")
+                assertArrayEquals(originalKeys.getValue(restored.id).encoded, KeyManager.unwrapKey(wrapped).encoded)
+            }
+            verify(f.repository, times(25)).updateDeviceKeys(anyString(), anyMap())
         }
     }
 
@@ -182,20 +335,19 @@ class MediaTransferDownloadTest {
     }
 
     @Test
-    fun missingDeviceEnvelopeCanUseAccountRecoveryButUnavailableKeysNeverExposePlaintext() = runBlocking<Unit> {
+    fun missingDeviceAndAccountEnvelopesNeverExposePlaintext() = runBlocking<Unit> {
         Fixture().use { f ->
             f.ticket()
             val missing = f.document.copy(wrappedKeys = emptyMap())
             `when`(f.cache.availability("owner", missing)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
             val failure = assertThrows(MediaAccessException::class.java) { runBlocking { f.controller.downloadFile(missing, "owner") } }
-            assertEquals(MediaAccessError.KEY_UNAVAILABLE, failure.reason)
+            assertEquals(MediaAccessError.ACCOUNT_WRAPPER_MISSING, failure.reason)
             val recoverable = missing.copy(accountRecoveryReady = true)
             `when`(f.cache.availability("owner", recoverable)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
-            `when`(f.repository.recoverDocumentKey("doc")).thenReturn(f.key)
-            val opened = f.controller.downloadFile(recoverable, "owner")
-            assertArrayEquals(f.plaintext, opened.readBytes())
-            verify(f.repository).recoverDocumentKey("doc")
-            opened.delete()
+            val unavailable = assertThrows(MediaAccessException::class.java) {
+                runBlocking { f.controller.downloadFile(recoverable, "owner") }
+            }
+            assertEquals(MediaAccessError.ACCOUNT_WRAPPER_MISSING, unavailable.reason)
         }
     }
 
@@ -204,14 +356,14 @@ class MediaTransferDownloadTest {
         Fixture().use { f ->
             `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(true)
             `when`(f.cache.verifiedCiphertext("owner", f.document)).thenReturn(null, f.encrypted, null, f.encrypted, null)
-            val promoted = f.controller.downloadFile(f.document, "owner")
+            val promoted = f.controller.downloadFile(f.document, "owner").file
             assertArrayEquals(f.plaintext, promoted.readBytes())
             promoted.delete()
 
             `when`(f.cache.promoteUploadCandidateAsRecent("owner", f.document)).thenReturn(false)
             `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.REVALIDATION_REQUIRED)
             f.ticket()
-            val revalidated = f.controller.downloadFile(f.document, "owner")
+            val revalidated = f.controller.downloadFile(f.document, "owner").file
             assertArrayEquals(f.plaintext, revalidated.readBytes())
             verify(f.cache).markRevalidated("owner", "doc")
             revalidated.delete()
@@ -219,6 +371,59 @@ class MediaTransferDownloadTest {
             `when`(f.cache.availability("owner", f.document)).thenReturn(OfflineMediaAvailability.NOT_CACHED)
             f.status = 500
             assertThrows(IllegalStateException::class.java) { runBlocking { f.controller.downloadFile(f.document, "owner") } }
+        }
+    }
+
+    @Test
+    fun accountKeysetRecoveryDecryptsAndPersistsDeviceKeyAsynchronouslyWithoutBlockingOpen() = runBlocking<Unit> {
+        Fixture().use { f ->
+            val recoveryKey = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", recoveryKey)
+            val unlocked = envelope.unlock("owner", recoveryKey)
+            val recoveredDoc = f.document.copy(
+                wrappedKeys = emptyMap(),
+                deviceWrappedKeys = emptyMap(),
+                accountWrappedKeys = mapOf(
+                    "owner" to AccountKeysetWrappedKey(
+                        envelope.keyId,
+                        envelope.epoch,
+                        "RSA-OAEP-256",
+                        KeyManager.wrapForAccountKeyset(f.key, unlocked.publicKey),
+                    ),
+                ),
+            )
+            val controller = MediaTransferController(
+                f.app, f.scope, f.repository, f.store, f.cache,
+                client = OkHttpClient(),
+                accountKeysetUnlocker = { unlocked },
+            )
+            val rewrappedKeys = java.util.concurrent.CopyOnWriteArrayList<Map<String, String>>()
+            doAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                rewrappedKeys += invocation.getArgument<Map<String, String>>(1)
+                CloudMediaRecord(
+                    "doc", "owner", "objects/doc", "", emptyMap(), listOf("owner"),
+                    0L, "", KeyManager.CURRENT_KEY_WRAP_VERSION, 0L,
+                )
+            }.doThrow(IllegalStateException("Network unavailable"))
+                .`when`(f.repository).updateDeviceKeys(anyString(), anyMap())
+            `when`(f.cache.verifiedCiphertext("owner", recoveredDoc)).thenReturn(f.encrypted)
+
+            val firstOpened = controller.downloadFile(recoveredDoc, "owner").file
+            assertArrayEquals(f.plaintext, firstOpened.readBytes())
+            firstOpened.delete()
+            withTimeout(5_000) { while (rewrappedKeys.isEmpty()) delay(10) }
+            val deviceEntryKey = "owner--${KeyManager.deviceId()}"
+            val persisted = rewrappedKeys.single()[deviceEntryKey]
+            assertNotNull(persisted)
+            assertArrayEquals(f.key.encoded, KeyManager.unwrapKey(persisted!!).encoded)
+
+            // Even if persisting the device wrapper fails on retry, opening remains unblocked.
+            val secondDoc = recoveredDoc.copy(id = "doc-retry-open")
+            `when`(f.cache.verifiedCiphertext("owner", secondDoc)).thenReturn(f.encrypted)
+            val secondOpened = controller.downloadFile(secondDoc, "owner").file
+            assertArrayEquals(f.plaintext, secondOpened.readBytes())
+            secondOpened.delete()
         }
     }
 }

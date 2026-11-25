@@ -81,15 +81,38 @@ class SessionNavigationPrivacyTest {
         SessionRuntimeFixture().use { f ->
             val r = f.runtime
             r.state.screen = SessionScreen.Cover
-            r.state.coverType = CoverType.GAME
+            r.state.coverType = CoverType.NEWS
             r.navigation.openScreen(SessionScreen.ReturningCredentials)
             r.navigation.openScreen(SessionScreen.ReturningCredentials)
             assertEquals(1, r.screenHistory.size)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
-            assertEquals(CoverType.GAME, r.state.coverType)
+            assertEquals(CoverType.NEWS, r.state.coverType)
             r.navigation.back()
             assertEquals(SessionScreen.Cover, r.state.screen)
+        }
+    }
+
+    @Test
+    fun completeWalkthroughTourDismissesStepClearsHistoryAndReturnsToSafeHome() {
+        for (role in listOf(AccountRole.USER, AccountRole.SAFE_CONTACT)) {
+            SessionRuntimeFixture(role).use { f ->
+                val r = f.runtime
+                r.state.screen = SessionScreen.Safe
+                r.state.page = SafePage.Settings
+                r.safePageHistory += listOf(SafePage.Home, SafePage.Notes, SafePage.Messages)
+                r.state.walkthroughTourStepId = "settings_permissions_automatic"
+                r.state.activityCategory = ActivityCategory.Privacy
+                r.state.message = "Temporary status"
+
+                r.navigation.completeWalkthroughTour()
+
+                assertNull(r.state.walkthroughTourStepId)
+                assertEquals(SafePage.Home, r.state.page)
+                assertTrue(r.safePageHistory.isEmpty())
+                assertNull(r.state.activityCategory)
+                assertNull(r.state.message)
+            }
         }
     }
 

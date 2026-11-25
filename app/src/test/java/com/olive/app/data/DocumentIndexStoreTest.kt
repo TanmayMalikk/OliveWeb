@@ -2,6 +2,7 @@ package com.olive.app.data
 
 import android.content.Context
 import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.security.AccountKeysetWrappedKey
 import com.olive.app.data.safety.DocumentIndexStore
 import com.olive.app.data.safety.DocumentListSnapshot
 import com.olive.app.data.safety.DocumentListSource
@@ -25,7 +26,7 @@ class DocumentIndexStoreTest {
         val remote = FakeRemote()
         val original = document("standalone-evidence", ALICE).copy(evidence = false)
         remote.documents = listOf(original)
-        val repository = IndexedSafetyDocumentRepository(remote, index)
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" })
         repository.listFor(ALICE)
         repository.setEvidence(original, ALICE, true)
         assertTrue(repository.cachedFor(ALICE, original.id)!!.evidence)
@@ -48,6 +49,7 @@ class DocumentIndexStoreTest {
         val alice = store.read(ALICE)
         assertEquals(listOf("one"), alice.documents.map { it.id })
         assertEquals(setOf(ALICE), alice.documents.single().wrappedKeys.keys)
+        assertEquals(setOf(ALICE), alice.documents.single().accountWrappedKeys.keys)
         assertTrue(alice.documents.single().deviceWrappedKeys.keys.all { it.startsWith("$ALICE--") })
         assertFalse(alice.documents.single().deviceWrappedKeys.keys.any { it.startsWith("$BOB--") })
         assertTrue(alice.documents.single().evidence)
@@ -59,11 +61,24 @@ class DocumentIndexStoreTest {
     }
 
     @Test
+    fun `index preserves chatOnly flag across reads`() {
+        val store = DocumentIndexStore(FakeJsonVault())
+        store.replace(
+            ALICE,
+            listOf(document("doc", ALICE), document("voice", ALICE).copy(chatOnly = true)),
+            100,
+        )
+        val byId = store.read(ALICE).documents.associateBy(SafetyDocument::id)
+        assertFalse(byId.getValue("doc").chatOnly)
+        assertTrue(byId.getValue("voice").chatOnly)
+    }
+
+    @Test
     fun `firestore cache cannot purge but authoritative server snapshot can`() {
         val index = DocumentIndexStore(FakeJsonVault())
         index.replace(ALICE, listOf(document("kept", ALICE), document("revoked", ALICE)), 100)
         val remote = FakeRemote()
-        val repository = IndexedSafetyDocumentRepository(remote, index) { 500 }
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" }) { 500 }
         val observed = mutableListOf<DocumentListSnapshot>()
         repository.observeFor(ALICE, observed::add) { error(it) }
 
@@ -82,12 +97,46 @@ class DocumentIndexStoreTest {
     }
 
     @Test
+    fun `recovered metadata and current device wrapper survive a stale server snapshot`() = runBlocking {
+        val index = DocumentIndexStore(FakeJsonVault())
+        val remote = FakeRemote()
+        val encrypted = document("recovered", ALICE).copy(
+            name = "Encrypted document",
+            mimeType = "application/octet-stream",
+            deviceWrappedKeys = emptyMap(),
+        )
+        remote.documents = listOf(encrypted)
+        val repository = IndexedSafetyDocumentRepository(
+            remote = remote,
+            index = index,
+            clock = { 500 },
+            deviceId = { "new-device" },
+        )
+        repository.listFor(ALICE)
+        repository.rememberRecovered(
+            ALICE,
+            encrypted.copy(
+                name = "recovered.pdf",
+                mimeType = "application/pdf",
+                deviceWrappedKeys = mapOf("$ALICE--new-device" to "local-device-wrapper"),
+            ),
+        )
+
+        val refreshed = repository.listFor(ALICE).documents.single()
+
+        assertEquals("recovered.pdf", refreshed.name)
+        assertEquals("application/pdf", refreshed.mimeType)
+        assertEquals("local-device-wrapper", refreshed.deviceWrappedKeys["$ALICE--new-device"])
+    }
+
+    @Test
     fun `authorization failure never falls back through getFor`() = runBlocking {
         val index = DocumentIndexStore(FakeJsonVault())
         index.replace(ALICE, listOf(document("cached", ALICE)), 100)
         val repository = IndexedSafetyDocumentRepository(
             FakeRemote(getFailure = SecurityException("revoked")),
-            index
+            index,
+            deviceId = { "phone" },
         )
 
         assertEquals("cached", repository.cachedFor(ALICE, "cached")?.id)
@@ -100,7 +149,7 @@ class DocumentIndexStoreTest {
         val index = DocumentIndexStore(FakeJsonVault())
         val remote = FakeRemote()
         val original = document("cached", ALICE)
-        val repository = IndexedSafetyDocumentRepository(remote, index)
+        val repository = IndexedSafetyDocumentRepository(remote, index, deviceId = { "phone" })
         remote.documents = listOf(original)
         repository.listFor(ALICE)
         val observed = mutableListOf<DocumentListSnapshot>()
@@ -147,9 +196,17 @@ class DocumentIndexStoreTest {
         ciphertextSha256 = "a".repeat(64),
         encryptionVersion = 2,
         deviceWrappedKeys = mapOf("$ALICE--phone" to "device-a", "$BOB--phone" to "device-b"),
+        accountWrappedKeys = mapOf(
+            ALICE to accountWrapper("123e4567-e89b-42d3-a456-426614174000", "account-a"),
+            BOB to accountWrapper("223e4567-e89b-42d3-a456-426614174000", "account-b"),
+        ),
         evidence = true,
         tags = listOf("Safety Plan"),
     ).also { require(viewer in it.allowedUsers) }
+
+    private fun accountWrapper(keyId:String,wrappedKey:String)=AccountKeysetWrappedKey(
+        keyId,1,"RSA-OAEP-256",wrappedKey,
+    )
 
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
         var documents = emptyList<SafetyDocument>()

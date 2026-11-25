@@ -1,11 +1,17 @@
 // Safe contacts: shows the user’s shared safety information to a safe contact.
 package com.olive.app.ui.users.safecontact
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.shared.safetyplan.SafeContactSafetyPlansScreen
+import com.olive.app.ui.users.shared.walkthrough.SafeWalkthroughScreen
 import com.olive.app.ui.users.user.account.SettingsEditor
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
 import com.olive.app.ui.users.user.location.LocationMapScreen
@@ -54,11 +60,20 @@ import com.olive.app.data.account.PrivateEntryKind
  *
  * @param session Shared session view model owning application state and actions.
  * @param exit Action or callback executed for exit.
+ * @param guideTopicId The optional walkthrough topic selected for this screen.
  */
 @Composable
-internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
+internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit, guideTopicId: String? = null) {
     val profile = session.profile ?: return
-    LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
+    LaunchedEffect(session.coverAccountId, session.coverUsername, session.localMode) {
+        session.messages.ensureMessagingObservation()
+        if (!session.localMode) {
+            session.ensureSharedEntriesObservation()
+            session.coverAccountId?.let { uid ->
+                session.documents.load(uid, session.coverUsername, false)
+            }
+        }
+    }
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
@@ -73,6 +88,7 @@ internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
+            SafePage.Walkthrough -> SafeWalkthroughScreen(session, guideTopicId)
             else -> SafeContactHome(session)
         }
     }
@@ -149,7 +165,7 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_notes_help),
             Icons.Outlined.Description,
             "safe_contact_notes",
-            0,
+            session.sharedPrivateEntries.size,
             { session.navigation.openSafePage(SafePage.Notes) })
         SafeContactActionCard(
             stringResource(R.string.messages),
@@ -170,8 +186,15 @@ private fun SafeContactHome(session: SessionViewModel) {
             stringResource(R.string.safe_contact_documents_help),
             Icons.Outlined.FolderOpen,
             "safe_contact_documents",
-            0,
+            session.documents.state.files.count { it.ownerUid != session.coverAccountId },
             { session.navigation.openSafePage(SafePage.Documents) })
+        SafeContactActionCard(
+            stringResource(R.string.support_walkthrough),
+            stringResource(R.string.walkthrough_subtitle),
+            Icons.Outlined.Description,
+            "safe_contact_walkthrough",
+            0,
+            { session.navigation.openSafePage(SafePage.Walkthrough) })
         if (session.pendingSync) Surface(
             Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.primaryContainer
@@ -376,10 +399,10 @@ private fun SharedIncidentField(label: String, value: String, minLines: Int = 1)
  */
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("safe_contact_identity"),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -442,10 +465,10 @@ internal fun SafeContactActionCard(
     label: String, description: String, icon: ImageVector, tag: String, badgeCount: Int,
     onClick: () -> Unit, modifier: Modifier = Modifier
 ) {
-    Surface(
+    OliveActionSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 104.dp).testTag(tag),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

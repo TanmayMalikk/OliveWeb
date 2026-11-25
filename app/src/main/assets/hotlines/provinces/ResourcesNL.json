@@ -22,6 +22,43 @@
         "hours": "24/7",
         "url": "https://iriskirbyhouse.ca/"
       }
+    },
+    "LegalAid": {
+      "NL Legal Aid Commission (St. John's Office)": {
+        "Desc": "Legal aid applications, family law representation, and domestic violence advocacy across NL.",
+        "Phone": "709-753-7860",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM NST",
+        "address": "Suite 200, 251 Empire Ave, St. John's, NL A1C 3H9",
+        "lat": 47.5625,
+        "lng": -52.7192,
+        "url": "https://www.legalaid.nl.ca/"
+      }
+    },
+    "Counseling": {
+      "Ruah Counselling Centre": {
+        "Desc": "Accessible, confidential individual and family counselling in St. John's.",
+        "Phone": "709-579-0168",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM NST",
+        "address": "35 Barnes Rd, St. John's, NL A1C 3X1",
+        "lat": 47.5718,
+        "lng": -52.7077,
+        "url": "https://www.ruahcounselling.ca/"
+      }
+    },
+    "CrisisServices": {
+      "Mental Health Mobile Crisis Response Team": {
+        "Desc": "Mobile crisis stabilization dispatched via 811 with 24/7 telephone crisis triage.",
+        "Phone": "811",
+        "hours": "24/7 telephone; Mobile team daily 9:00 AM - 11:00 PM NST",
+        "url": "https://nl.bridgethegapp.ca/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
+      }
     }
   },
   "Corner Brook": {
@@ -39,6 +76,30 @@
         "Phone": "1-709-279-3560",
         "hours": "24/7",
         "url": "https://gracesparkeshouse.com/"
+      }
+    },
+    "LegalAid": {
+      "NL Legal Aid Commission (Provincial Toll-Free)": {
+        "Desc": "Toll-free legal aid intake and family law services for Western Newfoundland.",
+        "Phone": "1-800-563-9911",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM NST",
+        "url": "https://www.legalaid.nl.ca/"
+      }
+    },
+    "Counseling": {
+      "NL HealthLine Doorways Counselling Access": {
+        "Desc": "Drop-in and telephone single-session mental health counselling referrals in Western NL.",
+        "Phone": "811",
+        "hours": "24/7",
+        "url": "https://nl.bridgethegapp.ca/"
+      }
+    },
+    "CrisisServices": {
+      "NL 811 Mental Health Crisis Line (Corner Brook)": {
+        "Desc": "24/7 crisis intervention and emergency community mental health triage.",
+        "Phone": "811",
+        "hours": "24/7",
+        "url": "https://nl.bridgethegapp.ca/"
       }
     }
   }

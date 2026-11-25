@@ -6,6 +6,93 @@ const {safetyCaller} = require("./safetyPlanAccess");
 const options = {enforceAppCheck: true, invoker: "public"};
 const validId = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
+const VALID_USERNAME = /^[a-z0-9_]{4,24}$/;
+
+async function resolveAdminUsername(user) {
+  const displayName = String(user?.displayName || "").trim().toLowerCase();
+  if (VALID_USERNAME.test(displayName)) return displayName;
+  try {
+    const directory = db.collection("accountDirectory");
+    if (typeof directory?.where === "function") {
+      const snap = await directory.where("uid", "==", user.uid).limit(1).get();
+      const fromDir = String(snap?.docs?.[0]?.get?.("username") || "").trim().toLowerCase();
+      if (VALID_USERNAME.test(fromDir)) return fromDir;
+    }
+  } catch {
+    // Fall back to the auth email local-part when accountDirectory lookup is unavailable.
+  }
+  const emailPrefix = String(user?.email || "").split("@")[0].trim().toLowerCase();
+  return VALID_USERNAME.test(emailPrefix) ? emailPrefix : "";
+}
+
+async function collectEmergencyAdminRecipients() {
+  const recipients = [];
+  let pageToken;
+  do {
+    const page = await auth.listUsers(1000, pageToken);
+    for (const user of page.users) {
+      if (user.disabled || user.customClaims?.role !== "ADMIN") continue;
+      if (recipients.length >= 24) break;
+      let accountKeyset = null;
+      try {
+        const keysetDoc = await db.collection("accountKeyDirectories").doc(user.uid).get();
+        if (keysetDoc.exists && keysetDoc.get("ownerUid") === user.uid) {
+          const keyId = keysetDoc.get("keyId");
+          const epoch = keysetDoc.get("epoch");
+          const algorithm = keysetDoc.get("algorithm");
+          const publicKey = keysetDoc.get("publicKey");
+          if (
+            typeof keyId === "string" && keyId &&
+            Number.isInteger(epoch) && epoch >= 1 &&
+            algorithm === "RSA-OAEP-256" &&
+            typeof publicKey === "string" && publicKey
+          ) {
+            accountKeyset = {keyId, epoch, algorithm, publicKey};
+          }
+        }
+      } catch {
+        accountKeyset = null;
+      }
+      let publicKey = "";
+      let devices = [];
+      try {
+        const username = await resolveAdminUsername(user);
+        if (username) {
+          const dirRef = db.collection("messageDirectory").doc(username);
+          const dirDoc = await dirRef.get();
+          if (dirDoc.exists && dirDoc.get("uid") === user.uid) {
+            const rawPrimary = dirDoc.get("publicKey");
+            if (typeof rawPrimary === "string" && rawPrimary) publicKey = rawPrimary;
+            const devicesSnap = await dirRef.collection("devices").get();
+            devices = (devicesSnap?.docs || []).map(doc => {
+              if (doc.get("uid") !== user.uid) return null;
+              const deviceId = doc.get("deviceId");
+              const deviceKey = doc.get("publicKey");
+              if (typeof deviceId !== "string" || !deviceId || typeof deviceKey !== "string" || !deviceKey) {
+                return null;
+              }
+              return {
+                deviceId,
+                publicKey: deviceKey,
+                mgf1Digest: doc.get("mgf1Digest") === "SHA-256" ? "SHA-256" : "SHA-1",
+              };
+            }).filter(Boolean).slice(0, 8);
+          }
+        }
+      } catch {
+        publicKey = "";
+        devices = [];
+      }
+      if (accountKeyset || publicKey || devices.length > 0) {
+        recipients.push({uid: user.uid, accountKeyset, publicKey, devices});
+      }
+    }
+    if (recipients.length >= 24) break;
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return recipients;
+}
+
 exports.emergencyStart = onCall(options, async request => {
   const caller = await safetyCaller(request);
   if (caller.role !== "USER") throw new HttpsError("permission-denied", "User access required.");
@@ -24,7 +111,8 @@ exports.emergencyStart = onCall(options, async request => {
       status: "awaiting_report",
     });
   });
-  return {id};
+  const recipients = await collectEmergencyAdminRecipients();
+  return {id, recipients};
 });
 
 async function setEmergencyResolution(request, resolved) {

@@ -8,10 +8,10 @@
         "url": "https://www.fvps.ca/"
       },
       "Island Helpline": {
-        "Desc": "Free, confidential 24/7 crisis response line for mental health and domestic abuse support in PEI.",
-        "Phone": "1-800-218-2885",
+        "Desc": "Free, confidential 24/7 crisis response line for mental health and distress support in PEI.",
+        "Phone": "1-833-553-6983",
         "hours": "24/7",
-        "url": "https://www.princeedwardisland.ca/en/information/workforce-and-advanced-learning/emergency-services-for-victims-of-family-violence"
+        "url": "https://www.princeedwardisland.ca/en/information/health-pei/mental-health-and-addictions-phone-line"
       }
     },
     "Shelters": {
@@ -26,6 +26,43 @@
         "Phone": "1-855-297-2332",
         "hours": "24/7",
         "url": "https://www.cmbmws.com/"
+      }
+    },
+    "LegalAid": {
+      "PEI Legal Aid (Charlottetown Office)": {
+        "Desc": "Family and criminal legal aid intake and representation across Prince Edward Island.",
+        "Phone": "902-368-6043",
+        "hours": "Mon-Fri 8:30 AM - 5:00 PM AT (8:00 AM - 4:00 PM Jun-Sep)",
+        "address": "Suite 200, 133 Queen St, Charlottetown, PE C1A 4J9",
+        "lat": 46.2351,
+        "lng": -63.1286,
+        "url": "https://www.princeedwardisland.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service PEI": {
+        "Desc": "Individual, family, and crisis recovery counselling on a sliding-scale basis in Charlottetown.",
+        "Phone": "902-892-2441",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM AT",
+        "address": "Suite 106, 155 Belvedere Ave, Charlottetown, PE C1A 2Y9",
+        "lat": 46.2528,
+        "lng": -63.1260,
+        "url": "https://fspei.ca/"
+      }
+    },
+    "CrisisServices": {
+      "PEI Mobile Mental Health Crisis Line": {
+        "Desc": "24/7 confidential mental health crisis intervention and mobile crisis team dispatch across PEI.",
+        "Phone": "1-833-553-6983",
+        "hours": "24/7",
+        "url": "https://www.princeedwardisland.ca/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   }

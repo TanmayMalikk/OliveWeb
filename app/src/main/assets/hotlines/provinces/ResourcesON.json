@@ -2,7 +2,7 @@
   "Toronto": {
     "Hotlines": {
       "Assaulted Women's Helpline (AWHL)": {
-        "Desc": "Confidential 24/7 provincial crisis line for women experiencing domestic, emotional, or physical abuse.",
+        "Desc": "Confidential 24/7 provincial crisis line in over 200 languages for women experiencing domestic, emotional, or physical abuse.",
         "Phone": "1-866-863-0511",
         "hours": "24/7",
         "url": "https://www.awhl.org/"
@@ -13,25 +13,510 @@
         "hours": "24/7",
         "url": "https://www.awhl.org/"
       },
-      "Barbra Schlifer Commemorative Clinic": {
-        "Desc": "Free legal, counselling, and language support for women experiencing violence.",
+      "Barbra Schlifer Commemorative Clinic Intake": {
+        "Desc": "Free legal representation, trauma-informed counselling, and multilingual interpretation for women experiencing violence.",
         "Phone": "416-323-9149",
-        "hours": "Mon 9am-5pm * Tue 9am-5pm * Wed 9am-5pm * Thu 9am-5pm * Fri 9am-5pm",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET (Walk-in intake Fri 9:30 AM - 3:30 PM)",
+        "address": "Suite 503, 489 College St, Toronto, ON M6G 1A5",
+        "lat": 43.6559,
+        "lng": -79.4095,
         "url": "https://schliferclinic.com/"
       }
     },
     "Shelters": {
+      "101 Placer Ct": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "101 Placer Ct Toronto ON M2H 3H9",
+        "lat": 43.8022,
+        "lng": -79.34137,
+        "url": "https://homesfirst.on.ca/hf_property/101-placer/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "1st Stop Woodlawn Residence": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women, youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "80 Woodlawn Ave E Toronto ON M4T 1C1",
+        "lat": 43.684547,
+        "lng": -79.389984,
+        "url": "https://www.ywcatoronto.org/ourprograms/shelterandhousing/homelessshelter",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "4117 Lawrence Avenue East Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "4117 Lawrence Ave E Scarborough ON M1E 2S2",
+        "lat": 43.766286,
+        "lng": -79.193516,
+        "url": "https://homesfirst.on.ca/hf_property/4117-lawrence/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "705 Progress Ave Shelter Building E": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "705 Progress Ave Toronto ON M1H 2X1",
+        "lat": 43.77691,
+        "lng": -79.24624,
+        "url": "https://www.toronto.ca/news/city-of-toronto-opens-new-shelter-at-705-progress-ave/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Adelaide Resource Centre": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "67 Adelaide St E Toronto ON M5C 1K6",
+        "lat": 43.650986,
+        "lng": -79.375299,
+        "url": "https://www.fredvictor.org/location-information/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Bethlehem United Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "1161 Caledonia Rd Toronto ON M6A 2W9",
+        "lat": 43.715641,
+        "lng": -79.466611,
+        "url": "https://www.fredvictor.org/location-information/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Birkdale Residence": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: families. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "1229 Ellesmere Rd Toronto ON M1P 4V8",
+        "lat": 43.768282,
+        "lng": -79.267447,
+        "url": "https://211central.ca/record/72506037/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Christie-Ossington Neighbourhood Centre (Bloor St W)": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Monday-Friday 4:30 pm-8am, Saturday-Sunday 24 hrs",
+        "address": "850 Bloor St W Toronto ON M6G 1M2",
+        "lat": 43.662443,
+        "lng": -79.424144,
+        "url": "https://www.conccommunity.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Christie-Ossington Neighbourhood Centre (Lansdowne Ave)": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Monday-Sunday 4:30pm - 8am, Saturday-Sunday 24 hrs",
+        "address": "973 Lansdowne Ave Toronto ON M6H 3Z5",
+        "lat": 43.666118,
+        "lng": -79.446101,
+        "url": "https://www.conccommunity.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Cornerstone Place": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Monday-Sunday, 4:00 pm - 8:00 am",
+        "address": "616 Vaughan Rd Toronto ON M6C 2R5",
+        "lat": 43.691962,
+        "lng": -79.439859,
+        "url": "https://211north.ca/record/75496449/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Covenant House (Gerrard St E)": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "20 Gerrard St E Toronto ON M5B 2P3",
+        "lat": 43.659402,
+        "lng": -79.381488,
+        "url": "https://covenanthousetoronto.ca/get-help/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Davenport Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women, youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "348 Davenport Road Toronto ON M5R 1K6",
+        "lat": 43.675281,
+        "lng": -79.401442,
+        "url": "https://www.ywcatoronto.org/ourprograms/shelterandhousing/homelessshelter",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Elisa House": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "60 Newcastle St Toronto ON M8Y 1A3",
+        "lat": 43.618029,
+        "lng": -79.497321,
+        "url": "https://www.torontocentralhealthline.ca/displayService.aspx?id=133768",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Eva's Place": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "360 Lesmill Rd Toronto ON M3B 2T5",
+        "lat": 43.763371,
+        "lng": -79.3609,
+        "url": "https://www.evas.ca/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Evangeline Residence": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "2808 Dundas St W Toronto ON M6P 1Y5",
+        "lat": 43.665519,
+        "lng": -79.463138,
+        "url": "https://torontohhs.org/shelters/evangeline-residence/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Family Residence": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: families. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "4222 Kingston Rd Toronto ON M1E 2M6",
+        "lat": 43.760768,
+        "lng": -79.196739,
+        "url": "https://211central.ca/record/72506045/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Fred Victor Centre Fatima House": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "1059 College Street Toronto ON M6H 1B1",
+        "lat": 43.652677,
+        "lng": -79.430807,
+        "url": "https://www.fredvictor.org/location-information/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Good Shepherd Centre": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "412 Queen St E Toronto ON M5A 1T3",
+        "lat": 43.656151,
+        "lng": -79.362522,
+        "url": "https://www.goodshepherd.ca/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Heyworth House": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "2714 Danforth Ave Toronto ON M4C 1L7",
+        "lat": 43.689116,
+        "lng": -79.298255,
+        "url": "https://dixonhall.org/shelter-and-respite-services/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "HFS Metro Strachan": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "22 Metropolitan Rd Toronto ON M1R 2T5",
+        "lat": 43.7689,
+        "lng": -79.3018,
+        "url": "https://homesfirst.on.ca/our-portfolio/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Horizons for Youth": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "422 Gilbert Ave Toronto ON M6E 4X3",
+        "lat": 43.689353,
+        "lng": -79.462388,
+        "url": "https://horizonsforyouth.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Islington Seniors' Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men, women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "2671 Islington Ave Toronto ON M9V 2X6",
+        "lat": 43.739305,
+        "lng": -79.56588,
+        "url": "https://torontohhs.org/shelters/islington-seniors-shelter/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Junction Place": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "731 Runnymede Rd Toronto ON M6N 3V7",
+        "lat": 43.668441,
+        "lng": -79.482811,
+        "url": "https://211central.ca/record/72506061/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Kennedy House Youth Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "1076 Pape Ave Toronto ON M4K 3W5",
+        "lat": 43.69091,
+        "lng": -79.349663,
+        "url": "https://kennedyhouse.org/services/youth-shelter/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Kennedy Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "702 Kennedy Rd Toronto ON M1K 2B5",
+        "lat": 43.727926,
+        "lng": -79.267674,
+        "url": "https://homesfirst.on.ca/hf_property/kennedy-road-shelter/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Mary's Home": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "70 Gerrard St E Toronto ON M5B 1G6",
+        "lat": 43.66005,
+        "lng": -79.378312,
+        "url": "https://www.centralwesthealthline.ca/displayservice.aspx?id=133475&region=Dufferin",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Maxwell Meighen Centre": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "135 Sherbourne St Toronto ON M5A 2R5",
+        "lat": 43.655028,
+        "lng": -79.369215,
+        "url": "https://torontohhs.org/shelters/maxwell-meighen/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Na-Me-Res": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "14 Vaughan Rd Toronto ON M6G 2N1",
+        "lat": 43.681482,
+        "lng": -79.418172,
+        "url": "https://www.nameres.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Native Child & Family - Spadina": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "111 Spadina Rd Toronto ON M5R 2T1",
+        "lat": 43.67135,
+        "lng": -79.40537,
+        "url": "https://nativechild.org/youth/housing/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "New Hope Leslieville": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "29A Leslie St Toronto ON M4M 3C3",
+        "lat": 43.661969,
+        "lng": -79.329504,
+        "url": "https://torontohhs.org/shelters/new-hope/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Robertson House": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: families. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "291 Sherbourne St Toronto ON M5A 2R9",
+        "lat": 43.660507,
+        "lng": -79.371793,
+        "url": "https://211central.ca/record/72506058/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Seaton House": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "339 George St Toronto ON M5A 2N2",
+        "lat": 43.659956,
+        "lng": -79.374265,
+        "url": "https://211central.ca/record/69800050/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Sistering": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "962 Bloor St W Toronto ON M6H 1L6",
+        "lat": 43.661586,
+        "lng": -79.428873,
+        "url": "https://sistering.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "St. Clair Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "3576 St Clair Ave E Toronto ON M1K 1M2",
+        "lat": 43.717528,
+        "lng": -79.258109,
+        "url": "https://homesfirst.on.ca/hf_property/st-clair/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Street Haven at the Crossroads": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "87 Pembroke St Toronto ON M5A 2N9",
+        "lat": 43.659242,
+        "lng": -79.37243,
+        "url": "https://streethaven.org/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "The Gateway": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "107 Jarvis St Toronto ON M5C 2H4",
+        "lat": 43.652367,
+        "lng": -79.372272,
+        "url": "https://torontohhs.org/shelters/the-gateway/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "The Scott Mission - 346 Spadina Ave.": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: men. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "346 Spadina Ave. Toronto ON M5T 1J5",
+        "lat": 43.65436,
+        "lng": -79.399905,
+        "url": "https://scottmission.com/programs/mens-ministry/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Toronto Plaza Hotel": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: mixed adults. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "1677 Wilson Ave North York ON M3L 1A5",
+        "lat": 43.71888,
+        "lng": -79.51458,
+        "url": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/about-torontos-shelter-system/developing-shelter-sites/1677-wilson-avenue/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Turning Point Youth Services": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "95 Wellesley St E Toronto ON M4Y 2X9",
+        "lat": 43.665864,
+        "lng": -79.379215,
+        "url": "https://www.woodgreen.org/programs/emergency-youth-shelter",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Women's Residence": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: women. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "674 Dundas St W Toronto ON M5H 1H9",
+        "lat": 43.651882,
+        "lng": -79.403695,
+        "url": "https://www.torontocentralhealthline.ca/mobile/displayservice.aspx?id=133394",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "YMCA House - Wagner Green": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "7 Vanauley St Toronto ON M5T 2V9",
+        "lat": 43.648883,
+        "lng": -79.398229,
+        "url": "https://www.ymcagta.org/our-impact/our-new-ys/The-Wagner-Green-YMCA",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "Youth Without Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "24/7",
+        "address": "6 Warrendale Ct Etobicoke ON M9V 1P9",
+        "lat": 43.736293,
+        "lng": -79.580427,
+        "url": "https://yws.on.ca/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
+      "YouthLink Shelter": {
+        "Desc": "Shelter for people experiencing homelessness. Listed eligibility: youth. Call Toronto Central Intake for placement.",
+        "Phone": "1-877-338-3398",
+        "hours": "Call Central Intake to confirm intake hours",
+        "address": "747 Warden Ave Scarborough ON M1L 4A1",
+        "lat": 43.717716,
+        "lng": -79.28325,
+        "url": "https://youthlink.ca/",
+        "source": "https://www.toronto.ca/community-people/housing-shelter/homeless-help/shelters/"
+      },
       "Ernestine's Women's Shelter": {
-        "Desc": "Emergency shelter and 24/7 crisis line providing safe refuge, food, and legal support for women and children.",
+        "Desc": "Emergency shelter and 24/7 crisis support providing safe refuge, food, and advocacy for women and children.",
         "Phone": "416-746-3701",
-        "hours": "Mon - Fri: 10 am - 5:30 pm",
+        "hours": "24/7 crisis support; Office Mon-Fri 10:00 AM - 5:30 PM ET",
         "url": "https://ernestines.ca/"
       },
       "Red Door Family Shelter": {
-        "Desc": "Safe emergency shelter for families and women fleeing domestic abuse.",
-        "Phone": "416-915-5671",
-        "hours": "Mon-Fri 9 am-5 pm",
-        "url": "https://www.reddoorshelter.ca/"
+        "Desc": "Emergency shelter for families experiencing homelessness. Call Central Family Intake for placement.",
+        "Phone": "416-397-5637",
+        "hours": "24/7",
+        "address": "189B Booth Ave, Toronto, ON M4M 2M5",
+        "lat": 43.659806,
+        "lng": -79.343194,
+        "url": "https://www.reddoorshelter.ca/what-we-do/family-shelter/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Provincial Contact Centre & Head Office)": {
+        "Desc": "Provincial legal aid intake in 300+ languages, domestic violence advice certificates, and family law services.",
+        "Phone": "1-800-668-8258",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM ET",
+        "address": "Suite 730, 20 Dundas St W, Toronto, ON M5G 2H1",
+        "lat": 43.6561,
+        "lng": -79.3818,
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Service Toronto": {
+        "Desc": "Trauma-informed counselling, gender-based violence support, and community social work across Toronto.",
+        "Phone": "416-595-9618",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "355 Church St, Toronto, ON M5B 0B2",
+        "lat": 43.6598,
+        "lng": -79.3788,
+        "url": "https://familyservicetoronto.org/"
+      },
+      "Barbra Schlifer Commemorative Clinic Counselling": {
+        "Desc": "Free individual and group trauma counselling and interpreter services for women survivors of violence.",
+        "Phone": "416-323-9149",
+        "hours": "Monday to Friday, 9:00 AM - 5:00 PM ET",
+        "address": "Suite 503, 489 College St, Toronto, ON M6G 1A5",
+        "lat": 43.6559,
+        "lng": -79.4095,
+        "url": "https://schliferclinic.com/"
+      }
+    },
+    "CrisisServices": {
+      "Gerstein Crisis Centre": {
+        "Desc": "24/7 community mental health crisis response, mobile crisis team, and short-stay crisis beds.",
+        "Phone": "416-929-5200",
+        "hours": "24/7",
+        "address": "100 Charles St E, Toronto, ON M4Y 1V3",
+        "lat": 43.6695,
+        "lng": -79.3827,
+        "url": "https://gersteincentre.org/"
+      },
+      "9-8-8 Suicide Crisis Helpline": {
+        "Desc": "Confidential 24/7 national suicide prevention and crisis response by call or text.",
+        "Phone": "988",
+        "Text": "988",
+        "hours": "24/7",
+        "url": "https://988.ca/"
       }
     }
   },
@@ -52,10 +537,40 @@
         "url": "https://maisondamitie.ca/"
       },
       "Interval House Ottawa": {
-        "Desc": "Emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
+        "Desc": "24/7 emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
         "Phone": "613-234-5181",
         "hours": "24/7",
         "url": "https://www.intervalhouseottawa.org/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Ottawa District Office)": {
+        "Desc": "Legal representation, Integrated Legal Services, and family violence court support in Ottawa.",
+        "Phone": "613-238-7931",
+        "hours": "Monday to Friday, 8:30 AM - 4:00 PM ET",
+        "address": "Suite 1101, 275 Slater St, Ottawa, ON K1P 5H9",
+        "lat": 45.4193,
+        "lng": -75.7024,
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Family Services Ottawa": {
+        "Desc": "Walk-in and ongoing individual, couple, and family counselling including trauma programs.",
+        "Phone": "613-725-3601",
+        "hours": "Mon-Thu 8:30 AM - 7:00 PM; Fri 8:30 AM - 4:30 PM ET",
+        "address": "312 Parkdale Ave, Ottawa, ON K1Y 4X5",
+        "lat": 45.4027,
+        "lng": -75.7302,
+        "url": "https://familyservicesottawa.org/"
+      }
+    },
+    "CrisisServices": {
+      "Mental Health Crisis Line (Ottawa & Region)": {
+        "Desc": "24/7 bilingual crisis line and mobile crisis team dispatch across Ottawa and Eastern Ontario.",
+        "Phone": "613-722-6914",
+        "hours": "24/7",
+        "url": "https://www.crisisline.ca/"
       }
     }
   },
@@ -70,10 +585,37 @@
     },
     "Shelters": {
       "Interval House Hamilton": {
-        "Desc": "24/7 safe emergency shelter, advocacy, and community support.",
+        "Desc": "24/7 safe emergency shelter, advocacy, and community support for women and children.",
         "Phone": "905-387-8881",
         "hours": "24/7",
         "url": "https://intervalhousehamilton.org/"
+      }
+    },
+    "LegalAid": {
+      "Legal Aid Ontario (Hamilton Toll-Free)": {
+        "Desc": "Family law aid, duty counsel, and protection support across Hamilton-Wentworth.",
+        "Phone": "1-800-668-8258",
+        "hours": "Monday to Friday, 8:00 AM - 5:00 PM ET",
+        "url": "https://www.legalaid.on.ca/"
+      }
+    },
+    "Counseling": {
+      "Catholic Family Services of Hamilton": {
+        "Desc": "Walk-in and trauma-informed counselling services open to all individuals and families.",
+        "Phone": "905-527-3823",
+        "hours": "Monday to Friday, 8:30 AM - 4:30 PM ET",
+        "address": "Suite 201, 447 Main St E, Hamilton, ON L8N 1K1",
+        "lat": 43.2528,
+        "lng": -79.8559,
+        "url": "https://cfshw.com/"
+      }
+    },
+    "CrisisServices": {
+      "COAST Hamilton Crisis Line": {
+        "Desc": "24/7 mobile mental health crisis outreach and emergency distress line for Hamilton.",
+        "Phone": "905-972-8338",
+        "hours": "24/7",
+        "url": "https://coasthamilton.ca/"
       }
     }
   }

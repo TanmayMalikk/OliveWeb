@@ -3,6 +3,7 @@ package com.olive.app.data.messaging
 
 import android.annotation.SuppressLint
 import android.util.Log
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -24,6 +25,7 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
      */
     override fun onRegistered(installationId: String) {
         super.onRegistered(installationId)
+        if (FirebaseApp.getApps(this).isEmpty()) return
         runCatching { VoipPushTokenRegistration.onTokenRefreshed(this, installationId) }
             .onFailure { error ->
                 Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
@@ -38,6 +40,7 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
      * @param message Chat message or remote payload.
      */
     override fun onMessageReceived(message: RemoteMessage) {
+        if (FirebaseApp.getApps(this).isEmpty()) return
         val data = message.data
         val invalidation = syncInvalidationFrom(data)
         if (invalidation != null) {

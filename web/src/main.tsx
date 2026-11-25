@@ -8,10 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
-import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
+import { Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
-import { Button, Field, Form } from "./components/SharedComponents";
+import { Button, Field } from "./components/SharedComponents";
+import BrowserPinGate from "./users/shared/auth/BrowserPinGate";
 import PublicCoverPage from "./public/PublicCoverPage";
 import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
@@ -20,110 +21,50 @@ const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
-// User cover apps: asks for the private PIN before opening the Safe App.
-function PinGate() {
-  const s = useSession();
-  const [pin, setPin] = useState("");
-  return (
-    <main id="main" className="access-page pin-page private-shell">
-      <div className="access-header">
-        <span className="access-wordmark"><Leaf size={21} aria-hidden="true" /> Olive Branch</span>
-        {s.enrollment?.role === "USER" && (
-          <Button variant="exit floating-quick-exit" onClick={s.quickExit}>
-            <LogOut size={17} aria-hidden="true" /> Quick Exit
-          </Button>
-        )}
-      </div>
-      <section className="access-card pin-card" aria-labelledby="pin-heading">
-        <span className="access-mark"><LockKeyhole size={24} aria-hidden="true" /></span>
-        <h1 id="pin-heading">Unlock Safe Space</h1>
-        <p>Enter your browser PIN to continue.</p>
-        <Form
-          onSubmit={async () => {
-            await s.perform(async () => {
-              try {
-                await s.unlock(pin);
-              } finally {
-                setPin("");
-              }
-            });
-          }}
-        >
-          <div className="pin-dots" aria-hidden="true">
-            {Array.from({ length: 6 }, (_, idx) => (
-              <span
-                key={idx}
-                className={idx < pin.length ? "pin-dot filled" : "pin-dot"}
-              />
-            ))}
-          </div>
-          <Field
-            label="Browser PIN"
-            type="password"
-            value={pin}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              if (s.message) s.clearMessage();
-              setPin(e.target.value.replace(/\D/g, "").slice(0, 6));
-            }}
-            inputMode="numeric"
-            autoComplete="off"
-            pattern="[0-9]{4,6}"
-            required
-            maxLength={6}
-          />
-          <div className="pin-keypad" role="group" aria-label="PIN keypad">
-            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
-              <button
-                type="button"
-                key={digit}
-                disabled={s.busy}
-                onClick={() => {
-                  if (s.message) s.clearMessage();
-                  setPin((value) => (value + digit).slice(0, 6));
-                }}
-              >
-                {digit}
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-label="Delete digit"
-              disabled={s.busy || pin.length === 0}
-              onClick={() => {
-                if (s.message) s.clearMessage();
-                setPin((value) => value.slice(0, -1));
-              }}
-            >
-              <Delete size={20} aria-hidden="true" />
-            </button>
-          </div>
-          {s.message && (
-            <p role="alert" className="form-error">
-              {s.message}
-            </p>
-          )}
-          <Button type="submit" disabled={s.busy || pin.length < 4}>
-            {s.busy ? "Unlocking…" : "Unlock"} <ArrowRight size={17} aria-hidden="true" />
-          </Button>
-        </Form>
-        <button
-          className="text-link"
-          type="button"
-          onClick={() => {
-            s.quickExit();
-            s.go("/account/link");
-          }}
-        >
-          Need a new browser PIN or link? <ArrowRight size={15} aria-hidden="true" />
-        </button>
-      </section>
-    </main>
-  );
-}
 // Little Grove is the browser cover for every account.
 function Cover() {
   const s = useSession();
   return <PublicCoverPage onPrivateEntry={() => { void s.perform(s.beginEntry); }} />;
+}
+
+// All roles use the same zero-knowledge, tab-scoped recovery action.
+function EncryptedAccessRecovery() {
+  const s = useSession();
+  const [password, setPassword] = useState("");
+  if (
+    !s.cloudMode ||
+    (s.phase !== "safe" && s.phase !== "portal") ||
+    s.hasEncryptedAccess ||
+    s.passwordRecoveryEnrolled !== true
+  ) return null;
+  return (
+    <section className="account-recovery-notice" aria-labelledby="encrypted-access-heading">
+      <div>
+        <h2 id="encrypted-access-heading">Unlock encrypted access</h2>
+        <p>Enter your Olive Branch recovery password to open encrypted documents and messages on this browser.</p>
+      </div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const entered = password;
+          setPassword("");
+          void s.perform(() => s.recoverEncryptedAccess(entered));
+        }}
+      >
+        <Field
+          label="Recovery password"
+          type="password"
+          autoComplete="off"
+          value={password}
+          disabled={s.busy}
+          onChange={(event: { target: { value: string } }) => setPassword(event.target.value)}
+        />
+        <Button type="submit" disabled={s.busy || !password}>
+          {s.busy ? "Unlocking…" : "Unlock with password"}
+        </Button>
+      </form>
+    </section>
+  );
 }
 // Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
@@ -138,7 +79,7 @@ function Routes({ mode }: { mode: SiteMode }) {
   } else if (s.phase === "safe" && s.profile) content = <SafeApp />;
   else if (s.phase === "setup") content = <Setup />;
   else if (s.phase === "link") content = <EntryLink />;
-  else if (s.phase === "pin") content = <PinGate />;
+  else if (s.phase === "pin") content = <BrowserPinGate />;
   else if (s.path === "/get") content = <Download />;
   else if (s.path.startsWith("/account")) content = <AuthPage />;
   else content = <Cover />;
@@ -155,6 +96,7 @@ function Routes({ mode }: { mode: SiteMode }) {
           </div>
         }
       >
+        <EncryptedAccessRecovery />
         {content}
       </Suspense>
     </>

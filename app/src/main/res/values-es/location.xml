@@ -43,4 +43,18 @@
     <string name="location_sharing_until">Compartiendo hasta las %1$s</string>
     <string name="location_ten_seconds_testing">10 segundos (prueba)</string>
     <string name="location_notification_sharing_text">El uso compartido de tu ubicación en directo está activo.</string>
+    <string name="location_gps_destination_title">Destino GPS libre</string>
+    <string name="location_gps_destination_hint">Busca lugares, direcciones o coordenadas</string>
+    <string name="location_gps_start_route">Iniciar ruta</string>
+    <string name="location_gps_clear_destination">Borrar destino</string>
+    <string name="location_gps_coordinates_label">Coordenadas: %1$s</string>
+    <string name="location_gps_coordinates_hint">Navegar directamente a estas coordenadas</string>
+    <string name="location_gps_no_match">No se encontró el destino. Prueba con un lugar, una dirección o coordenadas.</string>
+    <string name="location_gps_searching">Buscando lugares…</string>
+    <string name="location_route_driving">En auto</string>
+    <string name="location_route_walking">Caminando</string>
+    <string name="location_compass_north_up">Norte arriba</string>
+    <string name="location_compass_heading_up">Según dirección</string>
+    <string name="location_compass_toggle_north_desc">Mapa fijo al norte. Toca para rotar según tu dirección al caminar.</string>
+    <string name="location_compass_toggle_heading_desc">Mapa rotando con tu dirección. Toca para fijar al norte.</string>
 </resources>

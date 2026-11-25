@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.R
+import com.olive.app.dismissTestKeyboard
 import com.olive.app.ui.covers.fitness.*
 import com.olive.app.ui.shared.OliveTheme
 import org.junit.Assert.*
@@ -34,10 +35,10 @@ class NutritionSearchUiTest {
         }
         var selected: NutritionFood? = null
         compose.setContent { OliveTheme {
-            FoodSearchPage(true, PaddingValues(0.dp), { choice, _, _ -> selected = choice }, source)
+            FoodSearchPage(true, PaddingValues(0.dp), { choice, _, _, _ -> selected = choice }, source)
         } }
         compose.onNodeWithTag("fitness_food_search").performTextInput("oat")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.runOnUiThread { compose.activity.dismissTestKeyboard() }
         compose.waitUntil(10000) { compose.onAllNodesWithText("Oats autocomplete").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Oats autocomplete").performClick()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text(R.string.nutrition_more)))
@@ -71,7 +72,7 @@ class NutritionSearchUiTest {
                 library = library,
                 initialSection = FoodLibrarySection.Recent,
                 recentFoods = listOf(FoodLogEntry("id", recent, 2f, MealType.LUNCH)),
-                onFoodAdded = { choice, servings, meal -> added = FoodLogEntry("new", choice, servings, meal) },
+                onFoodAdded = { choice, servings, meal, logId -> added = FoodLogEntry(logId, choice, servings, meal) },
             )
         } }
         compose.onNodeWithText("oat bar").assertExists()
@@ -80,7 +81,9 @@ class NutritionSearchUiTest {
         compose.onNodeWithContentDescription(text(R.string.nutrition_unsave_food)).assertExists()
         compose.onNodeWithText(text(R.string.add_food)).performClick()
         compose.runOnIdle {
-            assertEquals(FoodLogEntry("new", recent, 2f, MealType.LUNCH), added)
+            val entry = checkNotNull(added)
+            assertEquals(4, java.util.UUID.fromString(entry.logId).version())
+            assertEquals(FoodLogEntry(entry.logId, recent, 2f, MealType.LUNCH), entry)
             assertEquals(recent, FitnessFoodLibrary(store.preferences).savedFoods().single().food)
         }
         compose.onNodeWithText(text(R.string.nutrition_saved_foods)).performClick()
@@ -101,7 +104,7 @@ class NutritionSearchUiTest {
             }
         }
         compose.setContent { OliveTheme {
-            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _ -> error("Must not add food") }, source)
+            FoodSearchPage(true, PaddingValues(0.dp), { _, _, _, _ -> error("Must not add food") }, source)
         } }
         compose.onNodeWithText(text(R.string.nutrition_barcode)).performClick()
         val search = compose.onNodeWithContentDescription(text(R.string.search))

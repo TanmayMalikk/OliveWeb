@@ -295,7 +295,7 @@ export function DocumentsPage() {
             account on phone or web.
           </p>
         </div>
-        <div className="toolbar-actions">
+        <div className="toolbar-actions" data-walkthrough-id="documents-upload">
           <Button
             variant="outline"
             onClick={() => void refresh()}

@@ -1,9 +1,16 @@
 // Admins: shows account records and controls for admins.
 package com.olive.app.ui.users.admin
 
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveCard as Card
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveOutlinedCard as OutlinedCard
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -58,8 +65,17 @@ internal fun AdminAccounts(
             AccountRole.entries.forEach { role -> put(role, true) }
         }
     }
+    val listState = rememberLazyListState()
+    var lastStatus by remember { mutableIntStateOf(status) }
+    LaunchedEffect(status) {
+        if (status != lastStatus) {
+            lastStatus = status
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
+        state = listState,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item("account_header") {
@@ -307,6 +323,21 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
     var affected by remember { mutableStateOf("") }
     var abuser by remember { mutableStateOf("") }
     var situation by remember { mutableStateOf("") }
+    var showErrors by remember { mutableStateOf(false) }
+    var shakeAttempt by remember { mutableIntStateOf(0) }
+    val orgRole = role in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    val usernameError = if (showErrors && !InputPolicy.validUsername(username)) {
+        uiText(R.string.ui_invalid_username)
+    } else null
+    val passwordError = when {
+        !showErrors -> null
+        !InputPolicy.passwordExcludesUsername(password, username) -> uiText(R.string.password_excludes_username)
+        !InputPolicy.validAccountPassword(password, username) -> uiText(R.string.ui_invalid_password)
+        else -> null
+    }
+    val emailError = if (showErrors && orgRole && email.isNotBlank() && !InputPolicy.validEmail(email.trim())) {
+        uiText(R.string.email_invalid_message)
+    } else null
     val dialogColors = MaterialTheme.colorScheme.copy(
         surface = androidx.compose.ui.graphics.Color.White,
         surfaceContainer = androidx.compose.ui.graphics.Color.White,
@@ -354,16 +385,28 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                             }
                         }
                     }
-                    Field(uiText(R.string.username), username, "admin_username") {
+                    Field(
+                        uiText(R.string.username),
+                        username,
+                        "admin_username",
+                        error = usernameError,
+                        shakeTrigger = shakeAttempt
+                    ) {
                         username = it.take(24)
+                        showErrors = false
                     }
                     Field(
                         uiText(R.string.ui_temporary_password),
                         password,
                         "admin_password",
                         secret = true,
-                        showSecretToggle = true
-                    ) { password = it.take(24) }
+                        showSecretToggle = true,
+                        error = passwordError,
+                        shakeTrigger = shakeAttempt
+                    ) {
+                        password = it.take(24)
+                        showErrors = false
+                    }
                     HorizontalDivider()
                     Text(
                         uiText(R.string.ui_optional_onboarding_details),
@@ -375,11 +418,19 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                     BirthdayPicker(
                         birthday, "admin_dob", enabled = true,
                         showErrors = showBirthdayErrors && birthday.isNotEmpty(), required = false,
+                        shakeTrigger = shakeAttempt
                     ) { birthday = it }
                     // Only staff and admin accounts can be protected from deletion.
                     if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-                        Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
+                        Field(
+                            uiText(R.string.ui_login_email_optional),
+                            email,
+                            "admin_email",
+                            error = emailError,
+                            shakeTrigger = shakeAttempt
+                        ) {
                             email = it.take(254)
+                            showErrors = false
                         }
                         Text(
                             uiText(R.string.ui_login_email_creation_help),
@@ -425,7 +476,15 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
             confirmButton = {
                 Button(onClick = create@{
                     showBirthdayErrors = birthday.isNotEmpty() && !InputPolicy.validDob(birthday)
-                    if (showBirthdayErrors) return@create
+                    val emailValid = !orgRole || email.isBlank() || InputPolicy.validEmail(email.trim())
+                    val validCredentials = InputPolicy.validUsername(username) &&
+                        InputPolicy.passwordExcludesUsername(password, username) &&
+                        InputPolicy.validAccountPassword(password, username)
+                    if (!validCredentials || !emailValid || showBirthdayErrors) {
+                        showErrors = true
+                        shakeAttempt += 1
+                        return@create
+                    }
                     session.createManagedAccount(
                         AdminAccountDraft(
                             username = username,

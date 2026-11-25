@@ -57,6 +57,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         )
         click("pin_setup_submit")
         waitCover()
+        markInitialWalkthroughSeen(session)
         unlock()
         click("safe_safety_plan")
         waitFor("safety_primary_documents")

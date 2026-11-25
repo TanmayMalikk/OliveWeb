@@ -1,7 +1,11 @@
 // Safe-app users: shows the user’s private notes.
 package com.olive.app.ui.users.user.notes
 
-import androidx.activity.compose.BackHandler
+import com.olive.app.ui.shared.OliveButton as Button
+import com.olive.app.ui.shared.OliveFilledTonalIconButton as FilledTonalIconButton
+import com.olive.app.ui.shared.OliveIconButton as IconButton
+import com.olive.app.ui.shared.OliveOutlinedButton as OutlinedButton
+import com.olive.app.ui.shared.OliveTextButton as TextButton
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,11 +32,14 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.location.AddressSuggestion
+import com.olive.app.data.location.DestinationAutocompleteClient
 import com.olive.app.data.location.DeviceLocation
 import com.olive.app.data.location.GeoapifyClient
 import com.olive.app.data.location.MapLocationPoint
@@ -77,12 +84,16 @@ private fun validIncidentTime(value: String, saved: String?) =
 @Composable
 internal fun PrivateNotes(session: SessionViewModel) {
     val uiText = rememberResourceText()
+    val offerUndo = LocalOliveUndo.current
+    val noteTrashed = stringResource(R.string.undo_note_trashed)
     var editorOpen by remember { mutableStateOf(false) }
     var editorVersion by remember { mutableIntStateOf(0) }
+    val newEntryId = remember(editorVersion) { java.util.UUID.randomUUID().toString() }
     var editingId by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf(PrivateEntryKind.Note) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
+    var noteShake by remember { mutableIntStateOf(0) }
     var incidentDate by remember { mutableStateOf("") }
     var incidentTime by remember { mutableStateOf("") }
     var incidentLocation by remember { mutableStateOf("") }
@@ -106,6 +117,16 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var newestFirst by rememberSaveable { mutableStateOf(true) }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
+    var sharingEntry by remember { mutableStateOf<PrivateEntry?>(null) }
+    val notesGridState = rememberLazyGridState()
+    var lastBoardFilter by remember { mutableStateOf(shownKind to newestFirst) }
+    LaunchedEffect(shownKind, newestFirst) {
+        val current = shownKind to newestFirst
+        if (current != lastBoardFilter) {
+            lastBoardFilter = current
+            notesGridState.scrollToItem(0)
+        }
+    }
     val editorTitleFocus = remember { FocusRequester() }
     val mapTitleFocus = remember { FocusRequester() }
     val formatter = remember {
@@ -170,21 +191,46 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }
     }
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
-        if (uid != null) session.documents.load(uid, session.coverUsername, session.localMode)
+        if (uid != null) {
+            session.documents.load(uid, session.coverUsername, session.localMode)
+            if (!session.localMode) {
+                session.messages.ensureMessagingObservation()
+                session.ensureSharedEntriesObservation()
+            }
+        }
     }
     LaunchedEffect(incidentLocation, kind, locationSearchRetry) {
-        locationSuggestions = emptyList()
         locationSearchFailed = false
+        val trimmed = incidentLocation.trim()
         if (kind != PrivateEntryKind.Incident || incidentLatitude != null ||
-            incidentLocation.trim().length < 3 || !GeoapifyClient.configured
-        ) return@LaunchedEffect
-        delay(300.milliseconds)
-        val results = try {
-            GeoapifyClient.autocomplete(incidentLocation, false)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
+            trimmed.length < 2 || (!GeoapifyClient.configured && BuildConfig.MAPBOX_ACCESS_TOKEN.isBlank())
+        ) {
+            locationSuggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(50.milliseconds)
+        val geoResults = if (GeoapifyClient.configured) {
+            try {
+                GeoapifyClient.autocomplete(trimmed, false, minLength = 2)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
             emptyList()
+        }
+        val results = if (geoResults.isNotEmpty() || BuildConfig.MAPBOX_ACCESS_TOKEN.isBlank()) {
+            geoResults
+        } else {
+            DestinationAutocompleteClient.suggest(trimmed).map { item ->
+                AddressSuggestion(
+                    item.id,
+                    item.title,
+                    item.subtitle,
+                    DeliveryAddress(line1 = item.title, latitude = item.latitude, longitude = item.longitude),
+                )
+            }
         }
         locationSuggestions = results
         locationSearchFailed = results.isEmpty()
@@ -204,6 +250,25 @@ internal fun PrivateNotes(session: SessionViewModel) {
             editorTitleFocus.requestFocus()
         }
     }
+    val directive = LocalWalkthroughDirective.current
+    var wtOpenedEditor by remember { mutableStateOf(false) }
+    var wtOpenedAttach by remember { mutableStateOf(false) }
+    LaunchedEffect(directive?.stepId, directive?.action) {
+        when (directive?.action) {
+            "notes_open_incident_editor" -> {
+                if (!editorOpen) { openEditor(null); wtOpenedEditor = true }
+                kind = PrivateEntryKind.Incident; attachmentMenuOpen = false; wtOpenedAttach = false
+            }
+            "notes_open_attachment_sheet" -> {
+                if (!editorOpen) { openEditor(null); wtOpenedEditor = true }
+                kind = PrivateEntryKind.Incident; attachmentMenuOpen = true; wtOpenedAttach = true
+            }
+            else -> {
+                if (wtOpenedAttach) { attachmentMenuOpen = false; wtOpenedAttach = false }
+                if (wtOpenedEditor) { editorOpen = false; wtOpenedEditor = false }
+            }
+        }
+    }
     // Announce the map panel only after the user opens it from the location field.
     LaunchedEffect(incidentMapOpen, editorVersion) {
         if (incidentMapOpen) {
@@ -215,7 +280,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
             } while (editorOpen && incidentMapOpen && !locationLookupFailed)
         }
     }
-    BackHandler(editorOpen || logEntryId != null || trashOpen) {
+    val backProgress = rememberOliveBack(editorOpen || logEntryId != null || trashOpen, preview = editorOpen) {
         when {
             logEntryId != null -> logEntryId = null
             incidentMapOpen -> incidentMapOpen = false
@@ -233,7 +298,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
         val editorListState = rememberLazyListState()
         LazyColumn(
-            Modifier.fillMaxSize().testTag("private_editor_list").oliveScrollbar(editorListState),
+            Modifier.fillMaxSize().oliveBackPreview(backProgress).testTag("private_editor_list").oliveScrollbar(editorListState),
             state = editorListState,
             contentPadding = PaddingValues(
                 start = 24.dp,
@@ -259,6 +324,18 @@ internal fun PrivateNotes(session: SessionViewModel) {
                                 paneTitle = if (editingId == null) uiText(R.string.new_private_entry)
                                 else uiText(R.string.edit_private_entry)
                             })
+                    if (entry != null && !session.localMode) IconButton(
+                        onClick = { sharingEntry = entry },
+                        enabled = !session.busy,
+                        modifier = Modifier.size(48.dp).testTag("private_share_editor")
+                    ) {
+                        val sharedCount = session.sharedEntryRecipients[entry.id].orEmpty().size
+                        Icon(
+                            Icons.Outlined.Share,
+                            uiText(R.string.notes_manage_sharing),
+                            tint = if (sharedCount > 0) OliveGreen else Muted
+                        )
+                    }
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
@@ -272,7 +349,9 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     }
                     if (entry != null) IconButton(
                         onClick = {
-                            session.trashPrivateEntry(entry.id)
+                            session.trashPrivateEntry(entry.id) {
+                                offerUndo(noteTrashed) { session.restorePrivateEntry(entry.id) }
+                            }
                             editorOpen = false
                         },
                         enabled = !session.busy,
@@ -306,14 +385,16 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             if (kind == PrivateEntryKind.Incident) {
                 item {
-                    Text(stringResource(R.string.incident_optional_fields), color = Muted)
-                    IncidentDateTimeFields(
-                        date = incidentDate,
-                        time = incidentTime,
-                        enabled = !session.busy,
-                        onDateChange = { incidentDate = it },
-                        onTimeChange = { incidentTime = it },
-                    )
+                    Column(Modifier.fillMaxWidth().walkthroughTarget("private_incident_fields")) {
+                        Text(stringResource(R.string.incident_optional_fields), color = Muted)
+                        IncidentDateTimeFields(
+                            date = incidentDate,
+                            time = incidentTime,
+                            enabled = !session.busy,
+                            onDateChange = { incidentDate = it },
+                            onTimeChange = { incidentTime = it },
+                        )
+                    }
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -403,47 +484,27 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 }
             }
             item {
+                val bodyMissing = noteShake > 0 && body.isBlank()
                 OutlinedTextField(
                     value = body,
                     onValueChange = { body = it.take(10_000) },
-                    label = {
-                        Text(
-                            stringResource(
-                                if (kind == PrivateEntryKind.Incident) R.string.incident_body_required
-                                else R.string.note_content_required
-                            )
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp)
-                        .testTag("private_entry_body").keepVisibleWhileTyping(),
+                    label = { Text(stringResource(if (kind == PrivateEntryKind.Incident) R.string.incident_body_required else R.string.note_content_required)) },
+                    isError = bodyMissing,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp).testTag("private_entry_body")
+                        .oliveErrorShake(if (bodyMissing) noteShake else 0).keepVisibleWhileTyping(),
                     enabled = !session.busy
                 )
             }
             item {
-                Button(
-                    onClick = { attachmentMenuOpen = true },
-                    enabled = uid != null && !session.busy,
-                    modifier = Modifier.fillMaxWidth().testTag("private_add_attachment"),
-                ) {
+                Button(onClick = { attachmentMenuOpen = true }, enabled = uid != null && !session.busy,
+                    modifier = Modifier.fillMaxWidth().testTag("private_add_attachment")) {
                     Icon(Icons.Outlined.Attachment, null)
-                    Text(
-                        stringResource(R.string.add_attachment),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                    Text(stringResource(R.string.add_attachment), modifier = Modifier.padding(start = 8.dp))
                 }
-                if (kind == PrivateEntryKind.Incident) Text(
-                    stringResource(R.string.incident_attachments_help),
-                    color = Muted,
-                )
+                if (kind == PrivateEntryKind.Incident) Text(stringResource(R.string.incident_attachments_help), color = Muted)
                 session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
-                    Row(
-                        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = true,
-                            onCheckedChange = { selectedAttachments = selectedAttachments - document.id },
-                        )
+                    Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = true, onCheckedChange = { selectedAttachments = selectedAttachments - document.id })
                         Text(document.name, modifier = Modifier.weight(1f))
                         if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
                     }
@@ -452,24 +513,20 @@ internal fun PrivateNotes(session: SessionViewModel) {
             item {
                 Button(
                     onClick = {
-                        if (kind == PrivateEntryKind.Incident && uid != null) {
+                        val valid = body.isNotBlank() && (kind == PrivateEntryKind.Note ||
+                            (validIncidentDate(incidentDate) && validIncidentTime(incidentTime, entry?.incidentTime)))
+                        if (!valid) noteShake += 1
+                        if (valid && kind == PrivateEntryKind.Incident && uid != null) {
                             session.documents.state.files.filter { it.id in selectedAttachments && !it.evidence }
                                 .forEach { session.documents.setEvidence(it, uid, true) }
                         }
-                        session.savePrivateEntry(
-                            editingId, kind, title, body, incidentDate, incidentTime,
-                            incidentLocation, incidentLatitude, incidentLongitude,
-                            selectedAttachments.toList(),
-                        )
-                        if (body.isNotBlank()) editorOpen = false
+                        session.savePrivateEntry(editingId, kind, title, body, incidentDate, incidentTime,
+                            incidentLocation, incidentLatitude, incidentLongitude, selectedAttachments.toList(), newEntryId = newEntryId)
+                        if (valid) editorOpen = false
                     },
-                    enabled = !session.busy && body.isNotBlank() &&
-                        (kind == PrivateEntryKind.Note || (validIncidentDate(incidentDate) &&
-                            validIncidentTime(incidentTime, entry?.incidentTime))),
+                    enabled = !session.busy,
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
-                ) {
-                    Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
-                }
+                ) { Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry)) }
             }
             // Save the note only after at least one field has changed.
             if (entry?.edits?.isNotEmpty() == true) item {
@@ -485,7 +542,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         SafetyDocumentUploadFlow(
             session = session,
             visible = attachmentMenuOpen,
-            onDismiss = { attachmentMenuOpen = false },
+            inWindowSheet = wtOpenedAttach,
+            onDismiss = { attachmentMenuOpen = false; wtOpenedAttach = false },
             onSelectExisting = { document ->
                 selectedAttachments = selectedAttachments + document.id
             },
@@ -494,6 +552,18 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 attachAfterUpload = true
             },
         )
+        sharingEntry?.let { target ->
+            NoteSharingDialog(
+                entry = target,
+                currentRecipientUids = session.sharedEntryRecipients[target.id].orEmpty(),
+                friends = session.messages.friends,
+                contacts = session.profile?.contacts.orEmpty(),
+                onDismiss = { sharingEntry = null },
+                onSave = { friends ->
+                    session.sharePrivateEntryWithFriends(target, friends) { sharingEntry = null }
+                },
+            )
+        }
         return
     }
     val trashed =
@@ -515,7 +585,15 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val sorted = if (newestFirst) filtered.sortedByDescending { it.updatedAt }
         else filtered.sortedBy { it.updatedAt }
     val (pinned, others) = sorted.partition { it.pinned }
-    val notesGridState = rememberLazyGridState()
+    val filteredShared = session.sharedPrivateEntries.filter { shared ->
+        val entry = shared.entry
+        entry.deletedAt == null && (shownKind == null || entry.kind == shownKind) &&
+            (search.isBlank() || entry.title.contains(search, ignoreCase = true) ||
+                entry.body.contains(search, ignoreCase = true))
+    }.let { list ->
+        if (newestFirst) list.sortedByDescending { it.entry.updatedAt }
+        else list.sortedBy { it.entry.updatedAt }
+    }
     LazyVerticalGrid(
         columns = if (LocalDensity.current.fontScale >= 1.3f) GridCells.Fixed(1) else GridCells.Adaptive(192.dp),
         modifier = Modifier.fillMaxSize().oliveScrollbar(notesGridState),
@@ -542,7 +620,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 IconButton(
                     onClick = { trashOpen = true },
                     enabled = !session.loadingHistory && !session.historyLoadFailed,
-                    modifier = Modifier.testTag("open_scratchpad")
+                    modifier = Modifier.walkthroughTarget("open_scratchpad").testTag("open_scratchpad")
                 ) {
                     BadgedBox(badge = { if (!session.loadingHistory && !session.historyLoadFailed && trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) } }) {
                         Icon(Icons.Outlined.DeleteOutline, uiText(R.string.ui_trash))
@@ -551,7 +629,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 FilledTonalIconButton(
                     onClick = { openEditor(null) },
                     enabled = !session.busy,
-                    modifier = Modifier.testTag("new_private_entry")
+                    modifier = Modifier.walkthroughTarget("new_private_entry").testTag("new_private_entry")
                 ) { Icon(Icons.Outlined.Add, uiText(R.string.ui_new_note)) }
             }
         }
@@ -593,12 +671,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
             NoteBoardControls(shownKind, newestFirst, { shownKind = it }, { newestFirst = it })
         }
         if (hasFilters) item(span = { GridItemSpan(maxLineSpan) }) {
+            val totalMatches = filtered.size + filteredShared.size
             AccessibleMessage(
-                androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, filtered.size, filtered.size),
+                androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, totalMatches, totalMatches),
             )
         }
         // Let the empty-search message use the full grid width.
-        if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+        if (filtered.isEmpty() && filteredShared.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 if (hasFilters) uiText(R.string.notes_board_no_matching_entries)
                 else uiText(R.string.no_private_entries_yet),
@@ -627,11 +706,30 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
             )
         }
+        if (filteredShared.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+            Text(
+                stringResource(R.string.notes_shared_with_you),
+                style = MaterialTheme.typography.titleMedium,
+                color = OliveGreen,
+                modifier = Modifier.semantics { heading() }
+            )
+        }
+        gridItems(filteredShared, key = { "shared_${it.entry.id}" }) { shared ->
+            val ownerName = session.messages.friends.firstOrNull { it.uid == shared.ownerUid }?.username
+                ?: stringResource(R.string.account)
+            SharedPrivateNoteCard(
+                item = shared,
+                ownerDisplayName = ownerName,
+                formatter = formatter,
+                onOpen = { session.messages.openSharedPrivateEntry(shared.entry.id) },
+                modifier = Modifier.animateItem(),
+            )
+        }
     }
 }
 
 /**
- * Computes note board kind label.
+ * Selects the label resource for the note or incident filter.
  *
  * @param kind Optional kind supplied to [noteBoardKindLabel].
  * @return The computed note board kind label numeric value.
@@ -659,7 +757,7 @@ private fun NoteBoardControls(
 ) {
     var sortOpen by remember { mutableStateOf(false) }
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().walkthroughTarget("notes_board_controls"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
@@ -668,7 +766,9 @@ private fun NoteBoardControls(
                 selected = kind == option,
                 onClick = { onKindChange(option) },
                 label = { Text(stringResource(noteBoardKindLabel(option))) },
-                modifier = Modifier.testTag("private_filter_${option?.name?.lowercase() ?: "all"}"),
+                modifier = Modifier
+                    .then(if (option == null) Modifier.walkthroughTarget("private_filter_all") else Modifier)
+                    .testTag("private_filter_${option?.name?.lowercase() ?: "all"}"),
             )
         }
         Box {

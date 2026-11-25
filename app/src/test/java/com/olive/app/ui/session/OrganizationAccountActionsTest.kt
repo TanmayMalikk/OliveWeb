@@ -1,5 +1,6 @@
 package com.olive.app.ui.session
 
+import com.olive.app.R
 import com.olive.app.data.account.*
 import com.olive.app.support.SessionRuntimeFixture
 import com.olive.app.ui.users.shared.navigation.SessionScreen
@@ -71,6 +72,24 @@ class OrganizationAccountActionsTest {
             verify(f.admin).delete("staff")
             assertEquals(listOf(staff), f.runtime.state.adminAccounts)
             assertEquals(totals, f.runtime.state.adminCounts)
+        }
+    }
+
+    @Test
+    fun deleteManagedAccountTimeoutUsesGenericTimeoutMessageInsteadOfAccountExists() = runBlocking<Unit> {
+        fixture().use { f ->
+            f.runtime.organization.deleteManagedAccount(staff)
+            f.await { !f.runtime.state.busy }
+            verify(f.admin).accounts()
+            verify(f.admin).summary()
+
+            f.runtime.operations.runOperation("Unable to delete", timeoutMillis = 20) { delay(200) }
+            f.await { !f.runtime.state.busy }
+            assertEquals(
+                f.runtime.application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry),
+                f.runtime.state.message,
+            )
+            assertFalse(f.runtime.state.message.orEmpty().contains("already exist", ignoreCase = true))
         }
     }
 

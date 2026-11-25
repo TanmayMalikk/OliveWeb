@@ -221,4 +221,96 @@ class SessionConversationDeliveryTest {
         }
     }
 
+    @Test
+    fun initialDirectorySnapshotDuringFailedRecoveryDoesNotTriggerRetryLoopOrBiometrics() = runBlocking<Unit> {
+        Fixture().use { t ->
+            lateinit var onKey: (String, String) -> Unit
+            doAnswer { call ->
+                onKey = call.getArgument(2)
+                ChatSubscription {}
+            }.`when`(t.f.secureChat).observeKeyChanges(
+                eq(t.chat) ?: t.chat, eq("owner") ?: "owner",
+                any<(String, String) -> Unit>() ?: { _, _ -> },
+                any<(String, String) -> Unit>() ?: { _, _ -> },
+            )
+            `when`(t.f.messaging.searchUsers("friend_fixture", "owner")).thenReturn(emptyList())
+            `when`(t.f.secureChat.existingRoomKey(t.chat.id, "owner")).thenReturn(null)
+            `when`(t.f.secureChat.wrappedRoomKey(t.chat.id, "owner")).thenReturn(null)
+            `when`(t.f.secureChat.hasAccountRoomKey(t.chat.id, "owner")).thenAnswer {
+                onKey("messageDirectory/owner_fixture", "owner-public-key")
+                onKey("messageDirectory/friend_fixture", "friend-public-key")
+                false
+            }
+
+            t.r.conversationActions.openConversation(t.chat)
+            t.f.await { !t.r.state.messagingBusy }
+
+            assertNull(t.r.activeRoomKey)
+            assertNull(t.r.state.deviceLockRequest)
+            assertEquals("unable_to_open_secure_conversation", t.r.state.message)
+            verify(t.f.secureChat, times(1)).hasAccountRoomKey(t.chat.id, "owner")
+        }
+    }
+
+    @Test
+    fun openingConversationRecoversRoomKeyWithoutBiometricsAndCachesWrappedAccessForReopen() = runBlocking<Unit> {
+        Fixture().use { t ->
+            val ark = AccountRecoveryKey.generate()
+            val envelope = AccountKeysetEnvelope.create("owner", ark)
+            val sampleKeyset = envelope.unlock("owner", ark)
+            t.r.settings.protectDeviceRecoveryKey("owner", ark, envelope, t.r.epoch)
+
+            val wrapped = KeyManager.wrapKey(t.key, KeyManager.getOrCreatePublicKey())
+            var cachedAccessSavedOnServer = false
+
+            `when`(t.f.messaging.searchUsers("friend_fixture", "owner")).thenReturn(emptyList())
+            `when`(t.f.secureChat.existingRoomKey(t.chat.id, "owner")).thenReturn(null)
+            `when`(t.f.secureChat.wrappedRoomKey(t.chat.id, "owner")).thenAnswer {
+                if (cachedAccessSavedOnServer) wrapped else null
+            }
+            `when`(t.f.secureChat.hasAccountRoomKey(t.chat.id, "owner")).thenReturn(true)
+            `when`(
+                t.f.secureChat.existingRoomKey(
+                    eq(t.chat.id) ?: t.chat.id,
+                    eq("owner") ?: "owner",
+                    any<UnlockedAccountKeyset>() ?: sampleKeyset,
+                )
+            ).thenReturn(t.key)
+            `when`(t.f.secureChat.persistCurrentDeviceRoomKey(t.chat, "owner", t.key)).thenAnswer {
+                cachedAccessSavedOnServer = true
+                wrapped
+            }
+            doAnswer { call ->
+                t.messages = call.getArgument(2); t.failure = call.getArgument(3); t.ciphertext = call.getArgument(4)
+                ChatSubscription { t.closed++ }
+            }.`when`(t.f.secureChat).observeMessages(
+                eq("chat") ?: "",
+                any<SecretKey>() ?: t.key,
+                any<(List<ChatMessage>) -> Unit>() ?: {},
+                any<(String) -> Unit>() ?: {},
+                any<(List<EncryptedChatMessage>) -> Unit>(),
+            )
+
+            t.r.conversationActions.openConversation(t.chat)
+            t.f.await { !t.r.state.messagingBusy }
+
+            assertNull(t.r.state.deviceLockRequest)
+            assertArrayEquals(t.key.encoded, t.r.activeRoomKey?.encoded)
+            val cached = t.r.chatCache.open("owner", t.chat.id, KeyManager.deviceId(), System.currentTimeMillis())
+            assertEquals(wrapped, cached.wrappedRoomKey)
+
+            t.r.conversationActions.closeConversation()
+            doAnswer { throw java.io.IOException("Temporary network hiccup") }
+                .`when`(t.f.secureChat).wrappedRoomKey(t.chat.id, "owner")
+            clearInvocations(t.f.secureChat)
+
+            t.r.conversationActions.openConversation(t.chat)
+            t.f.await { !t.r.state.messagingBusy }
+
+            assertNull(t.r.state.deviceLockRequest)
+            assertArrayEquals(t.key.encoded, t.r.activeRoomKey?.encoded)
+            verify(t.f.secureChat, never()).hasAccountRoomKey(t.chat.id, "owner")
+        }
+    }
+
 }
