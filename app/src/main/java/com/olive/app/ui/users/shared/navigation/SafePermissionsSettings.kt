@@ -426,20 +426,28 @@ internal fun rememberSafeAppUpdate(
 }
 
 /**
- * Shows the available update as an inline action below the dashboard header.
- *
- * @param modifier Positioning and padding supplied by the dashboard.
+ * Shows a badged download button when a newer release is available.
  */
 @Composable
-internal fun SafeAppUpdateReminder(modifier: Modifier = Modifier) {
+internal fun SafeAppUpdateReminder() {
     val update = LocalSafeUpdateReminder.current ?: return
-    Column(modifier) {
-        TextButton(onClick = update.onDownload, modifier = Modifier.testTag("safe_update_reminder")) {
-            Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(if (update.required) R.string.app_update_required else R.string.ui_a_new_update_is_available))
+    val status = stringResource(
+        if (update.required) R.string.app_update_required else R.string.ui_a_new_update_is_available
+    )
+    IconButton(onClick = update.onDownload, modifier = Modifier.testTag("safe_update_reminder")) {
+        BadgedBox(badge = { Badge(Modifier.testTag("safe_update_badge")) }) {
+            Icon(Icons.Outlined.FileDownload, contentDescription = status)
         }
-        if (update.launchFailed) AccessibleMessage(stringResource(R.string.app_update_failed))
+    }
+}
+
+/**
+ * Reports an installer launch failure below the dashboard header.
+ */
+@Composable
+internal fun SafeAppUpdateError() {
+    if (LocalSafeUpdateReminder.current?.launchFailed == true) {
+        AccessibleMessage(stringResource(R.string.app_update_failed))
     }
 }
 
