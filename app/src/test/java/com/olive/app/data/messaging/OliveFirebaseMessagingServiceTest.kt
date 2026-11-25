@@ -11,7 +11,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.messaging.RemoteMessage
 import com.olive.app.BuildConfig
-import com.olive.app.notification.OliveNotificationManager
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,7 +26,7 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [35])
 class OliveFirebaseMessagingServiceTest {
     @Test
-    fun onlyNewerReleasePushesShowAnUpdateAndScheduleTheDownloadCheck() = withService { service, _, work ->
+    fun onlyNewerReleasePushesScheduleAnUpdateCheckWithoutShowingANotification() = withService { service, _, work ->
         val notifications = shadowOf(service.getSystemService(NotificationManager::class.java))
         for (version in listOf(BuildConfig.VERSION_CODE - 1, BuildConfig.VERSION_CODE)) {
             service.onMessageReceived(message("app_update", "versionCode" to version.toString()))
@@ -36,8 +35,10 @@ class OliveFirebaseMessagingServiceTest {
         assertTrue(mockingDetails(work).invocations.isEmpty())
         service.onMessageReceived(message("app_update",
             "versionCode" to (BuildConfig.VERSION_CODE + 1).toString(), "versionName" to "fixture-update"))
-        val notification = notifications.allNotifications.single()
-        assertEquals(OliveNotificationManager.CHANNEL_APP_UPDATES, notification.channelId)
+        assertTrue(notifications.allNotifications.isEmpty())
+        assertTrue(mockingDetails(work).invocations.any {
+            it.method.name == "enqueueUniqueWork" && it.arguments[0] == "olive-update-manifest"
+        })
         assertTrue(mockingDetails(work).invocations.any {
             it.method.name == "enqueueUniqueWork" && it.arguments[0] == "olive-update-fcm"
         })

@@ -9,7 +9,6 @@ import androidx.work.workDataOf
 import androidx.work.WorkerParameters
 import androidx.work.impl.utils.taskexecutor.TaskExecutor
 import com.olive.app.BuildConfig
-import com.olive.app.notification.OliveNotificationManager
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -32,7 +31,7 @@ class AppUpdateWorkerTest {
     )
 
     @Test
-    fun onlyANewVerifiedApkCreatesAnInstallerNotificationWithTheExactRelease() = runBlocking<Unit> {
+    fun onlyANewReleaseIsPreparedAndRemainsAvailableWithoutANotification() = runBlocking<Unit> {
         val context = notificationContext()
         val manager = context.getSystemService(NotificationManager::class.java)
         val notifications = shadowOf(manager)
@@ -52,11 +51,8 @@ class AppUpdateWorkerTest {
         }.use { clients ->
             assertEquals(Result.success(), worker(context).doWork())
             verify(clients.constructed().single()).prepare(release)
-            val notification = notifications.allNotifications.single()
-            assertEquals(OliveNotificationManager.CHANNEL_APP_UPDATES, notification.channelId)
-            val launch = shadowOf(notification.contentIntent).savedIntent
-            assertEquals(AppUpdateInstallerActivity::class.java.name, launch.component?.className)
-            assertEquals(release, AppReleaseManifest.fromJson(launch.getStringExtra(AppUpdateInstallerActivity.EXTRA_RELEASE_JSON)!!))
+            assertEquals(release, AppUpdateStore(context).offer()?.release)
+            assertTrue(notifications.allNotifications.isEmpty())
         }
     }
 
@@ -74,29 +70,27 @@ class AppUpdateWorkerTest {
     }
 
     @Test
-    fun minimizationPersistsAcrossSessionsUntilANewerRelease() {
+    fun availabilityIgnoresOldDismissalsAndTracksTheLatestRelease() {
         val context = notificationContext()
         val installed = BuildConfig.VERSION_CODE.toLong()
         val store = AppUpdateStore(context)
+        context.getSharedPreferences("olive_app_update", Context.MODE_PRIVATE).edit()
+            .putLong("dismissed_version", release.versionCode).apply()
         store.publish(release.copy(mandatory = true))
-        assertTrue(checkNotNull(store.offer()).required)
-        store.dismiss(checkNotNull(store.offer()))
-        assertTrue(checkNotNull(AppUpdateStore(context).offer()).dismissed)
-        store.publish(release.copy(releaseNotes = listOf("Same version with revised notes")))
-        assertTrue(checkNotNull(store.offer()).dismissed)
-
-        val nextRelease = release.copy(versionCode = release.versionCode + 1)
-        store.publish(nextRelease)
-        assertFalse(checkNotNull(store.offer()).dismissed)
-        store.publish(nextRelease.copy(minimumSupportedVersionCode = installed + 1))
-        assertTrue(checkNotNull(store.offer()).required)
-        assertFalse(checkNotNull(store.offer()).dismissed)
-        assertNull(AppUpdateStore(context, installedVersion = nextRelease.versionCode).offer())
+        val savedOffer = checkNotNull(AppUpdateStore(context).offer())
+        assertEquals(release.versionCode, savedOffer.release.versionCode)
+        assertTrue(savedOffer.required)
 
         val offers = mutableListOf<AppUpdateOffer?>()
         val subscription = store.observe { offers += it }
-        store.publish(nextRelease.copy(releaseNotes = listOf("Live observer update")))
-        assertTrue(offers.size >= 2)
+        val nextRelease = release.copy(
+            versionCode = release.versionCode + 1,
+            minimumSupportedVersionCode = installed + 1,
+        )
+        store.publish(nextRelease)
+        assertEquals(nextRelease, offers.last()?.release)
+        assertTrue(checkNotNull(offers.last()).required)
+        assertNull(AppUpdateStore(context, installedVersion = nextRelease.versionCode).offer())
         subscription.close()
     }
 
@@ -121,11 +115,8 @@ class AppUpdateWorkerTest {
 
     private fun notificationContext(): Context {
         val app = RuntimeEnvironment.getApplication()
-        val resources = spy(app.resources)
-        doReturn("Synthetic release notification").`when`(resources).getString(anyInt())
         return object : ContextWrapper(app) {
             override fun getApplicationContext() = this
-            override fun getResources() = resources
         }
     }
 
