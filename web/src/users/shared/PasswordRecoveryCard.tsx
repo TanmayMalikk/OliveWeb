@@ -45,8 +45,9 @@ export function PasswordRecoveryCard({
                 });
               }}
             >
+              <p className="help-note">This is the same as your account password.</p>
               <Field
-                label="Recovery password"
+                label="Account password"
                 type="password"
                 autoComplete="off"
                 value={password}
