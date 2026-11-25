@@ -183,3 +183,107 @@ test("Stripe status returns currentPeriodEndMs from item or plan period end capp
   ];
   assert.deepEqual(await billing.status("member"), {active: true, canManage: true, currentPeriodEndMs: 1_800_001_200_000});
 });
+
+test("fitnessAiBilling callable dispatches actions, validates auth, and handles checkout and closeFitnessBilling", async () => {
+  const price = {id: "price_weekly", active: true, currency: "cad", unit_amount: 599,
+    recurring: {interval: "week", interval_count: 1}};
+  const deletedCustomers = [];
+  let createdCustomer = 0;
+  let openSessions = [];
+  let plans = [];
+  let deleteError = null;
+  let listError = null;
+
+  const f = fixture({
+    _params: {
+      FITNESS_STRIPE_SECRET_KEY: "sk_test_fixture",
+      FITNESS_STRIPE_WEEKLY_PRICE_ID: "price_weekly",
+      FITNESS_STRIPE_PUBLISHABLE_KEY: "pk_test_fixture",
+    },
+    stripe: class {
+      prices = {retrieve: async () => price};
+      customers = {
+        create: async () => ({id: `cus_new_${++createdCustomer}`}),
+        del: async (customer) => {
+          if (deleteError) throw deleteError;
+          deletedCustomers.push(customer);
+        },
+      };
+      checkout = {
+        sessions: {
+          list: () => ({
+            data: openSessions,
+            async *[Symbol.asyncIterator]() {
+              for (const s of openSessions) yield s;
+            },
+          }),
+          expire: async () => {},
+          create: async (params) => ({id: "cs_created", url: `https://checkout.stripe.com/${params.customer}`}),
+        },
+      };
+      subscriptions = {
+        list: () => {
+          if (listError) throw listError;
+          return plans;
+        },
+        create: async () => ({
+          id: "sub_new", status: "incomplete", items: {data: [{price}]},
+          latest_invoice: {confirmation_secret: {client_secret: "pi_new_secret_123"}},
+        }),
+      };
+      billingPortal = {
+        sessions: {create: async ({customer}) => ({url: `https://billing.stripe.com/${customer}`})},
+      };
+    },
+  });
+
+  const {fitnessAiBilling} = f.load("fitnessAi");
+  const {closeFitnessBilling, fitnessBilling} = f.load("fitnessAiBilling");
+
+  await assert.rejects(fitnessAiBilling({data: {action: "status"}}), {code: "unauthenticated"});
+  await assert.rejects(fitnessAiBilling({auth: {uid: "u1"}, data: {action: "unknown"}}), {code: "invalid-argument"});
+
+  // Checkout creates a new customer and session, reuses an open matching session, and blocks when subscribed.
+  const firstCheckout = await fitnessAiBilling({auth: {uid: "u1"}, data: {action: "checkout"}});
+  assert.equal(firstCheckout.url, "https://checkout.stripe.com/cus_new_1");
+  assert.equal(f.records.get("fitnessAiBilling/u1").customerId, "cus_new_1");
+
+  openSessions = [{id: "cs_open", status: "open", metadata: {fitnessPrice: "price_weekly"}, url: "https://checkout.stripe.com/reused"}];
+  assert.deepEqual(await fitnessAiBilling({auth: {uid: "u1"}, data: {action: "checkout"}}), {url: "https://checkout.stripe.com/reused"});
+
+  plans = [{status: "active", items: {data: [{price, current_period_end: 1_900_000_000}]}}];
+  assert.deepEqual(await fitnessAiBilling({auth: {uid: "u1"}, data: {action: "status"}}),
+    {active: true, canManage: true, currentPeriodEndMs: 1_900_000_000_000});
+  assert.deepEqual(await fitnessAiBilling({auth: {uid: "u1"}, data: {action: "portal"}}),
+    {url: "https://billing.stripe.com/cus_new_1"});
+  await assert.rejects(fitnessAiBilling({auth: {uid: "u1"}, data: {action: "checkout"}}), {code: "failed-precondition"});
+
+  // PaymentSheet works when no active subscription exists.
+  plans = [];
+  assert.deepEqual(await fitnessAiBilling({auth: {uid: "u1"}, data: {action: "paymentSheet"}}),
+    {publishableKey: "pk_test_fixture", clientSecret: "pi_new_secret_123"});
+
+  // Unexpected non-HttpsError wraps into unavailable.
+  listError = new Error("Network down");
+  await assert.rejects(fitnessAiBilling({auth: {uid: "u1"}, data: {action: "status"}}), {code: "unavailable"});
+  listError = null;
+
+  // Invalid billing configuration throws failed-precondition.
+  assert.throws(() => fitnessBilling("", "invalid"), {code: "failed-precondition"});
+
+  // closeFitnessBilling removes Firestore billing + limits docs and Stripe customer, ignoring resource_missing.
+  f.records.set("fitnessAiLimits/user-u1", {count: 3});
+  await closeFitnessBilling("u1");
+  assert.deepEqual(deletedCustomers, ["cus_new_1"]);
+  assert.equal(f.records.has("fitnessAiBilling/u1"), false);
+  assert.equal(f.records.has("fitnessAiLimits/user-u1"), false);
+
+  f.records.set("fitnessAiBilling/u2", {customerId: "cus_missing"});
+  deleteError = Object.assign(new Error("Missing"), {code: "resource_missing"});
+  await closeFitnessBilling("u2");
+  assert.equal(f.records.has("fitnessAiBilling/u2"), false);
+
+  f.records.set("fitnessAiBilling/u3", {customerId: "cus_err"});
+  deleteError = Object.assign(new Error("Down"), {code: "api_connection_error"});
+  await assert.rejects(closeFitnessBilling("u3"), {code: "unavailable"});
+});

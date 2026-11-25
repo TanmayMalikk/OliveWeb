@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">69.23% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>9/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">62.5% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>5/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">57.14% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>4/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">81.81% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>9/11</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -103,22 +103,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -127,23 +127,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from "react";
 import { Button, Modal } from "../components/SharedComponents";
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >DownloadInvite() {</span>
-  const [code] = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >useState(() =&gt; {</span></span>
-    const value = <span class="cstat-no" title="statement not covered" >new URLSearchParams(location.search).get("invite") ?? "";</span>
-<span class="cstat-no" title="statement not covered" >    return /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : "";</span>
+export function DownloadInvite() {
+  const [code] = useState(() =&gt; {
+    const value = new URLSearchParams(location.search).get("invite") ?? <span class="branch-1 cbranch-no" title="branch not covered" >"";</span>
+    return /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : <span class="branch-1 cbranch-no" title="branch not covered" >"";</span>
   });
-  const [opened, setOpened] = <span class="cstat-no" title="statement not covered" >useState(Boolean(code));</span>
-  const [copied, setCopied] = <span class="cstat-no" title="statement not covered" >useState("");</span>
-<span class="cstat-no" title="statement not covered" >  if (!code) <span class="cstat-no" title="statement not covered" >return null;</span></span>
-<span class="cstat-no" title="statement not covered" >  return &lt;&gt;</span>
+  const [opened, setOpened] = useState(Boolean(code));
+  const [copied, setCopied] = useState("");
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!code) <span class="cstat-no" title="statement not covered" >return null;</span>
+  return &lt;&gt;
     &lt;p&gt;Your invite code is &lt;strong&gt;{code}&lt;/strong&gt;. &lt;Button variant="quiet" <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etOpened(true)}&gt;V</span>iew invite&lt;/Button&gt;&lt;/p&gt;
     {opened &amp;&amp; &lt;Modal title="You have an invite" <span class="fstat-no" title="function not covered" >onClose={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etOpened(false)}&gt;</span>
       &lt;p&gt;Enter this code during onboarding to connect with the person who invited you.&lt;/p&gt;
       &lt;p&gt;&lt;strong&gt;{code}&lt;/strong&gt;&lt;/p&gt;
       &lt;p&gt;Already installed? Open Messages and enter the code there.&lt;/p&gt;
       &lt;p&gt;The code works once and expires 48 hours after it was created. A refreshed code replaces it.&lt;/p&gt;
-      &lt;Button <span class="fstat-no" title="function not covered" >onClick={() =&gt; {</span> <span class="cstat-no" title="statement not covered" >void navigator.clipboard.writeText(code)</span>
-        .<span class="fstat-no" title="function not covered" >then(() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etCopied("Code copied."<span class="fstat-no" title="function not covered" >), () =&gt; <span class="cstat-no" title="statement not covered" >s</span></span>etCopied("Select the code above to copy it."))</span>; }}&gt;Copy code&lt;/Button&gt;
+      &lt;Button onClick={() =&gt; { void navigator.clipboard.writeText(code)
+        .then(() =&gt; setCopied("Code copied."<span class="fstat-no" title="function not covered" >), () =&gt; <span class="cstat-no" title="statement not covered" >s</span>etCopied("Select the code above to copy it."))</span>; }}&gt;Copy code&lt;/Button&gt;
       &lt;p role="status"&gt;{copied}&lt;/p&gt;
       &lt;a className="button" href="/download/android"&gt;Download Android app&lt;/a&gt;
     &lt;/Modal&gt;}
@@ -156,7 +156,7 @@ export function <span class="fstat-no" title="function not covered" >DownloadInv
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:01.560Z
+                at 2026-11-25T07:58:32.688Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

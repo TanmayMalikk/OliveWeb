@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">94.44% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/18</span>
+                <span class='fraction'>17/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">88.88% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>8/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -176,38 +176,36 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">115x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">290x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -228,10 +226,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">72x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -252,26 +252,26 @@ export interface WorkspacePage&lt;View extends string&gt; {
   icon: LucideIcon;
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >OrganizationWorkspace&lt;View extends string&gt;({</span> role, pages, view, onNavigate, children }: {
+export function OrganizationWorkspace&lt;View extends string&gt;({ role, pages, view, onNavigate, children }: {
   role: "Staff" | "Administrator";
   pages: readonly WorkspacePage&lt;View&gt;[];
   view: View;
   onNavigate: (view: View) =&gt; void;
   children: ReactNode;
 }) {
-  const session = <span class="cstat-no" title="statement not covered" >useSession()</span>;
-  const heading = <span class="cstat-no" title="statement not covered" >useRef&lt;HTMLHeadingElement&gt;(null);</span>
-  const previousView = <span class="cstat-no" title="statement not covered" >useRef(view);</span>
-  const page = <span class="cstat-no" title="statement not covered" >pages.<span class="fstat-no" title="function not covered" >find(({</span> id }) =&gt; <span class="cstat-no" title="statement not covered" >id === view)</span>;</span>
+  const session = useSession();
+  const heading = useRef&lt;HTMLHeadingElement&gt;(null);
+  const previousView = useRef(view);
+  const page = pages.find(({ id }) =&gt; id === view);
 &nbsp;
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  useEffect(() =&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >    if (previousView.current === view) <span class="cstat-no" title="statement not covered" >return;</span></span>
-<span class="cstat-no" title="statement not covered" >    window.scrollTo({ top: 0, behavior: "instant" });</span>
-<span class="cstat-no" title="statement not covered" >    heading.current?.focus({ preventScroll: true });</span>
-<span class="cstat-no" title="statement not covered" >    previousView.current = view;</span>
+  useEffect(() =&gt; {
+    if (previousView.current === view) return;
+    window.scrollTo({ top: 0, behavior: "instant" });
+    heading.current?.focus({ preventScroll: true });
+    previousView.current = view;
   }, [view]);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;div className="safe-shell private-shell organization-workspace"&gt;
       &lt;aside className="organization-rail"&gt;
         &lt;div className="organization-brand"&gt;
@@ -279,16 +279,16 @@ export function <span class="fstat-no" title="function not covered" >Organizatio
           &lt;div&gt;&lt;strong&gt;Olive Branch&lt;/strong&gt;&lt;small&gt;{role} workspace&lt;/small&gt;&lt;/div&gt;
         &lt;/div&gt;
         &lt;nav className="safe-nav-group" aria-label={role + " workspace"}&gt;
-          {pages.<span class="fstat-no" title="function not covered" >map(({</span> id, label, icon: Icon }) =&gt; (
-<span class="cstat-no" title="statement not covered" >            &lt;button key={id} type="button" aria-current={view === id ? "page" : undefined}</span>
-<span class="fstat-no" title="function not covered" >              onClick={() =&gt; <span class="cstat-no" title="statement not covered" >o</span>nNavigate(id)}&gt;</span>
+          {pages.map(({ id, label, icon: Icon }) =&gt; (
+            &lt;button key={id} type="button" aria-current={view === id ? "page" : undefined}
+              onClick={() =&gt; onNavigate(id)}&gt;
               &lt;Icon size={18} aria-hidden="true" /&gt; {label}
             &lt;/button&gt;
           ))}
         &lt;/nav&gt;
         &lt;div className="organization-session"&gt;
           &lt;span&gt;@{session.profile?.username}&lt;/span&gt;
-          &lt;button type="button" <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >v</span>oid session.perform(session.signOut)}&gt;</span>
+          &lt;button type="button" onClick={() =&gt; void session.perform(session.signOut)}&gt;
             &lt;LogOut size={17} aria-hidden="true" /&gt; Sign out
           &lt;/button&gt;
         &lt;/div&gt;
@@ -307,14 +307,14 @@ export function <span class="fstat-no" title="function not covered" >Organizatio
   );
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >WorkspaceShortcuts&lt;View extends string&gt;({</span> pages, onNavigate }: {
+export function WorkspaceShortcuts&lt;View extends string&gt;({ pages, onNavigate }: {
   pages: readonly WorkspacePage&lt;View&gt;[];
   onNavigate: (view: View) =&gt; void;
 }) {
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;div className="safe-shortcuts"&gt;
-      {pages.<span class="fstat-no" title="function not covered" >map(({</span> id, label, description, icon: Icon }) =&gt; (
-<span class="cstat-no" title="statement not covered" >        &lt;button className="safe-task" type="button" key={id} <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >o</span>nNavigate(id)}&gt;</span></span>
+      {pages.map(({ id, label, description, icon: Icon }) =&gt; (
+        &lt;button className="safe-task" type="button" key={id} <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >o</span>nNavigate(id)}&gt;</span>
           &lt;span className="safe-task-icon"&gt;&lt;Icon size={22} aria-hidden="true" /&gt;&lt;/span&gt;
           &lt;span className="safe-task-copy"&gt;&lt;strong&gt;{label}&lt;/strong&gt;&lt;span&gt;{description}&lt;/span&gt;&lt;/span&gt;
           &lt;ArrowRight size={18} aria-hidden="true" /&gt;
@@ -330,7 +330,7 @@ export function <span class="fstat-no" title="function not covered" >WorkspaceSh
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:01.560Z
+                at 2026-11-25T07:58:32.688Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

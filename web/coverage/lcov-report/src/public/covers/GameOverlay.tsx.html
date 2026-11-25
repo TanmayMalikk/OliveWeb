@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">97.29% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/37</span>
+                <span class='fraction'>36/37</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -215,10 +215,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -277,15 +277,15 @@ import { type ReactNode } from "react";
 import { Play, RotateCcw, Trophy } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >GameOverlay({</span>
-  tone = <span class="branch-0 cbranch-no" title="branch not covered" >"ready",</span>
+export function GameOverlay({
+  tone = "ready",
   title,
   subtitle,
   score,
-  scoreLabel = <span class="branch-0 cbranch-no" title="branch not covered" >"Score",</span>
+  scoreLabel = "Score",
   best,
-  bestLabel = <span class="branch-0 cbranch-no" title="branch not covered" >"Best",</span>
-  isNewBest = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
+  bestLabel = "Best",
+  isNewBest = false,
   actionLabel,
   actionAriaLabel,
   onAction,
@@ -293,7 +293,7 @@ export function <span class="fstat-no" title="function not covered" >GameOverlay
   onSecondary,
   controlsHint,
   icon,
-  asButtonSurface = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
+  asButtonSurface = false,
   children,
 }: {
   tone?: "ready" | "paused" | "over" | "won";
@@ -314,13 +314,13 @@ export function <span class="fstat-no" title="function not covered" >GameOverlay
   asButtonSurface?: boolean;
   children?: ReactNode;
 }) {
-  const isEnd = <span class="cstat-no" title="statement not covered" >tone === "over" || tone === "won";</span>
-  const ActionIcon = <span class="cstat-no" title="statement not covered" >tone === "over" ? RotateCcw : Play;</span>
+  const isEnd = tone === "over" || tone === "won";
+  const ActionIcon = tone === "over" ? RotateCcw : Play;
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;div
       className={`game-stage-overlay game-stage-overlay-${tone}`}
-      onPointerDown={asButtonSurface ? <span class="fstat-no" title="function not covered" >undefined : (e</span>vent) =&gt; <span class="cstat-no" title="statement not covered" >event.stopPropagation()}</span>
+      onPointerDown={asButtonSurface ? <span class="fstat-no" title="function not covered" ><span class="branch-1 cbranch-no" title="branch not covered" >undefined : (e</span>vent) =&gt; <span class="cstat-no" title="statement not covered" >event.stopPropagation()}</span></span>
     &gt;
       &lt;div className="game-overlay-card"&gt;
         {icon &amp;&amp; &lt;div className="game-overlay-emblem" aria-hidden="true"&gt;{icon}&lt;/div&gt;}
@@ -378,7 +378,7 @@ export function <span class="fstat-no" title="function not covered" >GameOverlay
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:01.560Z
+                at 2026-11-25T07:58:32.688Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

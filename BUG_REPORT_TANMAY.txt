@@ -1,0 +1,502 @@
+================================================================================
+                        BUG REPORT - TANMAYMALIKK
+                 30 Bugs Fixed in Repository (FriendsRevamp)
+================================================================================
+
+--------------------------------------------------------------------------------
+Bug #1
+What the bug was : Olive Crossing character freezing on floating logs & missing
+                   4-way movement animations
+File(s)          : web/src/public/covers/olive-crossing.ts
+                   web/src/public/covers/OliveCrossing.tsx
+                   web/src/public/covers/OliveCrossingBoard.tsx
+                   web/src/styles/cover-crossing.css
+Why it happened  : moveCrossing forced integer column snapping
+                   (if (onMovingLog || !destinationUsesLogs)) when moving
+                   vertically off/between moving logs, trapping the player on
+                   drifting logs; keyboard input depended on container focus
+                   rather than a window listener; and the player only had a
+                   flat vertical CSS hop.
+How it was fixed : Removed the onMovingLog snap check when landing on log lanes,
+& who fixed it     added a window-level keydown listener, and implemented 3D
+                   isometric computePlayerPose 4-directional hop animations,
+                   directional eyes, and idle log bobbing.
+                   Fixed by: TanmayMalikk (commit 724301b5)
+
+--------------------------------------------------------------------------------
+Bug #2
+What the bug was : Safety Plan questionnaire edits failed to remove outdated
+                   unedited checklist items
+File(s)          : app/src/main/java/com/olive/app/data/safety/SafetyPlanRepository.kt
+                   (then SafetyPlanIntakeDefaults.kt)
+                   app/src/main/java/com/olive/app/ui/users/shared/safetyplan/SafetyPlanFormComponents.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/safetyplan/SafetyPlanScreen.kt
+Why it happened  : mergeTailoredChecklistItems only appended newly relevant
+                   prompts and never pruned previously auto-generated prompts
+                   that became irrelevant after questionnaire answers changed.
+How it was fixed : Updated mergeTailoredChecklistItems with removablePrompts and
+& who fixed it     protectedItemIds so outdated unedited default prompts are
+                   pruned while strictly preserving user edits, checkmarks,
+                   custom rows, and document attachments.
+                   Fixed by: TanmayMalikk (commit 4dc0d6e2)
+
+--------------------------------------------------------------------------------
+Bug #3
+What the bug was : Completing the walkthrough stranded users on the final
+                   toured screen with out-of-order steps
+File(s)          : app/src/main/java/com/olive/app/ui/session/SessionNavigation.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/navigation/AppScreenNavigation.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/walkthrough/WalkthroughModels.kt
+                   (then WalkthroughTourCatalog.kt)
+                   web/src/users/shared/safe_app/SafeAppLayout.tsx
+                   web/src/users/shared/safe_app/WalkthroughCatalog.ts
+Why it happened  : Pressing Finish called dismissWalkthroughTour() without
+                   navigating back to Safe App Home, leaving users on whatever
+                   nested screen the last step visited, and tour steps jumped
+                   inconsistently across sections.
+How it was fixed : Added completeWalkthroughTour() to clear safePageHistory and
+& who fixed it     return to SafePage.Home (and /safe on Web), and reordered
+                   walkthrough steps sequentially across Android and Web.
+                   Fixed by: TanmayMalikk (commit 0c8bde2a)
+
+--------------------------------------------------------------------------------
+Bug #4
+What the bug was : Walkthrough coachmark popups overlapped the UI targets they
+                   were demonstrating
+File(s)          : app/src/main/java/com/olive/app/ui/shared/WalkthroughTarget.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/walkthrough/WalkthroughCoachmarkOverlay.kt
+                   app/src/main/java/com/olive/app/ui/shared/OliveDesignSystem.kt
+                   app/src/main/java/com/olive/app/ui/users/user/dashboard/UserDashboard.kt
+Why it happened  : Coachmark cards used fixed placement without measuring each
+                   target composable's live boundsInRoot, causing the overlay
+                   card to cover the highlighted button or section.
+How it was fixed : Added a WalkthroughTarget bounds registry
+& who fixed it     (Modifier.walkthroughTarget(...) using onGloballyPositioned)
+                   so coachmarks dynamically position outside the
+                   red-highlighted target bounds.
+                   Fixed by: TanmayMalikk (commit 7ef48783)
+
+--------------------------------------------------------------------------------
+Bug #5
+What the bug was : App ignored Android system language settings and hardcoded
+                   "English"
+File(s)          : app/src/main/java/com/olive/app/data/account/UserProfile.kt
+                   app/src/main/java/com/olive/app/data/news/NewsRepository.kt
+                   app/src/main/java/com/olive/app/ui/shared/OliveDesignSystem.kt
+                   (then SystemLocale.kt)
+                   app/src/main/java/com/olive/app/ui/covers/news/DailyDigestCover.kt
+Why it happened  : AdminAccountDraft defaulted language to "English" and
+                   GoogleNewsRepository.rssLocaleQuery depended on a custom
+                   AppLocaleManager override instead of Android's system BCP 47
+                   language tag.
+How it was fixed : Removed the hardcoded "English" default and custom locale
+& who fixed it     manager override, reading the device's primary BCP 47 locale
+                   directly for news queries and system localization.
+                   Fixed by: TanmayMalikk (commit d32fe688)
+
+--------------------------------------------------------------------------------
+Bug #6
+What the bug was : Birthday picker lost its outline and disabled submit buttons
+                   prevented error shake feedback
+File(s)          : app/src/main/java/com/olive/app/ui/covers/DiscreetCoverEntrySettings.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/FitnessGoalsPages.kt
+                   app/src/main/java/com/olive/app/ui/shared/SharedFormFields.kt
+Why it happened  : Submit buttons were disabled whenever required fields were
+                   empty, preventing users from tapping submit to trigger
+                   validation errors and shake feedback, and BirthdayPicker
+                   was missing its standard outline styling.
+How it was fixed : Kept submit buttons enabled while not busy, wired
+& who fixed it     rememberFieldErrorShakeTrigger to validation errors on
+                   submit, and restored the BirthdayPicker outline.
+                   Fixed by: TanmayMalikk (commit 8de62a9c)
+
+--------------------------------------------------------------------------------
+Bug #7
+What the bug was : Chat voice messages leaked into the Safety Documents list
+File(s)          : app/src/main/java/com/olive/app/data/safety/SafetyDocumentRepository.kt
+                   app/src/main/java/com/olive/app/ui/users/user/documents/SafetyDocumentController.kt
+                   app/src/main/java/com/olive/app/OliveActivity.kt
+                   app/src/main/AndroidManifest.xml
+Why it happened  : Encrypted voice messages shared in chat are stored in the
+                   same R2/Firestore files collection as safety documents and
+                   were not filtered out of the Safety Documents vault list.
+How it was fixed : Tagged chat-only voice media metadata and filtered chat-only
+& who fixed it     and legacy voice messages out of Safety Documents while
+                   keeping them openable inside conversations (and removed the
+                   retired Android Game launcher alias).
+                   Fixed by: TanmayMalikk (commit f52ca6e9)
+
+--------------------------------------------------------------------------------
+Bug #8
+What the bug was : Live location sharing email rules failed due to startedAt
+                   timestamp mismatch
+File(s)          : app/src/main/java/com/olive/app/data/location/LocationSharingRepository.kt
+                   app/src/main/java/com/olive/app/ui/users/user/location/UserLocationController.kt
+                   firebase/firestore.rules
+                   functions/src/emailNotifications.js
+                   functions/src/emailService.js
+Why it happened  : setSessionState stamped startedAt using
+                   System.currentTimeMillis() at write time instead of using
+                   the session's actual start timestamp, causing mismatches
+                   against expiresAt and Firestore rules validation, with no
+                   diagnostic logging on email failures.
+How it was fixed : Threaded explicit startedAt through setLiveSessionState and
+& who fixed it     setSessionState, aligned firestore.rules validation for
+                   liveLocationSessions, and added structured diagnostic
+                   logging in emailNotifications.js and emailService.js.
+                   Fixed by: TanmayMalikk (commit 9d887f5e)
+
+--------------------------------------------------------------------------------
+Bug #9
+What the bug was : WCAG/APCA color contrast failures across Fitness, News,
+                   Messaging, Safety Plan, and Location UI
+File(s)          : app/src/main/java/com/olive/app/ui/shared/OliveDesignSystem.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/FitnessHistoryCharts.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/ManualFoodEntryDialog.kt
+                   app/src/main/java/com/olive/app/ui/covers/news/DailyDigestCover.kt
+                   app/src/main/java/com/olive/app/ui/covers/news/NewsFeedScreen.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/messaging/FriendLists.kt
+                   app/src/test/java/com/olive/app/ui/shared/OliveContrastTest.kt
+Why it happened  : Dark foreground tones like FatPlum on dark fitness cards and
+                   hardcoded muted grays (0xFF6B7268) fell below WCAG/APCA
+                   readability thresholds.
+How it was fixed : Replaced failing color pairs with compliant tokens
+& who fixed it     (FatPlumLight, Muted, higher-contrast text/icon colors)
+                   across 11 UI files and added automated APCA contrast tests in
+                   OliveContrastTest.kt.
+                   Fixed by: TanmayMalikk (commit f53fd059)
+
+--------------------------------------------------------------------------------
+Bug #10
+What the bug was : Escalated admins blocked from accessing shared chat media,
+                   voice messages, and notes
+File(s)          : app/src/main/java/com/olive/app/data/media/MediaUploadWorker.kt
+                   app/src/main/java/com/olive/app/data/safety/SafetyDocumentRepository.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionSecureSharing.kt
+                   firebase/firestore.rules
+Why it happened  : SafetyDocumentRepository required document.ownerUid ==
+                   ownerUid to grant media keys for new participants, and
+                   MediaRepository.updateAccess enforced strict
+                   accountWrappedKeys.keys == wrappedKeys.keys, blocking
+                   authorized participants/staff from wrapping keys for
+                   escalated admins.
+How it was fixed : Allowed any authorized user
+& who fixed it     (ownerUid in document.allowedUsers) to wrap keys for newly
+                   escalated participants, relaxed the keyset check to
+                   wrappedKeys.keys.containsAll(accountWrappedKeys.keys), and
+                   updated firestore.rules.
+                   Fixed by: TanmayMalikk (commit 7424d28d)
+
+--------------------------------------------------------------------------------
+Bug #11
+What the bug was : Map follow camera zoomed too far out in close-follow mode
+File(s)          : app/src/main/assets/map/map.js
+                   app/src/main/java/com/olive/app/ui/users/user/location/UserLocationMap.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionSecureSharing.kt
+                   functions/src/safetyConsultations.js
+Why it happened  : updateHeadingCameraLoop() always clamped non-navigation
+                   follow zoom to 15.5 even when focusClose was requested, and
+                   oliveSetFollow cleared followFocusPending on periodic point
+                   syncs.
+How it was fixed : Added followCloseMode + closeFollowZoom() (maxZoom - 3) and
+& who fixed it     a fromPointsSync parameter to oliveSetFollow so close-follow
+                   maintains street-level zoom (alongside consultation
+                   assignment and safe-contact sharing fixes).
+                   Fixed by: TanmayMalikk (commit 700d4d5b)
+
+--------------------------------------------------------------------------------
+Bug #12
+What the bug was : Mapbox live location markers rendered offset and jumped during
+                   pinch-zoom
+File(s)          : app/src/main/assets/map/map.html
+                   app/src/main/assets/map/map.js
+Why it happened  : .olive-live-marker and .olive-service-marker used relative or
+                   unset positioning instead of position: absolute; top: 0;
+                   left: 0; margin: 0; padding: 0, clashing with Mapbox GL CSS
+                   transforms, and marker sizes recalculated on every zoom
+                   frame instead of zoomend.
+How it was fixed : Set explicit absolute zero-origin CSS on both marker classes
+& who fixed it     in map.html and moved marker resize updates from zoom to
+                   zoomend in map.js.
+                   Fixed by: TanmayMalikk (commit e4baca82)
+
+--------------------------------------------------------------------------------
+Bug #13
+What the bug was : 1-frame Safe App flash before the PIN unlock reveal animation
+File(s)          : app/src/main/java/com/olive/app/ui/session/SessionInfrastructure.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionState.kt
+                   app/src/main/java/com/olive/app/ui/users/shared/navigation/AppScreenNavigation.kt
+Why it happened  : Unlocking mutated page, screen, and unlockAnimationVersion++
+                   across three separate state writes, letting Compose render
+                   one frame of Safe App Home before the reveal overlay
+                   activated.
+How it was fixed : Added atomic enterSafeWithAnimation() in SessionState so
+& who fixed it     page, screen, and unlockAnimationVersion update together in
+                   one state snapshot.
+                   Fixed by: TanmayMalikk (commit 83256349)
+
+--------------------------------------------------------------------------------
+Bug #14
+What the bug was : Discreet cover settings stayed open after cover reset & News
+                   feed lost scroll position
+File(s)          : app/src/main/java/com/olive/app/ui/covers/DiscreetCoverEntrySettings.kt
+                   app/src/main/java/com/olive/app/ui/covers/news/DailyDigestCover.kt
+                   app/src/main/java/com/olive/app/ui/covers/news/NewsFeedScreen.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/FitnessCover.kt
+Why it happened  : settingsOpen used rememberSaveable without resetting on
+                   coverReset or !interactive, leaving cover settings visible
+                   after exiting Safe App, and navigating back from a News
+                   article reset the feed scroll state to index 0.
+How it was fixed : Changed settingsOpen to remember with a
+& who fixed it     LaunchedEffect(interactive, coverReset) auto-close guard and
+                   preserved News feed scroll state across article navigation.
+                   Fixed by: TanmayMalikk (commit 6edd7d86)
+
+--------------------------------------------------------------------------------
+Bug #15
+What the bug was : Chat sidebar hid already-cached conversations behind a
+                   loading skeleton during refresh
+File(s)          : app/src/main/java/com/olive/app/ui/users/shared/messaging/FriendsAndMessagesScreen.kt
+                   app/src/main/java/com/olive/app/ui/users/user/documents/EncryptedMediaTransferController.kt
+Why it happened  : MessagingSidebar checked
+                   if (session.messages.loadingIndex) return@LazyColumn,
+                   replacing the entire conversation list with a loading
+                   skeleton whenever a background refresh ran even when cached
+                   conversations existed.
+How it was fixed : Changed the guard to
+& who fixed it     val showSkeleton = session.messages.conversations.isEmpty() &&
+                   session.messages.loadingIndex so cached conversations render
+                   immediately during background refresh.
+                   Fixed by: TanmayMalikk (commit 6bff5510)
+
+--------------------------------------------------------------------------------
+Bug #16
+What the bug was : Cached conversation list waited on remote setup & pending
+                   uploads could not be opened locally
+File(s)          : app/src/main/java/com/olive/app/ui/session/SessionMessaging.kt
+                   app/src/main/java/com/olive/app/ui/users/user/documents/EncryptedMediaTransferController.kt
+                   app/src/main/java/com/olive/app/ui/users/user/documents/SafetyDocumentsScreen.kt
+Why it happened  : chatCache.conversations(device.uid) was launched after the
+                   remote setup block instead of immediately on screen open,
+                   and queued document uploads had no local preview path before
+                   cloud upload finished.
+How it was fixed : Moved local chatCache.conversations loading ahead of remote
+& who fixed it     messaging setup and added openPendingUpload(...) for
+                   immediate local decrypted preview of queued/uploading files.
+                   Fixed by: TanmayMalikk (commit 6b183a9c)
+
+--------------------------------------------------------------------------------
+Bug #17
+What the bug was : Deleting a single safety document triggered a full list
+                   refresh
+File(s)          : app/src/main/java/com/olive/app/ui/users/user/documents/SafetyDocumentController.kt
+Why it happened  : SafetyDocumentsController.delete(...) called
+                   run(refreshAfter = true), forcing a full cloud re-fetch and
+                   UI reload after removing one item.
+How it was fixed : Switched to optimistic removal from state.files with
+& who fixed it     automatic rollback and error display if the asynchronous
+                   repository delete fails.
+                   Fixed by: TanmayMalikk (commit 586fbd0e)
+
+--------------------------------------------------------------------------------
+Bug #18
+What the bug was : EncryptedVault re-decrypted from disk on every read and
+                   hidden cover screens kept running workloads
+File(s)          : app/src/main/java/com/olive/app/security/DeviceLockKey.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/FitnessCover.kt
+                   app/src/main/java/com/olive/app/ui/covers/news/DailyDigestCover.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionNavigation.kt
+Why it happened  : Every EncryptedVault.read() performed disk I/O and AES
+                   decryption from scratch, and cover screens kept executing
+                   background work while hidden behind the Safe App.
+How it was fixed : Added a session-scoped in-memory decrypted cache
+& who fixed it     (cachedJson / cachedLastModified) explicitly cleared via
+                   purge() on quick exit or backgrounding, and froze cover
+                   workloads when non-interactive.
+                   Fixed by: TanmayMalikk (commit 3a4177f9)
+
+--------------------------------------------------------------------------------
+Bug #19
+What the bug was : Fitness AI Coach pitched unsolicited workout routines during
+                   casual chat
+File(s)          : app/src/main/java/com/olive/app/ui/covers/fitness/FitnessCoachPage.kt
+                   functions/src/fitnessAiKnowledge.js
+Why it happened  : Only exact matches in a short hardcoded isCasualOrGreeting
+                   set received a conversational hint, so general chat received
+                   no guardrail and caused the LLM to suggest workout routines.
+How it was fixed : Replaced the narrow greeting list with a default non-pitch
+& who fixed it     conversational guardrail for every message outside
+                   isWorkoutOrMealAdvice, reinforced in fitnessAiKnowledge.js.
+                   Fixed by: TanmayMalikk (commit 7580c5a9)
+
+--------------------------------------------------------------------------------
+Bug #20
+What the bug was : Fitness AI Coach soft keyboard stayed open after send and hid
+                   new chat replies
+File(s)          : app/src/main/java/com/olive/app/ui/covers/fitness/FitnessCoachChat.kt
+                   app/src/main/java/com/olive/app/ui/covers/fitness/FitnessCoachPage.kt
+Why it happened  : FitnessCoachChat did not observe WindowInsets.ime height
+                   changes to scroll the LazyColumn above the keyboard, nor did
+                   it clear focus or dismiss the IME after replies arrived.
+How it was fixed : Tracked WindowInsets.ime.getBottom to auto-scroll on
+& who fixed it     keyboard/turn updates and invoked focusManager.clearFocus()
+                   plus keyboardController?.hide() after message submission.
+                   Fixed by: TanmayMalikk (commit a74f01cb)
+
+--------------------------------------------------------------------------------
+Bug #21
+What the bug was : SafetyPlanSyncWorker.enqueueAttachment attempted WorkManager
+                   sync in non-Firebase local mode
+File(s)          : app/src/main/java/com/olive/app/data/safety/SafetyPlanSyncWorker.kt
+                   app/src/main/java/com/olive/app/data/location/LocationSharingRepository.kt
+                   app/src/main/java/com/olive/app/ui/users/user/location/UserLocationController.kt
+Why it happened  : enqueueAttachment skipped checking BuildConfig.FIREBASE_CONFIGURED,
+                   triggering background sync work in local test runs, and
+                   AndroidAddressCoordinateResolver was private instead of
+                   internal.
+How it was fixed : Added if (!BuildConfig.FIREBASE_CONFIGURED) return in
+& who fixed it     enqueueAttachment and opened AndroidAddressCoordinateResolver
+                   visibility to internal.
+                   Fixed by: TanmayMalikk (commit 9f9020c5)
+
+--------------------------------------------------------------------------------
+Bug #22
+What the bug was : EncryptedVault writes via AtomicFile.finishWrite could
+                   silently keep stale vault files
+File(s)          : app/src/main/java/com/olive/app/security/DeviceLockKey.kt
+                   .github/workflows/publish-android-release.yml
+                   scripts/Package-Release.ps1
+Why it happened  : AtomicFile.finishWrite relies on File.renameTo, which can
+                   silently fail to overwrite an existing file and leave stale
+                   encrypted vault data on disk; CI also ran release tests
+                   without -PoliveLocalTest=true.
+How it was fixed : Replaced AtomicFile writes with an explicit .new staging
+& who fixed it     file, stream.fd.sync(), and Files.move(..., ATOMIC_MOVE,
+                   REPLACE_EXISTING), and ran local-mode unit tests separately
+                   from release lint/assemble in CI.
+                   Fixed by: TanmayMalikk (commit dde423e3)
+
+--------------------------------------------------------------------------------
+Bug #23
+What the bug was : Google AdSense tag could execute on private/authenticated web
+                   routes
+File(s)          : web/index.html
+                   web/public/public-ads.js
+                   web/server/pageSecurity.mjs
+                   web/server/httpApp.mjs
+                   web/src/public/PublicCoverPage.tsx
+Why it happened  : Client-side SPA routing shared one document shell between
+                   public cover pages and private Safe App routes, risking
+                   third-party AdSense script execution on sensitive pages.
+How it was fixed : Gated ad loading behind /public-ads.js with
+& who fixed it     data-public-ads="false" by default, enforced strict private
+                   CSP headers in pageSecurity.mjs, and forced fresh document
+                   navigation on private entry.
+                   Fixed by: TanmayMalikk (commit 04a1af77)
+
+--------------------------------------------------------------------------------
+Bug #24
+What the bug was : Malformed JSON nesting in Alberta hotlines hid "Shelters"
+                   inside another category
+File(s)          : app/src/main/assets/hotlines/provinces/ResourcesAB.json
+Why it happened  : A merge misplaced a closing brace in ResourcesAB.json,
+                   nesting the entire "Shelters" block (WIN House, Lurana
+                   Shelter, etc.) inside the preceding hotline category so
+                   shelter entries failed to parse as a top-level category.
+How it was fixed : Closed the preceding category object cleanly and promoted
+& who fixed it     "Shelters" back to the top-level province category map.
+                   Fixed by: TanmayMalikk (commit 903e6c78)
+
+--------------------------------------------------------------------------------
+Bug #25
+What the bug was : Chat attachments and media access grants committed in
+                   separate steps
+File(s)          : app/src/main/java/com/olive/app/data/media/MediaUploadWorker.kt
+                   app/src/main/java/com/olive/app/data/safety/SafetyDocumentRepository.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionSecureSharing.kt
+                   functions/src/mediaTickets.js
+Why it happened  : Granting encrypted file access and posting the chat
+                   attachment message ran as two separate calls, allowing
+                   partial failures that left recipients unable to decrypt a sent
+                   attachment or granted access without a message.
+How it was fixed : Added the atomic mediaShareInChat Cloud Function and
+& who fixed it     MediaRepository.shareInChat(...) path to commit recipient
+                   wrapped keys and the encrypted chat message together.
+                   Fixed by: TanmayMalikk (commit 30fbcde3)
+
+--------------------------------------------------------------------------------
+Bug #26
+What the bug was : Firestore rules blocked authorized reads of encrypted media
+                   containing account_recovery_ready
+File(s)          : firebase/firestore.rules
+Why it happened  : The files collection schema check in firestore.rules used a
+                   strict data.keys().hasOnly([...]) whitelist that omitted
+                   account_recovery_ready, rejecting reads on media documents
+                   carrying that boolean flag.
+How it was fixed : Added 'account_recovery_ready' to the allowed key list and
+& who fixed it     validated (!data.keys().hasAny(['account_recovery_ready']) ||
+                   data.account_recovery_ready is bool).
+                   Fixed by: TanmayMalikk (commit 0e410034)
+
+--------------------------------------------------------------------------------
+Bug #27
+What the bug was : Removed group chat members retained cached conversation and
+                   room-key access
+File(s)          : app/src/main/java/com/olive/app/data/messaging/MessagingRepository.kt
+                   app/src/main/java/com/olive/app/data/messaging/SecureChatRepository.kt
+                   app/src/main/java/com/olive/app/security/DeviceStore.kt
+                   functions/src/supportGroups.js
+                   web/src/services/MessagingService.ts
+Why it happened  : wrappedRoomKey read the conversation document using Firestore's
+                   default cache without verifying currentUid in participantIds,
+                   and snapshots surfaced stale cached membership after removal.
+How it was fixed : Forced Source.SERVER reads on wrappedRoomKey, added explicit
+& who fixed it     participantIds membership checks, purged revoked chats from
+                   local cache, and tightened server/web removal handling.
+                   Fixed by: TanmayMalikk (commit 893a90dc)
+
+--------------------------------------------------------------------------------
+Bug #28
+What the bug was : Safety Plan conflict resolution displayed unchanged
+                   checklist rows alongside conflicts
+File(s)          : app/src/main/java/com/olive/app/data/safety/SafetyPlanRepository.kt
+                   (then SafetyChecklistDiff.kt)
+                   app/src/main/java/com/olive/app/ui/users/shared/safetyplan/SafetyPlanScreen.kt
+                   web/src/services/SafetyChecklistCodec.ts
+Why it happened  : Conflict previews dumped the entire encoded safety checklist
+                   instead of diffing individual row properties, hiding what
+                   actually conflicted between local and incoming versions.
+How it was fixed : Added safetyChecklistConflictPreview(...) on Android and Web
+& who fixed it     to isolate and display only the checklist rows and properties
+                   that actually differ.
+                   Fixed by: TanmayMalikk (commit f424f855)
+
+--------------------------------------------------------------------------------
+Bug #29
+What the bug was : Revoking Safety Plan access unintentionally revoked
+                   independent chat/direct media grants
+File(s)          : app/src/main/java/com/olive/app/data/media/MediaUploadWorker.kt
+                   app/src/main/java/com/olive/app/data/safety/SafetyDocumentRepository.kt
+                   app/src/main/java/com/olive/app/ui/session/SessionSecureSharing.kt
+                   functions/src/mediaTickets.js
+Why it happened  : mediaUpdateAccess replaced recipient access solely from the
+                   Safety Plan grant set, stripping access for recipients who
+                   also had independent direct or chat sharing grants.
+How it was fixed : Added grantIndependentRecipients and
+& who fixed it     revokeIndependentRecipients tracking across Android and
+                   mediaTickets.js so revoking Safety Plan access preserves
+                   independent media grants.
+                   Fixed by: TanmayMalikk (commit 1a971386)
+
+--------------------------------------------------------------------------------
+Bug #30
+What the bug was : VoIP call API requests failed on HTTP/2 proxy handshakes
+File(s)          : app/src/main/java/com/olive/app/data/messaging/VoipCallStateAndManager.kt
+Why it happened  : VoipManager used a default OkHttpClient(), which negotiated
+                   HTTP/2 against the proxied VoIP API endpoint and suffered
+                   failed HTTP/2 handshakes and call-creation retries.
+How it was fixed : Configured OkHttpClient.Builder()
+& who fixed it     .protocols(listOf(Protocol.HTTP_1_1)).build() in VoipManager
+                   so TLS connections use HTTP/1.1 cleanly without replaying
+                   call-creation requests.
+                   Fixed by: TanmayMalikk (commit cbad65fb)

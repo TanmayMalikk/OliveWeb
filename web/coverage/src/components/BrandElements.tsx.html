@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -123,7 +123,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -139,7 +139,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -149,12 +149,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -165,8 +165,8 @@ import type { ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, Leaf } from "lucide-react";
 &nbsp;
 // Draws the olive branch used beside the website name.
-export function <span class="fstat-no" title="function not covered" >Branch({</span> className = <span class="branch-0 cbranch-no" title="branch not covered" >"" }: { className?: string }) {</span>
-<span class="cstat-no" title="statement not covered" >  return (</span>
+export function Branch({ className = "" }: { className?: string }) {
+  return (
     &lt;svg className={className} viewBox="0 0 320 180" fill="none" aria-hidden="true"&gt;
       &lt;path d="M20 154C86 134 139 95 280 33" stroke="currentColor" strokeWidth="2.5" /&gt;
       &lt;path
@@ -181,8 +181,8 @@ export function <span class="fstat-no" title="function not covered" >Branch({</s
 }
 &nbsp;
 // Combines the branch mark, site name, and short brand line.
-export function <span class="fstat-no" title="function not covered" >Logo({</span> small = <span class="branch-0 cbranch-no" title="branch not covered" >false }: { small?: boolean }) {</span>
-<span class="cstat-no" title="statement not covered" >  return (</span>
+export function Logo({ small = false }: { small?: boolean }) {
+  return (
     &lt;a href="/" className={`brand ${small ? "small" : ""}`} aria-label="Olive Branch home"&gt;
       &lt;Leaf aria-hidden="true" strokeWidth={1.2} /&gt;
       &lt;span&gt;olive&lt;span className="brand-second"&gt;branch&lt;/span&gt;&lt;i&gt;®&lt;/i&gt;&lt;/span&gt;
@@ -191,13 +191,13 @@ export function <span class="fstat-no" title="function not covered" >Logo({</spa
 }
 &nbsp;
 // Draws the small arrow used in branded links and buttons.
-export function <span class="fstat-no" title="function not covered" >Forward({</span> children }: { children: ReactNode }) {
-<span class="cstat-no" title="statement not covered" >  return &lt;&gt;{children}&lt;ArrowRight size={18} aria-hidden="true" /&gt;&lt;/&gt;;</span>
+export function Forward({ children }: { children: ReactNode }) {
+  return &lt;&gt;{children}&lt;ArrowRight size={18} aria-hidden="true" /&gt;&lt;/&gt;;
 }
 &nbsp;
 // Marks links that open another website or browser tab.
-export function <span class="fstat-no" title="function not covered" >External({</span> href, children }: { href: string; children: ReactNode }) {
-<span class="cstat-no" title="statement not covered" >  return (</span>
+export function External({ href, children }: { href: string; children: ReactNode }) {
+  return (
     &lt;a className="text-link" href={href} target="_blank" rel="noopener noreferrer"&gt;
       {children}&lt;ArrowUpRight size={16} aria-hidden="true" /&gt;
     &lt;/a&gt;
@@ -210,7 +210,7 @@ export function <span class="fstat-no" title="function not covered" >External({<
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:04.261Z
+                at 2026-11-25T07:58:32.997Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

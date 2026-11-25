@@ -98,7 +98,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
-    testOptions.unitTests.all { it.jvmArgs("--enable-native-access=ALL-UNNAMED") }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all { it.jvmArgs("--enable-native-access=ALL-UNNAMED") }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -179,6 +184,9 @@ dependencies {
     testImplementation("org.json:json:20260814")
     testImplementation("org.robolectric:robolectric:4.18.1")
     testImplementation("org.mockito:mockito-core:5.24.0")
+    testImplementation(platform("androidx.compose:compose-bom:2026.11.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")

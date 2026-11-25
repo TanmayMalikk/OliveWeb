@@ -116,3 +116,221 @@ test("opaque recovery fails closed when its persistent server setup is unavailab
     /OPAQUE recovery is not configured/i
   );
 });
+
+test("opaque recovery callables handle registration, unlock, wrong-password throttle, rotation, and removal", async () => {
+  const opaque = require("@serenity-kit/opaque");
+  const fixture = require("./test-support/runtime.cjs");
+  await opaque.ready;
+  const serverSetup = opaque.server.createSetup();
+  const f = fixture({ _params: { OPAQUE_SERVER_SETUP: serverSetup } });
+  const api = f.load("opaqueRecovery");
+  const recentAuth = () => ({ uid: "owner", token: { auth_time: Math.floor(Date.now() / 1000) } });
+  const staleAuth = () => ({ uid: "owner", token: { auth_time: Math.floor(Date.now() / 1000) - 600 } });
+
+  await assert.rejects(api.opaqueRecoveryBeginRegistration({ data: {} }), { code: "unauthenticated" });
+  await assert.rejects(
+    api.opaqueRecoveryBeginRegistration({ auth: staleAuth(), data: { registrationRequest: "x".repeat(32) } }),
+    { code: "failed-precondition" }
+  );
+  await assert.rejects(
+    api.opaqueRecoveryBeginRegistration({ auth: recentAuth(), data: { registrationRequest: "short" } }),
+    { code: "invalid-argument" }
+  );
+
+  // Full registration flow requires an existing stored keyset.
+  const regStart = opaque.client.startRegistration({ password: "MySecretPassword123!" });
+  const { registrationResponse } = await api.opaqueRecoveryBeginRegistration({
+    auth: recentAuth(),
+    data: { registrationRequest: regStart.registrationRequest },
+  });
+  const regFinish = opaque.client.finishRegistration({
+    password: "MySecretPassword123!",
+    registrationResponse,
+    clientRegistrationState: regStart.clientRegistrationState,
+  });
+  const makeEnvelope = (recordId, byte = 5) => ({
+    version: 1,
+    accountId: "owner",
+    opaqueRecordId: recordId,
+    algorithm: "OPAQUE-3DH-HKDF-SHA256-AES-256-GCM",
+    salt: b64(32, byte),
+    iv: b64(12, byte),
+    ciphertext: b64(48, byte),
+  });
+
+  const recordId1 = "rec_1234567890123456";
+  await assert.rejects(
+    api.opaqueRecoveryFinishRegistration({
+      auth: recentAuth(),
+      data: {
+        opaqueRecordId: recordId1,
+        registrationRecord: regFinish.registrationRecord,
+        envelope: makeEnvelope(recordId1),
+      },
+    }),
+    { code: "failed-precondition" }
+  );
+
+  f.records.set("accountKeysets/owner", {
+    version: 1,
+    accountId: "owner",
+    keyId: "123e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: b64(400),
+    iv: b64(12),
+    ciphertext: b64(1600),
+  });
+
+  assert.deepEqual(
+    await api.opaqueRecoveryFinishRegistration({
+      auth: recentAuth(),
+      data: {
+        opaqueRecordId: recordId1,
+        registrationRecord: regFinish.registrationRecord,
+        envelope: makeEnvelope(recordId1),
+      },
+    }),
+    { success: true, opaqueRecordId: recordId1 }
+  );
+
+  // Begin unlock validations & not-found for an unenrolled user.
+  await assert.rejects(
+    api.opaqueRecoveryBeginUnlock({ auth: { uid: "owner" }, data: { startLoginRequest: "short" } }),
+    { code: "invalid-argument" }
+  );
+  const loginStart = opaque.client.startLogin({ password: "MySecretPassword123!" });
+  await assert.rejects(
+    api.opaqueRecoveryBeginUnlock({
+      auth: { uid: "unenrolled" },
+      data: { startLoginRequest: loginStart.startLoginRequest },
+    }),
+    { code: "not-found" }
+  );
+
+  // Wrong password fails finishLogin and increments throttle.
+  const wrongStart = opaque.client.startLogin({ password: "WrongPassword!" });
+  const wrongBegin = await api.opaqueRecoveryBeginUnlock({
+    auth: { uid: "owner" },
+    data: { startLoginRequest: wrongStart.startLoginRequest },
+  });
+  const wrongFinish = opaque.client.finishLogin({
+    password: "WrongPassword!",
+    loginResponse: wrongBegin.loginResponse,
+    clientLoginState: wrongStart.clientLoginState,
+  });
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({
+      auth: { uid: "owner" },
+      data: { sessionId: wrongBegin.sessionId, finishLoginRequest: wrongFinish?.finishLoginRequest ?? "invalid_request_data" },
+    }),
+    { code: "permission-denied" }
+  );
+  assert.equal(f.records.get("accountRecoveryOpaqueThrottle/owner").failedAttempts, 1);
+
+  // Finish unlock rejections: bad types, missing/expired session, and throttled account.
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({ auth: { uid: "owner" }, data: { sessionId: 123, finishLoginRequest: 456 } }),
+    { code: "invalid-argument" }
+  );
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({ auth: { uid: "owner" }, data: { sessionId: "missing", finishLoginRequest: "x" } }),
+    { code: "not-found" }
+  );
+  f.records.set("accountRecoveryOpaqueSessions/expired-sess", {
+    ownerUid: "owner",
+    serverLoginState: "state",
+    createdAt: Date.now() - 10 * 60 * 1000,
+  });
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({ auth: { uid: "owner" }, data: { sessionId: "expired-sess", finishLoginRequest: "x" } }),
+    { code: "deadline-exceeded" }
+  );
+
+  f.records.set("accountRecoveryOpaqueThrottle/owner", {
+    failedAttempts: opaqueRecovery.MAX_UNLOCK_ATTEMPTS,
+    lockedUntil: Date.now() + 60_000,
+  });
+  await assert.rejects(
+    api.opaqueRecoveryBeginUnlock({ auth: { uid: "owner" }, data: { startLoginRequest: loginStart.startLoginRequest } }),
+    { code: "resource-exhausted" }
+  );
+  f.records.set("accountRecoveryOpaqueSessions/valid-sess", {
+    ownerUid: "owner",
+    serverLoginState: "state",
+    createdAt: Date.now(),
+  });
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({ auth: { uid: "owner" }, data: { sessionId: "valid-sess", finishLoginRequest: "x" } }),
+    { code: "resource-exhausted" }
+  );
+  f.records.delete("accountRecoveryOpaqueThrottle/owner");
+
+  // Successful unlock clears throttle and returns the recovery envelope.
+  const { sessionId, loginResponse } = await api.opaqueRecoveryBeginUnlock({
+    auth: { uid: "owner" },
+    data: { startLoginRequest: loginStart.startLoginRequest },
+  });
+  const loginFinish = opaque.client.finishLogin({
+    password: "MySecretPassword123!",
+    loginResponse,
+    clientLoginState: loginStart.clientLoginState,
+  });
+  const unlocked = await api.opaqueRecoveryFinishUnlock({
+    auth: { uid: "owner" },
+    data: { sessionId, finishLoginRequest: loginFinish.finishLoginRequest },
+  });
+  assert.deepEqual(unlocked.envelope, makeEnvelope(recordId1));
+
+  // Rotate updates registration record and envelope, and remove refuses permanent deletion.
+  const rotStart = opaque.client.startRegistration({ password: "NewSecretPassword123!" });
+  const rotResp = await api.opaqueRecoveryBeginRegistration({
+    auth: recentAuth(),
+    data: { registrationRequest: rotStart.registrationRequest },
+  });
+  const rotFinish = opaque.client.finishRegistration({
+    password: "NewSecretPassword123!",
+    registrationResponse: rotResp.registrationResponse,
+    clientRegistrationState: rotStart.clientRegistrationState,
+  });
+  const recordId2 = "rec_rotated1234567890";
+  assert.deepEqual(
+    await api.opaqueRecoveryRotate({
+      auth: recentAuth(),
+      data: {
+        opaqueRecordId: recordId2,
+        registrationRecord: rotFinish.registrationRecord,
+        envelope: makeEnvelope(recordId2, 9),
+      },
+    }),
+    { success: true, opaqueRecordId: recordId2 }
+  );
+
+  // Missing passwordRecovery envelope fails closed.
+  const rotLoginStart = opaque.client.startLogin({ password: "NewSecretPassword123!" });
+  const rotUnlockBegin = await api.opaqueRecoveryBeginUnlock({
+    auth: { uid: "owner" },
+    data: { startLoginRequest: rotLoginStart.startLoginRequest },
+  });
+  const rotUnlockFinish = opaque.client.finishLogin({
+    password: "NewSecretPassword123!",
+    loginResponse: rotUnlockBegin.loginResponse,
+    clientLoginState: rotLoginStart.clientLoginState,
+  });
+  f.records.set("accountKeysets/owner", {
+    ...f.records.get("accountKeysets/owner"),
+    passwordRecovery: null,
+  });
+  await assert.rejects(
+    api.opaqueRecoveryFinishUnlock({
+      auth: { uid: "owner" },
+      data: { sessionId: rotUnlockBegin.sessionId, finishLoginRequest: rotUnlockFinish.finishLoginRequest },
+    }),
+    { code: "not-found" }
+  );
+
+  await assert.rejects(
+    api.opaqueRecoveryRemove({ auth: recentAuth(), data: {} }),
+    { code: "failed-precondition" }
+  );
+});

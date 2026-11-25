@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/20</span>
+                <span class='fraction'>20/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">92% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/25</span>
+                <span class='fraction'>23/25</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -141,23 +141,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -169,9 +167,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -201,38 +201,38 @@ import { useEffect, useState } from "react";
 import { Modal } from "../../../components/SharedComponents";
 import type { BrowserDocument } from "../../../services/MediaService";
 &nbsp;
-function <span class="fstat-no" title="function not covered" >TextPreview({</span> url }: { url: string }) {
-  const [text, setText] = <span class="cstat-no" title="statement not covered" >useState&lt;string | null&gt;(null);</span>
-  const [failed, setFailed] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  useEffect(() =&gt; {</span></span>
-    const request = <span class="cstat-no" title="statement not covered" >new AbortController();</span>
-<span class="cstat-no" title="statement not covered" >    void fetch(url, { signal: request.signal })</span>
-      .<span class="fstat-no" title="function not covered" >then((r</span>esponse) =&gt; {
-<span class="cstat-no" title="statement not covered" >        if (!response.ok) <span class="cstat-no" title="statement not covered" >throw new Error("Unable to read decrypted text");</span></span>
-<span class="cstat-no" title="statement not covered" >        return response.text();</span>
+function TextPreview({ url }: { url: string }) {
+  const [text, setText] = useState&lt;string | null&gt;(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() =&gt; {
+    const request = new AbortController();
+    void fetch(url, { signal: request.signal })
+      .then((response) =&gt; {
+        if (!response.ok) throw new Error("Unable to read decrypted text");
+        return response.text();
       })
-      .<span class="fstat-no" title="function not covered" >then((v</span>alue) =&gt; { <span class="cstat-no" title="statement not covered" >if (!request.signal.aborted) <span class="cstat-no" title="statement not covered" >setText(value); }</span></span>)
-      .<span class="fstat-no" title="function not covered" >catch(() =&gt; {</span> <span class="cstat-no" title="statement not covered" >if (!request.signal.aborted) <span class="cstat-no" title="statement not covered" >setFailed(true); }</span></span>);
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >    return () =&gt; <span class="cstat-no" title="statement not covered" >r</span>equest.abort();</span></span>
+      .then((value) =&gt; { <span class="missing-if-branch" title="else path not taken" >E</span>if (!request.signal.aborted) setText(value); })
+      .catch(() =&gt; { <span class="missing-if-branch" title="else path not taken" >E</span>if (!request.signal.aborted) setFailed(true); });
+    return () =&gt; request.abort();
   }, [url]);
-<span class="cstat-no" title="statement not covered" >  if (failed) <span class="cstat-no" title="statement not covered" >return &lt;p role="alert"&gt;Unable to preview this text file.&lt;/p&gt;;</span></span>
-<span class="cstat-no" title="statement not covered" >  return text === null ? &lt;p role="status"&gt;Loading preview…&lt;/p&gt; : &lt;pre&gt;{text}&lt;/pre&gt;;</span>
+  if (failed) return &lt;p role="alert"&gt;Unable to preview this text file.&lt;/p&gt;;
+  return text === null ? &lt;p role="status"&gt;Loading preview…&lt;/p&gt; : &lt;pre&gt;{text}&lt;/pre&gt;;
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >SafeMediaViewer({</span>
+export function SafeMediaViewer({
   document,
   url,
   onClose,
-  allowAudioPlayback = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
+  allowAudioPlayback = false,
 }: {
   document: BrowserDocument;
   url: string;
   onClose: () =&gt; void;
   allowAudioPlayback?: boolean;
 }) {
-  const mimeType = <span class="cstat-no" title="statement not covered" >document.mimeType.toLowerCase().split(";", 1)[0].trim();</span>
-  const previewText = <span class="cstat-no" title="statement not covered" >mimeType.startsWith("text/") &amp;&amp; document.ciphertextSize &lt;= 1024 * 1024;</span>
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  const mimeType = document.mimeType.toLowerCase().split(";", 1)[0].trim();
+  const previewText = mimeType.startsWith("text/") &amp;&amp; document.ciphertextSize &lt;= 1024 * 1024;
+  return (
     &lt;Modal title={document.name} wide onClose={onClose}&gt;
       &lt;div className="safe-document-viewer"&gt;
         {mimeType.startsWith("image/") ? (
@@ -264,7 +264,7 @@ export function <span class="fstat-no" title="function not covered" >SafeMediaVi
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:01.560Z
+                at 2026-11-25T07:58:32.688Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

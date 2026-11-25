@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>11/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -115,30 +115,30 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -148,31 +148,31 @@ import { encrypt, decrypt } from "./EncryptionService";
 import type { Envelope } from "../domain/DomainModels";
 let keyPromise: Promise&lt;CryptoKey&gt; | undefined;
 // Loads this browser's encryption key, or creates one the first time it is needed.
-async function <span class="fstat-no" title="function not covered" >deviceKey() {</span>
-<span class="cstat-no" title="statement not covered" >  keyPromise ??= (<span class="fstat-no" title="function not covered" >async () =&gt; {</span></span>
-    const db = <span class="cstat-no" title="statement not covered" >await database;</span>
-    const existing = <span class="cstat-no" title="statement not covered" >await db.get("device", "cover-key");</span>
-<span class="cstat-no" title="statement not covered" >    if (existing) <span class="cstat-no" title="statement not covered" >return existing as CryptoKey;</span></span>
-    const key = <span class="cstat-no" title="statement not covered" >await crypto.subtle.generateKey(</span>
+async function deviceKey() {
+  keyPromise ??= (async () =&gt; {
+    const db = await database;
+    const existing = await db.get("device", "cover-key");
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (existing) <span class="cstat-no" title="statement not covered" >return existing as CryptoKey;</span>
+    const key = await crypto.subtle.generateKey(
       { name: "AES-GCM", length: 256 },
       false,
       ["encrypt", "decrypt"],
     );
-<span class="cstat-no" title="statement not covered" >    await db.put("device", key, "cover-key");</span>
-<span class="cstat-no" title="statement not covered" >    return key;</span>
+    await db.put("device", key, "cover-key");
+    return key;
   })();
-<span class="cstat-no" title="statement not covered" >  return keyPromise;</span>
+  return keyPromise;
 }
 // Decrypts one saved cover setting from this browser.
-export async function <span class="fstat-no" title="function not covered" >readCover&lt;T&gt;(i</span>d: string, fallback: T): Promise&lt;T&gt; {
-  const box: Envelope | undefined = <span class="cstat-no" title="statement not covered" >await (</span>
+export async function readCover&lt;T&gt;(id: string, fallback: T): Promise&lt;T&gt; {
+  const box: Envelope | undefined = await (
     await database
   ).get("device", `cover:${id}`);
-<span class="cstat-no" title="statement not covered" >  return box ? decrypt&lt;T&gt;(await deviceKey(), box) : fallback;</span>
+  return box ? decrypt&lt;T&gt;(await deviceKey(), box) : fallback;
 }
 // Encrypts one cover setting before storing it in this browser.
-export async function <span class="fstat-no" title="function not covered" >writeCover(i</span>d: string, value: unknown) {
-<span class="cstat-no" title="statement not covered" >  await (</span>
+export async function writeCover(id: string, value: unknown) {
+  await (
     await database
   ).put("device", await encrypt(await deviceKey(), value), `cover:${id}`);
 }
@@ -183,7 +183,7 @@ export async function <span class="fstat-no" title="function not covered" >write
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:04.261Z
+                at 2026-11-25T07:58:32.997Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -46,6 +46,39 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  wear-unit:
+    name: Wear unit tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-37.2
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Wear unit tests and create coverage report
+        run: ./gradlew :wear:createDebugUnitTestCoverageReport --stacktrace
+
+      - name: Enforce Wear line coverage threshold
+        run: python3 scripts/check_coverage.py jacoco wear/build/reports/coverage/test/debug/report.xml 90 --name Wear
+
+      - name: Upload Wear coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wear-coverage
+          path: wear/build/reports/coverage/test/debug/
+          if-no-files-found: warn
+          retention-days: 14
+
   web-unit:
     name: Web unit tests and coverage
     runs-on: ubuntu-latest
@@ -70,7 +103,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Enforce web line coverage threshold
-        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 10 --name Web
+        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 90 --name Web
 
       - name: Upload web coverage report
         if: always()
@@ -105,7 +138,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Enforce Functions line coverage threshold
-        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 85 --name "Cloud Functions"
+        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 90 --name "Cloud Functions"
 
       - name: Upload Functions coverage report
         if: always()
@@ -228,6 +261,7 @@ jobs:
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     needs:
       - android-unit
+      - wear-unit
       - web-unit
       - functions-unit
       - android-build-and-lint

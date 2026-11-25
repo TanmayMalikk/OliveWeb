@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">96.15% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>22/22</span>
+                <span class='fraction'>25/26</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">88.23% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>13/13</span>
+                <span class='fraction'>15/17</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">95.45% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>18/18</span>
+                <span class='fraction'>21/22</span>
             </div>
         
             
@@ -109,8 +109,38 @@
 <a name='L33'></a><a href='#L33'>33</a>
 <a name='L34'></a><a href='#L34'>34</a>
 <a name='L35'></a><a href='#L35'>35</a>
-<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -125,7 +155,6 @@
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -134,21 +163,36 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { httpsCallable } from "firebase/functions";
 import { doc, onSnapshot } from "firebase/firestore";
 import { accounts, firebase } from "./AccountService";
 &nbsp;
 export interface FriendInvite { code: string; link: string; expiresAt: number }
+&nbsp;
+async function callProtected(name: string, payload: Record&lt;string, unknown&gt;) {
+  const { auth, functions } = await firebase();
+  try {
+    return (await httpsCallable&lt;Record&lt;string, unknown&gt;, unknown&gt;(functions, name)(payload))?.data;
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (code === "functions/unauthenticated" &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >auth?.currentUser) {</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error(</span>
+        "App Check verification failed (401). Confirm Firebase App Check is enabled for this domain and reload.",
+      );
+    }
+    throw error;
+  }
+}
+&nbsp;
 export async function subscribeFriendInvite(uid: string, update: (value: { code: string; claimedBy: string }) =&gt; void) {
   const { db } = await firebase();
   return onSnapshot(doc(db, "friendInviteOwners", uid), snapshot =&gt; {
@@ -158,8 +202,7 @@ export async function subscribeFriendInvite(uid: string, update: (value: { code:
 export async function createFriendInvite(refresh = false): Promise&lt;FriendInvite&gt; {
   const identity = accounts.identity;
   if (!identity) throw new Error("Sign in first.");
-  const { functions } = await firebase();
-  const result = (await httpsCallable&lt;{ refresh: boolean }, FriendInvite&gt;(functions, "friendInviteCreate")({ refresh })).data;
+  const result = (await callProtected("friendInviteCreate", { refresh })) as FriendInvite;
   if (accounts.identity?.uid !== identity.uid) throw new Error("Your account changed. Open Invite again.");
   return result;
 }
@@ -168,16 +211,15 @@ export async function claimFriendInvite(code: string): Promise&lt;{ friendshipId
   if (!identity) throw new Error("Sign in first.");
   const { register } = await import("./MessagingService");
   await register(identity);
-  const { functions } = await firebase();
-  const result = (await httpsCallable&lt;{ code: string }, { friendshipId: string; username: string }&gt;(
-    functions, "friendInviteClaim",
-  )({ code: code.trim() })).data;
+  const result = (await callProtected("friendInviteClaim", { code: code.trim() })) as {
+    friendshipId: string;
+    username: string;
+  };
   if (accounts.identity?.uid !== identity.uid) throw new Error("Your account changed. Reopen Messages.");
   return result;
 }
 export async function authorizeMessagingPeer(username: string): Promise&lt;void&gt; {
-  const { functions } = await firebase();
-  await httpsCallable(functions, "messagingAuthorizePeer")({ username: username.trim().toLowerCase() });
+  await callProtected("messagingAuthorizePeer", { username: username.trim().toLowerCase() });
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -186,7 +228,7 @@ export async function authorizeMessagingPeer(username: string): Promise&lt;void&
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:04.261Z
+                at 2026-11-25T07:58:32.997Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>11/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>11/12</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -156,33 +156,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -192,6 +183,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -231,19 +231,19 @@ import { useRef, useState } from "react";
 import { Leaf } from "lucide-react";
 import Game from "./covers/OliveGamesCover";
 &nbsp;
-export default function <span class="fstat-no" title="function not covered" >PublicCoverPage({</span> onPrivateEntry }: { onPrivateEntry: () =&gt; void }) {
-  const [accountOpen, setAccountOpen] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
-  const lastOliveTap = <span class="cstat-no" title="statement not covered" >useRef(0);</span>
-  const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >tapOlive = () =&gt; {</span></span>
-    const now = <span class="cstat-no" title="statement not covered" >Date.now();</span>
-<span class="cstat-no" title="statement not covered" >    if (now - lastOliveTap.current &gt; 1500) {</span>
-<span class="cstat-no" title="statement not covered" >      lastOliveTap.current = now;</span>
-<span class="cstat-no" title="statement not covered" >      return;</span>
+export default function PublicCoverPage({ onPrivateEntry }: { onPrivateEntry: () =&gt; void }) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  const lastOliveTap = useRef(0);
+  const tapOlive = () =&gt; {
+    const now = Date.now();
+    if (now - lastOliveTap.current &gt; 1500) {
+      lastOliveTap.current = now;
+      return;
     }
-<span class="cstat-no" title="statement not covered" >    lastOliveTap.current = 0;</span>
-<span class="cstat-no" title="statement not covered" >    onPrivateEntry();</span>
+    lastOliveTap.current = 0;
+    onPrivateEntry();
   };
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;main
       id="main"
       className="cover-container game-cover"
@@ -267,7 +267,7 @@ export default function <span class="fstat-no" title="function not covered" >Pub
           role="tab"
           aria-selected={accountOpen}
           aria-controls="cover-account-panel"
-<span class="fstat-no" title="function not covered" >          onClick={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etAccountOpen(true)}</span>
+          onClick={() =&gt; setAccountOpen(true)}
         &gt;
           Account
         &lt;/button&gt;
@@ -309,7 +309,7 @@ export default function <span class="fstat-no" title="function not covered" >Pub
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:04.261Z
+                at 2026-11-25T07:58:32.997Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

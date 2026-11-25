@@ -34,30 +34,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -72,7 +72,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -143,7 +143,13 @@
 <a name='L67'></a><a href='#L67'>67</a>
 <a name='L68'></a><a href='#L68'>68</a>
 <a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -204,13 +210,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">396x</span>
+<span class="cline-any cline-yes">394x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Signed-in users: defines the React session state shared by signed-in pages.
 import { createContext, useContext } from "react";
@@ -260,6 +272,12 @@ export type SessionValue = {
   beginEntry: () =&gt; Promise&lt;void&gt;;
   quickExit: () =&gt; void;
   unlock: (pin: string) =&gt; Promise&lt;void&gt;;
+  recoverEncryptedAccess: (password: string) =&gt; Promise&lt;void&gt;;
+  enablePasswordRecovery: (password: string) =&gt; Promise&lt;void&gt;;
+  refreshPasswordRecoveryStatus: () =&gt; Promise&lt;void&gt;;
+  hasEncryptedAccess: boolean;
+  passwordRecoveryEnrolled: boolean | null;
+  passwordRecoveryKeysetExists: boolean;
   saveProfile: (profile: Profile, action?: string) =&gt; Promise&lt;void&gt;;
   saveEntry: (entry: Entry) =&gt; Promise&lt;void&gt;;
   record: (category: Category, event: Event | Entry) =&gt; Promise&lt;void&gt;;
@@ -273,13 +291,13 @@ export type SessionValue = {
   onboardingProfile: Profile | null;
 };
 &nbsp;
-export const SessionContext = <span class="cstat-no" title="statement not covered" >createContext&lt;SessionValue | null&gt;(null);</span>
+export const SessionContext = createContext&lt;SessionValue | null&gt;(null);
 &nbsp;
 // Gives each screen the active account session and stops use outside the provider.
-export const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >useSession = () =&gt; {</span></span>
-  const value = <span class="cstat-no" title="statement not covered" >useContext(SessionContext);</span>
-<span class="cstat-no" title="statement not covered" >  if (!value) <span class="cstat-no" title="statement not covered" >throw new Error("Missing session");</span></span>
-<span class="cstat-no" title="statement not covered" >  return value;</span>
+export const useSession = () =&gt; {
+  const value = useContext(SessionContext);
+  if (!value) throw new Error("Missing session");
+  return value;
 };
 &nbsp;</pre></td></tr></table></pre>
 
@@ -288,7 +306,7 @@ export const <span class="cstat-no" title="statement not covered" ><span class="
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-20T02:20:01.560Z
+                at 2026-11-25T07:58:32.688Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
