@@ -3,6 +3,7 @@ package com.olive.app.data.account
 import com.olive.app.security.AccountRecoveryKey
 import com.olive.app.security.OpaquePasswordRecoveryEnvelope
 import java.util.UUID
+import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.firestore.FieldValue
@@ -12,6 +13,7 @@ import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
 import com.olive.app.security.AccountKeysetEnvelope
 import com.olive.app.security.AccountKeysetException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import android.annotation.SuppressLint
@@ -392,18 +394,35 @@ internal class FirebaseAccountRecoveryAuthenticator(
     }
 }
 
+/** Raised when Firebase App Check verification fails before invoking a recovery callable. */
+internal class AccountRecoveryDeviceVerificationException(
+    message: String,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
+
 internal class FirebaseAccountRecoveryCallable(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
+    private val verifyAppCheck: suspend () -> Unit = {
+        FirebaseAppCheck.getInstance().getAppCheckToken(false).await()
+    },
 ) : AccountRecoveryCallable {
     /**
-     * Calls the named Firebase callable function and returns its deserialized payload.
+     * Verifies App Check, calls the named Firebase callable function, and returns its payload.
      *
      * @param name The Firebase callable function name.
      * @param data The data payload to read or deserialize.
      * @return The payload returned by the callable function, which may be null.
      */
-    override suspend fun call(name: String, data: Map<String, Any?>): Any? =
-        functions.getHttpsCallable(name).call(data).await().data
+    override suspend fun call(name: String, data: Map<String, Any?>): Any? {
+        try {
+            verifyAppCheck()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            throw AccountRecoveryDeviceVerificationException("Firebase App Check verification failed", failure)
+        }
+        return functions.getHttpsCallable(name).call(data).await().data
+    }
 }
 
 internal enum class OpaqueBridgeMethod(internal val functionName: String) {

@@ -177,7 +177,12 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                     )
                     return
                 }
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
+                operations.runOperation(
+                    runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be),
+                    timeoutMessage = runtime.application.getString(
+                        R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist,
+                    ),
+                ) { token ->
                     repository.create(value)
                     val rows = repository.accounts()
                     val counts = repository.summary()
@@ -205,10 +210,16 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy || value.protected) return
-                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_delete_this_account)) { token ->
+                operations.runOperation(
+                    runtime.application.getString(R.string.ui_unable_to_delete_this_account),
+                    timeoutMillis = 120_000,
+                ) { token ->
                     repository.delete(value.uid)
-                    val rows = repository.accounts()
-                    val counts = repository.summary()
+                    val (rows, counts) = coroutineScope {
+                        val rowsDeferred = async { repository.accounts() }
+                        val countsDeferred = async { repository.summary() }
+                        rowsDeferred.await() to countsDeferred.await()
+                    }
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminPreloader.adopt(rows, counts)

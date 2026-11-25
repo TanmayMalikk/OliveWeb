@@ -196,6 +196,7 @@
     <string name="changes_synced">Modifications synchronisées.</string>
     <string name="saved_on_this_device_cloud_sync_failed_retry_when_connected">Enregistré sur cet appareil. La synchronisation a échoué; réessayez une fois connecté.</string>
     <string name="the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist">Le délai est dépassé. Vérifiez votre connexion et réessayez; votre compte existe peut-être déjà.</string>
+    <string name="the_operation_timed_out_check_your_connection_and_retry">Le délai est dépassé. Vérifiez votre connexion et réessayez.</string>
     <string name="edited">Modifié</string>
     <string name="edit_log">Journal des modifications</string>
 <string name="no_changes_to_save">Aucune modification à enregistrer.</string>
@@ -536,6 +537,7 @@
     <string name="password_recovery_error_device_lock_required">Activez un verrouillage d’écran sur cet appareil avant de configurer ou restaurer la récupération. Code : OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">Impossible d’initialiser l’environnement cryptographique sécurisé sur cet appareil. Veuillez redémarrer l’application et réessayer.</string>
     <string name="password_recovery_error_not_enrolled">La récupération par mot de passe n’est pas configurée pour ce compte ; l’accès chiffré ne peut donc pas être restauré sur cet appareil.</string>
+    <string name="password_recovery_error_device_verification">La vérification de l’application a échoué. Sur une version de débogage ou un émulateur, enregistrez le jeton de débogage Firebase App Check depuis Logcat et réessayez. Code : OPK-11.</string>
     <string name="password_recovery_unlock_title">Déverrouiller l’accès chiffré</string>
     <string name="password_recovery_unlock_prompt">Entrez votre mot de passe de récupération Olive Branch pour restaurer vos discussions et fichiers chiffrés sur cet appareil.</string>
     <string name="password_recovery_unlock_confirm">Déverrouiller</string>

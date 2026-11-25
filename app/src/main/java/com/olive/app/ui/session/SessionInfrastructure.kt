@@ -581,12 +581,14 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
      *
      * @param failure Exception or failure reason encountered during execution.
      * @param timeoutMillis Duration or timestamp for timeout, in milliseconds.
+     * @param timeoutMessage Message shown if the task exceeds [timeoutMillis].
      * @param failureFor Maps an exception to a localized failure message.
      * @param block Callback or suspending lambda executed within this scope.
      */
     fun runOperation(
         failure: String,
         timeoutMillis: Long = 25_000,
+        timeoutMessage: String = runtime.application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry),
         failureFor: (Exception) -> String = { failure },
         block: suspend (Long) -> Unit,
     ) {
@@ -602,8 +604,7 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                     try {
                         withTimeout(timeoutMillis.milliseconds) { block(token) }
                     } catch (_: TimeoutCancellationException) {
-                        if (epoch == token) finalFailure =
-                            application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist)
+                        if (epoch == token) finalFailure = timeoutMessage
                     } catch (e: CancellationException) {
                         throw e
                     } catch (error: Exception) {

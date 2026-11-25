@@ -2,13 +2,16 @@ package com.olive.app.ui.session
 
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountKeysetRepository
 import com.olive.app.data.account.AccountRecoveryAuthenticator
 import com.olive.app.data.account.AccountRecoveryCallable
+import com.olive.app.data.account.AccountRecoveryDeviceVerificationException
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.FirebaseAccountRecoveryCallable
 import com.olive.app.data.account.OpaqueClientProtocol
 import com.olive.app.data.account.OpaqueRecoveryRepository
 import com.olive.app.data.account.UserProfile
@@ -33,6 +36,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
 import java.security.KeyStore
@@ -718,6 +722,30 @@ class SessionPasswordRecoveryTest {
             `when`(keysets.isPasswordRecoveryEnrolled(uid)).thenReturn(false)
             enrollDeviceArk(runtime)
             assertTrue(runtime.settings.canRecoverAccountKeyset(uid))
+        }
+    }
+
+    @Test
+    fun appCheckFailureMapsToDeviceVerificationMessageInsteadOfSessionExpired() = runBlocking<Unit> {
+        val functions = mock(FirebaseFunctions::class.java)
+        val callable = FirebaseAccountRecoveryCallable(
+            functions = functions,
+            verifyAppCheck = { throw IllegalStateException("App attestation failed") },
+        )
+
+        val thrown = runCatching {
+            callable.call("opaqueRecoveryBeginRegistration", emptyMap())
+        }.exceptionOrNull()
+
+        assertTrue(thrown is AccountRecoveryDeviceVerificationException)
+        verifyNoInteractions(functions)
+        fixture().use { fixture ->
+            val runtime = fixture.runtime
+            val expected = runtime.application.getString(R.string.password_recovery_error_device_verification)
+            val unexpected = runtime.application.getString(R.string.password_recovery_error_session_expired)
+            assertNotEquals(unexpected, expected)
+            assertEquals(expected, runtime.passwordRecovery.passwordRecoveryFailure(thrown!!))
+            assertEquals(expected, runtime.passwordRecovery.encryptedAccessRestoreFailure(thrown))
         }
     }
 

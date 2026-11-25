@@ -266,6 +266,7 @@
     <string name="changes_synced">Changes synced.</string>
     <string name="saved_on_this_device_cloud_sync_failed_retry_when_connected">Saved on this device. Cloud sync failed; retry when connected.</string>
     <string name="the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist">The operation timed out. Check your connection and retry; your account may already exist.</string>
+    <string name="the_operation_timed_out_check_your_connection_and_retry">The operation timed out. Check your connection and retry.</string>
     <string name="edited">Edited</string>
     <string name="edit_log">Edit log</string>
 <string name="no_changes_to_save">No changes to save.</string>
@@ -536,6 +537,7 @@
     <string name="password_recovery_error_device_lock_required">Turn on a device screen lock before enabling or restoring account recovery. Code: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">Could not initialize the secure cryptographic runtime on this device. Please restart the app and try again.</string>
     <string name="password_recovery_error_not_enrolled">Password recovery is not set up for this account, so encrypted access cannot be restored on this device.</string>
+    <string name="password_recovery_error_device_verification">App verification failed. On a debug build or emulator, register the Firebase App Check debug token from Logcat and try again. Code: OPK-11.</string>
     <string name="password_recovery_unlock_title">Unlock encrypted access</string>
     <string name="password_recovery_unlock_prompt">Enter your Olive Branch recovery password to restore encrypted chats and files on this device.</string>
     <string name="password_recovery_unlock_confirm">Unlock</string>

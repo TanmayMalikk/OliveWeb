@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
+import com.olive.app.data.account.AccountRecoveryDeviceVerificationException
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.OpaqueRecoveryRepository
 import com.olive.app.security.AccountKeysetEnvelope
@@ -217,6 +218,8 @@ internal class SessionPasswordRecovery(private val runtime: SessionRuntime) {
                 R.string.password_recovery_error_session_expired
             networkEx != null ->
                 R.string.password_recovery_error_connection
+            causes.any { it is AccountRecoveryDeviceVerificationException } ->
+                R.string.password_recovery_error_device_verification
             causes.any { it is IllegalArgumentException && it.message?.contains("Incorrect recovery password", ignoreCase = true) == true } ->
                 R.string.password_recovery_error_incorrect
             causes.any { it is AEADBadTagException || it is AccountKeysetException } ->

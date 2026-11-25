@@ -196,6 +196,7 @@
     <string name="changes_synced">Cambios sincronizados.</string>
     <string name="saved_on_this_device_cloud_sync_failed_retry_when_connected">Guardado en este dispositivo. Error de sincronización en la nube; Vuelva a intentarlo cuando esté conectado.</string>
     <string name="the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist">La operación expiró. Verifique su conexión y vuelva a intentarlo; Es posible que su cuenta ya exista.</string>
+    <string name="the_operation_timed_out_check_your_connection_and_retry">La operación expiró. Verifique su conexión y vuelva a intentarlo.</string>
     <string name="edited">Editado</string>
     <string name="edit_log">Editar registro</string>
 <string name="no_changes_to_save">No hay cambios para guardar.</string>
@@ -536,6 +537,7 @@
     <string name="password_recovery_error_device_lock_required">Activa el bloqueo de pantalla del dispositivo antes de configurar o restaurar la recuperación de cuenta. Código: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">No se pudo inicializar el entorno criptográfico seguro en este dispositivo. Reinicia la aplicación e inténtalo de nuevo.</string>
     <string name="password_recovery_error_not_enrolled">La recuperación con contraseña no está configurada para esta cuenta, por lo que no se puede restaurar el acceso cifrado en este dispositivo.</string>
+    <string name="password_recovery_error_device_verification">Error de verificación de la aplicación. En una compilación de depuración o emulador, registra el token de depuración de Firebase App Check desde Logcat e inténtalo de nuevo. Código: OPK-11.</string>
     <string name="password_recovery_unlock_title">Desbloquear acceso cifrado</string>
     <string name="password_recovery_unlock_prompt">Introduce tu contraseña de recuperación de Olive Branch para restaurar tus chats y archivos cifrados en este dispositivo.</string>
     <string name="password_recovery_unlock_confirm">Desbloquear</string>

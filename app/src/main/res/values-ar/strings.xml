@@ -196,6 +196,7 @@
     <string name="changes_synced">تمت مزامنة التغييرات.</string>
     <string name="saved_on_this_device_cloud_sync_failed_retry_when_connected">تم الحفظ على هذا الجهاز. فشلت المزامنة السحابية؛ أعد المحاولة عند الاتصال.</string>
     <string name="the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist">انتهت مهلة العملية. تحقق من اتصالك وأعد المحاولة؛ قد يكون حسابك موجودًا بالفعل.</string>
+    <string name="the_operation_timed_out_check_your_connection_and_retry">انتهت مهلة العملية. تحقق من اتصالك وأعد المحاولة.</string>
     <string name="edited">تم تحريره</string>
     <string name="edit_log">تحرير السجل</string>
 <string name="no_changes_to_save">لا توجد تغييرات للحفظ.</string>
@@ -545,6 +546,7 @@
     <string name="password_recovery_error_device_lock_required">فعّل قفل شاشة الجهاز قبل إعداد أو استعادة استرداد الحساب. الرمز: OPK-10.</string>
     <string name="password_recovery_error_runtime_unavailable">تعذر تهيئة بيئة التشفير الآمنة على هذا الجهاز. يرجى إعادة تشغيل التطبيق والمحاولة مرة أخرى.</string>
     <string name="password_recovery_error_not_enrolled">لم يتم إعداد استرداد كلمة المرور لهذا الحساب، لذا لا يمكن استعادة الوصول المشفر على هذا الجهاز.</string>
+    <string name="password_recovery_error_device_verification">فشل التحقق من التطبيق. في إصدار التصحيح أو المحاكي، سجّل رمز تصحيح Firebase App Check من Logcat ثم أعد المحاولة. الرمز: OPK-11.</string>
     <string name="password_recovery_unlock_title">فتح الوصول المشفّر</string>
     <string name="password_recovery_unlock_prompt">أدخل كلمة مرور الاسترداد الخاصة بـ Olive Branch لاستعادة محادثاتك وملفاتك المشفرة على هذا الجهاز.</string>
     <string name="password_recovery_unlock_confirm">فتح</string>

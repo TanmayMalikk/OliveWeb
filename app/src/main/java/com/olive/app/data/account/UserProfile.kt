@@ -425,7 +425,9 @@ class AdminRepository(private val functions: FirebaseFunctions = FirebaseFunctio
      * @param uid Firebase UID of the target user account.
      */
     suspend fun delete(uid: String) {
-        functions.getHttpsCallable("adminDeleteAccount").call(mapOf("uid" to uid)).await()
+        functions.getHttpsCallable("adminDeleteAccount")
+            .apply { setTimeout(120, java.util.concurrent.TimeUnit.SECONDS) }
+            .call(mapOf("uid" to uid)).await()
     }
 
     /**

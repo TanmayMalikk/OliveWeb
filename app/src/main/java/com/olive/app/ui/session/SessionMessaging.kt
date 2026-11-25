@@ -454,7 +454,15 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
         )
         val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null && runtime.state.accountRole == AccountRole.USER
-        runtime.operations.runOperation(failureMessage, timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000) { sessionVersion ->
+        val timeoutMessage = runtime.application.getString(
+            if (create) R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist
+            else R.string.the_operation_timed_out_check_your_connection_and_retry,
+        )
+        runtime.operations.runOperation(
+            failureMessage,
+            timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000,
+            timeoutMessage = timeoutMessage,
+        ) { sessionVersion ->
             val creatingIdentity = create && runtime.pendingIdentity?.username != InputPolicy.username(username)
             val identity = try {
                 if (creatingIdentity) {
