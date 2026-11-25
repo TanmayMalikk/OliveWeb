@@ -555,6 +555,7 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                SafeAppUpdateReminder()
                 FilledTonalIconButton(
                     onClick = { session.navigation.openSafePage(SafePage.Camera) },
                     enabled = !session.localMode,
@@ -565,9 +566,7 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                     modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
                 ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
             }
-            SafeAppUpdateReminder(
-                Modifier.align(Alignment.End).padding(horizontal = OlivePrivateLayout.ScreenPadding)
-            )
+            SafeAppUpdateError()
         }
     }
 }

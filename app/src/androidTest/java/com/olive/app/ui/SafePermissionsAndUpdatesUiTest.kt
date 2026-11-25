@@ -97,7 +97,7 @@ class SafePermissionsAndUpdatesUiTest {
     }
 
     @Test
-    fun updateLabelAppearsOnlyForAnAvailableReleaseAndOpensTheInstaller() {
+    fun updateBadgeAppearsOnlyForAnAvailableReleaseAndOpensTheInstaller() {
         val release = AppReleaseManifest("com.olive.app", BuildConfig.VERSION_CODE.toLong() + 1, "Fixture release", 1,
             "https://yourolivebranch.ca/fixture.apk", "1".repeat(64), 20, "", false, emptyList())
         val prefs = context.getSharedPreferences("test_updates", Context.MODE_PRIVATE)
@@ -127,15 +127,19 @@ class SafePermissionsAndUpdatesUiTest {
                 }
             }
         }
-        val updateLabel = compose.onNodeWithTag("safe_update_reminder")
-        updateLabel.assertDoesNotExist()
+        val updateButton = compose.onNodeWithTag("safe_update_reminder")
+        val badge = compose.onNodeWithTag("safe_update_badge", useUnmergedTree = true)
+        updateButton.assertDoesNotExist()
+        badge.assertDoesNotExist()
         compose.runOnIdle { store.publish(release) }
-        updateLabel.assertIsDisplayed().assertHasClickAction()
-        compose.onNodeWithText(text(R.string.ui_a_new_update_is_available)).assertIsDisplayed()
+        updateButton.assertIsDisplayed().assertHasClickAction()
+        badge.assertIsDisplayed()
+        updateButton.assertContentDescriptionEquals(text(R.string.ui_a_new_update_is_available))
+        compose.onNodeWithText(text(R.string.ui_a_new_update_is_available)).assertDoesNotExist()
         compose.runOnIdle { enabled.value = false }
-        updateLabel.assertDoesNotExist()
+        updateButton.assertDoesNotExist()
         compose.runOnIdle { enabled.value = true }
-        updateLabel.performClick()
+        updateButton.performClick()
         compose.runOnIdle {
             val intent = started.single()
             assertEquals(AppUpdateInstallerActivity::class.java.name, intent.component?.className)
@@ -144,8 +148,10 @@ class SafePermissionsAndUpdatesUiTest {
             ).versionCode)
             store.publish(release.copy(versionCode = release.versionCode + 1, mandatory = true))
         }
-        compose.onNodeWithText(text(R.string.app_update_required)).assertIsDisplayed()
+        badge.assertIsDisplayed()
+        updateButton.assertContentDescriptionEquals(text(R.string.app_update_required))
+        compose.onNodeWithText(text(R.string.app_update_required)).assertDoesNotExist()
         compose.runOnIdle { store.publish(release.copy(versionCode = BuildConfig.VERSION_CODE.toLong())) }
-        updateLabel.assertDoesNotExist()
+        updateButton.assertDoesNotExist()
     }
 }
