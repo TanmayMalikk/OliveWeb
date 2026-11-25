@@ -58,7 +58,6 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
         if (data["type"] == APP_UPDATE) {
             val remoteVersion = data["versionCode"]?.toLongOrNull() ?: Long.MAX_VALUE
             if (remoteVersion > BuildConfig.VERSION_CODE) {
-                AppUpdateScheduler.announceRelease(this, data["versionName"].orEmpty())
                 runCatching { AppUpdateScheduler.triggerNow(this) }
             }
             return

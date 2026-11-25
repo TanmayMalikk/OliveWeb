@@ -97,7 +97,7 @@ class SafePermissionsAndUpdatesUiTest {
     }
 
     @Test
-    fun minimizedReleaseUsesTheDownloadArrowAndTheReminderCanBeSwipedOrTimesOut() {
+    fun updateLabelAppearsOnlyForAnAvailableReleaseAndOpensTheInstaller() {
         val release = AppReleaseManifest("com.olive.app", BuildConfig.VERSION_CODE.toLong() + 1, "Fixture release", 1,
             "https://yourolivebranch.ca/fixture.apk", "1".repeat(64), 20, "", false, emptyList())
         val prefs = context.getSharedPreferences("test_updates", Context.MODE_PRIVATE)
@@ -107,7 +107,6 @@ class SafePermissionsAndUpdatesUiTest {
             override fun getSharedPreferences(name: String, mode: Int) = prefs
         }
         val store = AppUpdateStore(fixture)
-        store.publish(release.copy(mandatory = true))
         val enabled = mutableStateOf(true)
         val started = mutableListOf<Intent>()
         compose.setContent {
@@ -118,46 +117,35 @@ class SafePermissionsAndUpdatesUiTest {
             }
             OliveTheme {
                 CompositionLocalProvider(LocalLifecycleOwner provides lifecycle, LocalContext provides fixture) {
-                    val update = rememberSafeAppUpdate(enabled.value, cameraInHeader = true) {
+                    val update = rememberSafeAppUpdate(enabled.value) {
                         started.add(it)
                         true
                     }
-                    CompositionLocalProvider(LocalSafeUpdateReminder provides update.onDownload) {
-                        Column {
-                            SafeAppUpdateBanner(update)
-                            SafeAppUpdateReminder()
-                        }
+                    CompositionLocalProvider(LocalSafeUpdateReminder provides update) {
+                        SafeAppUpdateReminder()
                     }
                 }
             }
         }
-        compose.onNodeWithText(text(R.string.app_update_required)).assertExists()
-        compose.onNodeWithTag("safe_update_banner_surface").performTouchInput { swipeDown() }
-        compose.onNodeWithTag("safe_update_banner_surface").assertExists()
-        compose.onNodeWithTag("safe_update_banner_surface").performTouchInput { swipeUp() }
-        compose.onNodeWithTag("safe_update_banner_surface").assertDoesNotExist()
-        compose.onNodeWithTag("safe_update_notice").performTouchInput { swipeDown() }
-        compose.onNodeWithTag("safe_update_notice").assertExists()
-        compose.onNodeWithTag("safe_update_notice").performTouchInput { swipeLeft() }
-        compose.onNodeWithTag("safe_update_notice").assertDoesNotExist()
+        val updateLabel = compose.onNodeWithTag("safe_update_reminder")
+        updateLabel.assertDoesNotExist()
+        compose.runOnIdle { store.publish(release) }
+        updateLabel.assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithText(text(R.string.ui_a_new_update_is_available)).assertIsDisplayed()
         compose.runOnIdle { enabled.value = false }
-        compose.onNodeWithTag("safe_update_reminder").assertDoesNotExist()
+        updateLabel.assertDoesNotExist()
         compose.runOnIdle { enabled.value = true }
-        compose.onNodeWithTag("safe_update_reminder").performClick()
-        compose.onNodeWithTag("safe_update_banner_surface").assertDoesNotExist()
+        updateLabel.performClick()
         compose.runOnIdle {
             val intent = started.single()
             assertEquals(AppUpdateInstallerActivity::class.java.name, intent.component?.className)
             assertEquals(release.versionCode, AppReleaseManifest.fromJson(
                 checkNotNull(intent.getStringExtra(AppUpdateInstallerActivity.EXTRA_RELEASE_JSON)),
             ).versionCode)
-            store.publish(release.copy(versionCode = release.versionCode + 1))
+            store.publish(release.copy(versionCode = release.versionCode + 1, mandatory = true))
         }
-        compose.onNodeWithTag("safe_update_banner_surface").performTouchInput { swipeRight() }
-        compose.onNodeWithText(text(R.string.app_update_later_camera_hint)).assertExists()
-        compose.mainClock.advanceTimeBy(2_000)
-        compose.onNodeWithText(text(R.string.app_update_later_camera_hint)).assertExists()
-        compose.mainClock.advanceTimeBy(1_100)
-        compose.onNodeWithText(text(R.string.app_update_later_camera_hint)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.app_update_required)).assertIsDisplayed()
+        compose.runOnIdle { store.publish(release.copy(versionCode = BuildConfig.VERSION_CODE.toLong())) }
+        updateLabel.assertDoesNotExist()
     }
 }

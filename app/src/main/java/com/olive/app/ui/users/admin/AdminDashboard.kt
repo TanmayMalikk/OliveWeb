@@ -207,7 +207,7 @@ private fun AdminDashboard(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(end = if (LocalSafeUpdateReminder.current == null) 56.dp else 104.dp),
+            Column(Modifier.padding(end = 56.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.olive_tree),
@@ -222,13 +222,11 @@ private fun AdminDashboard(
                 )
                 Text(uiText(R.string.ui_signed_in_as_value, session.coverUsername), color = Muted)
             }
-            Row(Modifier.align(Alignment.TopEnd)) {
-                SafeAppUpdateReminder()
-                IconButton(onClick = onSettings) {
-                    Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
-                }
+            IconButton(onClick = onSettings, modifier = Modifier.align(Alignment.TopEnd)) {
+                Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
             }
         }
+        SafeAppUpdateReminder()
         if (dashboard.adminSummaryOwner == session.coverAccountId && dashboard.adminSummaryOwner != null || session.localMode) {
             AccountCountGrid(dashboard.adminCounts)
             TicketCountGrid(dashboard.adminCounts)

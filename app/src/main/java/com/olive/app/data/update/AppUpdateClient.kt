@@ -256,10 +256,9 @@ internal data class AppReleaseManifest(
 internal data class AppUpdateOffer(
     val release: AppReleaseManifest,
     val required: Boolean,
-    val dismissed: Boolean,
 )
 
-/** Keeps release discovery and the device's minimized release across sessions. */
+/** Persists the latest available release across sessions. */
 internal class AppUpdateStore(
     context: Context,
     private val installedVersion: Long = BuildConfig.VERSION_CODE.toLong(),
@@ -285,9 +284,7 @@ internal class AppUpdateStore(
         val raw = preferences.getString(RELEASE, null) ?: return null
         val release = runCatching { AppReleaseManifest.fromJson(raw) }.getOrNull()
             ?.takeIf { it.versionCode > installedVersion } ?: return null
-        val required = release.requiresUpdate(installedVersion)
-        return AppUpdateOffer(release, required,
-            dismissed = preferences.getLong(DISMISSED, 0) >= release.versionCode)
+        return AppUpdateOffer(release, required = release.requiresUpdate(installedVersion))
     }
 
     /**
@@ -299,19 +296,6 @@ internal class AppUpdateStore(
         preferences.edit {
             if (release.versionCode > installedVersion) putString(RELEASE, release.toJson())
             else remove(RELEASE)
-        }
-    }
-
-    /**
-     * Dismisses the app update store.
-     *
-     * @param offer Offer supplied to [dismiss].
-     */
-    fun dismiss(offer: AppUpdateOffer) {
-        synchronized(preferences) {
-            if (offer.release.versionCode > preferences.getLong(DISMISSED, 0)) {
-                preferences.edit { putLong(DISMISSED, offer.release.versionCode) }
-            }
         }
     }
 
@@ -331,6 +315,5 @@ internal class AppUpdateStore(
     private companion object {
         val refreshLock = Any()
         const val RELEASE = "release"
-        const val DISMISSED = "dismissed_version"
     }
 }

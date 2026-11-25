@@ -2,19 +2,10 @@
 package com.olive.app.data.update
 
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.Manifest
-import android.os.Build
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.google.firebase.messaging.FirebaseMessaging
 import com.olive.app.BuildConfig
-import com.olive.app.R
-import com.olive.app.notification.OliveNotificationManager
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
@@ -52,50 +43,21 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
         if (release.versionCode <= BuildConfig.VERSION_CODE) return Result.success()
         if (inputData.getBoolean(CHECK_ONLY, false)) return Result.success()
         client.prepare(release)
-        notifyReady(release)
         Result.success()
     }.getOrElse { error ->
         if (error is CancellationException) throw error
         if (runAttemptCount < 3 && error is java.io.IOException) Result.retry() else Result.failure()
     }
 
-    /**
-     * The notification opens a small installer screen; Android owns the final confirmation.
-     *
-     * @param release Release supplied to [notifyReady].
-     */
-    private fun notifyReady(release: AppReleaseManifest) {
-        val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        OliveNotificationManager.createNotificationChannels(applicationContext)
-        val intent = Intent(applicationContext, AppUpdateInstallerActivity::class.java)
-            .putExtra(AppUpdateInstallerActivity.EXTRA_RELEASE_JSON, release.toJson())
-        val pending = PendingIntent.getActivity(
-            applicationContext,
-            release.versionCode.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        manager.notify(
-            NOTIFICATION,
-            NotificationCompat.Builder(applicationContext, OliveNotificationManager.CHANNEL_APP_UPDATES)
-                .setSmallIcon(R.drawable.ic_notification_olive)
-                .setContentTitle(applicationContext.getString(R.string.ui_a_new_update_is_available))
-                .setContentText(release.versionName)
-                .setContentIntent(pending)
-                .setAutoCancel(true)
-                .build(),
-        )
-    }
-
     companion object {
         const val CHECK_ONLY = "check_only"
-        private const val NOTIFICATION = 7401
     }
 }
 
 // Schedules periodic background update checks over unmetered Wi-Fi and handles FCM release broadcasts.
 internal object AppUpdateScheduler {
     const val TOPIC_APP_UPDATES = "app_updates"
+    private const val LEGACY_UPDATE_NOTIFICATION = 7401
 
     /**
      * Checks once after startup and then once per day on an unmetered connection because the APK is large.
@@ -103,6 +65,7 @@ internal object AppUpdateScheduler {
      * @param context Android context used to access system services, resources, or storage.
      */
     fun schedule(context: Context) {
+        context.getSystemService(NotificationManager::class.java).cancel(LEGACY_UPDATE_NOTIFICATION)
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
         val manager = WorkManager.getInstance(context)
         manager.enqueueUniqueWork(
@@ -135,31 +98,7 @@ internal object AppUpdateScheduler {
     }
 
     /**
-     * Computes announce release.
-     *
-     * @param context Android context used to access system services, resources, or storage.
-     * @param versionName Version name supplied to [announceRelease].
-     */
-    fun announceRelease(context: Context, versionName: String) {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
-                context, Manifest.permission.POST_NOTIFICATIONS,
-            ) != PackageManager.PERMISSION_GRANTED) return
-        OliveNotificationManager.createNotificationChannels(context)
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        val pending = PendingIntent.getActivity(context, 7401, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(context, OliveNotificationManager.CHANNEL_APP_UPDATES)
-            .setSmallIcon(R.drawable.ic_notification_olive_branch)
-            .setContentTitle(context.getString(R.string.ui_a_new_update_is_available))
-            .setContentText(versionName.take(80))
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .build()
-        context.getSystemService(NotificationManager::class.java).notify(7401, notification)
-    }
-
-    /**
-     * Immediately enqueues an update check and download when an FCM release alert is received.
+     * Immediately enqueues an update check and download when an FCM release signal is received.
      *
      * @param context Android context used to access system services, resources, or storage.
      */
@@ -180,4 +119,3 @@ internal object AppUpdateScheduler {
         )
     }
 }
-

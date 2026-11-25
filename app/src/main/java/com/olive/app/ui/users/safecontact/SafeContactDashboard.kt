@@ -103,7 +103,6 @@ private fun SafeContactHome(session: SessionViewModel) {
                 Text(stringResource(R.string.safe_contact_home_help), color = Muted)
             }
             Row {
-                SafeAppUpdateReminder()
                 IconButton(
                     onClick = { session.navigation.openSafePage(SafePage.Camera) }, enabled = !session.localMode,
                     modifier = Modifier.testTag("safe_contact_camera")
@@ -118,6 +117,7 @@ private fun SafeContactHome(session: SessionViewModel) {
                 }
             }
         }
+        SafeAppUpdateReminder()
         ModeNotice(session)
         Button(
             onClick = { session.navigation.openSafePage(SafePage.Profile) },

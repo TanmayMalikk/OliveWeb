@@ -157,7 +157,6 @@ internal fun OliveRoot(
     val systemLaunchers = rememberSafeSystemLaunchers(session)
     val update = rememberSafeAppUpdate(
         enabled = privateArea && !privacyHidden && !session.localMode,
-        cameraInHeader = navigation.screen == SessionScreen.Safe,
         launch = systemLaunchers.open,
     )
     SideEffect {
@@ -334,7 +333,7 @@ internal fun OliveRoot(
                                     LocalQuickExit provides if (userQuickExit) exit else null,
                                     LocalSafeSystemLauncher provides systemLaunchers.open,
                                     LocalSafePermissionActions provides systemLaunchers.permissions,
-                                    LocalSafeUpdateReminder provides update.onDownload,
+                                    LocalSafeUpdateReminder provides update,
                                 ) {
                                     // Entry setup owns its pane title because choosing New PIN changes its local screen.
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
@@ -394,9 +393,6 @@ internal fun OliveRoot(
                                 }
                             }
                         }
-                    }
-                    if (privateArea && !privacyHidden && !showPinAnimation && !supportExpanded && navigation.page != SafePage.Camera) {
-                        SafeAppUpdateBanner(update, Modifier.align(Alignment.TopCenter))
                     }
                     if (showPinAnimation) PinSafeOliveTransition(
                         backgroundColor = screenBackground,

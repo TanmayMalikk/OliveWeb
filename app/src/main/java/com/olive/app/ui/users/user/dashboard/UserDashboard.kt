@@ -537,33 +537,37 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
         label = "Safe Home bar color"
     )
     Surface(color = color, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = OlivePrivateLayout.ScreenPadding),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(Modifier.weight(1f)) {
-                if (compact) Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.clearAndSetSemantics {}
-                ) else Text(
-                    stringResource(R.string.olive_branch),
-                    fontFamily = FontFamily.Serif,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+        Column {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = OlivePrivateLayout.ScreenPadding),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f)) {
+                    if (compact) Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.clearAndSetSemantics {}
+                    ) else Text(
+                        stringResource(R.string.olive_branch),
+                        fontFamily = FontFamily.Serif,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                FilledTonalIconButton(
+                    onClick = { session.navigation.openSafePage(SafePage.Camera) },
+                    enabled = !session.localMode,
+                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
+                ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
+                FilledTonalIconButton(
+                    onClick = { session.navigation.openSafePage(SafePage.Settings) },
+                    modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
+                ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
             }
-            SafeAppUpdateReminder()
-            FilledTonalIconButton(
-                onClick = { session.navigation.openSafePage(SafePage.Camera) },
-                enabled = !session.localMode,
-                modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_camera")
-            ) { Icon(Icons.Outlined.PhotoCamera, stringResource(R.string.camera_title)) }
-            FilledTonalIconButton(
-                onClick = { session.navigation.openSafePage(SafePage.Settings) },
-                modifier = Modifier.size(OlivePrivateLayout.HeaderActionSize).testTag("safe_settings")
-            ) { Icon(Icons.Outlined.Settings, stringResource(R.string.settings)) }
+            SafeAppUpdateReminder(
+                Modifier.align(Alignment.End).padding(horizontal = OlivePrivateLayout.ScreenPadding)
+            )
         }
     }
 }
