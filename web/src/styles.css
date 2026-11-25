@@ -277,13 +277,6 @@
   outline-offset: 4px;
   border-radius: 0.45rem;
 }
-.pin-dots.field-invalid .pin-dot {
-  border-color: #b43c2e;
-}
-.pin-dots.field-invalid .pin-dot.filled {
-  background: #b43c2e;
-  border-color: #b43c2e;
-}
 .form-error {
   background: #faebe5;
   color: #8b3b30;

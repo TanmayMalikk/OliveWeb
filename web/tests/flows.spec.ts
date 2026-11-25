@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "./coverageFixture";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
-async function onboard(page: Page) {
+async function onboard(page: Page, pin = "123456") {
   await page.goto("/account/create");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -26,8 +26,8 @@ async function onboard(page: Page) {
   await page
     .getByLabel("Trigger word or phrase", { exact: true })
     .fill("moon garden");
-  await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
-  await page.getByLabel("Confirm PIN", { exact: true }).fill("123456");
+  await page.getByLabel("Browser PIN", { exact: true }).fill(pin);
+  await page.getByLabel("Confirm PIN", { exact: true }).fill(pin);
   await page.getByRole("button", { name: "Open my everyday app" }).click();
   await expect(
     page.getByRole("heading", { name: "Your own doorway." }),
@@ -80,6 +80,33 @@ test("account settings validate new credentials and rotate only a confirmed entr
   await page.getByLabel("New trigger phrase", { exact: true }).fill("synthetic fitness cover");
   await page.getByRole("button", { name: "Save trigger" }).click();
   await expect(page.getByText("Cover trigger updated.")).toBeVisible();
+});
+
+test("browser PIN supports a short PIN on a narrow screen", async ({ page }) => {
+  const link = await onboard(page, "3456");
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto(link);
+  const pin = page.getByLabel("Browser PIN", { exact: true });
+  await expect(pin).toBeFocused();
+  await expect(pin).toHaveAttribute("inputmode", "numeric");
+  await expect(page.locator(".pin-dot")).toHaveCount(4);
+  const accessibility = await new AxeBuilder({ page }).include(".pin-page").analyze();
+  expect(accessibility.violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+  const unlockButton = page.getByRole("button", { name: "Unlock", exact: true });
+  await expect(unlockButton).toBeDisabled();
+  await page.getByText("Use on-screen keypad", { exact: true }).click();
+  const keypad = page.getByRole("group", { name: "PIN keypad" });
+  for (const digit of ["3", "4", "5", "7"]) {
+    await keypad.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await keypad.getByRole("button", { name: "Delete digit" }).click();
+  await expect(unlockButton).toBeDisabled();
+  await pin.fill("3456");
+  await expect(page.locator(".pin-dot.filled")).toHaveCount(4);
+  await pin.press("Enter");
+  await expect(page.getByRole("heading", { name: "Your Safe Space" })).toBeVisible();
 });
 test("incident entry can be edited, pinned, found and restored from trash", async ({ page }) => {
   const link = await onboard(page);
@@ -281,9 +308,11 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   });
   expect(vaults).not.toContain("Private fixture note");
   expect(vaults).not.toContain("Details only inside");
-  await page.getByRole("button", { name: "Trusted contacts", exact: true }).click();
+  const navigation = page.getByRole("navigation", { name: "Safe Space navigation" });
+  await navigation.getByRole("button", { name: "Trusted contacts", exact: true }).click();
   await page.getByRole("button", { name: "Add a contact" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Trusted Friend");
+  await page.getByLabel("Relationship (optional)", { exact: true }).fill("Neighbour");
   await page
     .getByLabel("Phone, email, or other details")
     .fill("friend@example.invalid");
@@ -291,6 +320,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await expect(
     page.getByRole("heading", { name: "Trusted Friend" }),
   ).toBeVisible();
+  await expect(page.getByText("Neighbour", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("combobox", { name: /language/i })).toHaveCount(0);
   await expect(page.getByLabel("Personal entry link", { exact: true })).toBeVisible();
@@ -298,7 +328,9 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Private fixture note")).toHaveCount(0);
   await unlock(page, link);
-  await page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }).click();
+  await navigation.getByRole("button", { name: "Trusted contacts", exact: true }).click();
+  await expect(page.getByText("Neighbour", { exact: true })).toBeVisible();
+  await navigation.getByRole("button", { name: "Notes & incidents", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Private fixture note" }),
   ).toBeVisible();
@@ -355,7 +387,7 @@ test("a browser enrollment with a phone cover migrates to its own game field", a
   await page.evaluate(async () => {
     const { database } = await import("/src/services/LocalDataStore.ts");
     const db = await database;
-    const { webCover, ...enrollment } = await db.get("device", "current");
+    const { webCover, pinLength, ...enrollment } = await db.get("device", "current");
     await db.put("device", { ...enrollment, cover: "NEWS" }, "current");
   });
   await page.goto("/fitness");
@@ -366,6 +398,10 @@ test("a browser enrollment with a phone cover migrates to its own game field", a
     return [saved.webCover, "cover" in saved];
   })).toEqual(["GAME", false]);
   await unlock(page, link);
+  expect(await page.evaluate(async () => {
+    const { database } = await import("/src/services/LocalDataStore.ts");
+    return (await (await database).get("device", "current")).pinLength;
+  })).toBe(6);
 });
 // Inputs: the values in this case. Expected: personal links can be rotated and wrong PINs do not reveal private data.
 test("personal links can be rotated and wrong PINs do not reveal private data", async ({
@@ -374,9 +410,10 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   const original = await onboard(page);
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await page.goto(original);
-  await page.getByLabel("Browser PIN", { exact: true }).fill("9999");
+  await page.getByLabel("Browser PIN", { exact: true }).fill("999999");
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Incorrect PIN");
+  await expect(page.getByLabel("Browser PIN", { exact: true })).toHaveValue("");
   await expect(
     page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);

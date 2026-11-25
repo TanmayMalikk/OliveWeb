@@ -1,17 +1,14 @@
 // Safe-app users: shows the user safe contacts and friends.
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import type { Contact } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { useWalkthroughAction } from "../../shared/safe_app/WalkthroughCoachmark";
 export default function Contacts() {
   const s = useSession();
   const p = s.profile!;
-  const [editing, setEditing] = useState<{
-    id: string;
-    name: string;
-    details: string;
-  } | null>(null);
+  const [editing, setEditing] = useState<Contact | null>(null);
   const [wtOpened, setWtOpened] = useState(false);
   const wt = useWalkthroughAction();
   useEffect(() => {
@@ -41,6 +38,7 @@ export default function Contacts() {
           <article className="contact-card panel" key={contact.id}>
             <span className="avatar">{(contact.name.trim()[0] || "?").toUpperCase()}</span>
             <h2>{contact.name}</h2>
+            {contact.relationship && <p>{contact.relationship}</p>}
             <p className="preserve-lines">{contact.details}</p>
             <div className="toolbar-actions">
               <Button variant="quiet" onClick={() => setEditing(contact)}>
@@ -84,6 +82,7 @@ export default function Contacts() {
                   ...editing,
                   name: String(data.get("name")).trim(),
                   details: String(data.get("details")).trim(),
+                  relationship: String(data.get("relationship") ?? "").trim(),
                 };
                 if (!contact.name || !contact.details) {
                   shakeNamedFields(
@@ -111,6 +110,12 @@ export default function Contacts() {
               name="name"
               defaultValue={editing.name}
               required
+              maxLength={120}
+            />
+            <Field
+              label="Relationship (optional)"
+              name="relationship"
+              defaultValue={editing.relationship ?? ""}
               maxLength={120}
             />
             <Field

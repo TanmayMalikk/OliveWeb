@@ -8,10 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
-import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
+import { Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
-import { Button, Field, Form, shakeFormElement, shakeNamedFields } from "./components/SharedComponents";
+import { Button, Field } from "./components/SharedComponents";
+import BrowserPinGate from "./users/shared/auth/BrowserPinGate";
 import PublicCoverPage from "./public/PublicCoverPage";
 import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
@@ -20,109 +21,6 @@ const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
-// User cover apps: asks for the private PIN before opening the Safe App.
-function PinGate() {
-  const s = useSession();
-  const [pin, setPin] = useState("");
-  return (
-    <main id="main" className="access-page pin-page private-shell">
-      <div className="access-header">
-        <span className="access-wordmark"><Leaf size={21} aria-hidden="true" /> Olive Branch</span>
-        {s.enrollment?.role === "USER" && (
-          <Button variant="exit floating-quick-exit" onClick={s.quickExit}>
-            <LogOut size={17} aria-hidden="true" /> Quick Exit
-          </Button>
-        )}
-      </div>
-      <section className="access-card pin-card" aria-labelledby="pin-heading">
-        <span className="access-mark"><LockKeyhole size={24} aria-hidden="true" /></span>
-        <h1 id="pin-heading">Unlock Safe Space</h1>
-        <p>Enter your browser PIN to continue.</p>
-        <Form
-          onSubmit={async (_data, form) => {
-            await s.perform(async () => {
-              try {
-                await s.unlock(pin);
-              } catch (failure) {
-                shakeNamedFields(form, ["pin"]);
-                shakeFormElement(form.querySelector(".pin-dots"));
-                throw failure;
-              } finally {
-                setPin("");
-              }
-            });
-          }}
-        >
-          <div className="pin-dots" aria-hidden="true">
-            {Array.from({ length: 6 }, (_, idx) => (
-              <span
-                key={idx}
-                className={idx < pin.length ? "pin-dot filled" : "pin-dot"}
-              />
-            ))}
-          </div>
-          <Field
-            label="Browser PIN"
-            name="pin"
-            type="password"
-            value={pin}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              if (s.message) s.clearMessage();
-              setPin(e.target.value.replace(/\D/g, "").slice(0, 6));
-            }}
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={6}
-          />
-          <div className="pin-keypad" role="group" aria-label="PIN keypad">
-            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
-              <button
-                type="button"
-                key={digit}
-                disabled={s.busy}
-                onClick={() => {
-                  if (s.message) s.clearMessage();
-                  setPin((value) => (value + digit).slice(0, 6));
-                }}
-              >
-                {digit}
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-label="Delete digit"
-              disabled={s.busy || pin.length === 0}
-              onClick={() => {
-                if (s.message) s.clearMessage();
-                setPin((value) => value.slice(0, -1));
-              }}
-            >
-              <Delete size={20} aria-hidden="true" />
-            </button>
-          </div>
-          {s.message && (
-            <p role="alert" className="form-error">
-              {s.message}
-            </p>
-          )}
-          <Button type="submit" disabled={s.busy}>
-            {s.busy ? "Unlocking…" : "Unlock"} <ArrowRight size={17} aria-hidden="true" />
-          </Button>
-        </Form>
-        <button
-          className="text-link"
-          type="button"
-          onClick={() => {
-            s.quickExit();
-            s.go("/account/link");
-          }}
-        >
-          Need a new browser PIN or link? <ArrowRight size={15} aria-hidden="true" />
-        </button>
-      </section>
-    </main>
-  );
-}
 // Little Grove is the browser cover for every account.
 function Cover() {
   const s = useSession();
@@ -176,7 +74,7 @@ function Routes({ mode }: { mode: SiteMode }) {
   } else if (s.phase === "safe" && s.profile) content = <SafeApp />;
   else if (s.phase === "setup") content = <Setup />;
   else if (s.phase === "link") content = <EntryLink />;
-  else if (s.phase === "pin") content = <PinGate />;
+  else if (s.phase === "pin") content = <BrowserPinGate />;
   else if (s.path === "/get") content = <Download />;
   else if (s.path.startsWith("/account")) content = <AuthPage />;
   else content = <Cover />;

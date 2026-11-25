@@ -332,13 +332,17 @@ export function SessionProvider({
 
   // Opens PIN entry only when this browser has a valid saved private link.
   async function beginEntry() {
+    const epochAtEntry = epoch.current;
     setMessage("");
-    if (!enrollment) {
+    const current: Enrollment | undefined = await (await database).get("device", "current");
+    if (epochAtEntry !== epoch.current) return;
+    if (!current || current.uid !== enrollment?.uid) {
       setPath("/account/sign-in");
       window.history.replaceState({}, "", "/");
       return;
     }
-    const saved = await savedEntryLink(enrollment.uid);
+    const saved = await savedEntryLink(current.uid);
+    if (epochAtEntry !== epoch.current) return;
     const token = saved ? new URL(saved).hash.slice(1) : "";
     if (!validEntryToken(token)) {
       setPath("/account/sign-in");
@@ -346,7 +350,8 @@ export function SessionProvider({
       return;
     }
     pendingEntry.current = token;
-    entryOwner.current = enrollment.uid;
+    entryOwner.current = current.uid;
+    setEnrollment({ ...current, webCover: webCover.id });
     setPhase("pin");
     window.history.replaceState({}, "", "/");
   }

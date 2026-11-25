@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -88,12 +89,12 @@ import com.olive.app.ui.shared.walkthroughTarget
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Free-use GPS destination bar accepting arbitrary addresses or latitude/longitude coordinates
- * with immediate local suggestions + 50ms debounced remote autocomplete.
+ * Searches for nearby places, addresses and coordinates and routes to the selected result.
  *
  * @param controller The controller that owns the screen's state and actions.
  * @param state The current state used to render the component.
@@ -114,7 +115,9 @@ internal fun FreeUseGpsDestinationCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var query by rememberSaveable(state.ownerUid) { mutableStateOf("") }
-    var suppressNextAutocomplete by remember { mutableStateOf(false) }
+    var selectedQuery by remember { mutableStateOf<String?>(null) }
+    var submittedQuery by remember { mutableStateOf<String?>(null) }
+    var routeLookup by remember { mutableStateOf<Job?>(null) }
     var searchingRemote by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<DestinationSuggestion>>(emptyList()) }
     var resolveError by remember { mutableStateOf<String?>(null) }
@@ -132,7 +135,7 @@ internal fun FreeUseGpsDestinationCard(
      * @param lon The longitude in decimal degrees.
      */
     fun startRouteTo(title: String, lat: Double, lon: Double) {
-        suppressNextAutocomplete = true
+        selectedQuery = query
         suggestions = emptyList()
         resolveError = null
         controller.stopNavigation()
@@ -145,9 +148,8 @@ internal fun FreeUseGpsDestinationCard(
         }
     }
 
-    LaunchedEffect(query, directoryPlaces) {
-        if (suppressNextAutocomplete) {
-            suppressNextAutocomplete = false
+    LaunchedEffect(query, directoryPlaces, selectedQuery, submittedQuery, state.ownPoint != null) {
+        if (query == selectedQuery || query == submittedQuery) {
             searchingRemote = false
             suggestions = emptyList()
             return@LaunchedEffect
@@ -169,7 +171,7 @@ internal fun FreeUseGpsDestinationCard(
             searchingRemote = false
             return@LaunchedEffect
         }
-        delay(50.milliseconds)
+        delay(450.milliseconds)
         searchingRemote = true
         try {
             val proximity = latestOwnPoint
@@ -177,10 +179,11 @@ internal fun FreeUseGpsDestinationCard(
                 query = trimmed,
                 proximityLatitude = proximity?.latitude,
                 proximityLongitude = proximity?.longitude,
+                includePlaces = true,
             )
             val seen = local.map { "${it.latitude},${it.longitude}" }.toMutableSet()
             val merged = local + remote.filter { seen.add("${it.latitude},${it.longitude}") }
-            suggestions = merged.take(6)
+            if (query.trim() == trimmed && selectedQuery != query && submittedQuery != query) suggestions = merged.take(6)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -190,10 +193,29 @@ internal fun FreeUseGpsDestinationCard(
         }
     }
 
+    /**
+     * Updates the search text and clears results from the previous request.
+     *
+     * @param value The destination text currently entered by the user.
+     */
+    fun editQuery(value: String) {
+        routeLookup?.cancel()
+        routeLookup = null
+        selectedQuery = null
+        submittedQuery = null
+        suggestions = emptyList()
+        resolveError = null
+        query = value.take(180)
+    }
+
     /** Resolves and starts routing to the top suggestion or geocoded match for the current query. */
     fun submitFreeText() {
         val currentQuery = query.trim()
-        if (currentQuery.isEmpty()) return
+        if (currentQuery.isEmpty() || state.navigating || state.routeWorking || routeLookup?.isActive == true) return
+        state.privateDestination?.takeIf { query == selectedQuery }?.let {
+            startRouteTo(it.name, it.latitude, it.longitude)
+            return
+        }
         val origin = latestOwnPoint
         resolveError = null
         suggestions.firstOrNull()?.let { first ->
@@ -201,8 +223,8 @@ internal fun FreeUseGpsDestinationCard(
             startRouteTo(targetTitle, first.latitude, first.longitude)
             return
         }
-        scope.launch {
-            searchingRemote = true
+        submittedQuery = query
+        routeLookup = scope.launch {
             try {
                 val resolved = DestinationAutocompleteClient.resolveFreeText(
                     context = context,
@@ -211,6 +233,7 @@ internal fun FreeUseGpsDestinationCard(
                     proximityLatitude = origin?.latitude,
                     proximityLongitude = origin?.longitude,
                 )
+                if (query.trim() != currentQuery) return@launch
                 if (resolved != null) {
                     query = resolved.title
                     startRouteTo(resolved.title, resolved.latitude, resolved.longitude)
@@ -220,9 +243,9 @@ internal fun FreeUseGpsDestinationCard(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                resolveError = noMatchMessage
+                if (query.trim() == currentQuery) resolveError = noMatchMessage
             } finally {
-                searchingRemote = false
+                if (routeLookup == coroutineContext[Job]) routeLookup = null
             }
         }
     }
@@ -240,11 +263,7 @@ internal fun FreeUseGpsDestinationCard(
         ) {
             TextField(
                 value = query,
-                onValueChange = { next ->
-                    suppressNextAutocomplete = false
-                    resolveError = null
-                    query = next.take(180)
-                },
+                onValueChange = ::editQuery,
                 placeholder = {
                     Text(
                         text = stringResource(R.string.location_gps_destination_hint),
@@ -263,7 +282,7 @@ internal fun FreeUseGpsDestinationCard(
                     ) {
                         if (query.isNotEmpty()) {
                             IconButton(
-                                onClick = { query = ""; suggestions = emptyList(); resolveError = null },
+                                onClick = { editQuery("") },
                                 modifier = Modifier.size(36.dp),
                             ) {
                                 Icon(
@@ -276,7 +295,7 @@ internal fun FreeUseGpsDestinationCard(
                         if (query.isNotBlank() && !state.navigating) {
                             FilledIconButton(
                                 onClick = { submitFreeText() },
-                                enabled = !state.routeWorking,
+                                enabled = !state.routeWorking && routeLookup?.isActive != true,
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = OliveGreen,
                                     contentColor = Color.White,
@@ -331,8 +350,7 @@ internal fun FreeUseGpsDestinationCard(
             if (state.privateDestination != null && !state.navigating) {
                 TextButton(
                     onClick = {
-                        query = ""
-                        resolveError = null
+                        editQuery("")
                         controller.clearPrivateDestination()
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -342,7 +360,7 @@ internal fun FreeUseGpsDestinationCard(
             }
         }
 
-        if (searchingRemote && suggestions.isEmpty()) {
+        if ((searchingRemote || routeLookup?.isActive == true) && suggestions.isEmpty()) {
             Text(
                 stringResource(R.string.location_gps_searching),
                 style = MaterialTheme.typography.bodySmall,
@@ -377,6 +395,7 @@ internal fun FreeUseGpsDestinationCard(
                                 imageVector = when (item.kind) {
                                     DestinationSuggestionKind.Coordinates -> Icons.Outlined.MyLocation
                                     DestinationSuggestionKind.DirectoryPlace -> Icons.Outlined.LocationOn
+                                    DestinationSuggestionKind.BusinessOrLandmark -> Icons.Outlined.Storefront
                                     DestinationSuggestionKind.Address -> Icons.Outlined.Navigation
                                 },
                                 contentDescription = null,
@@ -397,7 +416,7 @@ internal fun FreeUseGpsDestinationCard(
                                         item.subtitle,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Muted,
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }

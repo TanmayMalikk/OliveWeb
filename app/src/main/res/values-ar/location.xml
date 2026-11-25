@@ -47,13 +47,13 @@
     <string name="location_ten_seconds_testing">10 ثوانٍ (للاختبار)</string>
     <string name="location_notification_sharing_text">مشاركة موقعك المباشر نشطة.</string>
     <string name="location_gps_destination_title">وجهة GPS حرة</string>
-    <string name="location_gps_destination_hint">العنوان أو الإحداثيات (lat, lng)</string>
+    <string name="location_gps_destination_hint">ابحث عن مكان أو عنوان أو إحداثيات</string>
     <string name="location_gps_start_route">بدء المسار</string>
     <string name="location_gps_clear_destination">مسح الوجهة</string>
     <string name="location_gps_coordinates_label">الإحداثيات: %1$s</string>
     <string name="location_gps_coordinates_hint">التوجيه مباشرة إلى هذه الإحداثيات</string>
-    <string name="location_gps_no_match">تعذر العثور على هذا العنوان أو الإحداثيات. أدخل خط العرض والطول أو اختر اقتراحًا.</string>
-    <string name="location_gps_searching">جارٍ البحث عن عناوين…</string>
+    <string name="location_gps_no_match">لم يتم العثور على الوجهة. جرّب اسم مكان أو عنوانًا أو إحداثيات.</string>
+    <string name="location_gps_searching">جارٍ البحث عن أماكن…</string>
     <string name="location_route_driving">بالسيارة</string>
     <string name="location_route_walking">سيرًا</string>
     <string name="location_compass_north_up">الشمال للأعلى</string>

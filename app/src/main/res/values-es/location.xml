@@ -44,13 +44,13 @@
     <string name="location_ten_seconds_testing">10 segundos (prueba)</string>
     <string name="location_notification_sharing_text">El uso compartido de tu ubicación en directo está activo.</string>
     <string name="location_gps_destination_title">Destino GPS libre</string>
-    <string name="location_gps_destination_hint">Dirección o coordenadas (lat, lng)</string>
+    <string name="location_gps_destination_hint">Busca lugares, direcciones o coordenadas</string>
     <string name="location_gps_start_route">Iniciar ruta</string>
     <string name="location_gps_clear_destination">Borrar destino</string>
     <string name="location_gps_coordinates_label">Coordenadas: %1$s</string>
     <string name="location_gps_coordinates_hint">Navegar directamente a estas coordenadas</string>
-    <string name="location_gps_no_match">No se encontró esa dirección o coordenadas. Ingresa lat, lng o elige una sugerencia.</string>
-    <string name="location_gps_searching">Buscando direcciones…</string>
+    <string name="location_gps_no_match">No se encontró el destino. Prueba con un lugar, una dirección o coordenadas.</string>
+    <string name="location_gps_searching">Buscando lugares…</string>
     <string name="location_route_driving">En auto</string>
     <string name="location_route_walking">Caminando</string>
     <string name="location_compass_north_up">Norte arriba</string>

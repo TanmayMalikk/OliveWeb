@@ -42,13 +42,13 @@
     <string name="location_ten_seconds_testing">10 秒（测试）</string>
     <string name="location_notification_sharing_text">您的实时位置共享正在进行。</string>
     <string name="location_gps_destination_title">自由 GPS 目的地</string>
-    <string name="location_gps_destination_hint">地址或坐标（纬度, 经度）</string>
+    <string name="location_gps_destination_hint">搜索地点、地址或坐标</string>
     <string name="location_gps_start_route">开始导航</string>
     <string name="location_gps_clear_destination">清除目的地</string>
     <string name="location_gps_coordinates_label">坐标：%1$s</string>
     <string name="location_gps_coordinates_hint">直接导航至此坐标</string>
-    <string name="location_gps_no_match">未找到该地址或坐标。请输入纬度、经度或选择一个建议。</string>
-    <string name="location_gps_searching">正在搜索地址…</string>
+    <string name="location_gps_no_match">未找到匹配的目的地。请尝试输入地点名称、地址或坐标。</string>
+    <string name="location_gps_searching">正在搜索地点…</string>
     <string name="location_route_driving">驾车</string>
     <string name="location_route_walking">步行</string>
     <string name="location_compass_north_up">正北朝上</string>

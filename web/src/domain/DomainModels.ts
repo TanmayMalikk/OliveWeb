@@ -27,6 +27,7 @@ export interface Contact {
   id: string;
   name: string;
   details: string;
+  relationship?: string;
 }
 export interface Profile {
   username: string;
@@ -105,6 +106,7 @@ export interface Enrollment {
   role: Role;
   triggerHash: string;
   pinKey: WrappedKey;
+  pinLength?: number;
   failures: number;
 }
 export const covers: {

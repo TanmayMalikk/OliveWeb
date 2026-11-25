@@ -17,6 +17,7 @@ import {
   normalizeUsername,
   signInEmail,
   purgeEntry,
+  validPin,
   type Profile,
   type Identity,
   type Role,
@@ -319,6 +320,7 @@ export class Accounts {
       role: profile.role,
       triggerHash: profile.triggerHash,
       pinKey: await wrapKey(pin, raw),
+      pinLength: validPin(pin) ? pin.length : undefined,
       failures: 0,
     };
     await (await database).put("device", enrollment, "current");
@@ -361,7 +363,11 @@ export class Accounts {
       if (!value.profile) throw new Error("Sign in again to finish setup.");
       await (
         await database
-      ).put("device", { ...enrollment, failures: 0 }, "current");
+      ).put("device", {
+        ...enrollment,
+        pinLength: validPin(pin) ? pin.length : undefined,
+        failures: 0,
+      }, "current");
       if (cloudMode) {
         void recordWebSignIn(true);
         return await this.load();

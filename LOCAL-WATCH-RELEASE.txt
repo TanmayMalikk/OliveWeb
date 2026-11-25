@@ -7,11 +7,18 @@
     if ($version -notmatch '^\d+\.\d+\.\d+$' -or $versionCode -lt 1 -or $versionCode -gt 2100000000) {
         throw 'Set a valid watch version and a positive Android version code.'
     }
-    $env:JAVA_HOME = Join-Path $env:LOCALAPPDATA 'Programs/AndroidStudio-Rabbit2-Clean/android-studio/jbr'
-    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
-        $env:JAVA_HOME = Join-Path $env:ProgramFiles 'Android/Android Studio/jbr'
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
+    $javaHomes = @(
+        $env:JAVA_HOME,
+        (Join-Path $env:ProgramFiles 'Android/Android Studio/jbr'),
+        'D:/Android Studio/jbr',
+        (Join-Path $env:LOCALAPPDATA 'Programs/AndroidStudio-Rabbit2-Clean/android-studio/jbr')
+    )
+    $env:JAVA_HOME = $javaHomes | Where-Object {
+        $_ -and
+        (Test-Path -LiteralPath (Join-Path $_ 'bin/java.exe') -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path $_ 'lib/jvm.cfg') -PathType Leaf)
+    } | Select-Object -First 1
+    if (-not $env:JAVA_HOME) {
         throw 'Set JAVA_HOME to your Android Studio jbr folder or installed JDK.'
     }
 

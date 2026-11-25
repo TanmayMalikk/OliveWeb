@@ -44,6 +44,7 @@ import org.json.JSONObject
 internal enum class DestinationSuggestionKind {
     Coordinates,
     DirectoryPlace,
+    BusinessOrLandmark,
     Address,
 }
 
@@ -176,13 +177,14 @@ internal object DestinationAutocompleteClient {
     }
 
     /**
-     * Fetches address autocomplete suggestions using Mapbox Geocoding v6 with Geoapify fallback.
+     * Looks up addresses and, for map navigation, businesses and landmarks near the search origin.
      *
      * @param query The search text entered by the user.
      * @param proximityLatitude The latitude used to bias search results, if available.
      * @param proximityLongitude The longitude used to bias search results, if available.
      * @param mapboxToken The Mapbox access token used for the request.
      * @param useGeoapifyFallback Whether to try Geoapify when Mapbox has no suggestions.
+     * @param includePlaces Whether to use Mapbox Search Box for named places as well as addresses.
      * @param openConnection The injected factory used to open an HTTPS connection.
      * @return The available address suggestions for the current query and location bias.
      */
@@ -192,17 +194,30 @@ internal object DestinationAutocompleteClient {
         proximityLongitude: Double? = null,
         mapboxToken: String = BuildConfig.MAPBOX_ACCESS_TOKEN,
         useGeoapifyFallback: Boolean = true,
+        includePlaces: Boolean = false,
         openConnection: ((URL) -> HttpsURLConnection)? = null,
     ): List<DestinationSuggestion> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.length < 2 || parseCoordinates(trimmed) != null) return@withContext emptyList()
-        val key = cacheKey(trimmed, proximityLatitude, proximityLongitude)
+        val key = cacheKey(trimmed, proximityLatitude, proximityLongitude, includePlaces)
         synchronized(cacheLock) { cache[key] }?.let { return@withContext it }
 
+        var placeLookupAvailable = !includePlaces || mapboxToken.isBlank()
         val mapboxResult = if (mapboxToken.isNotBlank()) {
-            val url = buildMapboxUrl(trimmed, proximityLatitude, proximityLongitude, mapboxToken)
-            if (openConnection == null) fetchMapboxSuggestionsOkHttp(url)
-            else fetchMapboxSuggestionsLegacy(url, openConnection)
+            /**
+             * Loads the chosen Mapbox search endpoint using the configured transport.
+             *
+             * @param places Whether to use Search Box.
+             * @return Parsed destinations, or null when the request fails.
+             */
+            suspend fun fetch(places: Boolean): List<DestinationSuggestion>? {
+                val url = buildMapboxUrl(trimmed, proximityLatitude, proximityLongitude, mapboxToken, places)
+                return if (openConnection == null) fetchMapboxSuggestionsOkHttp(url)
+                else fetchMapboxSuggestionsLegacy(url, openConnection)
+            }
+            val places = if (includePlaces) fetch(places = true) else null
+            if (places != null) placeLookupAvailable = true
+            if (!places.isNullOrEmpty()) places else fetch(places = false)
         } else {
             emptyList()
         }
@@ -234,14 +249,14 @@ internal object DestinationAutocompleteClient {
                 emptyList()
             }
         }
-        if (resolved.isNotEmpty() || (mapboxSucceeded && geoSucceeded)) {
+        if (placeLookupAvailable && (resolved.isNotEmpty() || (mapboxSucceeded && geoSucceeded))) {
             synchronized(cacheLock) { cache[key] = resolved }
         }
         resolved
     }
 
     /**
-     * Resolves a submitted free-text destination (coordinates, directory match, autocomplete, or Android Geocoder).
+     * Resolves coordinates, directory entries, named places, and street addresses for map navigation.
      *
      * @param context The Android context used for resources or system services.
      * @param query The search text entered by the user.
@@ -264,19 +279,20 @@ internal object DestinationAutocompleteClient {
             return DestinationSuggestion("coord:$formatted", formatted, "", lat, lon, DestinationSuggestionKind.Coordinates)
         }
         localDestinationSuggestions(trimmed, directoryPlaces, { it }, "").firstOrNull()?.let { return it }
-        suggest(trimmed, proximityLatitude, proximityLongitude).firstOrNull()?.let { return it }
+        suggest(trimmed, proximityLatitude, proximityLongitude, includePlaces = true).firstOrNull()?.let { return it }
         return DeviceLocation.coordinatesForQuery(context, trimmed)?.let { (lat, lon) ->
             DestinationSuggestion("geocoder:$trimmed", trimmed, "", lat, lon, DestinationSuggestionKind.Address)
         }
     }
 
     /**
-     * Constructs a Mapbox forward-geocode v6 URL for [query] with optional proximity coordinates.
+     * Builds a Search Box or Geocoding request with proximity bias when coordinates are available.
      *
      * @param query The search text entered by the user.
      * @param proximityLatitude The latitude used to bias search results, if available.
      * @param proximityLongitude The longitude used to bias search results, if available.
      * @param mapboxToken The Mapbox access token used for the request.
+     * @param includePlaces Whether to send the query to Search Box.
      * @return The forward-geocoding URL with the query and any proximity bias encoded.
      */
     private fun buildMapboxUrl(
@@ -284,11 +300,14 @@ internal object DestinationAutocompleteClient {
         proximityLatitude: Double?,
         proximityLongitude: Double?,
         mapboxToken: String,
+        includePlaces: Boolean = false,
     ): String {
         val params = buildList {
             add("q=${encode(query)}")
-            add("autocomplete=true")
-            add("limit=5")
+            if (includePlaces) add("limit=6") else {
+                add("autocomplete=true")
+                add("limit=5")
+            }
             if (proximityLatitude != null && proximityLongitude != null &&
                 proximityLatitude in -90.0..90.0 && proximityLongitude in -180.0..180.0
             ) {
@@ -296,7 +315,8 @@ internal object DestinationAutocompleteClient {
             }
             add("access_token=${encode(mapboxToken)}")
         }.joinToString("&")
-        return "https://api.mapbox.com/search/geocode/v6/forward?$params"
+        val path = if (includePlaces) "searchbox/v1/forward" else "geocode/v6/forward"
+        return "https://api.mapbox.com/search/$path?$params"
     }
 
     /**
@@ -334,7 +354,7 @@ internal object DestinationAutocompleteClient {
                     val result = runCatching {
                         response.use { res ->
                             if (!res.isSuccessful) null
-                            else parseMapboxGeocodeV6(res.body.string())
+                            else parseMapboxDestinations(res.body.string())
                         }
                     }.getOrNull()
                     if (continuation.isActive) continuation.resume(result)
@@ -363,7 +383,7 @@ internal object DestinationAutocompleteClient {
                 connection.requestMethod = "GET"
                 connection.setRequestProperty("Accept", "application/json")
                 if (connection.responseCode !in 200..299) null
-                else parseMapboxGeocodeV6(connection.inputStream.bufferedReader().use { it.readText() })
+                else parseMapboxDestinations(connection.inputStream.bufferedReader().use { it.readText() })
             } finally {
                 connection.disconnect()
             }
@@ -375,29 +395,37 @@ internal object DestinationAutocompleteClient {
     }
 
     /**
-     * Parses Mapbox Geocoding v6 GeoJSON features into validated [DestinationSuggestion] items.
+     * Parses Mapbox Search Box and Geocoding GeoJSON responses into navigable suggestions.
      *
      * @param raw The unprocessed response or value to parse.
      * @return The valid destinations parsed from the Mapbox features.
      */
-    internal fun parseMapboxGeocodeV6(raw: String): List<DestinationSuggestion> = runCatching {
+    internal fun parseMapboxDestinations(raw: String): List<DestinationSuggestion> = runCatching {
         val features = JSONObject(raw).optJSONArray("features") ?: return@runCatching emptyList()
         (0 until features.length()).mapNotNull { index ->
             val feature = features.optJSONObject(index) ?: return@mapNotNull null
-            val coords = feature.optJSONObject("geometry")?.optJSONArray("coordinates") ?: return@mapNotNull null
+            val geometry = feature.optJSONObject("geometry") ?: return@mapNotNull null
+            if (geometry.optString("type") != "Point") return@mapNotNull null
+            val coords = geometry.optJSONArray("coordinates") ?: return@mapNotNull null
             val lon = coords.optDouble(0, Double.NaN)
             val lat = coords.optDouble(1, Double.NaN)
             if (!lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
                 return@mapNotNull null
             }
             val props = feature.optJSONObject("properties") ?: return@mapNotNull null
+            val type = props.optString("feature_type")
+            if (type == "category") return@mapNotNull null
+            val isPlace = type == "poi"
             val name = props.optString("name").ifBlank { props.optString("name_preferred") }.trim()
             val fullAddress = props.optString("full_address")
-                .ifBlank { props.optString("place_formatted") }
+                .ifBlank {
+                    listOf(props.optString("address"), props.optString("place_formatted"))
+                        .filter { it.isNotBlank() }.distinct().joinToString(", ")
+                }
                 .trim()
             val title = name.ifBlank { fullAddress.substringBefore(',').trim() }
             if (title.isBlank()) return@mapNotNull null
-            val subtitle = fullAddress.removePrefix(title).trimStart(',', ' ')
+            val subtitle = if (isPlace) fullAddress else fullAddress.removePrefix(title).trimStart(',', ' ')
             val id = feature.optString("id").ifBlank { props.optString("mapbox_id") }.ifBlank { "$lat,$lon" }
             DestinationSuggestion(
                 id = "mb:$id",
@@ -405,7 +433,7 @@ internal object DestinationAutocompleteClient {
                 subtitle = subtitle.take(240),
                 latitude = lat,
                 longitude = lon,
-                kind = DestinationSuggestionKind.Address,
+                kind = if (isPlace) DestinationSuggestionKind.BusinessOrLandmark else DestinationSuggestionKind.Address,
             )
         }
     }.getOrDefault(emptyList())
@@ -416,13 +444,15 @@ internal object DestinationAutocompleteClient {
      * @param query The search text entered by the user.
      * @param lat The latitude in decimal degrees.
      * @param lon The longitude in decimal degrees.
+     * @param includePlaces Whether the lookup includes named places.
      * @return The key combining the normalized search query with quantized coordinates.
      */
-    private fun cacheKey(query: String, lat: Double?, lon: Double?): String {
+    private fun cacheKey(query: String, lat: Double?, lon: Double?, includePlaces: Boolean): String {
         val norm = query.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
-        val latBucket = lat?.let { (it * 10.0).roundToLong() }
-        val lonBucket = lon?.let { (it * 10.0).roundToLong() }
-        return "$norm|$latBucket|$lonBucket"
+        val precision = if (includePlaces) 100.0 else 10.0
+        val latBucket = lat?.let { (it * precision).roundToLong() }
+        val lonBucket = lon?.let { (it * precision).roundToLong() }
+        return "$includePlaces|$norm|$latBucket|$lonBucket"
     }
 
     /**

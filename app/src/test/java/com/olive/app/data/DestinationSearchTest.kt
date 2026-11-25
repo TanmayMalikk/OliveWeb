@@ -94,7 +94,7 @@ class DestinationSearchTest {
               ]
             }
         """.trimIndent()
-        val parsed = DestinationAutocompleteClient.parseMapboxGeocodeV6(raw)
+        val parsed = DestinationAutocompleteClient.parseMapboxDestinations(raw)
         assertEquals(1, parsed.size)
         assertEquals("10123 99 St NW", parsed.single().title)
         assertEquals("Edmonton, Alberta T5J 3H1, Canada", parsed.single().subtitle)
@@ -102,23 +102,64 @@ class DestinationSearchTest {
         assertEquals(-113.4938, parsed.single().longitude, 0.00001)
     }
 
+    private fun fakeConnection(code: Int, body: String): javax.net.ssl.HttpsURLConnection {
+        val stream = java.io.ByteArrayInputStream(body.toByteArray())
+        return object : javax.net.ssl.HttpsURLConnection(java.net.URL("https://api.mapbox.com/test")) {
+            override fun disconnect() {}
+            override fun usingProxy() = false
+            override fun connect() {}
+            override fun getCipherSuite() = ""
+            override fun getLocalCertificates(): Array<java.security.cert.Certificate>? = null
+            override fun getServerCertificates(): Array<java.security.cert.Certificate>? = null
+            override fun getResponseCode() = code
+            override fun getInputStream() = stream
+        }
+    }
+
+    @Test
+    fun routeSearchUsesProximityAndKeepsBusinessNamesAndStreetAddresses() = kotlinx.coroutines.runBlocking {
+        DestinationAutocompleteClient.clearCache()
+        val calls = mutableListOf<java.net.URL>()
+        val results = DestinationAutocompleteClient.suggest(
+            "Walmart", 53.55, -113.49, "pk.test", useGeoapifyFallback = false, includePlaces = true,
+        ) { url ->
+            calls += url
+            fakeConnection(200, """
+                {"features":[
+                  {"geometry":{"type":"Point","coordinates":[-113.51,53.56]},
+                   "properties":{"feature_type":"poi","mapbox_id":"first","name":"Walmart","full_address":"1 Kingsway, Edmonton"}},
+                  {"geometry":{"type":"Point","coordinates":[-113.44,53.54]},
+                   "properties":{"feature_type":"poi","mapbox_id":"second","name":"Walmart","address":"5004 98 Ave","place_formatted":"Edmonton"}},
+                  {"geometry":{"type":"Point","coordinates":[-113.50,53.53]},
+                   "properties":{"feature_type":"address","name":"10020 100 Street NW","full_address":"10020 100 Street NW, Edmonton"}}
+                ]}
+            """.trimIndent())
+        }
+        assertEquals("/search/searchbox/v1/forward", calls.single().path)
+        assertTrue(calls.single().query.contains("proximity=-113.49,53.55"))
+        assertEquals(listOf("Walmart", "Walmart", "10020 100 Street NW"), results.map { it.title })
+        assertEquals(listOf("1 Kingsway, Edmonton", "5004 98 Ave, Edmonton", "Edmonton"), results.map { it.subtitle })
+        assertEquals(DestinationSuggestionKind.BusinessOrLandmark, results.first().kind)
+        assertEquals(DestinationSuggestionKind.Address, results.last().kind)
+        assertEquals(53.54, results[1].latitude, 0.00001)
+        assertEquals(-113.44, results[1].longitude, 0.00001)
+    }
+
+    @Test
+    fun routeSearchFallsBackToAddressGeocodingWhenSearchBoxFails() = kotlinx.coroutines.runBlocking {
+        DestinationAutocompleteClient.clearCache()
+        val paths = mutableListOf<String>()
+        DestinationAutocompleteClient.suggest("10020 100 St", mapboxToken = "pk.test", useGeoapifyFallback = false, includePlaces = true) {
+            paths += it.path
+            if (paths.size == 1) fakeConnection(503, "{}") else fakeConnection(200, """{"features":[]}""")
+        }
+        assertEquals(listOf("/search/searchbox/v1/forward", "/search/geocode/v6/forward"), paths)
+    }
+
     @Test
     fun autocompleteCachesValidEmptyResponsesAndRetriesAfterErrors() = kotlinx.coroutines.runBlocking {
         DestinationAutocompleteClient.clearCache()
         var calls = 0
-        fun fakeConnection(code: Int, body: String): javax.net.ssl.HttpsURLConnection {
-            val stream = java.io.ByteArrayInputStream(body.toByteArray())
-            return object : javax.net.ssl.HttpsURLConnection(java.net.URL("https://api.mapbox.com/test")) {
-                override fun disconnect() {}
-                override fun usingProxy() = false
-                override fun connect() {}
-                override fun getCipherSuite() = ""
-                override fun getLocalCertificates(): Array<java.security.cert.Certificate>? = null
-                override fun getServerCertificates(): Array<java.security.cert.Certificate>? = null
-                override fun getResponseCode() = code
-                override fun getInputStream() = stream
-            }
-        }
 
         // Transient 500 error must not be cached so the next request retries.
         val first = DestinationAutocompleteClient.suggest("Jasper Ave", 53.5, -113.5, "pk.test", useGeoapifyFallback = false) {
