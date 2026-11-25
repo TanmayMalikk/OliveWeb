@@ -10,6 +10,7 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -626,8 +628,15 @@ internal fun SafetyDocumentCard(
                 preview = preview,
                 loading = previewLoading,
                 offlineCached = cached,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1.15f)
-                    .then(if (!isAudio && !opening) Modifier.clickable(onClick = onOpen) else Modifier),
+                opening = opening,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.15f).let { base ->
+                    if (isAudio) base
+                    else base.testTag("document_open_${file.id}").clickable(
+                        enabled = !opening,
+                        onClickLabel = stringResource(R.string.open),
+                        onClick = onOpen,
+                    )
+                },
             )
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -668,7 +677,7 @@ internal fun SafetyDocumentCard(
             }
             // Only the owner may change evidence status; shared viewers do not see this action.
             if (own) Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("document_evidence_${file.id}")
+                Modifier.fillMaxWidth().heightIn(min = 36.dp).testTag("document_evidence_${file.id}")
                     .toggleable(
                         value = file.evidence,
                         enabled = !evidenceUpdating,
@@ -681,58 +690,50 @@ internal fun SafetyDocumentCard(
                     checked = file.evidence,
                     onCheckedChange = null,
                     enabled = !evidenceUpdating,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(32.dp),
                 )
                 Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Muted,
-                    )
-                }
-                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(R.string.evidence),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
             }
-            if (!isAudio) Button(
-                onClick = onOpen,
-                enabled = !opening,
-                modifier = Modifier.fillMaxWidth().testTag("document_open_${file.id}"),
-            ) {
-                if (opening) SecureFileOpeningIndicator()
-                else {
-                    Icon(Icons.Outlined.Visibility, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.open), maxLines = 1)
-                }
-            }
-            // Owners can share the document; recipients only get the open action.
+            // Owners can share or remove the document via compact icon actions.
             if (own) Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Outlined.Share, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.share), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                OutlinedIconButton(
+                    onClick = onShare,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, OliveOutline),
+                    modifier = Modifier.weight(1f).height(38.dp),
+                ) {
+                    Icon(Icons.Outlined.Share, stringResource(R.string.share), Modifier.size(18.dp))
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        stringResource(R.string.remove),
-                    )
+                OutlinedIconButton(
+                    onClick = onDelete,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, OliveOutline),
+                    modifier = Modifier.weight(1f).height(38.dp),
+                ) {
+                    Icon(Icons.Outlined.Delete, stringResource(R.string.remove), Modifier.size(18.dp))
                 }
             }
             if (file.objectKey.isNotBlank()) {
                 OutlinedButton(
                     onClick = if (cached) onRemoveOffline else onMakeOffline,
                     enabled = offline != OfflineMediaAvailability.SAVING,
-                    modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 36.dp)
+                        .testTag("document_offline_${file.id}"),
                 ) {
-                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null, Modifier.size(16.dp))
+                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null, Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
                         stringResource(when {
@@ -740,6 +741,7 @@ internal fun SafetyDocumentCard(
                             cached -> R.string.documents_remove_offline_copy
                             else -> R.string.documents_make_available_offline
                         }),
+                        style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

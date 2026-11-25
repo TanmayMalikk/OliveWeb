@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -20,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -28,8 +30,10 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
@@ -465,103 +469,115 @@ internal fun SharedMediaMessage(
         val uid = session.coverAccountId ?: return@LaunchedEffect
         session.documents.requestPreviewById(uid, id)
     }
+    val displayName = document?.name?.takeIf { it.isNotBlank() }
+        ?: name.ifBlank { stringResource(R.string.encrypted_document) }
+    val resolvedMime = document?.mimeType.orEmpty()
+    val isAudio = pickerMediaKind(resolvedMime) == MediaKind.AUDIO
+    val offlineCached = offline in setOf(
+        OfflineMediaAvailability.AVAILABLE,
+        OfflineMediaAvailability.REVALIDATION_REQUIRED,
+    )
+    val openMedia: () -> Unit = {
+        val uid = session.coverAccountId
+        if (uid != null && !opening) {
+            session.documents.openShared(uid, id) { doc, local -> onOpen(doc, local) }
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-    Surface(
-        onClick = {
-            val uid = session.coverAccountId ?: return@Surface
-            if (opening) return@Surface
-            session.documents.openShared(
-                uid,
-                id,
-            ) { document, local -> onOpen(document, local) }
-        }, enabled = !opening, shape = MaterialTheme.shapes.medium,
-        color = when {
-            onLightSurface -> Color.White
-            mine -> Color.White.copy(alpha = .2f)
-            else -> Color.Black.copy(alpha = .05f)
-        },
-        contentColor = if (onLightSurface) Ink else LocalContentColor.current,
-        border = if (onLightSurface) androidx.compose.foundation.BorderStroke(1.dp, ChatBorder) else null,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
-            .semantics { if (senderDescription != null) stateDescription = senderDescription }
-    ) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val resolvedMime = document?.mimeType.orEmpty()
-            if (pickerMediaKind(resolvedMime) != MediaKind.AUDIO) {
+        val mediaContent: @Composable () -> Unit = {
+            if (!isAudio) {
                 BlurredDocumentPreviewSurface(
                     document = document,
                     preview = session.documents.previewFor(id),
                     loading = session.documents.isPreviewLoading(id),
                     fallbackMimeType = resolvedMime,
-                    fallbackName = document?.name ?: name,
-                    offlineCached = offline in setOf(
-                        OfflineMediaAvailability.AVAILABLE,
-                        OfflineMediaAvailability.REVALIDATION_REQUIRED,
-                    ),
-                    modifier = Modifier.fillMaxWidth().height(132.dp),
+                    fallbackName = displayName,
+                    offlineCached = offlineCached,
+                    opening = opening,
+                    modifier = Modifier.fillMaxWidth().height(148.dp),
                 )
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (opening) SecureFileOpeningIndicator()
-                else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
-                Column {
-                    Text(
-                        stringResource(R.string.shared_secure_file),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    Text(
-                        document?.name?.takeIf { it.isNotBlank() }
-                            ?: name.ifBlank { stringResource(R.string.encrypted_document) },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        maxLines = 2
-                    )
-                }
+                if (opening && isAudio) SecureFileOpeningIndicator()
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-    }
-    if (document?.objectKey?.isNotBlank() == true &&
-        canManageSharedMediaOfflineCopy(session.accountRole)
-    ) {
-        val cached = offline in setOf(
-            OfflineMediaAvailability.AVAILABLE,
-            OfflineMediaAvailability.REVALIDATION_REQUIRED,
-        )
-        TextButton(
-            onClick = {
-                if (cached) session.documents.removeOfflineCopy(document)
-                else session.documents.makeAvailableOffline(document)
-            },
-            enabled = offline != OfflineMediaAvailability.SAVING,
-            colors = if (mine && !onLightSurface) ButtonDefaults.textButtonColors(
-                contentColor = Paper,
-                disabledContentColor = PaleOlive,
-            ) else ButtonDefaults.textButtonColors(),
-            modifier = Modifier.testTag("shared_media_offline_$id"),
-        ) {
-            Text(stringResource(when {
-                offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
-                cached -> R.string.documents_remove_offline_copy
-                else -> R.string.documents_make_available_offline
-            }))
+        if (onLightSurface) {
+            Surface(
+                onClick = openMedia,
+                enabled = !opening,
+                shape = MaterialTheme.shapes.medium,
+                color = Color.White,
+                contentColor = Ink,
+                border = androidx.compose.foundation.BorderStroke(1.dp, ChatBorder),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
+                    .semantics { if (senderDescription != null) stateDescription = senderDescription },
+            ) {
+                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    mediaContent()
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = !opening, onClick = openMedia)
+                    .testTag("shared_media_$id")
+                    .semantics { if (senderDescription != null) stateDescription = senderDescription },
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                mediaContent()
+            }
         }
-        if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
-            stringResource(R.string.documents_recently_cached),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-    error?.let {
-        Text(
-            it,
-            color = if (mine && !onLightSurface) OliveErrorContainer else MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                .testTag("shared_media_error_$id"),
-        )
-    }
+        if (document?.objectKey?.isNotBlank() == true &&
+            canManageSharedMediaOfflineCopy(session.accountRole)
+        ) {
+            val cached = offline in setOf(
+                OfflineMediaAvailability.AVAILABLE,
+                OfflineMediaAvailability.REVALIDATION_REQUIRED,
+            )
+            TextButton(
+                onClick = {
+                    if (cached) session.documents.removeOfflineCopy(document)
+                    else session.documents.makeAvailableOffline(document)
+                },
+                enabled = offline != OfflineMediaAvailability.SAVING,
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp),
+                colors = if (mine && !onLightSurface) ButtonDefaults.textButtonColors(
+                    contentColor = Paper,
+                    disabledContentColor = PaleOlive,
+                ) else ButtonDefaults.textButtonColors(),
+                modifier = Modifier.defaultMinSize(minHeight = 32.dp).testTag("shared_media_offline_$id"),
+            ) {
+                Text(stringResource(when {
+                    offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                    cached -> R.string.documents_remove_offline_copy
+                    else -> R.string.documents_make_available_offline
+                }))
+            }
+            if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
+                stringResource(R.string.documents_recently_cached),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        error?.let {
+            Text(
+                it,
+                color = if (mine && !onLightSurface) OliveErrorContainer else MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    .testTag("shared_media_error_$id"),
+            )
+        }
     }
 }
 

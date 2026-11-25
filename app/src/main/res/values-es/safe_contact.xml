@@ -84,9 +84,9 @@
     <string name="share">Compartir</string>
     <string name="documents_offline_index">Mostrando tu índice cifrado sin conexión. Los cambios se sincronizarán al conectarte.</string>
     <string name="documents_not_available_offline">Este archivo aún no está disponible sin conexión.</string>
-    <string name="documents_make_available_offline">Hacer disponible sin conexión</string>
-    <string name="documents_remove_offline_copy">Eliminar copia sin conexión</string>
-    <string name="documents_saving_offline">Guardando copia cifrada sin conexión…</string>
+    <string name="documents_make_available_offline">Descargar sin conexión</string>
+    <string name="documents_remove_offline_copy">Quitar sin conexión</string>
+    <string name="documents_saving_offline">Descargando…</string>
     <string name="documents_available_offline">Disponible sin conexión</string>
     <string name="documents_recently_cached">Guardado recientemente; puede eliminarse automáticamente</string>
     <string name="documents_recent_cache_title">Caché de archivos recientes</string>

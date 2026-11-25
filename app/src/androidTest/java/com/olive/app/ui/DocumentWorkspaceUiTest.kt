@@ -175,7 +175,7 @@ class DocumentWorkspaceUiTest {
         compose.onNodeWithText(text(R.string.safety_storage_documents)).performClick()
         compose.onNodeWithTag("document_evidence_pdf").performClick()
         compose.waitUntil(10000) {source.rows.single {it.id=="pdf"}.evidence}
-        compose.onNodeWithText(text(R.string.share)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.share)).performClick()
         compose.onNodeWithText(text(R.string.save)).performClick()
         compose.waitUntil(10000) {source.shared}
         compose.onNodeWithContentDescription(text(R.string.remove)).performClick()

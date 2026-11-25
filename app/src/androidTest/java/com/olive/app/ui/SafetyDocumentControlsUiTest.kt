@@ -89,7 +89,7 @@ class SafetyDocumentControlsUiTest {
             }
         }
         compose.onNodeWithTag("document_evidence_sample").assertDoesNotExist()
-        compose.onNodeWithText(text(R.string.share)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.share)).assertDoesNotExist()
         compose.onNodeWithText(text(R.string.documents_recently_cached)).assertExists()
         compose.onNodeWithTag("document_open_sample").assertIsNotEnabled()
     }
@@ -109,7 +109,7 @@ class SafetyDocumentControlsUiTest {
         }
         compose.onNodeWithTag("document_open_sample").assertDoesNotExist()
         compose.onNodeWithTag("document_evidence_sample").assertExists()
-        compose.onNodeWithText(text(R.string.share)).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.share)).assertExists()
     }
 
     @Test

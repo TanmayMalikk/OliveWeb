@@ -84,9 +84,9 @@
     <string name="share">分享</string>
     <string name="documents_offline_index">正在显示加密的离线索引。连接网络后将同步更改。</string>
     <string name="documents_not_available_offline">此文件尚不可离线使用。</string>
-    <string name="documents_make_available_offline">设为可离线使用</string>
-    <string name="documents_remove_offline_copy">移除离线副本</string>
-    <string name="documents_saving_offline">正在保存加密离线副本…</string>
+    <string name="documents_make_available_offline">离线下载</string>
+    <string name="documents_remove_offline_copy">移除离线</string>
+    <string name="documents_saving_offline">正在下载…</string>
     <string name="documents_available_offline">可离线使用</string>
     <string name="documents_recently_cached">最近已缓存，可能会被自动移除</string>
     <string name="documents_recent_cache_title">最近文件缓存</string>
