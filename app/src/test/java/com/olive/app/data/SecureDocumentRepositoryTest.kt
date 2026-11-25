@@ -4,6 +4,8 @@ package com.olive.app.data
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.safety.SecureDocumentRepository
+import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountRecoveryKey
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import com.olive.app.support.FirestoreTestDriver
@@ -75,6 +77,49 @@ class SecureDocumentRepositoryTest {
             assertEquals("You do not have the cryptographic key to read this document.", missingKey?.message)
             val missingDocument = runCatching { repository.loadAndDecryptEntry("missing", "owner") }.exceptionOrNull()
             assertEquals("Document not found.", missingDocument?.message)
+        }
+    }
+
+    @Test
+    fun loadAndDecryptEntryRecoversViaAccountKeysetAcrossDevices() = runBlocking<Unit> {
+        TestAndroidKeyStore.install().use {
+            val database = FirestoreTestDriver()
+            val repository = SecureDocumentRepository(database.db)
+            val ownerPub = KeyManager.getOrCreatePublicKey()
+            val staleGuestPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+            val guestRecovery = AccountRecoveryKey.generate()
+            val guestKeyset = AccountKeysetEnvelope.create("guest", guestRecovery)
+            database.records["accountKeyDirectories/guest"] = mapOf(
+                "ownerUid" to "guest",
+                "keyId" to guestKeyset.keyId,
+                "epoch" to guestKeyset.epoch,
+                "algorithm" to "RSA-OAEP-256",
+                "publicKey" to guestKeyset.publicKeyBase64,
+            )
+
+            val entry = PrivateEntry(
+                id = "shared-recover",
+                title = "Cross-device note",
+                body = "Visible after account recovery",
+                kind = PrivateEntryKind.Note,
+            )
+            repository.saveMultiRecipientEntry(
+                entry,
+                "owner",
+                mapOf("owner" to ownerPub, "guest" to staleGuestPair.public),
+            )
+            val stored = database.records.getValue("privateEntries/${entry.id}")
+            assertTrue((stored["accountWrappedKeys"] as? Map<*, *>)?.containsKey("guest") == true)
+
+            // Fails on a new device without unlocker because guest's wrappedKey is for the old device.
+            val withoutUnlocker = runCatching { repository.loadAndDecryptEntry(entry.id, "guest") }.exceptionOrNull()
+            assertNotNull(withoutUnlocker)
+
+            // Succeeds with accountKeysetUnlocker and caches a wrapper for the new device.
+            val recovered = repository.loadAndDecryptEntry(entry.id, "guest") {
+                guestKeyset.unlock("guest", guestRecovery)
+            }
+            assertEquals(entry, recovered)
         }
     }
 }

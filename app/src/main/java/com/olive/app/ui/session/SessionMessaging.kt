@@ -453,7 +453,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val failureMessage = runtime.application.getString(
             R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again
         )
-        val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null && runtime.state.accountRole == AccountRole.USER
+        val needsDeviceConfirmation = runtime.opaqueRecoveryRepository != null
         runtime.operations.runOperation(failureMessage, timeoutMillis = if (needsDeviceConfirmation) 120_000 else 25_000) { sessionVersion ->
             val creatingIdentity = create && runtime.pendingIdentity?.username != InputPolicy.username(username)
             val identity = try {
@@ -483,7 +483,8 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             runtime.pendingIdentity = identity
             runtime.pendingProfile = profile
             if (needsDeviceConfirmation) {
-                val setupRequired = create || profile == null || AccountPolicy.personalProfileNeedsSetup(profile)
+                val setupRequired = create || profile == null ||
+                    (runtime.state.accountRole == AccountRole.USER && AccountPolicy.personalProfileNeedsSetup(profile))
                 try {
                     runtime.passwordRecovery.enrollAfterAuthentication(identity.uid, password, sessionVersion, setupRequired)
                 } catch (cancelled: CancellationException) {

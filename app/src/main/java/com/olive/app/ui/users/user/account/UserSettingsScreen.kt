@@ -141,9 +141,9 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         }
     }
     val cacheUid = session.coverAccountId
-    LaunchedEffect(cacheUid) {
+    LaunchedEffect(cacheUid, session.localMode) {
         cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
-        if (userRole && cacheUid != null) {
+        if (!session.localMode && cacheUid != null) {
             session.refreshPasswordRecovery()
         }
     }

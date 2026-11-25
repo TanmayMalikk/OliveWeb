@@ -1,13 +1,36 @@
 // Repairs server-owned ticket metadata created before numbered consultation chats.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebaseAdminClient");
-const {safetyCaller} = require("./safetyPlanAccess");
+const {auth, db} = require("./firebaseAdminClient");
+const {readProfile} = require("./accountStorage");
+const {chooseStaff} = require("./safetyPlanPolicy");
+const {safetyCaller, planReference} = require("./safetyPlanAccess");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
-const {saveSupportConversation, PLAN_CONSULT} = require("./supportGroups");
+const {
+  saveSupportConversation,
+  PLAN_CONSULT,
+  eligibleStaffCandidates,
+  hasRegisteredMessagingKey,
+} = require("./supportGroups");
 
 const numbered = value => Number.isSafeInteger(value) && value >= 0;
+const validUsername = value => /^[a-z0-9_]{4,24}$/.test(String(value || "").trim().toLowerCase());
 const normalizedNames = value => Object.fromEntries(Object.entries(value || {})
     .map(([uid, name]) => [uid, String(name).trim().toLowerCase()]));
+
+async function resolveMissingUsernames(participantIds, currentNames) {
+  const resolved = {...currentNames};
+  const missing = participantIds.filter(uid => !validUsername(resolved[uid]));
+  await Promise.all(missing.map(async uid => {
+    const profile = await readProfile(uid).catch(() => null);
+    let candidate = String(profile?.username || "").trim().toLowerCase();
+    if (!validUsername(candidate)) {
+      const user = await auth.getUser(uid).catch(() => null);
+      candidate = String(user?.displayName || "").trim().toLowerCase();
+    }
+    if (validUsername(candidate)) resolved[uid] = candidate;
+  }));
+  return resolved;
+}
 
 async function repairPlanTicket(ownerUid) {
   const planRef = db.collection("safetyPlans").doc(ownerUid);
@@ -55,23 +78,125 @@ async function repairConversation(id) {
   const initial = await reference.get();
   if (!initial.exists || initial.get("type") !== "SUPPORT") return;
   if (initial.get("ownerUid")) await repairPlanTicket(initial.get("ownerUid"));
+  const beforeTx = await reference.get();
+  if (!beforeTx.exists) return;
+  const beforeIds = Array.isArray(beforeTx.get("participantIds")) ? beforeTx.get("participantIds") : [];
+  const resolvedNames = await resolveMissingUsernames(beforeIds, normalizedNames(beforeTx.get("participantUsernames")));
+
+  // Reassigns uninitialized open tickets whose assigned staff member lacks a messaging key.
+  const canCheckReassign = !beforeTx.get("closedAt") &&
+    !beforeTx.get("lastMessageId") &&
+    (!beforeTx.get("roomKeys") || Object.keys(beforeTx.get("roomKeys")).length === 0) &&
+    Boolean(beforeTx.get("staffUid"));
+  let readyStaffPool = [];
+  if (canCheckReassign) {
+    const oldStaffUid = beforeTx.get("staffUid");
+    const staffReady = await hasRegisteredMessagingKey(oldStaffUid, resolvedNames[oldStaffUid]);
+    if (!staffReady) {
+      readyStaffPool = await eligibleStaffCandidates({strictKeyReady: true});
+    }
+  }
+
   return db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) return;
     const origin = snapshot.get("supportOrigin") || (id.startsWith("plan-consult-") ? PLAN_CONSULT : "SUPPORT");
+    let participantIds = Array.isArray(snapshot.get("participantIds")) ? [...snapshot.get("participantIds")] : [];
+    const participantUsernames = {
+      ...normalizedNames(snapshot.get("participantUsernames")),
+      ...Object.fromEntries(participantIds.filter(uid => resolvedNames[uid]).map(uid => [uid, resolvedNames[uid]])),
+    };
+    let staffUid = snapshot.get("staffUid") || "";
+    const canReassign = readyStaffPool.length > 0 &&
+      Boolean(staffUid) &&
+      !snapshot.get("closedAt") &&
+      !snapshot.get("lastMessageId") &&
+      (!snapshot.get("roomKeys") || Object.keys(snapshot.get("roomKeys")).length === 0);
+
+    let reassignment = null;
+    if (canReassign) {
+      const oldStaffRef = db.collection("safetyStaff").doc(staffUid);
+      const oldStaffSnap = await transaction.get(oldStaffRef);
+      const candidateSettings = [];
+      for (const staff of readyStaffPool) {
+        const ref = db.collection("safetyStaff").doc(staff.uid);
+        const doc = await transaction.get(ref);
+        candidateSettings.push({...staff, ref, ...(doc.data() || {})});
+      }
+      let sourceRef = origin === PLAN_CONSULT && snapshot.get("ownerUid") ?
+        planReference(snapshot.get("ownerUid")) :
+        origin === "SUPPORT" && snapshot.get("requestSource") !== "GROUP_CHAT" ?
+          db.collection("supportRequests").doc(snapshot.get("sourceConversationId") || id) :
+          null;
+      let sourceSnap = sourceRef ? await transaction.get(sourceRef) : null;
+      if (origin === "SUPPORT" && snapshot.get("requestSource") !== "GROUP_CHAT" &&
+          !sourceSnap?.exists && !snapshot.get("sourceConversationId") && snapshot.get("ownerUid")) {
+        const legacyRef = db.collection("supportRequests").doc(snapshot.get("ownerUid"));
+        const legacySnap = await transaction.get(legacyRef);
+        if (legacySnap.exists) {
+          sourceRef = legacyRef;
+          sourceSnap = legacySnap;
+        }
+      }
+      const replacement = chooseStaff(candidateSettings);
+      if (replacement && replacement.uid !== staffUid) {
+        reassignment = {oldStaffUid: staffUid, oldStaffRef, oldStaffSnap, replacement, sourceRef, sourceSnap};
+      }
+    }
+
+    if (reassignment) {
+      const {oldStaffUid, oldStaffRef, oldStaffSnap, replacement, sourceRef, sourceSnap} = reassignment;
+      const ownerUid = snapshot.get("ownerUid");
+      const adminUid = snapshot.get("adminUid");
+      participantIds = [...new Set(participantIds.map(uid => uid === oldStaffUid ? replacement.uid : uid))];
+      if (!participantIds.includes(replacement.uid)) participantIds.push(replacement.uid);
+      if (oldStaffUid !== ownerUid && oldStaffUid !== adminUid) delete participantUsernames[oldStaffUid];
+      participantUsernames[replacement.uid] = replacement.username;
+      staffUid = replacement.uid;
+      transaction.set(
+        oldStaffRef,
+        {activeCount: Math.max(0, (oldStaffSnap.data()?.activeCount || 0) - 1)},
+        {merge: true},
+      );
+      transaction.set(
+        replacement.ref,
+        {activeCount: (replacement.activeCount || 0) + 1},
+        {merge: true},
+      );
+      if (sourceSnap?.exists) {
+        const expectedConv = origin === PLAN_CONSULT ?
+          sourceSnap.data()?.consultationConversationId :
+          sourceSnap.data()?.conversationId;
+        if (expectedConv === id) {
+          transaction.set(
+            sourceRef,
+            {staffUid: replacement.uid, staffName: replacement.name, updatedAt: Date.now()},
+            {merge: true},
+          );
+        }
+      }
+    }
+
     const changes = {
       ticketNumber: numbered(snapshot.get("ticketNumber")) ? snapshot.get("ticketNumber") :
         await reserveSupportTicketNumber(transaction),
       supportOrigin: origin,
       supportTag: snapshot.get("adminUid") ? "NEEDS_ADMIN" : origin,
       friendshipId: id,
-      participantUsernames: normalizedNames(snapshot.get("participantUsernames")),
-      lastMessage: snapshot.get("lastMessage") || "", lastMessageId: snapshot.get("lastMessageId") || "",
+      staffUid,
+      participantIds,
+      participantUsernames,
+      lastMessage: snapshot.get("lastMessage") || "",
+      lastMessageId: snapshot.get("lastMessageId") || "",
     };
     if (Object.entries(changes).some(([key, value]) => JSON.stringify(snapshot.get(key)) !== JSON.stringify(value))) {
       transaction.set(reference, changes, {merge: true});
     }
-    return {participantUsernames: changes.participantUsernames, ticketNumber: changes.ticketNumber};
+    return {
+      participantIds: changes.participantIds,
+      participantUsernames: changes.participantUsernames,
+      ticketNumber: changes.ticketNumber,
+    };
   });
 }
 

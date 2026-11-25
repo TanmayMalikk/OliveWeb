@@ -140,7 +140,7 @@
     <string name="edit_contact">编辑联系人</string>
     <string name="phone_or_email">电话或电子邮件</string>
     <string name="enter_a_name_and_a_phone_number_or_email">输入姓名和电话号码或电子邮件。</string>
-    <string name="you_can_save_up_to_25_contacts">您最多可以保存 25 个联系人。</string>
+    <string name="you_can_save_up_to_25_contacts">您最多可以保存 100 个联系人。</string>
     <string name="save_contact">保存联系方式</string>
 <string name="save_settings">保存设置</string>
     <string name="change_account_password">更改账户密码</string>

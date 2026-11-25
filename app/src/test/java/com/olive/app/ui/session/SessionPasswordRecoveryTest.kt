@@ -560,6 +560,87 @@ class SessionPasswordRecoveryTest {
         }
     }
 
+    @Test
+    fun safeContactCanEnrollAndRotatePasswordRecovery() =
+        verifyRoleEnrollAndRotate(AccountRole.SAFE_CONTACT, SessionScreen.Safe)
+
+    @Test
+    fun staffCanEnrollAndRotatePasswordRecovery() =
+        verifyRoleEnrollAndRotate(AccountRole.STAFF, SessionScreen.Portal)
+
+    @Test
+    fun adminCanEnrollAndRotatePasswordRecovery() =
+        verifyRoleEnrollAndRotate(AccountRole.ADMIN, SessionScreen.Portal)
+
+    private fun verifyRoleEnrollAndRotate(role: AccountRole, screen: SessionScreen) = runBlocking<Unit> {
+        var registrationCalls = 0
+        var rotationCalls = 0
+        val exportKey = ByteArray(32) { 9 }
+        val activeClient = object : OpaqueClientProtocol {
+            override suspend fun startRegistration(password: String) =
+                OpaqueClientProtocol.RegistrationStart("state", "regReq")
+
+            override suspend fun finishRegistration(state: String, response: String, password: String) =
+                OpaqueClientProtocol.RegistrationFinish("record", exportKey.copyOf())
+
+            override suspend fun startLogin(password: String) =
+                OpaqueClientProtocol.LoginStart("loginState", "startReq")
+
+            override suspend fun finishLogin(state: String, response: String, password: String) =
+                OpaqueClientProtocol.LoginFinish("finishReq", exportKey.copyOf())
+        }
+        val activeRepo = OpaqueRecoveryRepository(
+            callable = AccountRecoveryCallable { name, _ ->
+                when (name) {
+                    "opaqueRecoveryBeginRegistration" -> mapOf("registrationResponse" to "srvReg")
+                    "opaqueRecoveryFinishRegistration" -> {
+                        registrationCalls += 1
+                        mapOf("success" to true)
+                    }
+                    "opaqueRecoveryRotate" -> {
+                        rotationCalls += 1
+                        mapOf("success" to true)
+                    }
+                    else -> emptyMap<String, Any?>()
+                }
+            },
+            authenticator = AccountRecoveryAuthenticator { _, _ -> },
+            opaqueClient = activeClient,
+        )
+        val keysetRepo = unenrolledKeysets()
+        SessionRuntimeFixture(
+            accountKeysetsOverride = keysetRepo,
+            opaqueRecoveryOverride = activeRepo,
+        ).use { fixture ->
+            val runtime = fixture.runtime
+            val identity = AccountIdentity(uid, "role_${role.name.lowercase()}")
+            val profile = UserProfile(
+                identity.username, "Role User", "", "", "2000-01-01",
+                "English", "", "", role = role
+            )
+            runtime.enrollment = runtime.store.enroll(identity, profile, "123456")
+            runtime.pinAuthorizedUid = uid
+            runtime.pinAuthorizedEpoch = runtime.epoch
+            runtime.state.screen = screen
+            runtime.state.accountRole = role
+
+            enrollDeviceArk(fixture, runtime)
+
+            startEnrollment(runtime, password)
+            answerDeviceLock(fixture, runtime)
+            assertTrue("Expected enrollment for $role on $screen", runtime.state.passwordRecoveryEnrolled == true)
+
+            runtime.passwordRecovery.rotatePasswordRecovery(password, "UpdatedPassword99!")
+            answerDeviceLock(fixture, runtime)
+            assertEquals(
+                runtime.application.getString(R.string.password_recovery_changed),
+                runtime.state.message,
+            )
+        }
+        assertEquals(1, registrationCalls)
+        assertEquals(1, rotationCalls)
+    }
+
     private suspend fun unenrolledKeysets() = mock(AccountKeysetRepository::class.java).also {
         `when`(it.isPasswordRecoveryEnrolled(uid)).thenReturn(false)
     }

@@ -25,6 +25,8 @@ describe("public advertising boundary", () => {
     expect(privateScriptSources).toContain("'wasm-unsafe-eval'");
     expect(privatePolicy).not.toContain("strict-dynamic");
     expect(privatePolicy).toContain("frame-ancestors 'none'");
+    expect(privatePolicy).toContain("https://www.google.com");
+    expect(privatePolicy).toContain("https://*.firebasedatabase.app");
     const nonce = publicPageNonce("/");
     const publicPolicy = contentSecurityPolicy(nonce);
     expect(publicPolicy).toContain(`'nonce-${nonce}'`);

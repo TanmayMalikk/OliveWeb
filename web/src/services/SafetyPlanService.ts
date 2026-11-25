@@ -233,7 +233,15 @@ export async function sharedPlans() {
 export async function staffConsultations() {
   return call<{
     available: boolean;
-    plans: { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[];
+    plans: {
+      ownerUid: string;
+      ownerName: string;
+      updatedAt: number;
+      ticketNumber: number;
+      staffUid?: string;
+      staffName?: string;
+      conversationId?: string;
+    }[];
   }>("safetyPlanConsultations");
 }
 // Lets the support queue know whether this staff member can take a ticket.

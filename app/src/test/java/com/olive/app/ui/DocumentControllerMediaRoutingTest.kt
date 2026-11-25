@@ -14,6 +14,7 @@ import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.MediaDeviceVerificationException
+import com.olive.app.data.media.MediaUploadRecipient
 import com.olive.app.data.media.OcrReview
 import com.olive.app.ui.users.user.documents.MediaTransferOperations
 import com.olive.app.ui.users.user.documents.OpenedMedia
@@ -400,6 +401,7 @@ class DocumentControllerMediaRoutingTest {
             tags: Set<String>,
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
+            extraRecipients: List<MediaUploadRecipient>,
         ) = Unit
         // Checks the download file step with the test's sample data.
         override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): OpenedMedia {

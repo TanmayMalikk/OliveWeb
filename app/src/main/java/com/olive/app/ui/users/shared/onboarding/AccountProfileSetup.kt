@@ -265,7 +265,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     contactDetails.trim(),
                     relationship = contactRelationship.trim(),
                 )
-            ) else emptyList()).take(25)
+            ) else emptyList()).take(100)
 
     // Checks the onboarding fields and saves the completed account profile.
     val saveScope = rememberCoroutineScope()
@@ -465,7 +465,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         uiText(R.string.ui_contact_name_optional),
                         contactName,
                         "setup_contact_name",
-                        enabled = !session.account.busy && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 100,
                         error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
                         shakeTrigger = shakeAttempt
                     ) {
@@ -476,7 +476,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         uiText(R.string.contact_relationship),
                         contactRelationship,
                         "setup_contact_relationship",
-                        enabled = !session.account.busy && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 100,
                     ) {
                         contactRelationship = it.take(120)
                     }
@@ -484,7 +484,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         uiText(R.string.ui_phone_or_email_optional),
                         contactDetails,
                         "setup_contact_details",
-                        enabled = !session.account.busy && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 100,
                         error = if (showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null,
                         shakeTrigger = shakeAttempt
                     ) {
@@ -509,7 +509,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                                 showErrors = false
                             }
                         },
-                        enabled = !session.account.busy && contacts.size < 25,
+                        enabled = !session.account.busy && contacts.size < 100,
                         modifier = Modifier.fillMaxWidth().testTag("add_onboarding_contact")
                     ) {
                         Icon(Icons.Outlined.Add, null)

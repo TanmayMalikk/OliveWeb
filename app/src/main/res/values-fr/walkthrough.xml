@@ -152,7 +152,7 @@
     <string name="wt_step_hotlines_directory_title">Lignes d’aide · Catégories et favoris</string>
     <string name="wt_step_hotlines_directory_body">Filtrez lignes 24/7, refuges et aide juridique ; ajoutez en favoris, appelez directement ou affichez sur la carte.</string>
     <string name="wt_step_contacts_directory_title">Contacts de confiance · Répertoire</string>
-    <string name="wt_step_contacts_directory_body">Enregistrez jusqu’à 25 contacts sûrs, indiquez chez qui héberger en urgence et associez-les à vos amis du chat.</string>
+    <string name="wt_step_contacts_directory_body">Enregistrez jusqu’à 100 contacts sûrs, indiquez chez qui héberger en urgence et associez-les à vos amis du chat.</string>
 
     <string name="wt_step_profile_overview_title">Mon profil · Cartes récapitulatives</string>
     <string name="wt_step_profile_overview_body">Vérifiez votre rôle, identifiant, consentement e-mail, couverture choisie et ville/adresse enregistrée.</string>

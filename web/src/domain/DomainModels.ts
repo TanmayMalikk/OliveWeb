@@ -105,6 +105,7 @@ export interface Enrollment {
   role: Role;
   triggerHash: string;
   pinKey: WrappedKey;
+  pinLength?: number;
   failures: number;
 }
 export const covers: {

@@ -152,7 +152,7 @@
     <string name="wt_step_hotlines_directory_title">求助热线 · 分类、搜索与收藏</string>
     <string name="wt_step_hotlines_directory_body">筛选 24/7 热线、庇护所与法律援助；点击心形收藏、一键拨号或在地图上查看。</string>
     <string name="wt_step_contacts_directory_title">信任安全联系人 · 个人名录</string>
-    <string name="wt_step_contacts_directory_body">保存最多 25 位信任联系人，标记紧急时可安全借宿的人选，并关联您的聊天好友。</string>
+    <string name="wt_step_contacts_directory_body">保存最多 100 位信任联系人，标记紧急时可安全借宿的人选，并关联您的聊天好友。</string>
 
     <string name="wt_step_profile_overview_title">我的资料 · 账户概览卡片</string>
     <string name="wt_step_profile_overview_body">集中查看账户角色、用户名、邮箱通知授权、伪装样式及已保存的城市/邮寄地址。</string>

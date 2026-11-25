@@ -375,7 +375,7 @@ service cloud.firestore {
 
         && (!('address' in p) || validAddress(p.address))
 
-        && p.contacts is list && p.contacts.size() <= 25
+        && p.contacts is list && p.contacts.size() <= 100
 
         && contactAt(p.contacts,0) && contactAt(p.contacts,1) && contactAt(p.contacts,2)
 
@@ -503,7 +503,7 @@ service cloud.firestore {
 
     match /privateEntries/{entryId} {
       function validPrivateEntry(data) {
-        return data.keys().hasOnly(['id','ownerUid','ciphertext','wrappedKeys','allowedUsers','createdAt','updatedAt'])
+        return data.keys().hasOnly(['id','ownerUid','ciphertext','wrappedKeys','deviceWrappedKeys','accountWrappedKeys','allowedUsers','createdAt','updatedAt'])
           && data.id == entryId
           && data.ownerUid is string
           && data.ciphertext is string && data.ciphertext.size() > 0
@@ -511,7 +511,9 @@ service cloud.firestore {
           && data.allowedUsers is list && data.allowedUsers.size() > 0 && data.allowedUsers.size() <= 25
           && data.allowedUsers.hasAny([data.ownerUid])
           && data.wrappedKeys.keys().hasAll(data.allowedUsers)
-          && data.wrappedKeys.keys().hasOnly(data.allowedUsers);
+          && data.wrappedKeys.keys().hasOnly(data.allowedUsers)
+          && (!('deviceWrappedKeys' in data) || (data.deviceWrappedKeys is map && data.deviceWrappedKeys.size() <= 250))
+          && (!('accountWrappedKeys' in data) || (data.accountWrappedKeys is map && data.accountWrappedKeys.keys().hasOnly(data.allowedUsers)));
       }
       allow read: if signedIn() && request.auth.uid in resource.data.allowedUsers;
       allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid

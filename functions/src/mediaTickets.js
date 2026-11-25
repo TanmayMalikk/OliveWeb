@@ -123,11 +123,16 @@ function uploadRequest(data, uid) {
   }
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? {}
-    : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
+    : validateUploadDeviceWrappedKeys(data.deviceWrappedKeys, uid, allowedUsers);
   if (data?.recoveryKeyToSeal != null || data?.accountAccessKey != null) {
     throw new HttpsError("invalid-argument", "Raw recovery keys are not accepted");
   }
-  const accountWrappedKeys = validateAccountWrappedKeys(data?.accountWrappedKeys, allowedUsers);
+  const accountWrappedKeys = validateAccountWrappedKeys(
+    data?.accountWrappedKeys, allowedUsers, {requireAll: false},
+  );
+  if (!accountWrappedKeys[uid]) {
+    throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
+  }
   return {
     jobId, size, checksum, encryptedMetadata, allowedUsers, wrappedKeys,
     encryptionVersion, deviceWrappedKeys, accountWrappedKeys,
@@ -143,6 +148,27 @@ function validateDeviceWrappedKeys(value, uid) {
   if (entries.length < 1 || entries.length > 50 || entries.some(([id, wrapped]) =>
     !id.startsWith(`${uid}--`) || id.length > 300 || typeof wrapped !== "string" ||
     wrapped.length < 1 || wrapped.length > 2048)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  return Object.fromEntries(entries);
+}
+
+// Validates initial upload device keys across authorized accounts while still requiring an owner device key.
+function validateUploadDeviceWrappedKeys(value, uid, allowedUsers) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  const entries = Object.entries(value);
+  if (
+    entries.length < 1 ||
+    entries.length > 250 ||
+    !entries.some(([id]) => id.startsWith(`${uid}--`)) ||
+    entries.some(([id, wrapped]) => {
+      const owner = allowedUsers.find((allowedUid) => id.startsWith(`${allowedUid}--`));
+      return !owner || id.length <= owner.length + 2 || id.length > 300 ||
+        typeof wrapped !== "string" || wrapped.length < 1 || wrapped.length > 2048;
+    })
+  ) {
     throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
   }
   return Object.fromEntries(entries);
@@ -349,7 +375,12 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
   if (Number(head.ContentLength) !== value.ciphertextSize) {
     throw new HttpsError("failed-precondition", "Uploaded size does not match");
   }
-  const accountWrappedKeys = validateAccountWrappedKeys(value.accountWrappedKeys, value.allowedUsers);
+  const accountWrappedKeys = validateAccountWrappedKeys(
+    value.accountWrappedKeys, value.allowedUsers, {requireAll: false},
+  );
+  if (!accountWrappedKeys[uid]) {
+    throw new HttpsError("invalid-argument", "Invalid accountWrappedKeys");
+  }
   const record = {
     owner_id: uid, object_key: value.objectKey, encrypted_metadata: value.encryptedMetadata,
     wrapped_keys: value.wrappedKeys, device_wrapped_keys: value.deviceWrappedKeys,

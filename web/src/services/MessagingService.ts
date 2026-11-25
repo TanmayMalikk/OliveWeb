@@ -461,10 +461,21 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   const { db, functions } = await firebase();
   if (conversationData.type === "SUPPORT") {
     const { httpsCallable } = await import("firebase/functions");
-    const result = await httpsCallable<{ conversationId: string }, { participantUsernames: Record<string, string> }>(
+    const result = await httpsCallable<
+      { conversationId: string },
+      { participantIds?: string[]; participantUsernames: Record<string, string> }
+    >(
       functions, "conversationPrepareKeys",
     )({ conversationId: id });
-    conversationData = { ...conversationData, participantUsernames: result.data.participantUsernames };
+    const nextNames = result.data.participantUsernames;
+    const nextIds = Array.isArray(result.data.participantIds) &&
+        result.data.participantIds.includes(current.uid) &&
+        result.data.participantIds.length >= 2
+      ? result.data.participantIds
+      : current.uid in nextNames && Object.keys(nextNames).length >= 2
+        ? Object.keys(nextNames)
+        : conversationData.participantIds;
+    conversationData = { ...conversationData, participantIds: nextIds, participantUsernames: nextNames };
   }
   const device = await messageDevice(current.uid);
   const conversation = doc(db, "conversations", id);

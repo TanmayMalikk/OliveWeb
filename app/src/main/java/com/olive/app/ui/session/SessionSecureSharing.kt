@@ -52,7 +52,13 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
             messaging.registerMessagingIdentity(AccountIdentity(device.uid, state.coverUsername))
             val prepared = if (conversation.type == "SUPPORT") {
-                conversation.copy(participantUsernames = repository.prepareTicketParticipantNames(conversation.id))
+                val names = repository.prepareTicketParticipantNames(conversation.id)
+                val updatedIds = if (device.uid in names && names.size >= 2) {
+                    names.keys.toList()
+                } else {
+                    conversation.participantIds
+                }
+                conversation.copy(participantIds = updatedIds, participantUsernames = names)
             } else conversation
             // Use the fallback when room key is unavailable.
             try {
@@ -367,7 +373,11 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 scope.launch {
                     // Turn an unexpected open failure into a readable message.
                     try {
-                        val entry = repository.loadAndDecryptEntry(entryId, uid)
+                        val entry = repository.loadAndDecryptEntry(
+                            entryId,
+                            uid,
+                            runtime.settings::unlockAccountKeysetForMedia,
+                        )
                         if (epoch == token) viewedSharedEntry = entry
                     } catch (error: CancellationException) {
                         throw error

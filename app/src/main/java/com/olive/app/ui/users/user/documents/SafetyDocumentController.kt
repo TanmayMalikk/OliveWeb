@@ -451,7 +451,8 @@ internal class SafetyDocumentsController(
                         applicationContext.getString(R.string.emergency_report_device_verification_failed), error,
                     )
                 }
-                emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                val startResult = emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                val adminRecipients = parseEmergencyRecipients(startResult.data)
                 if (token == generation && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid) {
                     onAlertSent()
                 }
@@ -478,14 +479,14 @@ internal class SafetyDocumentsController(
                 }
                 withContext(Dispatchers.IO) {
                     renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
-                }
+                } to adminRecipients
             }
             result.onFailure { error ->
                 if (token == generation) {
                     state = state.copy(loading = false, error = error.localizedMessage)
                     onFinished(Result.failure(error))
                 }
-            }.onSuccess { report ->
+            }.onSuccess { (report, adminRecipients) ->
                 if (token != generation) {
                     report.delete()
                     return@onSuccess
@@ -524,6 +525,7 @@ internal class SafetyDocumentsController(
                             onFinished(Result.failure(error))
                         }
                     },
+                    extraRecipients = adminRecipients,
                 )
             }
         }

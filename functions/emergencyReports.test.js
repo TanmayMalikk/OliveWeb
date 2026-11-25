@@ -158,3 +158,64 @@ test("only admins can resolve an emergency; retries retain the first resolver an
   assert.equal(f.records.get(`emergencyReports/${id}`).reopenedBy, "admin2");
   assert.equal(f.records.get(`emergencyReports/${id}`).mediaId, "pdf");
 });
+
+test("emergency start returns public encryption keys for active admins only", async () => {
+  const f = fixture();
+  f.users.set("admin", {uid: "admin", displayName: "olive_admin", customClaims: {role: "ADMIN"}});
+  f.users.set("admin_device_only", {uid: "admin_device_only", email: "dev_admin@yourolivebranch.ca", customClaims: {role: "ADMIN"}});
+  f.users.set("admin_no_keys", {uid: "admin_no_keys", displayName: "empty_admin", customClaims: {role: "ADMIN"}});
+  f.users.set("disabled", {uid: "disabled", disabled: true, displayName: "disabled_admin", customClaims: {role: "ADMIN"}});
+  f.users.set("staff", {uid: "staff", displayName: "olive_staff", customClaims: {role: "STAFF"}});
+
+  f.records.set("accountKeyDirectories/admin", {
+    ownerUid: "admin",
+    keyId: "123e4567-e89b-42d3-a456-426614174000",
+    epoch: 2,
+    algorithm: "RSA-OAEP-256",
+    publicKey: "admin-keyset-pub",
+  });
+  f.records.set("messageDirectory/olive_admin", {uid: "admin", publicKey: "admin-primary-pub"});
+  f.records.set("messageDirectory/olive_admin/devices/dev1", {
+    uid: "admin",
+    deviceId: "dev1",
+    publicKey: "admin-dev1-pub",
+    mgf1Digest: "SHA-256",
+  });
+  f.records.set("messageDirectory/dev_admin", {uid: "admin_device_only", publicKey: "dev-only-pub"});
+  f.records.set("accountKeyDirectories/disabled", {
+    ownerUid: "disabled",
+    keyId: "223e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: "disabled-keyset-pub",
+  });
+  f.records.set("accountKeyDirectories/staff", {
+    ownerUid: "staff",
+    keyId: "323e4567-e89b-42d3-a456-426614174000",
+    epoch: 1,
+    algorithm: "RSA-OAEP-256",
+    publicKey: "staff-keyset-pub",
+  });
+
+  const started = await f.api.emergencyStart({data: {id}});
+  assert.equal(started.id, id);
+  assert.deepEqual(started.recipients, [
+    {
+      uid: "admin",
+      accountKeyset: {
+        keyId: "123e4567-e89b-42d3-a456-426614174000",
+        epoch: 2,
+        algorithm: "RSA-OAEP-256",
+        publicKey: "admin-keyset-pub",
+      },
+      publicKey: "admin-primary-pub",
+      devices: [{deviceId: "dev1", publicKey: "admin-dev1-pub", mgf1Digest: "SHA-256"}],
+    },
+    {
+      uid: "admin_device_only",
+      accountKeyset: null,
+      publicKey: "dev-only-pub",
+      devices: [],
+    },
+  ]);
+});

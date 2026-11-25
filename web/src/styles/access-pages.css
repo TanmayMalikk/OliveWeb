@@ -90,8 +90,7 @@
 .access-sign-in .access-card { border-radius: 0 1rem 1rem 0; }
 .access-sign-in .access-card h1 { margin-bottom: 1.25rem; }
 .access-card :is(input:not([type='radio']), select) { border-radius: 0.6rem; font-size: 1rem; }
-.access-sign-in form > .button,
-.pin-card form > .button { width: 100%; }
+.access-sign-in form > .button { width: 100%; }
 .access-sign-in .auth-switch { margin: 0.75rem 0 0; }
 .access-sign-in .account-utility-links { margin-top: 0.35rem; }
 .access-sign-in .storage-note { margin-top: 0.8rem; }
@@ -150,40 +149,86 @@
   font: 1.2rem/1.1 var(--serif);
 }
 .access-wordmark > svg { flex-shrink: 0; }
-.pin-page { padding-bottom: 1rem; }
+.pin-page { padding-bottom: max(5rem, calc(env(safe-area-inset-bottom) + 4rem)); }
 .pin-card {
-  width: min(100%, 25rem);
-  margin: clamp(0.85rem, 4vh, 2.5rem) auto 0;
+  width: min(100%, 24rem);
+  margin: clamp(1rem, 8svh, 5rem) auto 0;
+  padding: clamp(1.25rem, 5vw, 2rem);
+  border-radius: 1.5rem;
+  box-shadow: 0 0.8rem 2.5rem rgb(32 44 37 / 8%);
   text-align: center;
 }
-.pin-card h1 { margin: 0.7rem 0 0.3rem; }
-.pin-card > p { margin-bottom: 0.9rem; }
-.pin-card .field { margin-bottom: 0.75rem; text-align: left; }
-.pin-card input { text-align: center; letter-spacing: 0.38em; }
+.pin-card .access-mark { width: 3rem; height: 3rem; border-radius: 50%; }
+.pin-card h1 { margin: 0.85rem 0 0.4rem; }
+.pin-card > p { margin: 0; }
+.pin-form { display: grid; gap: 0.75rem; margin-top: 1.4rem; }
+.pin-entry {
+  position: relative;
+  border: 1.5px solid #9aa99f;
+  border-radius: 1rem;
+  background: var(--paper);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.pin-entry:focus-within {
+  border-color: var(--olive);
+  box-shadow: 0 0 0 3px rgb(40 75 60 / 16%);
+  outline: 2px solid transparent;
+}
+.pin-entry[data-invalid="true"] {
+  border-color: #8b3b30;
+  box-shadow: 0 0 0 3px rgb(139 59 48 / 14%);
+}
+.pin-card .pin-entry input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  box-shadow: none;
+  outline: none;
+  cursor: text;
+}
+.pin-entry input::selection { background: transparent; color: transparent; }
 .pin-dots {
   display: flex;
   justify-content: center;
-  gap: 0.65rem;
-  margin-bottom: 0.85rem;
+  align-items: center;
+  min-height: 3.75rem;
+  gap: clamp(0.65rem, 4vw, 1.1rem);
+  pointer-events: none;
 }
 .pin-dot {
-  width: 0.72rem;
-  height: 0.72rem;
+  width: 0.82rem;
+  height: 0.82rem;
   border-radius: 50%;
-  border: 1.5px solid #8ea095;
+  border: 1.5px solid #65776b;
   background: transparent;
   transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
 }
 .pin-dot.filled {
   background: var(--olive);
   border-color: var(--olive);
-  transform: scale(1.1);
+  transform: scale(1.08);
+}
+.pin-keypad-options > summary {
+  padding: 0.65rem;
+  color: var(--olive);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  min-height: 2.75rem;
+  list-style-position: inside;
 }
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.45rem;
-  margin-bottom: 0.75rem;
+  margin-top: 0.35rem;
 }
 .pin-keypad > button {
   display: grid;
@@ -200,8 +245,14 @@
 .pin-keypad > button:nth-child(10) { grid-column: 2; }
 .pin-keypad > button:hover:not(:disabled) { background: var(--soft); }
 .pin-keypad > button:active:not(:disabled) { transform: scale(0.96); }
-.pin-card .form-error { margin-bottom: 0.75rem; text-align: left; }
-.pin-card > .text-link { margin-top: 0.45rem; }
+.pin-form > .button { width: 100%; min-height: 3rem; border-radius: 0.9rem; }
+.pin-card .form-error { margin: 0; text-align: left; }
+.pin-card > .text-link { margin-top: 0.5rem; min-height: 2.75rem; }
+
+@media (forced-colors: active) {
+  .pin-card .pin-entry input, .pin-entry input::selection { forced-color-adjust: none; }
+  .pin-dot.filled { forced-color-adjust: none; background: CanvasText; border-color: CanvasText; }
+}
 
 .install-main {
   width: min(100%, 68rem);

@@ -17,7 +17,7 @@
     "adminLiveLocations": {
       ".read": "auth != null && (auth.token.role === 'ADMIN' || auth.token.role === 'STAFF')",
       "$ownerUid": {
-        ".write": "auth != null && auth.uid === $ownerUid && auth.token.role === 'USER'",
+        ".write": "auth != null && auth.uid === $ownerUid && (auth.token.role === 'USER' || (!auth.token.role && auth.token.email.matches(/.*@users\\.olive\\.invalid$/)))",
         ".validate": "newData.hasChildren(['name','latitude','longitude','accuracy','updatedAt','active'])",
         "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
         "latitude": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },

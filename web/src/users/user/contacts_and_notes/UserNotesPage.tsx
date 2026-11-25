@@ -1,6 +1,6 @@
 // Safe-app users: shows the user private notes and note trash.
 import { useEffect, useState } from "react";
-import { Pin, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Paperclip, Pin, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Empty, Field, Form, Modal, shakeNamedFields } from "../../../components/SharedComponents";
 import { purgeEntry, TRASH_RETENTION_MS, type Entry } from "../../../domain/DomainModels";
@@ -157,8 +157,14 @@ export default function Notes() {
         {shown.map((entry) => (
           <article className="note-card panel" key={entry.id}>
             <div className="note-meta">
-              <span className="tag">
+              <span className="tag" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 {entry.kind === "Incident" ? "Incident" : "Note"}
+                {(entry.attachmentIds?.length ?? 0) > 0 && (
+                  <Paperclip
+                    size={13}
+                    aria-label={`${entry.attachmentIds!.length} attached file${entry.attachmentIds!.length === 1 ? "" : "s"}`}
+                  />
+                )}
               </span>
               <time>{new Date(entry.updatedAt).toLocaleDateString()}</time>
             </div>

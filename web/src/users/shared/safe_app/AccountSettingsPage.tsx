@@ -7,6 +7,7 @@ import { Button, Field, Form, Modal, shakeNamedFields } from "../../../component
 import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { issueEntryLink, savedEntryLink } from "../../../services/PrivateEntryLinks";
+import { PasswordRecoveryCard } from "../PasswordRecoveryCard";
 import { useWalkthroughAction } from "./WalkthroughCoachmark";
 export default function Settings() {
   const s = useSession();
@@ -153,6 +154,7 @@ export default function Settings() {
           </Button>
         </Form>
       </section>
+      <PasswordRecoveryCard onNotice={setNotice} />
       {p.role === "USER" && (
         <>
           <section className="panel" data-walkthrough-id="settings-browser-pin">
