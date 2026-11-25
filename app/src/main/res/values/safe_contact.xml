@@ -85,9 +85,9 @@
     <string name="share">Share</string>
     <string name="documents_offline_index">Showing your encrypted offline index. Changes sync when connected.</string>
     <string name="documents_not_available_offline">This file is not available offline yet.</string>
-    <string name="documents_make_available_offline">Make available offline</string>
-    <string name="documents_remove_offline_copy">Remove offline copy</string>
-    <string name="documents_saving_offline">Saving encrypted offline copy…</string>
+    <string name="documents_make_available_offline">Download offline</string>
+    <string name="documents_remove_offline_copy">Remove offline</string>
+    <string name="documents_saving_offline">Downloading…</string>
     <string name="documents_available_offline">Available offline</string>
     <string name="documents_recently_cached">Recently cached and may be removed automatically</string>
     <string name="documents_recent_cache_title">Recent file caching</string>

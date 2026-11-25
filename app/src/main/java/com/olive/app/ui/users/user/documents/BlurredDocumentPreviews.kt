@@ -77,6 +77,7 @@ internal fun BlurredDocumentPreviewSurface(
     showTypeBadge: Boolean = true,
     showEvidenceBadge: Boolean = false,
     offlineCached: Boolean = false,
+    opening: Boolean = false,
     extraCountBadge: Int = 0,
 ) {
     val mimeType = document?.mimeType ?: fallbackMimeType
@@ -180,6 +181,18 @@ internal fun BlurredDocumentPreviewSurface(
                             )
                         }
                     }
+                }
+            }
+            if (opening) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(26.dp),
+                        strokeWidth = 2.5.dp,
+                        color = Color.White,
+                    )
                 }
             }
             if (extraCountBadge > 0) {

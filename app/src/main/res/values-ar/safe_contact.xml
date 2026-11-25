@@ -84,9 +84,9 @@
     <string name="share">مشاركة</string>
     <string name="documents_offline_index">يتم عرض الفهرس المشفر بلا اتصال. ستتم مزامنة التغييرات عند الاتصال.</string>
     <string name="documents_not_available_offline">هذا الملف غير متاح بلا اتصال حتى الآن.</string>
-    <string name="documents_make_available_offline">إتاحة بلا اتصال</string>
-    <string name="documents_remove_offline_copy">إزالة النسخة غير المتصلة</string>
-    <string name="documents_saving_offline">جارٍ حفظ نسخة مشفرة بلا اتصال…</string>
+    <string name="documents_make_available_offline">تنزيل بلا اتصال</string>
+    <string name="documents_remove_offline_copy">إزالة النسخة</string>
+    <string name="documents_saving_offline">جارٍ التنزيل…</string>
     <string name="documents_available_offline">متاح بلا اتصال</string>
     <string name="documents_recently_cached">تم حفظه مؤخرًا وقد تتم إزالته تلقائيًا</string>
     <string name="documents_recent_cache_title">حفظ الملفات الحديثة</string>

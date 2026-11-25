@@ -84,9 +84,9 @@
     <string name="share">Partager</string>
     <string name="documents_offline_index">Affichage de votre index hors ligne chiffré. Les modifications seront synchronisées à la reconnexion.</string>
     <string name="documents_not_available_offline">Ce fichier n’est pas encore disponible hors ligne.</string>
-    <string name="documents_make_available_offline">Rendre disponible hors ligne</string>
-    <string name="documents_remove_offline_copy">Supprimer la copie hors ligne</string>
-    <string name="documents_saving_offline">Enregistrement de la copie chiffrée hors ligne…</string>
+    <string name="documents_make_available_offline">Télécharger hors ligne</string>
+    <string name="documents_remove_offline_copy">Retirer hors ligne</string>
+    <string name="documents_saving_offline">Téléchargement…</string>
     <string name="documents_available_offline">Disponible hors ligne</string>
     <string name="documents_recently_cached">Mis en cache récemment et susceptible d’être supprimé automatiquement</string>
     <string name="documents_recent_cache_title">Cache des fichiers récents</string>
