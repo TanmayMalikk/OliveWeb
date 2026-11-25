@@ -328,10 +328,6 @@ export function moveCrossing(
   let nextLaneId = world.nextLaneId;
 
   const currentLane = lanes[playerRow];
-  const onMovingLog =
-    currentLane?.type === "water" &&
-    currentLane.waterStyle === "logs" &&
-    (currentLane.logs?.length ?? 0) > 0;
 
   if (direction === "left") {
     const candidateCol = Math.max(0, playerColumn - 1);
@@ -373,7 +369,7 @@ export function moveCrossing(
 
     const destinationUsesLogs =
       targetLane?.type === "water" && targetLane.waterStyle === "logs";
-    if (onMovingLog || !destinationUsesLogs) {
+    if (!destinationUsesLogs) {
       playerColumn = snappedCol;
     }
 
@@ -403,7 +399,7 @@ export function moveCrossing(
 
     const destinationUsesLogs =
       targetLane?.type === "water" && targetLane.waterStyle === "logs";
-    if (onMovingLog || !destinationUsesLogs) {
+    if (!destinationUsesLogs) {
       playerColumn = snappedCol;
     }
 
