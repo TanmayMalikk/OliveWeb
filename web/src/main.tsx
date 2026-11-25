@@ -11,7 +11,7 @@ import { createRoot } from "react-dom/client";
 import { Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
-import { Button, Field } from "./components/SharedComponents";
+import { Button, Field, Modal, shakeFormElement } from "./components/SharedComponents";
 import BrowserPinGate from "./users/shared/auth/BrowserPinGate";
 import PublicCoverPage from "./public/PublicCoverPage";
 import { siteMode, type SiteMode } from "./sites/SiteRouting";
@@ -27,10 +27,11 @@ function Cover() {
   return <PublicCoverPage onPrivateEntry={() => { void s.perform(s.beginEntry); }} />;
 }
 
-// All roles use the same zero-knowledge, tab-scoped recovery action.
+// All roles use the same zero-knowledge, tab-scoped recovery modal before using the workspace.
 function EncryptedAccessRecovery() {
   const s = useSession();
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   if (
     !s.cloudMode ||
     (s.phase !== "safe" && s.phase !== "portal") ||
@@ -38,32 +39,70 @@ function EncryptedAccessRecovery() {
     s.passwordRecoveryEnrolled !== true
   ) return null;
   return (
-    <section className="account-recovery-notice" aria-labelledby="encrypted-access-heading">
-      <div>
-        <h2 id="encrypted-access-heading">Unlock encrypted access</h2>
-        <p>Enter your Olive Branch recovery password to open encrypted documents and messages on this browser.</p>
-      </div>
+    <Modal title="Unlock encrypted access">
+      <p>
+        Enter your Olive Branch account password (the same password you sign in with) to unlock encrypted documents and messages in this browser.
+      </p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          const form = event.currentTarget;
           const entered = password;
           setPassword("");
-          void s.perform(() => s.recoverEncryptedAccess(entered));
+          setError("");
+          void s.perform(async () => {
+            try {
+              await s.recoverEncryptedAccess(entered);
+            } catch (failure) {
+              setError(
+                failure instanceof Error
+                  ? failure.message
+                  : "Could not unlock encrypted access.",
+              );
+              shakeFormElement(form.querySelector(".field"));
+              throw failure;
+            }
+          });
         }}
       >
         <Field
-          label="Recovery password"
+          label="Account password"
           type="password"
           autoComplete="off"
+          autoFocus
           value={password}
           disabled={s.busy}
-          onChange={(event: { target: { value: string } }) => setPassword(event.target.value)}
+          required
+          onChange={(event: { target: { value: string } }) => {
+            setPassword(event.target.value);
+            if (error) setError("");
+          }}
         />
-        <Button type="submit" disabled={s.busy || !password}>
-          {s.busy ? "Unlocking…" : "Unlock with password"}
-        </Button>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <Button type="submit" disabled={s.busy || !password}>
+            {s.busy ? "Unlocking…" : "Unlock"}
+          </Button>
+          {s.profile?.role === "USER" && (
+            <Button type="button" variant="exit" onClick={s.quickExit}>
+              Quick Exit
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="quiet"
+            disabled={s.busy}
+            onClick={() => {
+              setPassword("");
+              setError("");
+              void s.signOut();
+            }}
+          >
+            Sign out
+          </Button>
+        </div>
       </form>
-    </section>
+    </Modal>
   );
 }
 // Sends each domain and signed-in role to its matching web screen.
